@@ -41,7 +41,7 @@ function Faixas({
           const de = i === 0 ? "0" : linhas[i - 1].ate || "?";
           return (
             <div key={i} className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="w-24 text-slate-500">{i === 0 ? "Primeiras" : `Acima de ${de}h`}</span>
+              <span className="w-28 text-slate-500">{i === 0 ? "Primeiras" : `Acima de ${de}h`}</span>
               {ultima ? (
                 <span className="w-36 text-slate-500">{i === 0 ? "todas as horas" : "em diante"}</span>
               ) : (
