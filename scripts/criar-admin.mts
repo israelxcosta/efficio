@@ -4,8 +4,8 @@
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import postgres from "postgres";
-import { gerarHashSenha } from "../src/lib/auth/password.ts";
-import { validarSenhaForte } from "../src/lib/validacao/senha.ts";
+import { gerarHashSenha } from "../src/lib/auth/password";
+import { validarSenhaForte } from "../src/lib/validacao/senha";
 
 const { values } = parseArgs({
   options: { email: { type: "string" }, nome: { type: "string" } },
