@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calcular ponto | Efficio Contabilidade</title>
+  <meta name="description" content="Calculadora de ponto gratuita da Efficio Contabilidade: cadastre a jornada semanal e calcule horas trabalhadas, horas extras, adicional noturno, intervalo intrajornada e interjornada conforme a CLT.">
+  <meta name="theme-color" content="#004AAD">
+  <script>document.documentElement.classList.add("js");</script>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="ponto.css">
+</head>
+<body>
+
+  <!-- Cabeçalho -->
+  <header class="header" id="topo">
+    <div class="container header__inner">
+      <a href="index.html" class="header__logo" aria-label="Efficio Contabilidade - início">
+        <img src="assets/logo.png" alt="Efficio Contabilidade" width="500" height="171">
+      </a>
+
+      <button class="header__toggle" aria-label="Abrir menu" aria-expanded="false" aria-controls="menu">
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav class="nav" id="menu">
+        <a href="index.html">Início</a>
+        <a href="index.html#servicos">Serviços</a>
+        <a href="index.html#contato">Contato</a>
+        <a href="ponto.html" class="btn btn--ghost btn--sm nav__ponto" aria-current="page">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-clock"/></svg>
+          Calcular ponto
+        </a>
+        <a href="https://wa.me/5519996859637?text=Ol%C3%A1!%20Vim%20pela%20calculadora%20de%20ponto%20e%20gostaria%20de%20falar%20com%20a%20Efficio." class="btn btn--primary btn--sm" target="_blank" rel="noopener">Fale conosco</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="ponto">
+    <section class="ponto__hero">
+      <div class="container">
+        <span class="eyebrow">Ferramenta gratuita</span>
+        <h1>Calculadora de <span class="highlight">ponto</span></h1>
+        <p>Cadastre a jornada semanal com horários, intervalos e folgas. O cálculo de horas trabalhadas, horas extras, horas noturnas e intervalos suprimidos segue a CLT e é atualizado na hora.</p>
+      </div>
+    </section>
+
+    <div class="container ponto__layout">
+      <form class="ponto__form" id="ponto-form" novalidate>
+
+        <!-- Parâmetros -->
+        <section class="painel" aria-labelledby="t-parametros">
+          <div class="painel__head">
+            <span class="painel__num">1</span>
+            <div>
+              <h2 id="t-parametros">Contrato de trabalho</h2>
+              <p>Defina o limite semanal e as regras que se aplicam ao empregado.</p>
+            </div>
+          </div>
+
+          <div class="campos campos--modelo">
+            <div class="campo">
+              <label for="modelo">Modelo de jornada</label>
+              <div class="campo__grupo">
+                <select id="modelo">
+                  <option value="44-5">44h · seg–sex 8h48</option>
+                  <option value="44-6">44h · seg–sex 8h + sáb 4h</option>
+                  <option value="40-5">40h · seg–sex 8h</option>
+                  <option value="36-6">36h · seg–sáb 6h</option>
+                  <option value="noturno">Noturno · seg–sex 22h–6h</option>
+                  <option value="vazio">Em branco</option>
+                </select>
+                <button type="button" class="btn btn--ghost btn--sm" id="aplicar-modelo">Aplicar</button>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="limiteSemanal">Limite semanal (horas)</label>
+              <input type="number" id="limiteSemanal" name="limiteSemanal" min="1" max="44" step="0.5" value="44" inputmode="decimal">
+            </div>
+            <div class="campo">
+              <label for="tipoTrabalhador">Tipo de trabalhador</label>
+              <select id="tipoTrabalhador" name="tipoTrabalhador">
+                <option value="urbano">Urbano (22h às 5h)</option>
+                <option value="lavoura">Rural lavoura (21h às 5h)</option>
+                <option value="pecuaria">Rural pecuária (20h às 4h)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="opcoes">
+            <label class="check">
+              <input type="checkbox" id="tolerancia" name="tolerancia" checked>
+              <span>Desconsiderar variações de até 10 min por dia <small>art. 58, §1º CLT</small></span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="prorrogacao" name="prorrogacao" checked>
+              <span>Adicional noturno nas horas prorrogadas após o período noturno <small>Súmula 60, II TST</small></span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="intervaloReduzido" name="intervaloReduzido">
+              <span>Intervalo mínimo reduzido para 30 min por acordo ou convenção coletiva <small>art. 611-A, III CLT</small></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Jornada -->
+        <section class="painel" aria-labelledby="t-jornada">
+          <div class="painel__head">
+            <span class="painel__num">2</span>
+            <div>
+              <h2 id="t-jornada">Jornada semanal</h2>
+              <p>Informe os horários de cada dia. Saída menor que a entrada conta como dia seguinte (virada da meia-noite).</p>
+            </div>
+          </div>
+
+          <div class="jornada" role="table" aria-label="Jornada semanal">
+            <div class="jornada__linha jornada__linha--head" role="row">
+              <span role="columnheader">Dia</span>
+              <span role="columnheader">Situação</span>
+              <span role="columnheader">Entrada</span>
+              <span role="columnheader">Saída intervalo</span>
+              <span role="columnheader">Retorno</span>
+              <span role="columnheader">Saída</span>
+              <span role="columnheader">Prevista</span>
+            </div>
+            <div id="dias"></div>
+          </div>
+
+          <div class="jornada__acoes">
+            <button type="button" class="btn btn--ghost btn--sm" id="copiar-segunda">Copiar segunda para ter. a sex.</button>
+            <button type="button" class="btn btn--ghost btn--sm" id="limpar">Limpar horários</button>
+          </div>
+        </section>
+
+        <!-- Valores -->
+        <section class="painel" aria-labelledby="t-valores">
+          <div class="painel__head">
+            <span class="painel__num">3</span>
+            <div>
+              <h2 id="t-valores">Valores <span class="opcional">(opcional)</span></h2>
+              <p>Informe o salário para estimar quanto representam as horas extras e adicionais.</p>
+            </div>
+          </div>
+
+          <div class="campos campos--3">
+            <div class="campo">
+              <label for="salario">Salário mensal (R$)</label>
+              <input type="text" id="salario" name="salario" inputmode="decimal" placeholder="Ex.: 2.500,00" autocomplete="off">
+            </div>
+            <div class="campo">
+              <label for="divisor">Divisor de horas</label>
+              <input type="number" id="divisor" name="divisor" min="1" step="1" value="220">
+            </div>
+            <div class="campo">
+              <label for="he50">Hora extra (%)</label>
+              <input type="number" id="he50" name="he50" min="50" step="1" value="50">
+            </div>
+            <div class="campo">
+              <label for="he100">Folga e feriado (%)</label>
+              <input type="number" id="he100" name="he100" min="0" step="1" value="100">
+            </div>
+            <div class="campo">
+              <label for="noturno">Adicional noturno (%)</label>
+              <input type="number" id="noturno" name="noturno" min="0" step="1" value="20">
+            </div>
+            <div class="campo">
+              <label for="intervalo">Intervalo suprimido (%)</label>
+              <input type="number" id="intervalo" name="intervalo" min="50" step="1" value="50">
+            </div>
+          </div>
+          <p class="nota">Percentuais mínimos da lei já preenchidos. Use os da convenção coletiva da categoria quando forem maiores.</p>
+        </section>
+      </form>
+
+      <!-- Resultado -->
+      <aside class="resultado" aria-labelledby="t-resultado" aria-live="polite">
+        <div class="resultado__box">
+          <h2 id="t-resultado">Resumo da semana</h2>
+          <div class="cards" id="cards"></div>
+
+          <div id="valores" class="valores" hidden></div>
+
+          <div class="resultado__acoes">
+            <button type="button" class="btn btn--primary btn--block" id="whatsapp">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-whatsapp"/></svg>
+              Enviar resumo para a Efficio
+            </button>
+            <button type="button" class="btn btn--ghost btn--block" id="imprimir">Imprimir / salvar PDF</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="container">
+      <section class="painel" aria-labelledby="t-alertas">
+        <div class="painel__head">
+          <span class="painel__num">!</span>
+          <div>
+            <h2 id="t-alertas">Pontos de atenção</h2>
+            <p>Situações da jornada informada que merecem cuidado segundo a legislação.</p>
+          </div>
+        </div>
+        <ul class="alertas" id="alertas"></ul>
+      </section>
+
+      <section class="painel legislacao" aria-labelledby="t-lei">
+        <div class="painel__head">
+          <span class="painel__num">§</span>
+          <div>
+            <h2 id="t-lei">Como o cálculo é feito</h2>
+            <p>Regras da CLT e da jurisprudência do TST aplicadas pela calculadora.</p>
+          </div>
+        </div>
+        <dl class="regras">
+          <div>
+            <dt>Jornada e horas extras</dt>
+            <dd>Limite de 8 horas diárias e 44 semanais (art. 7º, XIII da CF e art. 58 da CLT). O que passa da jornada prevista no dia é hora extra com adicional mínimo de 50% (art. 59 da CLT); horas normais que, somadas, passam do limite semanal também viram extras. São permitidas no máximo 2 horas extras por dia.</dd>
+          </div>
+          <div>
+            <dt>Tolerância</dt>
+            <dd>Variações de até 5 minutos por marcação, no máximo 10 minutos por dia, não são descontadas nem contadas como extras. Se passar disso, todo o tempo excedente conta (art. 58, §1º da CLT e Súmula 366 do TST).</dd>
+          </div>
+          <div>
+            <dt>Intervalo intrajornada</dt>
+            <dd>Jornada acima de 6 horas exige intervalo de 1 a 2 horas; entre 4 e 6 horas, de 15 minutos (art. 71 da CLT). Norma coletiva pode reduzir o intervalo para 30 minutos (art. 611-A, III). O tempo suprimido é pago com acréscimo de 50%, com natureza indenizatória (art. 71, §4º, redação da Lei 13.467/2017).</dd>
+          </div>
+          <div>
+            <dt>Intervalo interjornada</dt>
+            <dd>Entre duas jornadas deve haver 11 horas de descanso (art. 66 da CLT). As horas que faltarem são pagas como extras (OJ 355 da SDI-1 do TST). A calculadora considera que a semana se repete, ligando domingo à segunda.</dd>
+          </div>
+          <div>
+            <dt>Descanso semanal e feriados</dt>
+            <dd>Descanso semanal remunerado de 24 horas consecutivas, somado às 11 horas de interjornada (art. 67 da CLT e Súmula 110 do TST). Trabalho em folga ou feriado sem compensação é pago em dobro (Lei 605/49 e Súmula 146 do TST).</dd>
+          </div>
+          <div>
+            <dt>Horas noturnas</dt>
+            <dd>Trabalhador urbano: das 22h às 5h, hora noturna de 52min30s e adicional mínimo de 20% (art. 73 da CLT). Rural: das 21h às 5h na lavoura e das 20h às 4h na pecuária, hora de 60 minutos e adicional de 25% (Lei 5.889/73). Cumprida a jornada no período noturno e prorrogada, as horas seguintes também são noturnas (Súmula 60, II do TST); a calculadora aplica a regra quando ao menos metade do período noturno foi trabalhada. O adicional noturno integra a base das horas extras noturnas (OJ 97 da SDI-1).</dd>
+          </div>
+        </dl>
+        <p class="nota">Os resultados são uma estimativa da jornada informada e não substituem a análise da convenção coletiva, do acordo de compensação ou de banco de horas da empresa. Os valores não incluem reflexos em DSR, férias, 13º salário e FGTS. A estimativa mensal usa a média de 4,29 semanas por mês (30 ÷ 7). Para um cálculo completo, fale com a Efficio.</p>
+      </section>
+    </div>
+  </main>
+
+  <!-- Rodapé -->
+  <footer class="footer">
+    <div class="container footer__bottom">
+      <p>© <span id="ano">2026</span> Efficio Contabilidade · CNPJ 60.020.568/0001-04 · <a href="index.html">Voltar ao site</a></p>
+    </div>
+  </footer>
+
+  <template id="tpl-dia">
+    <div class="jornada__linha dia" role="row">
+      <span class="dia__nome" role="cell"></span>
+      <span role="cell" class="dia__campo" data-rotulo="Situação">
+        <select data-campo="tipo" aria-label="Situação">
+          <option value="trabalho">Trabalho</option>
+          <option value="folga">Folga (DSR)</option>
+          <option value="feriado">Feriado</option>
+        </select>
+      </span>
+      <span role="cell" class="dia__campo" data-rotulo="Entrada"><input type="time" data-campo="e1" aria-label="Entrada"></span>
+      <span role="cell" class="dia__campo" data-rotulo="Saída intervalo"><input type="time" data-campo="s1" aria-label="Saída para intervalo"></span>
+      <span role="cell" class="dia__campo" data-rotulo="Retorno"><input type="time" data-campo="e2" aria-label="Retorno do intervalo"></span>
+      <span role="cell" class="dia__campo" data-rotulo="Saída"><input type="time" data-campo="s2" aria-label="Saída"></span>
+      <span role="cell" class="dia__campo" data-rotulo="Prevista"><input type="time" data-campo="previsto" aria-label="Jornada prevista"></span>
+      <span role="cell" class="dia__resumo"></span>
+    </div>
+  </template>
+
+  <!-- Ícones -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="icon-whatsapp" viewBox="0 0 24 24"><path fill="currentColor" d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.49s1.07 2.89 1.22 3.09c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.04 21.5h-.01a9.4 9.4 0 0 1-4.8-1.32l-.34-.2-3.57.94.95-3.48-.22-.36a9.4 9.4 0 0 1-1.44-5.01c0-5.2 4.23-9.43 9.44-9.43 2.52 0 4.89.98 6.67 2.77a9.37 9.37 0 0 1 2.76 6.67c0 5.2-4.23 9.43-9.44 9.43zm8.03-17.46A11.28 11.28 0 0 0 12.04.72C5.78.72.69 5.8.69 12.06c0 2 .52 3.95 1.52 5.67L.6 23.6l6-1.57a11.3 11.3 0 0 0 5.43 1.38h.01c6.25 0 11.34-5.09 11.35-11.34 0-3.03-1.18-5.88-3.32-8.03z"/></symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g></symbol>
+  </svg>
+
+  <script src="script.js"></script>
+  <script src="ponto-calc.js"></script>
+  <script src="ponto.js"></script>
+</body>
+</html>

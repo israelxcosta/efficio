@@ -48,6 +48,7 @@
 
   // Formulário: monta a mensagem e abre o WhatsApp
   var form = document.getElementById("contato-form");
+  if (!form) return;
   var error = form.querySelector(".form__error");
   form.addEventListener("submit", function (e) {
     e.preventDefault();
