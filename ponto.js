@@ -219,6 +219,8 @@
       alertas.innerHTML = '<li class="alerta alerta--ok">Nenhuma irregularidade encontrada na jornada informada.</li>';
     }
 
+    document.getElementById("whatsapp").href =
+      "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(resumoTexto());
     salvar();
   }
 
@@ -281,9 +283,6 @@
 
   document.getElementById("imprimir").addEventListener("click", function () { window.print(); });
 
-  document.getElementById("whatsapp").addEventListener("click", function () {
-    window.open("https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(resumoTexto()), "_blank", "noopener");
-  });
 
   if (!carregar()) aplicarModelo("44-5");
   else atualizar();
