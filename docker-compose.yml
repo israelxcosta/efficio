@@ -1,0 +1,32 @@
+# PostgreSQL para desenvolvimento:   docker compose up -d db
+# Sistema completo (após o banco):     docker compose --profile app up --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: efficio
+      POSTGRES_USER: efficio
+      POSTGRES_PASSWORD: efficio
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U efficio -d efficio"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    profiles: ["app"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://efficio:efficio@db:5432/efficio
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  dados:

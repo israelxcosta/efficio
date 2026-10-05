@@ -146,4 +146,17 @@ describe("cálculo mensal", () => {
     expect(r.dias.find((x) => x.data === "2026-10-05")!.falta).toBe(false);
     expect(r.dias.find((x) => x.data === "2026-10-20")!.inconsistencias[0]).toContain("ímpar");
   });
+
+  it("um período de trabalho longo não divide a jornada", () => {
+    const r = calcularMes(
+      entrada([
+        ...dia("2026-10-02", "08:00", "12:00", "13:00", "17:48"),
+        ...dia("2026-10-05", "07:58", "12:00", "12:30", "19:30"),
+      ]),
+    );
+    const d = r.dias.find((x) => x.data === "2026-10-05")!;
+    expect(d.interjornada).toBe(3 * 1440 - 17 * 60 - 48 + 7 * 60 + 58);
+    expect(d.interjornadaSuprimida).toBe(0);
+    expect(d.extras).toBe(134);
+  });
 });

@@ -92,11 +92,16 @@ export function Menu({ admin, nome, sair }: { admin: boolean; nome: string; sair
           </nav>
           <div className="border-t border-slate-200 px-4 py-4">
             <p className="truncate text-sm font-medium text-slate-700">{nome}</p>
-            <form action={sair}>
-              <button type="submit" className="mt-1 text-sm text-slate-500 hover:text-red-600">
-                Sair
-              </button>
-            </form>
+            <div className="mt-1 flex gap-4 text-sm">
+              <Link href="/conta" onClick={() => setAberto(false)} className="text-slate-500 hover:text-slate-900">
+                Minha senha
+              </Link>
+              <form action={sair}>
+                <button type="submit" className="text-slate-500 hover:text-red-600">
+                  Sair
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </aside>

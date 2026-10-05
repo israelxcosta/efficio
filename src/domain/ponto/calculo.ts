@@ -143,12 +143,21 @@ export function medirPeriodos(periodos: Periodo[], config: Pick<ConfiguracaoCalc
   return med;
 }
 
-/** Agrupa marcações (minutos absolutos, ordenados) em jornadas. */
+/** Período aberto (entrada sem saída) mais longo que isto indica saída esquecida. */
+const PERIODO_MAXIMO = 20 * 60;
+
+/**
+ * Agrupa marcações (minutos absolutos, ordenados) em jornadas. Só o tempo
+ * depois de uma saída (marcação de posição par) é descanso: um período de
+ * trabalho longo entre entrada e saída não separa a jornada.
+ */
 export function agruparJornadas(marcas: number[], separacao: number): number[][] {
   const jornadas: number[][] = [];
   for (const m of marcas) {
     const atual = jornadas[jornadas.length - 1];
-    if (atual && m - atual[atual.length - 1] <= separacao) atual.push(m);
+    const intervalo = atual ? m - atual[atual.length - 1] : Infinity;
+    const aposSaida = atual ? atual.length % 2 === 0 : true;
+    if (atual && intervalo <= (aposSaida ? separacao : PERIODO_MAXIMO)) atual.push(m);
     else jornadas.push([m]);
   }
   return jornadas;

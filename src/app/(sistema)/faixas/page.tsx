@@ -15,10 +15,10 @@ const horas = (min: number) => {
 
 function Resumo({ faixas }: { faixas: { ateMinutos: number | null; percentual: string }[] }) {
   if (!faixas.length) return <span className="text-slate-500">Padrão legal</span>;
-  let anterior = 0;
   return (
     <ul className="space-y-0.5">
       {faixas.map((f, i) => {
+        const anterior = faixas[i - 1]?.ateMinutos ?? 0;
         const txt =
           f.ateMinutos === null
             ? i === 0
@@ -27,7 +27,6 @@ function Resumo({ faixas }: { faixas: { ateMinutos: number | null; percentual: s
             : i === 0
               ? `Primeiras ${horas(f.ateMinutos)}`
               : `De ${horas(anterior)} a ${horas(f.ateMinutos)}`;
-        if (f.ateMinutos !== null) anterior = f.ateMinutos;
         return (
           <li key={i}>
             {txt}: <strong className="tabular-nums">{Number(f.percentual)}%</strong>

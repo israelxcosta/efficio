@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: efficio
+          POSTGRES_USER: efficio
+          POSTGRES_PASSWORD: efficio
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U efficio" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://efficio:efficio@localhost:5432/efficio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run db:migrate
+      - run: npm run build
