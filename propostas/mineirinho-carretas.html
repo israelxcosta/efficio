@@ -653,6 +653,102 @@
       }
     }
 
+    /* Alças de tamanho e posição do campo selecionado (só na tela) */
+    .frame { position: fixed; z-index: 15; pointer-events: none; }
+    .frame[hidden] { display: none; }
+    .frame > * { pointer-events: auto; touch-action: none; }
+    .frame__tab {
+      position: absolute;
+      bottom: 100%; left: -1px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 24px;
+      margin-bottom: 6px;
+      padding: 0 10px 0 7px;
+      font: 600 11.5px/1 var(--font-head);
+      white-space: nowrap;
+      color: var(--white);
+      background: var(--blue);
+      border: 1.5px solid var(--white);
+      border-radius: 999px;
+      box-shadow: 0 3px 10px rgba(0, 53, 128, .3);
+      cursor: ns-resize;
+      user-select: none;
+    }
+    .frame__tab svg { width: 14px; height: 14px; }
+    .frame__reset {
+      position: absolute;
+      bottom: 100%; right: -1px;
+      display: none;
+      place-items: center;
+      width: 24px; height: 24px;
+      margin-bottom: 6px;
+      padding: 0;
+      color: var(--blue);
+      background: var(--white);
+      border: 1.5px solid var(--blue);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .frame__reset svg { width: 13px; height: 13px; }
+    .frame.has-layout .frame__reset { display: grid; }
+    .frame__handle {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: 22px; height: 22px;
+      color: var(--blue);
+      background: var(--white);
+      border: 1.5px solid var(--blue);
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0, 53, 128, .25);
+    }
+    .frame__handle svg { width: 14px; height: 14px; }
+    .frame__handle:hover, .frame__tab:hover { filter: brightness(1.08); }
+    .frame__handle--e { top: 50%; right: -12px; transform: translateY(-50%); cursor: ew-resize; }
+    .frame__handle--s { left: 50%; bottom: -12px; transform: translateX(-50%); cursor: ns-resize; }
+    .frame__readout {
+      position: absolute;
+      top: 100%; right: 0;
+      display: none;
+      margin-top: 16px;
+      padding: 5px 8px;
+      font: 600 11px/1 var(--font-body);
+      white-space: nowrap;
+      color: var(--white);
+      background: var(--blue-darker);
+      border-radius: 6px;
+    }
+    html[data-dragging] .frame__readout { display: block; }
+    html[data-dragging="e"], html[data-dragging="e"] * { cursor: ew-resize !important; }
+    html[data-dragging="s"], html[data-dragging="s"] *,
+    html[data-dragging="move"], html[data-dragging="move"] * { cursor: ns-resize !important; user-select: none; }
+
+    @media screen {
+      .page.is-overflow::after {
+        content: "";
+        position: absolute;
+        z-index: 2;
+        top: 297mm; left: 0; right: 0;
+        border-top: 2px dashed #d93025;
+        pointer-events: none;
+      }
+      .page.is-overflow::before {
+        content: "Limite da folha A4 · o que estiver abaixo vai para outra página";
+        position: absolute;
+        z-index: 3;
+        top: 297mm; right: 16mm;
+        padding: 1.2mm 3mm;
+        font: 600 7.5pt/1.2 var(--font-body);
+        color: var(--white);
+        background: #d93025;
+        border-radius: 999px;
+        transform: translateY(-50%);
+        pointer-events: none;
+      }
+    }
+
     @page { size: A4; margin: 0; }
 
     @media print {
@@ -1253,6 +1349,23 @@
     </section>
   </main>
 
+  <!-- Alças para ajustar tamanho e posição do campo selecionado -->
+  <div class="frame no-print" id="frame" hidden>
+    <span class="frame__tab" data-drag="move" title="Arraste para cima ou para baixo para posicionar o campo">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-arrows-v"/></svg>Mover
+    </span>
+    <button type="button" class="frame__reset" tabindex="-1" title="Voltar ao tamanho e à posição originais" aria-label="Restaurar tamanho e posição">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-undo"/></svg>
+    </button>
+    <span class="frame__handle frame__handle--e" data-drag="e" title="Arraste para os lados para ajustar a largura">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-arrows-h"/></svg>
+    </span>
+    <span class="frame__handle frame__handle--s" data-drag="s" title="Arraste para cima ou para baixo para ajustar a altura">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-arrows-v"/></svg>
+    </span>
+    <span class="frame__readout" id="frame-readout"></span>
+  </div>
+
   <!-- Linha usada pelo botão "Adicionar serviço" -->
   <template id="row-template">
     <tr>
@@ -1287,6 +1400,8 @@
     <symbol id="icon-align-center" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3 6h18M6 12h12M4 18h16"/></symbol>
     <symbol id="icon-align-right" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3 6h18M9 12h12M5 18h16"/></symbol>
     <symbol id="icon-align-justify" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3 6h18M3 12h18M3 18h18"/></symbol>
+    <symbol id="icon-arrows-h" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></symbol>
+    <symbol id="icon-arrows-v" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></symbol>
     <symbol id="icon-eraser" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L13 21"/><path d="M22 21H7M5 11l9 9"/></g></symbol>
     <symbol id="icon-print" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></g></symbol>
   </svg>
@@ -1314,6 +1429,11 @@
     var fillIndex = -1;
     var formatHost = null;
     var savedRange = null;
+    var frame = document.getElementById("frame");
+    var frameReadout = document.getElementById("frame-readout");
+    var LAYOUT_PROPS = ["width", "maxWidth", "minHeight", "marginTop"];
+    var drag = null;
+    var placePending = false;
 
     // Restaura as alterações salvas neste navegador
     try {
@@ -1458,6 +1578,7 @@
         }
       });
       fmtSize.textContent = formatHost ? fontPt(formatHost).toLocaleString("pt-BR") + " pt" : "—";
+      schedulePlace();
     }
 
     function unwrap(el) {
@@ -1512,9 +1633,111 @@
       }, 400);
     }
 
+    // Tamanho e posição dos campos -----------------------------------
+    function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
+
+    function pxToMm(px) { return px * 25.4 / 96; }
+
+    function formatMm(n) {
+      return n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " mm";
+    }
+
+    // Campos dentro de uma linha de texto ou de tabela não têm alças
+    function canResize(el) {
+      return !!el && !/^(inline|table-cell|table-row|contents)$/.test(getComputedStyle(el).display);
+    }
+
+    function placeFrame() {
+      placePending = false;
+      var el = formatHost;
+      if (!el || !canResize(el)) {
+        frame.hidden = true;
+        return;
+      }
+      var r = el.getBoundingClientRect();
+      frame.hidden = false;
+      frame.style.left = r.left + "px";
+      frame.style.top = r.top + "px";
+      frame.style.width = r.width + "px";
+      frame.style.height = r.height + "px";
+      frame.classList.toggle("has-layout", LAYOUT_PROPS.some(function (p) { return el.style[p]; }));
+    }
+
+    function schedulePlace() {
+      if (placePending) return;
+      placePending = true;
+      requestAnimationFrame(placeFrame);
+    }
+
+    // Margem que desloca o campo dy mm. Entre blocos vizinhos a margem de
+    // cima "colapsa" com a de baixo do anterior, então o cálculo parte do
+    // espaço visível entre os dois.
+    function marginFor(el, rect, scale) {
+      var flow = /^(block|flow-root|list-item|table)$/;
+      var prev = el.previousElementSibling;
+      var current = pxToMm(parseFloat(getComputedStyle(el).marginTop));
+      if (!prev || !flow.test(getComputedStyle(el.parentElement).display) ||
+          !flow.test(getComputedStyle(el).display) || !flow.test(getComputedStyle(prev).display)) {
+        return function (dy) { return current + dy; };
+      }
+      var prevMargin = Math.max(0, pxToMm(parseFloat(getComputedStyle(prev).marginBottom)));
+      var gap = (rect.top - prev.getBoundingClientRect().bottom) * scale;
+      return function (dy) {
+        var target = gap + dy;
+        return target >= prevMargin ? target : target - prevMargin;
+      };
+    }
+
+    function beginDrag(type, el, x, y) {
+      var page = el.closest(".page");
+      var pr = page.getBoundingClientRect();
+      var r = el.getBoundingClientRect();
+      var scale = 210 / pr.width;  // mm por pixel de tela, já considerando o zoom
+      return {
+        type: type, el: el, x: x, y: y, scale: scale, top: r.top,
+        width: r.width * scale,
+        height: r.height * scale,
+        maxWidth: 210 - pxToMm(parseFloat(getComputedStyle(page).paddingRight)) - (r.left - pr.left) * scale,
+        margin: marginFor(el, r, scale)
+      };
+    }
+
+    function applyDrag(d, dx, dy) {
+      var s = d.el.style;
+      if (d.type === "e") {
+        s.maxWidth = "none";
+        s.width = clamp(d.width + dx, 10, Math.max(10, d.maxWidth)).toFixed(1) + "mm";
+      } else if (d.type === "s") {
+        s.minHeight = clamp(d.height + dy, 0, 250).toFixed(1) + "mm";
+      } else {
+        s.marginTop = clamp(d.margin(dy), -80, 200).toFixed(1) + "mm";
+      }
+      var r = d.el.getBoundingClientRect();
+      var moved = (r.top - d.top) * d.scale;
+      frameReadout.textContent = d.type === "e" ? "Largura " + formatMm(r.width * d.scale)
+        : d.type === "s" ? "Altura " + formatMm(r.height * d.scale)
+        : "Posição " + (moved > 0.05 ? "+" : "") + formatMm(moved);
+      placeFrame();
+    }
+
+    function resetLayout(el) {
+      LAYOUT_PROPS.forEach(function (p) { el.style[p] = ""; });
+      if (!el.getAttribute("style")) el.removeAttribute("style");
+    }
+
+    // Marca as folhas que passaram do tamanho A4
+    function checkOverflow() {
+      doc.querySelectorAll(".page").forEach(function (page) {
+        var r = page.getBoundingClientRect();
+        page.classList.toggle("is-overflow", r.height / r.width * 210 > 297.5);
+      });
+    }
+
     function changed() {
       recalc();
       refresh();
+      checkOverflow();
+      schedulePlace();
       save();
     }
 
@@ -1527,7 +1750,7 @@
     }
 
     function slug(text) {
-      return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+      return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
         .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "cliente";
     }
 
@@ -1542,7 +1765,12 @@
       clone.querySelector("#status").textContent = defaultStatus;
       clone.querySelectorAll("[contenteditable]").forEach(function (el) { el.removeAttribute("contenteditable"); });
       clone.querySelectorAll("[data-mirror]").forEach(function (el) { el.removeAttribute("title"); });
-      clone.querySelectorAll(".is-pending").forEach(function (el) { el.classList.remove("is-pending"); });
+      clone.querySelectorAll(".is-pending, .is-overflow").forEach(function (el) { el.classList.remove("is-pending", "is-overflow"); });
+      clone.removeAttribute("data-dragging");
+      var cloneFrame = clone.querySelector("#frame");
+      cloneFrame.hidden = true;
+      cloneFrame.removeAttribute("style");
+      cloneFrame.classList.remove("has-layout");
 
       var blob = new Blob(["<!DOCTYPE html>\n" + clone.outerHTML], { type: "text/html;charset=utf-8" });
       var link = document.createElement("a");
@@ -1583,7 +1811,7 @@
 
     doc.addEventListener("focusout", function (e) {
       var next = e.relatedTarget;
-      if (!next || !fmtBar.contains(next)) setFormatHost(hostOf(next));
+      if (!next || !(fmtBar.contains(next) || frame.contains(next))) setFormatHost(hostOf(next));
 
       var el = e.target;
       if (!el.hasAttribute || !el.hasAttribute("data-money") || !/\d/.test(el.textContent)) return;
@@ -1669,13 +1897,50 @@
       }
     });
 
-    window.addEventListener("resize", fit);
+    // Alças: arrastar ajusta o campo selecionado sem tirar o cursor do texto
+    frame.addEventListener("mousedown", function (e) { e.preventDefault(); });
+
+    frame.addEventListener("pointerdown", function (e) {
+      var handle = e.target.closest("[data-drag]");
+      if (!handle || !formatHost) return;
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      drag = beginDrag(handle.getAttribute("data-drag"), formatHost, e.clientX, e.clientY);
+      root.setAttribute("data-dragging", drag.type);
+    });
+
+    frame.addEventListener("pointermove", function (e) {
+      if (drag) applyDrag(drag, (e.clientX - drag.x) * drag.scale, (e.clientY - drag.y) * drag.scale);
+    });
+
+    function endDrag() {
+      if (!drag) return;
+      drag = null;
+      root.removeAttribute("data-dragging");
+      changed();
+    }
+    frame.addEventListener("pointerup", endDrag);
+    frame.addEventListener("pointercancel", endDrag);
+
+    frame.addEventListener("click", function (e) {
+      if (!e.target.closest(".frame__reset") || !formatHost) return;
+      resetLayout(formatHost);
+      changed();
+    });
+
+    window.addEventListener("scroll", schedulePlace, { passive: true });
+    window.addEventListener("resize", function () {
+      fit();
+      schedulePlace();
+    });
 
     setEditing(true);
     doc.querySelectorAll("[data-field]").forEach(sync);
     recalc();
     refresh();
     fit();
+    checkOverflow();
+    if (document.fonts) document.fonts.ready.then(checkOverflow);
   })();
   </script>
 </body>
