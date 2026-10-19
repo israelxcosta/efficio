@@ -15,7 +15,7 @@ Para visualizar, basta abrir o `index.html` no navegador. Para publicar, envie o
 
 Cada proposta é um arquivo único (estilos, script e logos embutidos), que pode ser editado direto no navegador:
 
-1. Abra o arquivo no navegador e clique em qualquer texto para editar.
+1. Abra o arquivo no navegador e clique em qualquer texto para editar. A barra de formatação (negrito, itálico, sublinhado, alinhamento, tamanho da fonte e limpar formatação) vale para o campo onde está o cursor.
 2. Os campos destacados em amarelo ainda precisam ser preenchidos; o botão **campos a preencher** leva a cada um deles.
 3. O nome do cliente, o responsável, a data e a validade são editados na capa e atualizados nas demais páginas.
 4. Na tabela de honorários, digite os valores (ex.: `1500`) e o total mensal é calculado. Use **+ Adicionar serviço** ou o **×** para incluir ou remover linhas.

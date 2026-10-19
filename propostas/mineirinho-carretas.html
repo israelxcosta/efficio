@@ -130,6 +130,41 @@
     .tbtn[aria-pressed="true"] .switch { background: var(--blue); }
     .tbtn[aria-pressed="true"] .switch::after { transform: translateX(12px); }
 
+    .toolbar__format {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 12px;
+      width: 100%;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .format__hint { margin-right: 4px; font-size: 12.5px; color: var(--muted); }
+    .format__group { display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--blue-soft); border-radius: 10px; }
+    .fbtn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-width: 32px;
+      height: 30px;
+      padding: 0 8px;
+      font: 600 14px/1 var(--font-head);
+      color: var(--blue-darker);
+      background: transparent;
+      border: 0;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .fbtn svg { width: 17px; height: 17px; }
+    .fbtn:hover:not(:disabled) { color: var(--blue); background: var(--white); }
+    .fbtn:focus-visible { outline: 3px solid rgba(0, 74, 173, .35); }
+    .fbtn[aria-pressed="true"] { color: var(--white); background: var(--blue); }
+    .fbtn:disabled { opacity: .4; cursor: default; }
+    .fbtn--text { font-size: 13px; }
+    .format__size { min-width: 52px; font-size: 12.5px; font-weight: 600; text-align: center; color: var(--muted); }
+
     /* Folhas A4 ---------------------------------------------- */
     .doc {
       counter-reset: pg;
@@ -221,17 +256,24 @@
 
     .page__body { margin-bottom: 8mm; }
 
-    .page__foot {
+    /* Contatos centralizados, repetidos no rodapé de todas as páginas */
+    .contacts {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6mm;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2.5mm 7mm;
+      font-size: 8.4pt;
+    }
+    .contacts span { display: inline-flex; align-items: center; gap: 2mm; }
+    .contacts svg { flex-shrink: 0; width: 3.8mm; height: 3.8mm; color: var(--blue); }
+
+    .page__foot {
       margin-top: auto;
       padding-top: 4.5mm;
-      border-top: 1px solid var(--border);
-      font-size: 7.4pt;
       color: var(--muted);
+      border-top: 1px solid var(--border);
     }
+    .page__meta { display: flex; align-items: center; gap: 3mm; }
     .page__num {
       flex-shrink: 0;
       padding: 1.5mm 3.2mm;
@@ -336,20 +378,15 @@
     .mini-card__foot { margin: 2.5mm 0 0; font: 600 8.4pt/1.2 var(--font-head); text-align: right; color: var(--blue); }
 
     .cover__foot {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 2.5mm 7mm;
       padding-top: 5mm;
-      font-size: 8.4pt;
       color: rgba(255, 255, 255, .86);
       border-top: 1px solid rgba(255, 255, 255, .2);
     }
-    .cover__foot span { display: inline-flex; align-items: center; gap: 2mm; }
-    .cover__foot svg { width: 3.8mm; height: 3.8mm; color: var(--blue-pale); }
+    .cover__foot svg { color: var(--blue-pale); }
 
     /* Apresentação */
     .greeting { margin-bottom: 3mm; font: 600 10.6pt/1.4 var(--font-head); color: var(--blue-darker); }
-    .letter { font-size: 10pt; line-height: 1.6; }
+    .letter { font-size: 10pt; line-height: 1.6; text-align: justify; }
     .letter p { margin-bottom: 2.8mm; }
     .letter p:last-child { margin-bottom: 0; }
     .signoff { margin: 4mm 0 0; font-size: 9.6pt; line-height: 1.45; color: var(--muted); }
@@ -575,6 +612,7 @@
     .signs { display: grid; grid-template-columns: 1fr 1fr; gap: 14mm; }
     .sign { padding-top: 2.6mm; text-align: center; font-size: 8.6pt; color: var(--muted); border-top: 1px solid var(--blue-darker); }
     .sign strong { display: block; font: 600 9.6pt/1.4 var(--font-head); color: var(--blue-darker); }
+    .sign > span { display: table; margin: 0 auto; }
 
     .cta {
       display: grid;
@@ -666,6 +704,32 @@
         Imprimir / PDF
       </button>
     </div>
+
+    <div class="toolbar__format" id="format" role="toolbar" aria-label="Formatação do texto">
+      <span class="format__hint" id="format-hint">Clique em um texto para formatar</span>
+      <div class="format__group">
+        <button type="button" class="fbtn" data-cmd="bold" aria-pressed="false" aria-label="Negrito" title="Negrito (Ctrl+B)" disabled><b>B</b></button>
+        <button type="button" class="fbtn" data-cmd="italic" aria-pressed="false" aria-label="Itálico" title="Itálico (Ctrl+I)" disabled><i>I</i></button>
+        <button type="button" class="fbtn" data-cmd="underline" aria-pressed="false" aria-label="Sublinhado" title="Sublinhado (Ctrl+U)" disabled><u>U</u></button>
+      </div>
+      <div class="format__group">
+        <button type="button" class="fbtn" data-cmd="align-left" aria-pressed="false" aria-label="Alinhar à esquerda" title="Alinhar à esquerda" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-align-left"/></svg></button>
+        <button type="button" class="fbtn" data-cmd="align-center" aria-pressed="false" aria-label="Centralizar" title="Centralizar" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-align-center"/></svg></button>
+        <button type="button" class="fbtn" data-cmd="align-right" aria-pressed="false" aria-label="Alinhar à direita" title="Alinhar à direita" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-align-right"/></svg></button>
+        <button type="button" class="fbtn" data-cmd="align-justify" aria-pressed="false" aria-label="Justificar" title="Justificar" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-align-justify"/></svg></button>
+      </div>
+      <div class="format__group">
+        <button type="button" class="fbtn fbtn--text" data-cmd="smaller" aria-label="Diminuir fonte" title="Diminuir fonte" disabled>A−</button>
+        <span class="format__size" id="format-size" aria-live="polite">—</span>
+        <button type="button" class="fbtn fbtn--text" data-cmd="bigger" aria-label="Aumentar fonte" title="Aumentar fonte" disabled>A+</button>
+      </div>
+      <div class="format__group">
+        <button type="button" class="fbtn fbtn--text" data-cmd="clear" title="Remover a formatação aplicada neste campo" disabled>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-eraser"/></svg>
+          Limpar formatação
+        </button>
+      </div>
+    </div>
   </header>
 
   <main class="doc" id="doc">
@@ -728,7 +792,7 @@
         </div>
       </div>
 
-      <footer class="cover__foot">
+      <footer class="cover__foot contacts">
         <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-whatsapp"/></svg>(19) 99685-9637</span>
         <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-mail"/></svg>contato@efficio.com.br</span>
         <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-instagram"/></svg>@efficio.contabilidade</span>
@@ -740,7 +804,10 @@
     <section class="page">
       <header class="page__head">
         <span class="logo logo--blue" role="img" aria-label="Efficio Contabilidade"></span>
-        <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+        <div class="page__meta">
+          <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+          <span class="page__num" aria-hidden="true"></span>
+        </div>
       </header>
 
       <div class="page__body">
@@ -800,9 +867,11 @@
         </div>
       </div>
 
-      <footer class="page__foot">
-        <span>Efficio Contabilidade · CNPJ 60.020.568/0001-04 · (19) 99685-9637 · contato@efficio.com.br</span>
-        <span class="page__num" aria-hidden="true"></span>
+      <footer class="page__foot contacts">
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-whatsapp"/></svg>(19) 99685-9637</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-mail"/></svg>contato@efficio.com.br</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-instagram"/></svg>@efficio.contabilidade</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-pin"/></svg>Mogi Guaçu - SP</span>
       </footer>
     </section>
 
@@ -810,7 +879,10 @@
     <section class="page">
       <header class="page__head">
         <span class="logo logo--blue" role="img" aria-label="Efficio Contabilidade"></span>
-        <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+        <div class="page__meta">
+          <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+          <span class="page__num" aria-hidden="true"></span>
+        </div>
       </header>
 
       <div class="page__body">
@@ -898,9 +970,11 @@
         </div>
       </div>
 
-      <footer class="page__foot">
-        <span>Efficio Contabilidade · CNPJ 60.020.568/0001-04 · (19) 99685-9637 · contato@efficio.com.br</span>
-        <span class="page__num" aria-hidden="true"></span>
+      <footer class="page__foot contacts">
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-whatsapp"/></svg>(19) 99685-9637</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-mail"/></svg>contato@efficio.com.br</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-instagram"/></svg>@efficio.contabilidade</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-pin"/></svg>Mogi Guaçu - SP</span>
       </footer>
     </section>
 
@@ -908,7 +982,10 @@
     <section class="page">
       <header class="page__head">
         <span class="logo logo--blue" role="img" aria-label="Efficio Contabilidade"></span>
-        <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+        <div class="page__meta">
+          <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+          <span class="page__num" aria-hidden="true"></span>
+        </div>
       </header>
 
       <div class="page__body">
@@ -998,9 +1075,11 @@
         </div>
       </div>
 
-      <footer class="page__foot">
-        <span>Efficio Contabilidade · CNPJ 60.020.568/0001-04 · (19) 99685-9637 · contato@efficio.com.br</span>
-        <span class="page__num" aria-hidden="true"></span>
+      <footer class="page__foot contacts">
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-whatsapp"/></svg>(19) 99685-9637</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-mail"/></svg>contato@efficio.com.br</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-instagram"/></svg>@efficio.contabilidade</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-pin"/></svg>Mogi Guaçu - SP</span>
       </footer>
     </section>
 
@@ -1008,7 +1087,10 @@
     <section class="page">
       <header class="page__head">
         <span class="logo logo--blue" role="img" aria-label="Efficio Contabilidade"></span>
-        <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+        <div class="page__meta">
+          <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+          <span class="page__num" aria-hidden="true"></span>
+        </div>
       </header>
 
       <div class="page__body">
@@ -1081,9 +1163,11 @@
         </ol>
       </div>
 
-      <footer class="page__foot">
-        <span>Efficio Contabilidade · CNPJ 60.020.568/0001-04 · (19) 99685-9637 · contato@efficio.com.br</span>
-        <span class="page__num" aria-hidden="true"></span>
+      <footer class="page__foot contacts">
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-whatsapp"/></svg>(19) 99685-9637</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-mail"/></svg>contato@efficio.com.br</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-instagram"/></svg>@efficio.contabilidade</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-pin"/></svg>Mogi Guaçu - SP</span>
       </footer>
     </section>
 
@@ -1091,7 +1175,10 @@
     <section class="page">
       <header class="page__head">
         <span class="logo logo--blue" role="img" aria-label="Efficio Contabilidade"></span>
-        <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+        <div class="page__meta">
+          <span class="page__ref">Proposta comercial · <strong data-mirror="cliente">Mineirinho Carretas</strong></span>
+          <span class="page__num" aria-hidden="true"></span>
+        </div>
       </header>
 
       <div class="page__body">
@@ -1115,7 +1202,7 @@
             </div>
             <div>
               <dt data-edit>CNPJ</dt>
-              <dd class="fill" data-edit>[00.000.000/0000-00]</dd>
+              <dd class="fill" data-edit data-field="cnpj">[00.000.000/0000-00]</dd>
             </div>
             <div>
               <dt data-edit>Responsável</dt>
@@ -1133,10 +1220,12 @@
             <div class="sign">
               <strong data-mirror="cliente">Mineirinho Carretas</strong>
               <span data-mirror="responsavel">[Nome do responsável]</span>
+              <span>CNPJ <span data-mirror="cnpj">[00.000.000/0000-00]</span></span>
             </div>
             <div class="sign">
               <strong data-edit>Efficio Contabilidade</strong>
               <span class="fill" data-edit>[Nome do contador] · CRC [000000/O-0]</span>
+              <span>CNPJ 60.020.568/0001-04</span>
             </div>
           </div>
         </div>
@@ -1155,9 +1244,11 @@
         </div>
       </div>
 
-      <footer class="page__foot">
-        <span>Efficio Contabilidade · CNPJ 60.020.568/0001-04 · (19) 99685-9637 · contato@efficio.com.br</span>
-        <span class="page__num" aria-hidden="true"></span>
+      <footer class="page__foot contacts">
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-whatsapp"/></svg>(19) 99685-9637</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-mail"/></svg>contato@efficio.com.br</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-instagram"/></svg>@efficio.contabilidade</span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#icon-pin"/></svg>Mogi Guaçu - SP</span>
       </footer>
     </section>
   </main>
@@ -1192,6 +1283,11 @@
     <symbol id="icon-flag" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></g></symbol>
     <symbol id="icon-undo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></g></symbol>
     <symbol id="icon-download" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></g></symbol>
+    <symbol id="icon-align-left" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3 6h18M3 12h12M3 18h16"/></symbol>
+    <symbol id="icon-align-center" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3 6h18M6 12h12M4 18h16"/></symbol>
+    <symbol id="icon-align-right" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3 6h18M9 12h12M5 18h16"/></symbol>
+    <symbol id="icon-align-justify" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3 6h18M3 12h18M3 18h18"/></symbol>
+    <symbol id="icon-eraser" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L13 21"/><path d="M22 21H7M5 11l9 9"/></g></symbol>
     <symbol id="icon-print" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></g></symbol>
   </svg>
 
@@ -1199,7 +1295,7 @@
   (function () {
     "use strict";
 
-    var KEY = "efficio-proposta:v1:" + location.pathname;
+    var KEY = "efficio-proposta:v2:" + location.pathname;
     var PLACEHOLDER = /\[[^\]]*\]|R\$\s*0,00/;
     var MULTILINE = "ul, ol, [data-multiline]";
     var BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -1209,9 +1305,15 @@
     var statusEl = document.getElementById("status");
     var editBtn = document.getElementById("btn-edit");
     var fillBtn = document.getElementById("btn-fill");
+    var fmtBar = document.getElementById("format");
+    var fmtHint = document.getElementById("format-hint");
+    var fmtSize = document.getElementById("format-size");
+    var fmtButtons = fmtBar.querySelectorAll("[data-cmd]");
     var defaultStatus = statusEl.textContent;
     var saveTimer;
     var fillIndex = -1;
+    var formatHost = null;
+    var savedRange = null;
 
     // Restaura as alterações salvas neste navegador
     try {
@@ -1233,6 +1335,7 @@
         el.title = on ? "Clique para editar na capa" : "";
       });
       editBtn.setAttribute("aria-pressed", String(on));
+      if (!on) setFormatHost(null);
     }
 
     function cleanText(el) { return el.textContent.replace(/\s+/g, " ").trim(); }
@@ -1322,6 +1425,79 @@
       }
     }
 
+    // Formatação ---------------------------------------------------
+    function hostOf(node) {
+      var el = node && (node.nodeType === 1 ? node : node.parentElement);
+      el = el && el.closest('[contenteditable="true"]');
+      return el && doc.contains(el) ? el : null;
+    }
+
+    function fontPt(el) {
+      return Math.round(parseFloat(getComputedStyle(el).fontSize) * 0.75 * 2) / 2;
+    }
+
+    function setFormatHost(host) {
+      formatHost = host;
+      fmtButtons.forEach(function (btn) { btn.disabled = !host; });
+      fmtHint.textContent = host ? "Formatar o campo selecionado:" : "Clique em um texto para formatar";
+      updateFormatState();
+    }
+
+    function updateFormatState() {
+      var style = formatHost && getComputedStyle(formatHost);
+      var inline = style && style.display === "inline";
+      var align = style ? "align-" + style.textAlign.replace("start", "left").replace("end", "right") : "";
+      fmtButtons.forEach(function (btn) {
+        var cmd = btn.getAttribute("data-cmd");
+        if (cmd.indexOf("align-") === 0) {
+          // Alinhamento só faz sentido em blocos (parágrafos, listas, títulos)
+          btn.disabled = !formatHost || inline;
+          btn.setAttribute("aria-pressed", String(!inline && align === cmd));
+        } else if (btn.hasAttribute("aria-pressed")) {
+          btn.setAttribute("aria-pressed", String(!!formatHost && document.queryCommandState(cmd)));
+        }
+      });
+      fmtSize.textContent = formatHost ? fontPt(formatHost).toLocaleString("pt-BR") + " pt" : "—";
+    }
+
+    function unwrap(el) {
+      el.replaceWith.apply(el, Array.prototype.slice.call(el.childNodes));
+    }
+
+    function clearFormat(host) {
+      host.removeAttribute("style");
+      host.querySelectorAll("[style]").forEach(function (el) { el.removeAttribute("style"); });
+      host.querySelectorAll("b, i, u, font").forEach(unwrap);
+      host.querySelectorAll("span").forEach(function (el) { if (!el.attributes.length) unwrap(el); });
+      host.normalize();
+    }
+
+    function applyFormat(cmd) {
+      var host = formatHost;
+      if (!host) return;
+      if (document.activeElement !== host) host.focus({ preventScroll: true });
+      if (savedRange && host.contains(savedRange.commonAncestorContainer)) {
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+      }
+      if (cmd === "bold" || cmd === "italic" || cmd === "underline") {
+        document.execCommand(cmd);  // dispara "input", que salva
+      } else {
+        if (cmd.indexOf("align-") === 0) {
+          host.style.textAlign = cmd.slice(6);
+        } else if (cmd === "clear") {
+          clearFormat(host);
+        } else {
+          var pt = fontPt(host);
+          var step = pt >= 14 ? 1 : 0.5;
+          host.style.fontSize = Math.min(48, Math.max(6, pt + (cmd === "bigger" ? step : -step))) + "pt";
+        }
+        changed();
+      }
+      updateFormatState();
+    }
+
     // Salvamento --------------------------------------------------
     function save() {
       clearTimeout(saveTimer);
@@ -1402,9 +1578,13 @@
       var field = e.target.closest && e.target.closest("[data-field]");
       if (field) sync(field);
       changed();
+      if (formatHost) updateFormatState();
     });
 
     doc.addEventListener("focusout", function (e) {
+      var next = e.relatedTarget;
+      if (!next || !fmtBar.contains(next)) setFormatHost(hostOf(next));
+
       var el = e.target;
       if (!el.hasAttribute || !el.hasAttribute("data-money") || !/\d/.test(el.textContent)) return;
       var formatted = BRL.format(parseMoney(el.textContent));
@@ -1455,6 +1635,25 @@
         return;
       }
       selectPlaceholderAtCaret();
+    });
+
+    // A barra de formatação acompanha o campo onde está o cursor
+    document.addEventListener("selectionchange", function () {
+      var sel = window.getSelection();
+      var host = sel.rangeCount && hostOf(sel.anchorNode);
+      if (!host) return;
+      savedRange = sel.getRangeAt(0).cloneRange();
+      if (host !== formatHost) setFormatHost(host);
+      else updateFormatState();
+    });
+
+    // Clicar nos botões não tira o cursor do texto
+    fmtBar.addEventListener("mousedown", function (e) {
+      if (e.target.closest(".fbtn")) e.preventDefault();
+    });
+    fmtBar.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-cmd]");
+      if (btn && !btn.disabled) applyFormat(btn.getAttribute("data-cmd"));
     });
 
     editBtn.addEventListener("click", function () { setEditing(!isEditing()); });
