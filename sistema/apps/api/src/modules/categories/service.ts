@@ -98,8 +98,7 @@ export async function deleteCategory(db: DbExecutor, workspaceId: string, id: st
   await db.delete(categories).where(eq(categories.id, id));
 }
 
-/** Creates the default category tree for a new workspace. */
-/** Default categories of a new workspace: business ones for companies, household ones otherwise. */
+/** Creates the default category tree for a new workspace: business categories for companies. */
 export async function seedDefaultCategories(db: DbExecutor, workspaceId: string, kind: WorkspaceKind = 'personal'): Promise<void> {
   for (const def of kind === 'business' ? BUSINESS_CATEGORIES : DEFAULT_CATEGORIES) {
     const [parent] = await db

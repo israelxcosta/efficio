@@ -39,10 +39,10 @@ import { commitImport, previewImport } from '../modules/imports/service';
 import { FakeOpenFinanceProvider } from '../modules/open-finance/providers/fake';
 import { createConnection, linkAccounts, syncConnection } from '../modules/open-finance/service';
 
-export const DEMO_EMAIL = 'demo@effinance.app';
+export const DEMO_EMAIL = 'demo@efficio.app';
 export const DEMO_PASSWORD = 'demo12345';
 /** Second member of the shared "Família Costa" workspace. */
-export const DEMO_PARTNER_EMAIL = 'rafael@effinance.app';
+export const DEMO_PARTNER_EMAIL = 'rafael@efficio.app';
 export const FAMILY_WORKSPACE_NAME = 'Família Costa';
 /** Business workspace opened at login: the accounting office, its clients, fees and suppliers. */
 export const COMPANY_WORKSPACE_NAME = 'Efficio Contabilidade';
@@ -1018,14 +1018,14 @@ async function seedCompany(db: DbExecutor, ownerId: string): Promise<string> {
     });
 
     // --- fixed costs of the office --------------------------------------------------------------------
-    await fixed('expense', 'Aluguel do escritório', 320000, firstMonth, 5, find('Ocupação', 'Aluguel'), landlord.id, 'bank_slip');
-    await fixed('expense', 'Sistema contábil', 89000, firstMonth, 15, find('Tecnologia', 'Sistema contábil'), software.id, 'auto_debit');
-    await fixed('expense', 'Internet e telefone', 24990, firstMonth, 20, find('Ocupação', 'Internet e telefone'), telecom.id, 'auto_debit');
-    await fixed('expense', 'Energia elétrica', 41000, firstMonth, 12, find('Ocupação', 'Energia'), energy.id, 'auto_debit');
-    await fixed('expense', 'Salários da equipe', 1450000, firstMonth, 5, find('Pessoal', 'Salários'));
-    await fixed('expense', 'Pró-labore dos sócios', 800000, firstMonth, 5, find('Pessoal', 'Pró-labore'));
-    await fixed('expense', 'INSS e FGTS', 390000, firstMonth, 20, find('Pessoal', 'Encargos (INSS/FGTS)'), null, 'bank_slip');
-    await fixed('expense', 'Simples Nacional (DAS)', 285000, firstMonth, 20, find('Impostos e taxas', 'Simples Nacional (DAS)'), null, 'bank_slip');
+    await fixed('expense', 'Aluguel do escritório', 180000, firstMonth, 5, find('Ocupação', 'Aluguel'), landlord.id, 'bank_slip');
+    await fixed('expense', 'Sistema contábil', 59000, firstMonth, 15, find('Tecnologia', 'Sistema contábil'), software.id, 'auto_debit');
+    await fixed('expense', 'Internet e telefone', 19990, firstMonth, 20, find('Ocupação', 'Internet e telefone'), telecom.id, 'auto_debit');
+    await fixed('expense', 'Energia elétrica', 28000, firstMonth, 12, find('Ocupação', 'Energia'), energy.id, 'auto_debit');
+    await fixed('expense', 'Salários da equipe', 480000, firstMonth, 5, find('Pessoal', 'Salários'));
+    await fixed('expense', 'Pró-labore dos sócios', 300000, firstMonth, 5, find('Pessoal', 'Pró-labore'));
+    await fixed('expense', 'INSS e FGTS', 130000, firstMonth, 20, find('Pessoal', 'Encargos (INSS/FGTS)'), null, 'bank_slip');
+    await fixed('expense', 'Simples Nacional (DAS)', 95000, firstMonth, 20, find('Impostos e taxas', 'Simples Nacional (DAS)'), null, 'bank_slip');
     await add({
       ...find('Tecnologia', 'Certificado digital'),
       type: 'expense',
@@ -1048,12 +1048,15 @@ async function seedCompany(db: DbExecutor, ownerId: string): Promise<string> {
   return workspaceId;
 }
 
+/** Demo addresses of the Effinance base: removed too, so a reseed leaves no stale demo users. */
+const LEGACY_DEMO_EMAILS = ['demo@effinance.app', 'rafael@effinance.app'];
+
 /** Removes the demo users and every workspace they own (data cascades). */
 async function removeDemoUsers(db: DbExecutor) {
   const demoUsers = await db
     .select({ id: users.id })
     .from(users)
-    .where(inArray(users.email, [DEMO_EMAIL, DEMO_PARTNER_EMAIL]));
+    .where(inArray(users.email, [DEMO_EMAIL, DEMO_PARTNER_EMAIL, ...LEGACY_DEMO_EMAILS]));
   if (demoUsers.length === 0) return;
   const ids = demoUsers.map((u) => u.id);
   const owned = await db

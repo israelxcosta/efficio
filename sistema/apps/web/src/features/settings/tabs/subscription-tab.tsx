@@ -66,7 +66,7 @@ export function SubscriptionTab() {
       <Cell wide>
         <p className="flex items-center gap-2 text-xs text-muted">
           <Lock className="size-3.5 shrink-0" aria-hidden />
-          Pagamento processado com segurança pelo Mercado Pago. O Effinance não armazena dados do seu cartão.
+          Pagamento processado com segurança pelo Mercado Pago. O Efficio não armazena dados do seu cartão.
         </p>
       </Cell>
     </TabGrid>

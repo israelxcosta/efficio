@@ -41,7 +41,7 @@ import { openPluggyConnect } from './pluggy-connect';
 /** Plain-language summary of what the connection can and cannot do (LGPD transparency). */
 export function OpenFinanceTransparency({ compact = false }: { compact?: boolean }) {
   const items = [
-    { icon: <EyeOff />, text: 'Somente leitura: o Effinance vê contas, saldos, lançamentos e faturas — não faz pagamentos nem movimenta dinheiro.' },
+    { icon: <EyeOff />, text: 'Somente leitura: o Efficio vê contas, saldos, lançamentos e faturas — não faz pagamentos nem movimenta dinheiro.' },
     { icon: <KeyRound />, text: 'Você autoriza no ambiente do seu banco. Não pedimos nem guardamos suas senhas.' },
     { icon: <LockKeyhole />, text: 'O consentimento tem prazo e pode ser revogado a qualquer momento aqui ou no app do banco.' },
   ];
@@ -222,7 +222,7 @@ function IntroDialog({
         <OpenFinanceTransparency />
         <p className="rounded-md bg-surface-muted px-3 py-2.5 text-xs leading-relaxed text-muted">
           A conexão é feita pela Pluggy, plataforma de Open Finance que recebe os dados do banco com o seu consentimento e os repassa ao
-          Effinance. Você escolhe quais contas entram e pode desconectar quando quiser — os lançamentos já importados continuam aqui.
+          Efficio. Você escolhe quais contas entram e pode desconectar quando quiser — os lançamentos já importados continuam aqui.
         </p>
       </div>
     </Modal>

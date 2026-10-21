@@ -4,7 +4,7 @@ import { env } from '../env';
 import { configureKeyring } from '../lib/crypto/keyring';
 import { createKeyProvider } from '../setup';
 import { createDb } from './client';
-import { DEMO_EMAIL, DEMO_PARTNER_EMAIL, DEMO_PASSWORD, seedDemo } from './demo-seed';
+import { COMPANY_WORKSPACE_NAME, DEMO_EMAIL, DEMO_PARTNER_EMAIL, DEMO_PASSWORD, seedDemo } from './demo-seed';
 
 // The demo accounts have a published password and the seed deletes any user holding the demo
 // e-mails: never against production data (the build ships `dist/seed.js`).
@@ -21,7 +21,8 @@ createKeyProvider(env)
     return seedDemo(db);
   })
   .then(({ transactions: n }) => {
-    console.log(`✔ demo data ready: ${DEMO_EMAIL} / ${DEMO_PASSWORD} (${n} lançamentos)`);
+    console.log(`✔ demo data ready: ${DEMO_EMAIL} / ${DEMO_PASSWORD} (${n} lançamentos no espaço pessoal)`);
+    console.log(`  abre no escritório "${COMPANY_WORKSPACE_NAME}" (clientes, honorários e fornecedores)`);
     console.log(`  espaço compartilhado "Família Costa" com ${DEMO_PARTNER_EMAIL} / ${DEMO_PASSWORD}`);
   })
   .catch((err) => {

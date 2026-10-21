@@ -78,7 +78,7 @@ function ExportCard() {
     setExporting(true);
     try {
       const data = await exportWorkspaceData();
-      downloadJson(data, `effinance-${slug(workspace?.name ?? 'dados')}-${todayISO()}.json`);
+      downloadJson(data, `efficio-${slug(workspace?.name ?? 'dados')}-${todayISO()}.json`);
       toast.success('Exportação concluída');
     } catch (error) {
       toastError(error);

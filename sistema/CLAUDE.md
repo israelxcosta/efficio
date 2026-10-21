@@ -1,6 +1,7 @@
-# Effinance
+# Efficio — Sistema financeiro (base Effinance)
 
-Sistema financeiro pessoal (pt-BR). Monorepo pnpm:
+Sistema financeiro da empresa (pt-BR): clientes com honorários, fornecedores, contas a pagar/receber
+e relatórios. Construído sobre o Effinance (pacotes `@effinance/*` mantidos). Monorepo pnpm:
 
 - `packages/shared` — contrato: schemas Zod (`schemas.ts`), tipos de resposta (`types.ts`),
   catálogos (`constants.ts`: bancos, bandeiras, ícones, cores) e utilitários (datas, dinheiro,
@@ -26,6 +27,9 @@ Segurança (auditoria + correção com teste de regressão, um por linguagem/cam
 ## Regras
 
 - Dinheiro em centavos inteiros; datas de calendário como `YYYY-MM-DD`.
+- Clientes e fornecedores são `contacts` com `kind`; cliente com lançamentos não pode ser excluído
+  (só inativado). Vigências de honorários são anuais a partir do início do contrato (`feePeriod`).
+  Ver `docs/api.md` → "Clientes, honorários e fornecedores".
 - Toda query do backend filtra por `userId`.
 - UI em pt-BR; código em inglês.
 - Antes de concluir: `pnpm typecheck && pnpm test` (API precisa de Postgres; veja README).

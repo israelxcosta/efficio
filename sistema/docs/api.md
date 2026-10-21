@@ -44,11 +44,23 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/goals/:id/contributions` | — | `GoalContribution[]` |
 | POST | `/api/goals/:id/contributions` | `goalContributionInputSchema` | `GoalContribution` (201) |
 | DELETE | `/api/goals/:id/contributions/:contributionId` | — | 204 |
-| GET | `/api/contacts` | `contactQuerySchema` | `Paginated<Contact>` |
-| GET | `/api/contacts/:id` | — | `Contact` |
-| POST | `/api/contacts` | `contactInputSchema` | `Contact` (201) |
-| PUT | `/api/contacts/:id` | `contactInputSchema` | `Contact` |
-| DELETE | `/api/contacts/:id` | — | 204 (lançamentos ficam sem contato) |
+| GET | `/api/contacts` | `contactQuerySchema` (`kind`: `client` \| `supplier`; sem `kind` = ambos, para seletores) | `Paginated<Contact>` |
+| GET | `/api/contacts/:id` | — | `Contact` (só fornecedores) |
+| POST | `/api/contacts` | `contactInputSchema` | `Contact` (201) — cria um fornecedor |
+| PUT | `/api/contacts/:id` | `contactInputSchema` | `Contact` (só fornecedores; cliente → 404) |
+| DELETE | `/api/contacts/:id` | — | 204 (lançamentos ficam sem fornecedor; séries deixam de apontar para ele) |
+| GET | `/api/clients` | `clientQuerySchema` (`search`, `status`: `active` \| `inactive` \| `all`, `taxRegime`) | `ClientListResponse` (página + `summary`) |
+| GET | `/api/clients/:id` | — | `Client` |
+| POST | `/api/clients` | `clientInputSchema` | `Client` (201); 409 se o CNPJ já é cliente |
+| PUT | `/api/clients/:id` | `clientInputSchema` | `Client` |
+| DELETE | `/api/clients/:id` | — | 204; **409 se há lançamentos ou séries vinculados** |
+| POST | `/api/clients/:id/inactivate` | `clientInactivationSchema` (`date`, `reason`, `notes`) | `Client`; 409 se já inativo |
+| POST | `/api/clients/:id/reactivate` | — | `Client` |
+| GET | `/api/clients/:id/fees` | — | `ClientFeesResponse` (`current`, `items` mais recente primeiro, `next`) |
+| POST | `/api/clients/:id/fees` | `clientFeeInputSchema` (`amount`, `employeeFee`) | `ClientFee` (201) — próxima vigência |
+| PUT | `/api/clients/:id/fees/:feeId` | `clientFeeInputSchema` | `ClientFee` |
+| DELETE | `/api/clients/:id/fees/:feeId` | — | 204; 422 se não for a vigência mais recente |
+| GET | `/api/cnpj/:cnpj` | `cnpjParamsSchema` (14 dígitos válidos) | `CnpjLookupResult`; 404 não encontrado, 502 Receita indisponível, 503 desabilitado |
 | GET | `/api/transactions` | `transactionQuerySchema` (inclui `origin`: `manual` \| `file` \| `open_finance`) | `TransactionListResponse` |
 | GET | `/api/transactions/:id` | — | `Transaction` |
 | POST | `/api/transactions` | `transactionInputSchema` | `Transaction[]` (201) — todas as ocorrências criadas (e todas as partes, se dividido) |
@@ -103,6 +115,37 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 - **Relatórios por competência** (categorias, contatos, comparação, visão geral) usam `date` e
   incluem compras no cartão; **fluxo de caixa** usa a data efetiva e só movimentos de contas, com
   faturas pendentes projetadas no vencimento.
+
+## Clientes, honorários e fornecedores
+
+- **Contatos** têm `kind`: `supplier` (fornecedor, `/contacts`) ou `client` (empresa atendida,
+  `/clients`). Os dois aparecem nos seletores de lançamentos (`contactId`), então contas a receber se
+  vinculam ao cliente e contas a pagar ao fornecedor; relatórios por contato valem para ambos.
+- **Cliente** = empresa: CNPJ obrigatório e único por espaço (índice cego, índice único parcial),
+  razão social, nome fantasia, abertura, CNAE, contatos da empresa e do **responsável** (nome, e-mail
+  e telefone cifrados), **regime tributário** (Simples Nacional, MEI, Lucro Presumido, Lucro Real,
+  Imune/Isenta, Outro), **anexo do Simples** (I–V, obrigatório só no Simples; descartado nos demais)
+  e **data de início do contrato** (obrigatória).
+- **Importar da Receita** (`GET /cnpj/:cnpj`): consulta a BrasilAPI (dados públicos da Receita
+  Federal) **fora** da transação do banco e devolve os dados normalizados para o formulário — nada é
+  gravado. A Receita só informa as opções pelo Simples/MEI; Presumido/Real e o anexo são escolhidos
+  pelo usuário. O sócio administrador vira sugestão de responsável. `CNPJ_PROVIDER`: `brasilapi`
+  (padrão), `fake` (testes; recusado em produção) ou `disabled`. No build demo o navegador chama a
+  BrasilAPI direto (CSP do demo libera `connect-src https://brasilapi.com.br`).
+- **Inativação**: pede data (≥ início do contrato) e motivo — transferência de contabilidade,
+  encerramento de contrato, encerramento da empresa, inadimplência ou outro (este exige
+  observação, cifrada). Reativar limpa os três campos. Depois da data de inativação não há honorário
+  vigente nem nova vigência.
+- **Exclusão** só sem vínculos: com qualquer lançamento (`transactions.contact_id`) ou série
+  (`recurrences.template.contactId`) do cliente a API responde 409 — use a inativação. As vigências
+  vão junto com o cliente (FK em cascata).
+- **Honorários** (`client_fees`): uma linha por **vigência de 1 ano**, com honorário mensal e taxa
+  por empregado (centavos). Só o índice da vigência é gravado; as datas derivam do início do
+  contrato (`feePeriod` no contrato: a 1ª começa no início do contrato, as seguintes emendam ano a
+  ano; 29/02 vira 28/02 nos anos não bissextos). Alterar o início do contrato reposiciona todas. "+"
+  cria sempre a próxima vigência; só a mais recente pode ser excluída. **Vigente** = a vigência que
+  contém hoje; sem ela (nova ou vencida) o cliente entra em `summary.withoutCurrentFee`
+  ("reajuste pendente" na tela).
 
 ---
 
@@ -424,3 +467,15 @@ provider_unavailable` (agregador não respondeu; detalhes só no log do servidor
   UPDATE`). Um dump do banco não revela ids de item: o índice é um HMAC com chave protegida pelo KMS.
 - 0006: `import_batches.undone_at` e `import_tombstones` (tenant, RLS, FKs compostas `ON DELETE
   CASCADE` para conta/cartão, CHECK de exatamente um destino, únicos parciais por destino).
+
+## Banco (migração 0007)
+
+- `contacts`: `kind` (contatos existentes viram `supplier`), colunas do cliente (`trade_name`,
+  `opened_at`, `main_activity`, `responsible_*` cifrados, `tax_regime`, `simples_annex`,
+  `contract_start_date`, `status`, `inactivated_at`, `inactivation_reason`, `inactivation_notes`
+  cifrado) com CHECKs do contrato (cliente sempre com regime e início do contrato; anexo só no
+  Simples; inativo ⇔ data e motivo) e índice único parcial `(workspace_id, document_hash)` para
+  clientes.
+- `client_fees` (tenant, RLS `ENABLE`+`FORCE`, `UNIQUE (workspace_id, id)`, FK composta para o
+  cliente com `ON DELETE CASCADE`, único `(client_id, period_index)`, CHECKs de valor e índice).
+- A exportação LGPD inclui os campos de cliente decifrados e `clientFees`.

@@ -235,7 +235,7 @@ describe('workspace lifecycle and LGPD', () => {
       headers: { authorization: `Bearer ${owner.token}` },
     });
     expect(exported.statusCode).toBe(200);
-    expect(exported.headers['content-disposition']).toMatch(/attachment; filename="effinance-/);
+    expect(exported.headers['content-disposition']).toMatch(/attachment; filename="efficio-/);
     const data = exported.json();
     expect(data.workspace).toMatchObject({ id: familyId, name: 'Casa' });
     expect(data.contacts[0]).toMatchObject({ document: '52998224725', phone: '11987654321' });

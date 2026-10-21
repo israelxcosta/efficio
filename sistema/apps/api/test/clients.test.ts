@@ -309,6 +309,19 @@ describe('fees', () => {
   });
 });
 
+describe('business workspace', () => {
+  it('starts with business categories (fees, payroll, taxes)', async () => {
+    const created = await c.post('/workspaces', { name: 'Escritório', kind: 'business' });
+    expect(created.status).toBe(201);
+    expect((await c.post('/auth/switch-workspace', { workspaceId: created.body.id })).status).toBe(200);
+    const income = (await c.get('/categories?type=income')).body.map((x: { name: string }) => x.name);
+    const expense = (await c.get('/categories?type=expense')).body.map((x: { name: string }) => x.name);
+    expect(income).toContain('Honorários');
+    expect(expense).toEqual(expect.arrayContaining(['Pessoal', 'Impostos e taxas', 'Ocupação']));
+    expect(expense).not.toContain('Lazer');
+  });
+});
+
 describe('Receita Federal lookup', () => {
   it('returns the company data for the client form', async () => {
     const res = await c.get('/cnpj/11222333000181');

@@ -1,9 +1,15 @@
-# Effinance
+# Efficio — Sistema financeiro
 
-Sistema financeiro pessoal com visual SaaS clean (inspirado no Graniq, em azul-marinho):
-contas e carteiras, cartões de crédito com faturas, categorias e subcategorias com ícones e cores,
-metas, contatos, contas a pagar/receber com parcelas, recorrências e lançamentos fixos, extrato por
-conta, transferências e investimentos, e relatórios com insights.
+Sistema financeiro da Efficio Contabilidade, construído sobre a base do
+[Effinance](https://github.com/israelxcosta/effinance): **clientes** (empresas atendidas, com
+importação dos dados da Receita Federal, regime tributário, anexo do Simples, início do contrato e
+inativação com data e motivo), **honorários** por vigência anual com taxa por empregado,
+**fornecedores**, contas a pagar/receber com parcelas, recorrências e lançamentos fixos, contas e
+cartões, extrato, transferências e investimentos, e relatórios com insights. Visual SaaS clean
+(inspirado no Graniq, em azul-marinho).
+
+> Os pacotes continuam com o escopo `@effinance/*` e os papéis do banco com o prefixo
+> `effinance_` (nomes internos herdados da base; a marca visível é Efficio).
 
 ## Stack
 
@@ -45,7 +51,8 @@ cp apps/api/.env.example apps/api/.env
 
 # migrações + dados de demonstração
 pnpm db:migrate
-pnpm db:seed          # demo@effinance.app / demo12345 (espaço "Família Costa" com rafael@effinance.app)
+pnpm db:seed          # demo@efficio.app / demo12345 — abre no escritório "Efficio Contabilidade"
+                      # (também: espaço pessoal e "Família Costa" com rafael@efficio.app)
 
 # API (3333) + Web (5173)
 pnpm dev
@@ -80,12 +87,34 @@ cookie httpOnly e dados no servidor.
 
 ## Funcionalidades
 
+### Empresa (Efficio)
+
+- **Clientes** (`/clientes`): lista com resumo (clientes ativos, soma dos honorários vigentes,
+  clientes sem vigência atual e inativos), busca por razão social, fantasia ou CNPJ e filtros por
+  situação e regime. Em cada linha: **consultar**, **editar**, **honorários**, **inativar/reativar**
+  e **excluir** — a exclusão é bloqueada quando há qualquer lançamento vinculado ao cliente.
+- **Cadastro do cliente** com **Importar da Receita** (BrasilAPI): razão social, nome fantasia,
+  abertura, CNAE, e-mail, telefone, endereço, Simples/MEI e sócios (o administrador vira sugestão de
+  responsável). Campos de regime tributário, anexo do Simples (quando Simples Nacional), início do
+  contrato e contatos do responsável.
+- **Inativação** pede a data e o motivo: transferência de contabilidade, encerramento de contrato,
+  encerramento da empresa, inadimplência ou outro (com observação).
+- **Honorários**: janela com o honorário vigente em destaque, a lista simples de vigências e o botão
+  **+ Nova vigência**. Cada vigência dura 1 ano; a primeira começa na data de início do contrato e as
+  seguintes emendam ano a ano. Cada uma tem honorário mensal e taxa por empregado.
+- **Fornecedores** (`/fornecedores`) com nome, CPF/CNPJ, endereço, e-mail e telefone.
+- Contas a receber se vinculam ao cliente e contas a pagar ao fornecedor (seletores agrupados).
+- Espaços do tipo **Empresa** recebem categorias empresariais (Honorários, Pessoal, Impostos e
+  taxas, Ocupação, Tecnologia, Administrativo, Marketing...).
+
+### Base financeira
+
 1. **Categorias e subcategorias** de receitas e despesas, com ícone e cor.
 2. **Contas**: corrente, poupança, carteira, benefício, investimento; saldo atual e previsto.
 3. **Cartões de crédito**: banco (ícones dos principais bancos), bandeira, limite, dia de
    fechamento e vencimento; faturas por mês, limite usado/disponível e pagamento de fatura.
 4. **Metas** com aportes, progresso e quanto guardar por mês até o prazo.
-5. **Contatos** com nome, CPF/CNPJ (validado), endereço, e-mail e telefone.
+5. **Clientes e fornecedores** (ver acima).
 6. **Extrato** diário, semanal ou mensal por conta (ou todas), com saldo inicial, saldo após cada
    lançamento e saldo previsto.
 7. **Contas a pagar** e **8. contas a receber**: valor, categoria/subcategoria, vencimento,

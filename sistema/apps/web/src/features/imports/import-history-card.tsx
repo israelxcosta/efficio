@@ -110,9 +110,9 @@ export function ImportHistoryCard() {
                         {undone
                           ? ''
                           : empty
-                            ? ' · nenhum ainda no Effinance'
+                            ? ' · nenhum ainda no Efficio'
                             : b.remainingCount < b.createdCount
-                              ? ` · ${b.remainingCount} ainda no Effinance`
+                              ? ` · ${b.remainingCount} ainda no Efficio`
                               : ''}
                       </p>
                     </div>

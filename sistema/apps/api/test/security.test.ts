@@ -109,7 +109,7 @@ describe('two-factor authentication', () => {
     const user = await registerUser(app, 'Dois Fatores');
     const setup = await user.post('/auth/mfa/setup');
     expect(setup.status).toBe(200);
-    expect(setup.body.otpauthUrl).toMatch(/^otpauth:\/\/totp\/Effinance:/);
+    expect(setup.body.otpauthUrl).toMatch(/^otpauth:\/\/totp\/Efficio:/);
     const { secret } = setup.body;
 
     expect((await user.post('/auth/mfa/enable', { code: '000000' })).status).toBe(422);

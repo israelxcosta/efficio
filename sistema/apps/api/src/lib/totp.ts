@@ -88,7 +88,7 @@ export async function verifyTotp(
   return null;
 }
 
-export function otpauthUrl(secretBase32: string, account: string, issuer = 'Effinance'): string {
+export function otpauthUrl(secretBase32: string, account: string, issuer = 'Efficio'): string {
   const label = `${encodeURIComponent(issuer)}:${encodeURIComponent(account)}`;
   const params = new URLSearchParams({ secret: secretBase32, issuer, algorithm: 'SHA1', digits: '6', period: '30' });
   return `otpauth://totp/${label}?${params.toString()}`;

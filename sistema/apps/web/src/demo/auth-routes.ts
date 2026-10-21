@@ -116,7 +116,7 @@ export async function demoAuthRoutes(app: Scope) {
     if (result) {
       await app.platform.mailer.send({
         to: result.user.email,
-        subject: 'Redefinição de senha — Effinance',
+        subject: 'Redefinição de senha — Efficio',
         text: `Link de redefinição (demo): ${app.platform.appUrl}/redefinir-senha?token=${result.token}`,
       });
     }

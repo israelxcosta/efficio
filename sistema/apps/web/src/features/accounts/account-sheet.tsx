@@ -101,7 +101,7 @@ export function AccountSheet({ open, onOpenChange, account }: { open: boolean; o
 
         <Field
           label="Saldo inicial"
-          hint={account ? 'Alterar o saldo inicial recalcula o saldo atual.' : 'Saldo da conta antes dos lançamentos no Effinance. Use ± para negativo.'}
+          hint={account ? 'Alterar o saldo inicial recalcula o saldo atual.' : 'Saldo da conta antes dos lançamentos no Efficio. Use ± para negativo.'}
           error={formState.errors.initialBalance?.message}
         >
           <Controller

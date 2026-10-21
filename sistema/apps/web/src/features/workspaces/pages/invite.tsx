@@ -30,7 +30,7 @@ export default function InvitePage() {
 
   const footer = (
     <Link to="/" className="font-semibold text-brand-text hover:underline">
-      Ir para o Effinance
+      Ir para o Efficio
     </Link>
   );
 
@@ -91,7 +91,7 @@ export default function InvitePage() {
       subtitle={
         invite.expired
           ? 'Este convite não é mais válido. Peça um novo a quem convidou você.'
-          : `${invite.invitedBy} convidou você para participar deste espaço no Effinance.`
+          : `${invite.invitedBy} convidou você para participar deste espaço no Efficio.`
       }
       footer={footer}
     >

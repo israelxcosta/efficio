@@ -14,14 +14,14 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
       <div className="flex flex-col px-6 py-8 sm:px-12">
-        <span className="text-lg font-extrabold tracking-tight">effinance</span>
+        <span className="text-lg font-extrabold tracking-tight">efficio</span>
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
           <h1 className="text-[28px] font-semibold tracking-tight">{title}</h1>
           <p className="mt-1.5 text-sm text-muted">{subtitle}</p>
           <div className="mt-8">{children}</div>
           <div className="mt-6 text-center text-sm text-muted">{footer}</div>
         </div>
-        <p className="text-xs text-subtle">© {new Date().getFullYear()} Effinance</p>
+        <p className="text-xs text-subtle">© {new Date().getFullYear()} Efficio Contabilidade</p>
       </div>
       <div className="relative hidden overflow-hidden border-l border-border bg-surface-muted lg:block">
         <div className="dot-grid absolute inset-0 opacity-60" aria-hidden />

@@ -69,7 +69,7 @@ export async function toContact(cipher: FieldCipher, row: ContactRow): Promise<C
 }
 
 /** Encrypted columns (+ document blind index) for an insert/update. */
-export async function encryptContactInput<T extends ContactInput>(cipher: FieldCipher, input: T) {
+export async function encryptContactInput(cipher: FieldCipher, input: ContactInput) {
   const encrypted = await cipher.encryptFields(TABLE, input, CONTACT_ENCRYPTED_FIELDS);
   const digits = input.document ? onlyDigits(input.document) : '';
   return { ...encrypted, documentHash: digits ? await documentIndex(cipher, digits) : null };

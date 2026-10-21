@@ -143,7 +143,7 @@ function ConnectionItem({
     try {
       await remove.mutateAsync(c.id);
       setConfirming(false);
-      toast.success(`${c.institution.name} desconectado`, { description: 'O acesso foi revogado. Os lançamentos importados continuam no Effinance.' });
+      toast.success(`${c.institution.name} desconectado`, { description: 'O acesso foi revogado. Os lançamentos importados continuam no Efficio.' });
     } catch (error) {
       toastError(error);
     }
@@ -267,7 +267,7 @@ function ConnectionItem({
         open={confirming}
         onOpenChange={setConfirming}
         title={`Desconectar ${c.institution.name}?`}
-        description="O consentimento é revogado e o Effinance deixa de acessar os dados desta instituição. Os lançamentos já importados permanecem — exclua-os pelo histórico de importações, se quiser."
+        description="O consentimento é revogado e o Efficio deixa de acessar os dados desta instituição. Os lançamentos já importados permanecem — exclua-os pelo histórico de importações, se quiser."
         confirmLabel="Desconectar"
         loading={remove.isPending}
         onConfirm={() => void disconnect()}

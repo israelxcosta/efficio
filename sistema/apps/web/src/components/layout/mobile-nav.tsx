@@ -80,7 +80,7 @@ export function MobileNav({ onSearch }: { onSearch: () => void }) {
           Mais
         </button>
       </nav>
-      <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Menu" description="Todas as seções do Effinance">
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Menu" description="Todas as seções do Efficio">
         <div className="flex flex-col gap-1">
           <p className="eyebrow px-3 pb-1 text-subtle">Espaço</p>
           <WorkspaceList

@@ -41,7 +41,7 @@ const envSchema = z
     AWS_REGION: optional,
 
     MAILER: z.enum(['console', 'memory', 'webhook', 'ses']).optional(),
-    MAIL_FROM: z.string().default('Effinance <nao-responda@effinance.app>'),
+    MAIL_FROM: z.string().default('Efficio <nao-responda@efficio.app>'),
     MAIL_WEBHOOK_URL: optional,
     MAIL_WEBHOOK_SECRET: optional,
 

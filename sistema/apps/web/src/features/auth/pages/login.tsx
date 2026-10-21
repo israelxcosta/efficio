@@ -27,7 +27,7 @@ export default function LoginPage() {
   const form = useForm<LoginForm, unknown, z.output<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     // The demo build ships a sample user; prefill it so testers can sign in with one click.
-    defaultValues: IS_DEMO ? { email: 'demo@effinance.app', password: 'demo12345' } : { email: '', password: '' },
+    defaultValues: IS_DEMO ? { email: 'demo@efficio.app', password: 'demo12345' } : { email: '', password: '' },
   });
   // Only in-app paths: `from` comes from the URL the visitor first opened (e.g. `//evil.example`).
   const from = safeInternalPath((location.state as { from?: unknown } | null)?.from);

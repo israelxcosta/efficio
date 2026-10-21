@@ -117,8 +117,8 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
     const kind = WORKSPACE_KIND_LABELS[req.access.workspaceKind].toLowerCase();
     await app.platform.mailer.send({
       to: invite.email,
-      subject: oneLine(`Convite para o espaço "${req.access.workspaceName}" no Effinance`),
-      text: `Você foi convidado(a) para participar do espaço ${kind} "${req.access.workspaceName}" no Effinance.\n\nPara aceitar, acesse (válido por 7 dias):\n${url}`,
+      subject: oneLine(`Convite para o espaço "${req.access.workspaceName}" no Efficio`),
+      text: `Você foi convidado(a) para participar do espaço ${kind} "${req.access.workspaceName}" no Efficio.\n\nPara aceitar, acesse (válido por 7 dias):\n${url}`,
     });
     await audit(app.db, { ...requestContext(req), action: INVITED_ACTION, workspaceId: req.workspaceId, userId: req.userId, entity: 'invite', entityId: invite.id, metadata: { role: invite.role } });
     // Without real e-mail delivery the owner shares the link by hand.
@@ -138,7 +138,7 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
     assertOwner(req.access);
     const data = await exportWorkspace(app.db, req.access);
     await audit(app.db, { ...requestContext(req), action: 'data.exported', workspaceId: req.workspaceId, userId: req.userId, entity: 'workspace', entityId: req.workspaceId });
-    reply.header('content-disposition', `attachment; filename="effinance-${data.exportedAt.slice(0, 10)}.json"`);
+    reply.header('content-disposition', `attachment; filename="efficio-${data.exportedAt.slice(0, 10)}.json"`);
     reply.header('cache-control', 'no-store');
     return data;
   });

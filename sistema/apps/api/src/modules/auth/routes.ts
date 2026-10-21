@@ -165,7 +165,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
       app.platform.mailer
         .send({
           to: result.user.email,
-          subject: 'Redefinição de senha — Effinance',
+          subject: 'Redefinição de senha — Efficio',
           text: `Olá, ${result.user.name}.\n\nPara criar uma nova senha, acesse o link abaixo (válido por 30 minutos):\n${link}\n\nSe você não pediu a redefinição, ignore este e-mail.`,
         })
         .catch((err: unknown) => req.log.error({ err }, 'password reset e-mail failed'));

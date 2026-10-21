@@ -13,8 +13,8 @@ const TERMS: Section[] = [
   {
     title: '1. O serviço',
     paragraphs: [
-      'O Effinance é um sistema on-line de organização financeira pessoal, familiar e empresarial: contas, cartões, contas a pagar e a receber, metas, contatos e relatórios.',
-      'O Effinance não é instituição financeira, não movimenta dinheiro e não presta consultoria de investimentos. As informações e projeções exibidas são estimativas baseadas nos dados que você cadastra.',
+      'O Efficio é um sistema on-line de organização financeira pessoal, familiar e empresarial: contas, cartões, contas a pagar e a receber, metas, contatos e relatórios.',
+      'O Efficio não é instituição financeira, não movimenta dinheiro e não presta consultoria de investimentos. As informações e projeções exibidas são estimativas baseadas nos dados que você cadastra.',
     ],
   },
   {
@@ -28,7 +28,7 @@ const TERMS: Section[] = [
     title: '3. Assinatura, teste e pagamento',
     paragraphs: [
       `Novos espaços têm ${TRIAL_DAYS} dias de teste grátis, sem cartão. Depois disso, é necessário assinar um plano para continuar criando e editando dados; a consulta e a exportação continuam disponíveis.`,
-      'Os pagamentos são processados pelo Mercado Pago, em cobrança recorrente mensal ou anual conforme o plano. O Effinance não armazena dados de cartão.',
+      'Os pagamentos são processados pelo Mercado Pago, em cobrança recorrente mensal ou anual conforme o plano. O Efficio não armazena dados de cartão.',
       `Se um pagamento falhar, o espaço mantém acesso completo por ${GRACE_DAYS} dias enquanto a cobrança é refeita. Você pode cancelar a qualquer momento; o acesso segue até o fim do período já pago.`,
     ],
   },
@@ -63,7 +63,7 @@ const PRIVACY: Section[] = [
   {
     title: '1. Quem somos',
     paragraphs: [
-      'Esta política explica como o Effinance trata dados pessoais conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018 — LGPD). Controlador: [RAZÃO SOCIAL], CNPJ [00.000.000/0000-00], [ENDEREÇO].',
+      'Esta política explica como o Efficio trata dados pessoais conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018 — LGPD). Controlador: [RAZÃO SOCIAL], CNPJ [00.000.000/0000-00], [ENDEREÇO].',
       'Encarregado (DPO): [NOME] — [e-mail do encarregado].',
     ],
   },
@@ -119,7 +119,7 @@ function LegalPage({ title, sections }: { title: string; sections: Section[] }) 
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <Link to="/" className="text-lg font-extrabold tracking-tight text-fg">
-            effinance
+            efficio
           </Link>
           <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-text hover:underline">
             <ArrowLeft className="size-4" /> Voltar

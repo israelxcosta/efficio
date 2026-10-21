@@ -89,7 +89,7 @@ export class MercadoPagoProvider implements BillingProvider {
 
   async createCheckout(req: CheckoutRequest): Promise<CheckoutResult> {
     const out = await this.request<PreapprovalResponse>('POST', '/preapproval', {
-      reason: `Effinance ${req.plan.name}`,
+      reason: `Efficio ${req.plan.name}`,
       external_reference: req.workspaceId,
       payer_email: req.payerEmail,
       back_url: req.backUrl,
