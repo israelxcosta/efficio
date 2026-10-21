@@ -1,0 +1,320 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/plus-jakarta-sans';
+
+/* Dark mode is driven by <html data-theme="dark"> (see src/lib/theme.tsx). */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ---------------------------------------------------------------------------
+ * Design tokens — docs/design-system.md
+ * ------------------------------------------------------------------------- */
+:root {
+  --brand-50: #f1f5fd;
+  --brand-100: #e3eaf8;
+  --brand-200: #c6d4f1;
+  --brand-300: #9ab2e6;
+  --brand-400: #6889d4;
+  --brand-500: #3f64be;
+  --brand-600: #2a4c9f;
+  --brand-700: #1e3a80;
+  --brand-800: #152b61;
+  --brand-900: #0f1f47;
+  --brand-950: #0a1530;
+
+  --app-bg: #f6f6f4;
+  --app-bg-subtle: #efefec;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f7f7f5;
+  --app-border: #e7e7e3;
+  --app-border-strong: #d6d6d1;
+  --app-fg: #16181d;
+  --app-muted: #6b6f76;
+  --app-subtle: #9a9ea5;
+
+  --app-primary: var(--brand-800);
+  --app-primary-hover: var(--brand-700);
+  --app-primary-fg: #ffffff;
+  --app-primary-soft: var(--brand-100);
+  --app-primary-soft-fg: var(--brand-800);
+  --app-ring: var(--brand-500);
+  --app-brand-text: var(--brand-700);
+
+  --app-success: #12a150;
+  --app-success-soft: #e7f6ed;
+  --app-danger: #e5484d;
+  --app-danger-soft: #fdecec;
+  --app-warning: #b7791f;
+  --app-warning-soft: #fef6da;
+
+  --app-chart-income: var(--brand-300);
+  --app-chart-income-strong: var(--brand-700);
+  --app-chart-expense: #f2a3a5;
+  --app-chart-expense-strong: #e5484d;
+  /* Neutral series (e.g. the earlier period in comparisons). */
+  --app-chart-neutral: #d4d4d8;
+  --app-chart-grid: #e7e7e3;
+  /* Ordered data series (e.g. fixed / installments / variable) and single-series accents. */
+  --app-chart-1: var(--brand-800);
+  --app-chart-2: var(--brand-500);
+  --app-chart-3: var(--brand-300);
+  --app-chart-accent: var(--brand-500);
+
+  /* Gradient "hero" cards (insights, highlights) with white text. */
+  --app-hero-from: var(--brand-700);
+  --app-hero-via: var(--brand-800);
+  --app-hero-to: var(--brand-950);
+  --app-hero-accent: var(--brand-200);
+
+  --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-sm: 0 1px 3px rgb(16 24 40 / 0.06), 0 1px 2px rgb(16 24 40 / 0.03);
+  --shadow-lg: 0 12px 32px -8px rgb(16 24 40 / 0.18);
+
+  color-scheme: light;
+}
+
+/*
+ * Dark mode: neutral grays, white and off-white — dark gray page, lighter gray cards and sections,
+ * off-white text. The navy ramp becomes an inverted gray ramp (50 = dark … 950 = light), so utilities
+ * like `text-brand-700` stay readable and `bg-brand-50` stays a subtle tint; gradient cards use the
+ * hero tokens instead. The primary action is off-white with dark text.
+ */
+[data-theme='dark'] {
+  --brand-50: #303030;
+  --brand-100: #383838;
+  --brand-200: #424242;
+  --brand-300: #555554;
+  --brand-400: #73726f;
+  --brand-500: #96958f;
+  --brand-600: #b5b4ae;
+  --brand-700: #d1d0ca;
+  --brand-800: #e3e2dd;
+  --brand-900: #efeee9;
+  --brand-950: #f7f6f3;
+
+  --app-bg: #1e1e1e;
+  --app-bg-subtle: #252525;
+  --app-surface: #2b2b2b;
+  --app-surface-muted: #323232;
+  --app-border: #3b3b3b;
+  --app-border-strong: #4c4c4b;
+  --app-fg: #f4f3ef;
+  --app-muted: #cac9c3;
+  --app-subtle: #9c9b95;
+
+  --app-primary: #f4f3ef;
+  --app-primary-hover: #ffffff;
+  --app-primary-fg: #1e1e1e;
+  --app-primary-soft: #3b3b3b;
+  --app-primary-soft-fg: #f4f3ef;
+  --app-ring: #b5b4ae;
+  --app-brand-text: #e3e2dd;
+
+  --app-success: #4fcb85;
+  --app-success-soft: #27392d;
+  --app-danger: #f27a7d;
+  --app-danger-soft: #432a2b;
+  --app-warning: #e2b257;
+  --app-warning-soft: #3d3422;
+
+  --app-chart-income: #e3e2dd;
+  --app-chart-income-strong: #f4f3ef;
+  --app-chart-expense: #c4595d;
+  --app-chart-expense-strong: #f27a7d;
+  --app-chart-neutral: #5d5d5b;
+  --app-chart-grid: #3b3b3b;
+  --app-chart-1: #f4f3ef;
+  --app-chart-2: #b5b4ae;
+  --app-chart-3: #73726f;
+  --app-chart-accent: #d1d0ca;
+
+  --app-hero-from: #4a4a49;
+  --app-hero-via: #3b3b3b;
+  --app-hero-to: #2b2b2b;
+  --app-hero-accent: #f4f3ef;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.25);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.55);
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
+
+  --color-bg: var(--app-bg);
+  --color-bg-subtle: var(--app-bg-subtle);
+  --color-surface: var(--app-surface);
+  --color-surface-muted: var(--app-surface-muted);
+  --color-border: var(--app-border);
+  --color-border-strong: var(--app-border-strong);
+  --color-fg: var(--app-fg);
+  --color-muted: var(--app-muted);
+  --color-subtle: var(--app-subtle);
+
+  --color-primary: var(--app-primary);
+  --color-primary-hover: var(--app-primary-hover);
+  --color-primary-fg: var(--app-primary-fg);
+  --color-primary-soft: var(--app-primary-soft);
+  --color-primary-soft-fg: var(--app-primary-soft-fg);
+  --color-ring: var(--app-ring);
+  --color-brand-text: var(--app-brand-text);
+
+  --color-success: var(--app-success);
+  --color-success-soft: var(--app-success-soft);
+  --color-danger: var(--app-danger);
+  --color-danger-soft: var(--app-danger-soft);
+  --color-warning: var(--app-warning);
+  --color-warning-soft: var(--app-warning-soft);
+
+  --color-hero-from: var(--app-hero-from);
+  --color-hero-via: var(--app-hero-via);
+  --color-hero-to: var(--app-hero-to);
+  --color-hero-accent: var(--app-hero-accent);
+
+  --color-chart-income: var(--app-chart-income);
+  --color-chart-expense: var(--app-chart-expense);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-lg: var(--shadow-lg);
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-pop: pop 260ms var(--ease-out-soft);
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-sheet-in: sheet-in 240ms var(--ease-out-soft);
+  --animate-sheet-out: sheet-out 200ms ease-in;
+  --animate-dialog-in: dialog-in 180ms var(--ease-out-soft);
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes sheet-out {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes shimmer {
+  0% { opacity: 0.55; }
+  50% { opacity: 1; }
+  100% { opacity: 0.55; }
+}
+
+/*
+ * Page canvas — deliberately outside @layer: hosts that wrap the app (e.g. the claude.ai demo) ship
+ * unlayered body rules (font, colors) that would otherwise beat Tailwind's layered base.
+ */
+html:root,
+html:root > body {
+  background: var(--app-bg);
+  color: var(--app-fg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--app-border);
+  }
+
+  /* Charts are operated with the mouse; keep the focus ring for keyboard users only. */
+  .recharts-wrapper :focus:not(:focus-visible),
+  .recharts-surface:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--brand-500) 25%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--app-ring);
+    outline-offset: 2px;
+  }
+
+  input[type='date']::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+    cursor: pointer;
+  }
+  [data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-border-strong) transparent;
+  }
+
+  .dot-grid {
+    background-image: radial-gradient(var(--app-border-strong) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+}
+
+/* Custom utilities (usable with variants, e.g. [&_x]:eyebrow). */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
