@@ -5,16 +5,22 @@ import type {
   BankCode,
   CardBrand,
   CategoryType,
+  ClientStatus,
+  ContactKind,
   Frequency,
   IconName,
+  InactivationReason,
   InvoiceStatus,
   PaymentMethod,
   RecurrenceKind,
+  SimplesAnnex,
+  TaxRegime,
   TransactionType,
   TransferKind,
 } from './constants';
 import type { TransactionOrigin } from './integrations';
 import type { ISODate, MonthKey } from './utils/dates';
+import type { FeePeriod } from './utils/fees';
 
 export interface ApiError {
   /** Machine-readable code: 'validation_error' | 'not_found' | 'unauthorized' | 'conflict' | ... */
@@ -152,6 +158,10 @@ export interface GoalContribution {
 
 export interface Contact {
   id: string;
+  /** Client (empresa atendida) or supplier (fornecedor). */
+  kind: ContactKind;
+  /** Suppliers are always active; clients can be inactivated. */
+  status: ClientStatus;
   name: string;
   /** Digits only (CPF or CNPJ). */
   document: string | null;
@@ -167,6 +177,106 @@ export interface Contact {
   state: string | null;
   notes: string | null;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Clients (empresas atendidas) and fees (honorários)
+// ---------------------------------------------------------------------------
+
+export interface ClientInactivation {
+  date: ISODate;
+  reason: InactivationReason;
+  notes: string | null;
+}
+
+/** One fee period (vigência): one year, the first starting on the contract start date. */
+export interface ClientFee extends FeePeriod {
+  id: string;
+  clientId: string;
+  /** Honorário mensal (cents). */
+  amount: number;
+  /** Taxa por empregado (cents per employee, per month). */
+  employeeFee: number;
+  createdAt: string;
+}
+
+export interface Client {
+  id: string;
+  /** Razão social. */
+  name: string;
+  /** Nome fantasia. */
+  tradeName: string | null;
+  /** CNPJ, digits only. */
+  document: string;
+  openedAt: ISODate | null;
+  mainActivity: string | null;
+  email: string | null;
+  phone: string | null;
+  responsibleName: string | null;
+  responsibleEmail: string | null;
+  responsiblePhone: string | null;
+  taxRegime: TaxRegime;
+  /** Only for the Simples Nacional. */
+  simplesAnnex: SimplesAnnex | null;
+  contractStartDate: ISODate;
+  zipCode: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  district: string | null;
+  city: string | null;
+  state: string | null;
+  notes: string | null;
+  status: ClientStatus;
+  /** Set while inactive. */
+  inactivation: ClientInactivation | null;
+  /** Fee period that contains today, when registered. */
+  currentFee: ClientFee | null;
+  /** Most recent registered period (may have expired or not started yet). */
+  latestFee: ClientFee | null;
+  /** Transactions (lançamentos) linked to the client. While > 0 the client cannot be deleted. */
+  transactionCount: number;
+  createdAt: string;
+}
+
+export interface ClientFeesResponse {
+  /** Period that contains today, when registered. */
+  current: ClientFee | null;
+  /** Every period, newest first. */
+  items: ClientFee[];
+  /** Period the next registration ("+ nova vigência") will cover. */
+  next: FeePeriod;
+}
+
+export interface CnpjPartner {
+  name: string;
+  /** Qualificação, e.g. "Sócio-Administrador". */
+  role: string | null;
+}
+
+/** Basic company data from the Receita Federal (CNPJ), normalized for the client form. */
+export interface CnpjLookupResult {
+  document: string;
+  name: string;
+  tradeName: string | null;
+  openedAt: ISODate | null;
+  mainActivity: string | null;
+  /** Situação cadastral, e.g. "ATIVA", "BAIXADA". */
+  registrationStatus: string | null;
+  email: string | null;
+  phone: string | null;
+  zipCode: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  district: string | null;
+  city: string | null;
+  state: string | null;
+  /** Simples Nacional / MEI when the company opted in; null otherwise (Presumido/Real are not public). */
+  taxRegime: TaxRegime | null;
+  partners: CnpjPartner[];
+  /** Suggested responsible person: the first administrator partner. */
+  responsibleName: string | null;
 }
 
 // ---------------------------------------------------------------------------

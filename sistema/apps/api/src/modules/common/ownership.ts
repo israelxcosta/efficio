@@ -55,6 +55,24 @@ export async function getContactOrThrow(db: DbExecutor, workspaceId: string, id:
   return row;
 }
 
+export async function getSupplierOrThrow(db: DbExecutor, workspaceId: string, id: string): Promise<ContactRow> {
+  const [row] = await db
+    .select()
+    .from(contacts)
+    .where(and(eq(contacts.id, id), eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'supplier')));
+  if (!row) throw new NotFoundError('Fornecedor não encontrado');
+  return row;
+}
+
+export async function getClientOrThrow(db: DbExecutor, workspaceId: string, id: string): Promise<ContactRow> {
+  const [row] = await db
+    .select()
+    .from(contacts)
+    .where(and(eq(contacts.id, id), eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client')));
+  if (!row) throw new NotFoundError('Cliente não encontrado');
+  return row;
+}
+
 export async function getGoalOrThrow(db: DbExecutor, workspaceId: string, id: string): Promise<GoalRow> {
   const [row] = await db
     .select()

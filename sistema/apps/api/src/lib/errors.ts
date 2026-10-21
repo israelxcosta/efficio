@@ -62,6 +62,8 @@ const UNIQUE_CONFLICTS: Record<string, string> = {
   users_email_unique: 'Já existe uma conta com este e-mail',
   workspace_invites_pending_email_uq: 'Já existe um convite pendente para este e-mail',
   workspace_members_single_owner_uq: 'Este espaço já tem um proprietário',
+  contacts_client_document_uq: 'Já existe um cliente cadastrado com este CNPJ',
+  client_fees_period_uq: 'Esta vigência já foi cadastrada. Atualize a página e tente novamente.',
 };
 
 /**

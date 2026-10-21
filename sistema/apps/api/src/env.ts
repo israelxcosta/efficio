@@ -67,6 +67,12 @@ const envSchema = z
     /** Public base URL of this API (webhook URL given to the aggregator), e.g. https://api.effinance.com.br. */
     API_PUBLIC_URL: optional.transform((v) => v?.replace(/\/+$/, '')),
 
+    /**
+     * Company data by CNPJ (Receita Federal) in the client form. brasilapi = public BrasilAPI
+     * (default outside tests); fake = fictitious companies (tests, offline development); disabled.
+     */
+    CNPJ_PROVIDER: z.enum(['brasilapi', 'fake', 'disabled']).optional(),
+
     /** Shared rate-limit store for multiple API instances. */
     REDIS_URL: optional,
   })
@@ -121,6 +127,9 @@ const envSchema = z
         issue('DATABASE_SSL', 'must be verify-full in production (TLS with certificate and host verification)');
       }
       if (!e.APP_URL.startsWith('https://')) issue('APP_URL', 'must be an https URL in production');
+      if (e.CNPJ_PROVIDER === 'fake') {
+        issue('CNPJ_PROVIDER', 'the fake provider is not allowed in production (fictitious companies; use brasilapi or disabled)');
+      }
       if (e.OPEN_FINANCE_PROVIDER === 'fake') {
         issue('OPEN_FINANCE_PROVIDER', 'the fake provider is not allowed in production (use pluggy or disabled)');
       }

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { accountRoutes } from './modules/accounts/routes';
 import { categoryRoutes } from './modules/categories/routes';
+import { clientRoutes, cnpjRoutes } from './modules/clients/routes';
 import { contactRoutes } from './modules/contacts/routes';
 import { creditCardRoutes } from './modules/credit-cards/routes';
 import { dashboardRoutes } from './modules/dashboard/routes';
@@ -23,6 +24,7 @@ export const domainRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] =
   { prefix: '/credit-cards', plugin: creditCardRoutes },
   { prefix: '/goals', plugin: goalRoutes },
   { prefix: '/contacts', plugin: contactRoutes },
+  { prefix: '/clients', plugin: clientRoutes },
   { prefix: '/transactions', plugin: transactionRoutes },
   { prefix: '/transfers', plugin: transferRoutes },
   { prefix: '/statement', plugin: statementRoutes },
@@ -38,4 +40,5 @@ export const domainRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] =
 export const scopedRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] = [
   { prefix: '/imports', plugin: importRoutes },
   { prefix: '/open-finance', plugin: openFinanceRoutes },
+  { prefix: '/cnpj', plugin: cnpjRoutes },
 ];

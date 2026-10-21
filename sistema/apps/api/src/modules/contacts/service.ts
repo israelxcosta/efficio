@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, or } from 'drizzle-orm';
+import { and, asc, eq, ilike, or, sql } from 'drizzle-orm';
 import {
   onlyDigits,
   type Contact,
@@ -8,11 +8,11 @@ import {
 } from '@effinance/shared';
 import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
-import { contacts, type ContactRow } from '../../db/schema';
+import { contacts, recurrences, type ContactRow } from '../../db/schema';
 import { getCipher } from '../../lib/crypto/keyring';
 import type { FieldCipher } from '../../lib/crypto/field-cipher';
 import { countAll, likePattern } from '../../lib/sql';
-import { getContactOrThrow } from '../common/ownership';
+import { getSupplierOrThrow } from '../common/ownership';
 
 type ContactInput = z.output<typeof contactInputSchema>;
 type ContactQuery = z.output<typeof contactQuerySchema>;
@@ -30,6 +30,15 @@ export const CONTACT_ENCRYPTED_FIELDS = [
   'notes',
 ] as const satisfies readonly (keyof ContactRow & keyof ContactInput)[];
 
+/** Every encrypted column of `contacts` (supplier fields + the client-only personal fields). */
+export const CONTACT_ALL_ENCRYPTED_FIELDS = [
+  ...CONTACT_ENCRYPTED_FIELDS,
+  'responsibleName',
+  'responsibleEmail',
+  'responsiblePhone',
+  'inactivationNotes',
+] as const satisfies readonly (keyof ContactRow)[];
+
 const TABLE = 'contacts';
 
 /** Blind index of a CPF/CNPJ (digits only) for exact search. */
@@ -41,6 +50,8 @@ export async function toContact(cipher: FieldCipher, row: ContactRow): Promise<C
   const plain = await cipher.decryptFields(TABLE, row, CONTACT_ENCRYPTED_FIELDS);
   return {
     id: plain.id,
+    kind: plain.kind,
+    status: plain.status,
     name: plain.name,
     document: plain.document,
     email: plain.email,
@@ -58,7 +69,7 @@ export async function toContact(cipher: FieldCipher, row: ContactRow): Promise<C
 }
 
 /** Encrypted columns (+ document blind index) for an insert/update. */
-export async function encryptContactInput(cipher: FieldCipher, input: ContactInput) {
+export async function encryptContactInput<T extends ContactInput>(cipher: FieldCipher, input: T) {
   const encrypted = await cipher.encryptFields(TABLE, input, CONTACT_ENCRYPTED_FIELDS);
   const digits = input.document ? onlyDigits(input.document) : '';
   return { ...encrypted, documentHash: digits ? await documentIndex(cipher, digits) : null };
@@ -66,7 +77,8 @@ export async function encryptContactInput(cipher: FieldCipher, input: ContactInp
 
 /**
  * Search: name (partial) or CPF/CNPJ (exact, through the blind index). Encrypted fields such as
- * e-mail and phone are not searchable.
+ * e-mail and phone are not searchable. Without `kind`, suppliers and clients (pickers of the
+ * transaction forms and filters).
  */
 export async function listContacts(db: DbExecutor, workspaceId: string, q: ContactQuery): Promise<Paginated<Contact>> {
   const cipher = await getCipher(workspaceId);
@@ -80,7 +92,7 @@ export async function listContacts(db: DbExecutor, workspaceId: string, q: Conta
         : undefined,
     );
   }
-  const where = and(eq(contacts.workspaceId, workspaceId), search);
+  const where = and(eq(contacts.workspaceId, workspaceId), q.kind ? eq(contacts.kind, q.kind) : undefined, search);
   const [rows, [count]] = await Promise.all([
     db
       .select()
@@ -99,21 +111,22 @@ export async function listContacts(db: DbExecutor, workspaceId: string, q: Conta
   };
 }
 
+/** Suppliers only: clients are read and written through /clients. */
 export async function getContact(db: DbExecutor, workspaceId: string, id: string) {
-  return toContact(await getCipher(workspaceId), await getContactOrThrow(db, workspaceId, id));
+  return toContact(await getCipher(workspaceId), await getSupplierOrThrow(db, workspaceId, id));
 }
 
 export async function createContact(db: DbExecutor, workspaceId: string, input: ContactInput) {
   const cipher = await getCipher(workspaceId);
   const [row] = await db
     .insert(contacts)
-    .values({ workspaceId, ...(await encryptContactInput(cipher, input)) })
+    .values({ workspaceId, kind: 'supplier', ...(await encryptContactInput(cipher, input)) })
     .returning();
   return toContact(cipher, row!);
 }
 
 export async function updateContact(db: DbExecutor, workspaceId: string, id: string, input: ContactInput) {
-  await getContactOrThrow(db, workspaceId, id);
+  await getSupplierOrThrow(db, workspaceId, id);
   const cipher = await getCipher(workspaceId);
   const [row] = await db
     .update(contacts)
@@ -123,8 +136,20 @@ export async function updateContact(db: DbExecutor, workspaceId: string, id: str
   return toContact(cipher, row!);
 }
 
-/** Transactions keep existing without the contact (FK is ON DELETE SET NULL). */
+/**
+ * Series templates keep a copy of the contact id (jsonb, no foreign key): without clearing it, the
+ * next occurrence generated from the series would point at the deleted contact.
+ */
+export async function detachContactFromSeries(db: DbExecutor, workspaceId: string, id: string) {
+  await db
+    .update(recurrences)
+    .set({ template: sql`jsonb_set(${recurrences.template}, '{contactId}', 'null'::jsonb)` })
+    .where(and(eq(recurrences.workspaceId, workspaceId), sql`${recurrences.template}->>'contactId' = ${id}`));
+}
+
+/** Transactions keep existing without the supplier (FK is ON DELETE SET NULL). */
 export async function deleteContact(db: DbExecutor, workspaceId: string, id: string) {
-  await getContactOrThrow(db, workspaceId, id);
+  await getSupplierOrThrow(db, workspaceId, id);
+  await detachContactFromSeries(db, workspaceId, id);
   await db.delete(contacts).where(eq(contacts.id, id));
 }

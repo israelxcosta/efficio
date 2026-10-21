@@ -7,16 +7,21 @@ import {
   BANK_CODES,
   CARD_BRANDS,
   CATEGORY_TYPES,
+  CLIENT_STATUSES,
+  CONTACT_KINDS,
   FREQUENCIES,
   GRANULARITIES,
   ICON_NAMES,
+  INACTIVATION_REASONS,
   PAYMENT_METHODS,
   RECURRENCE_KINDS,
   SERIES_SCOPES,
+  SIMPLES_ANNEXES,
+  TAX_REGIMES,
   TRANSACTION_STATUSES,
 } from './constants';
 import { isISODate } from './utils/dates';
-import { isValidDocument, isValidPhone, onlyDigits } from './utils/documents';
+import { isValidCNPJ, isValidDocument, isValidPhone, onlyDigits } from './utils/documents';
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -211,22 +216,21 @@ export type GoalContributionInput = z.input<typeof goalContributionInputSchema>;
 // Contacts
 // ---------------------------------------------------------------------------
 
-export const contactInputSchema = z.object({
-  name: requiredName(120),
-  document: z
-    .string()
-    .nullish()
-    .transform((v) => (v ? onlyDigits(v) : null))
-    .refine((v) => v === null || isValidDocument(v), { message: 'CPF/CNPJ inválido' }),
-  email: z
+const optionalEmail = () =>
+  z
     .union([z.email({ message: 'E-mail inválido' }), z.literal('')])
     .nullish()
-    .transform((v) => (v ? v.toLowerCase() : null)),
-  phone: z
+    .transform((v) => (v ? v.toLowerCase() : null));
+
+const optionalPhone = () =>
+  z
     .string()
     .nullish()
     .transform((v) => (v ? onlyDigits(v) : null))
-    .refine((v) => v === null || isValidPhone(v), { message: 'Telefone inválido' }),
+    .refine((v) => v === null || isValidPhone(v), { message: 'Telefone inválido' });
+
+/** Address and notes, shared by suppliers and clients. */
+const addressFields = {
   zipCode: z
     .string()
     .nullish()
@@ -246,12 +250,115 @@ export const contactInputSchema = z.object({
     .or(z.literal(''))
     .transform((v) => (v ? v : null)),
   notes: optionalText(500),
+};
+
+/** Suppliers (fornecedores). Clients have their own, richer schema below. */
+export const contactInputSchema = z.object({
+  name: requiredName(120),
+  document: z
+    .string()
+    .nullish()
+    .transform((v) => (v ? onlyDigits(v) : null))
+    .refine((v) => v === null || isValidDocument(v), { message: 'CPF/CNPJ inválido' }),
+  email: optionalEmail(),
+  phone: optionalPhone(),
+  ...addressFields,
 });
 export type ContactInput = z.input<typeof contactInputSchema>;
 
 export const contactQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().max(80).optional(),
+  kind: z.enum(CONTACT_KINDS).optional(),
 });
+
+// ---------------------------------------------------------------------------
+// Clients (empresas atendidas) and their fees (honorários)
+// ---------------------------------------------------------------------------
+
+const requiredDate = (message: string) => z.string({ message }).min(1, { message }).pipe(isoDateSchema);
+
+const optionalDate = () =>
+  z
+    .union([z.literal(''), isoDateSchema])
+    .nullish()
+    .transform((v) => (v ? v : null));
+
+export const cnpjSchema = z
+  .string({ message: 'Informe o CNPJ' })
+  .transform((v) => onlyDigits(v))
+  .superRefine((v, ctx) => {
+    if (!v) ctx.addIssue({ code: 'custom', message: 'Informe o CNPJ' });
+    else if (!isValidCNPJ(v)) ctx.addIssue({ code: 'custom', message: 'CNPJ inválido' });
+  });
+
+export const clientInputSchema = z
+  .object({
+    /** Razão social. */
+    name: z
+      .string()
+      .trim()
+      .min(1, { message: 'Informe a razão social' })
+      .max(160, { message: 'Máximo de 160 caracteres' }),
+    /** Nome fantasia. */
+    tradeName: optionalText(160),
+    document: cnpjSchema,
+    /** Data de abertura (Receita Federal). */
+    openedAt: optionalDate(),
+    /** CNAE principal, e.g. "6920-6/01 — Atividades de contabilidade". */
+    mainActivity: optionalText(200),
+    email: optionalEmail(),
+    phone: optionalPhone(),
+    responsibleName: optionalText(120),
+    responsibleEmail: optionalEmail(),
+    responsiblePhone: optionalPhone(),
+    taxRegime: z.enum(TAX_REGIMES, { message: 'Selecione o regime tributário' }),
+    simplesAnnex: z
+      .union([z.literal(''), z.enum(SIMPLES_ANNEXES)])
+      .nullish()
+      .transform((v) => (v ? v : null)),
+    /** The first fee period starts on this date. */
+    contractStartDate: requiredDate('Informe a data de início do contrato'),
+    ...addressFields,
+  })
+  .superRefine((v, ctx) => {
+    if (v.taxRegime === 'simples_nacional' && !v.simplesAnnex) {
+      ctx.addIssue({ code: 'custom', path: ['simplesAnnex'], message: 'Selecione o anexo do Simples Nacional' });
+    }
+  })
+  .transform((v) => ({ ...v, simplesAnnex: v.taxRegime === 'simples_nacional' ? v.simplesAnnex : null }));
+export type ClientInput = z.input<typeof clientInputSchema>;
+
+export const clientQuerySchema = paginationQuerySchema.extend({
+  /** Razão social / nome fantasia (partial) or CNPJ (exact). */
+  search: z.string().trim().max(80).optional(),
+  status: z.enum([...CLIENT_STATUSES, 'all']).default('all'),
+  taxRegime: z.enum(TAX_REGIMES).optional(),
+});
+export type ClientQuery = z.input<typeof clientQuerySchema>;
+
+export const clientInactivationSchema = z
+  .object({
+    date: requiredDate('Informe a data da inativação'),
+    reason: z.enum(INACTIVATION_REASONS, { message: 'Selecione o motivo' }),
+    notes: optionalText(500),
+  })
+  .refine((v) => v.reason !== 'other' || Boolean(v.notes), { path: ['notes'], message: 'Descreva o motivo' });
+export type ClientInactivationInput = z.input<typeof clientInactivationSchema>;
+
+/** One fee period (vigência de 1 ano). The period itself is defined by the server. */
+export const clientFeeInputSchema = z.object({
+  /** Honorário mensal, in cents. */
+  amount: amountSchema,
+  /** Taxa por empregado (per employee, per month), in cents. */
+  employeeFee: z
+    .int({ message: 'Valor inválido' })
+    .min(0, { message: 'Valor inválido' })
+    .max(100_000_000_000, { message: 'Valor muito alto' })
+    .default(0),
+});
+export type ClientFeeInput = z.input<typeof clientFeeInputSchema>;
+
+export const cnpjParamsSchema = z.object({ cnpj: cnpjSchema });
 
 // ---------------------------------------------------------------------------
 // Transactions (contas a pagar / a receber / lançamentos)

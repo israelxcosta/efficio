@@ -8,6 +8,9 @@ import { ConsoleMailer, MemoryMailer, WebhookMailer, type Mailer } from './lib/m
 import { createSesMailer } from './lib/mailer-ses';
 import type { Platform } from './lib/platform';
 import { FakeBillingProvider } from './modules/billing/providers/fake';
+import { BrasilApiCnpjProvider } from './modules/clients/providers/brasilapi';
+import { FakeCnpjProvider } from './modules/clients/providers/fake';
+import type { CnpjProvider } from './modules/clients/providers/types';
 import { MercadoPagoProvider } from './modules/billing/providers/mercadopago';
 import { FakeOpenFinanceProvider } from './modules/open-finance/providers/fake';
 import { PluggyProvider } from './modules/open-finance/providers/pluggy';
@@ -68,9 +71,17 @@ export function createOpenFinance(env: Env): OpenFinanceSetup | null {
   };
 }
 
+/** Receita Federal lookups: the public BrasilAPI, except in tests (fictitious companies). */
+export function createCnpjProvider(env: Env): CnpjProvider | null {
+  const kind = env.CNPJ_PROVIDER ?? (env.NODE_ENV === 'test' ? 'fake' : 'brasilapi');
+  if (kind === 'disabled') return null;
+  return kind === 'fake' ? new FakeCnpjProvider() : new BrasilApiCnpjProvider();
+}
+
 export async function createPlatform(env: Env): Promise<Platform> {
   return {
     openFinance: createOpenFinance(env),
+    cnpj: createCnpjProvider(env),
     appUrl: env.APP_URL,
     relaxedRateLimits: env.NODE_ENV === 'test',
     mailer: await createMailer(env),

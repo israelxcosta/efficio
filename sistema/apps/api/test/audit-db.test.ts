@@ -35,6 +35,7 @@ import {
   bankConnectionAccounts,
   bankConnections,
   categories,
+  clientFees,
   contacts,
   creditCards,
   goalContributions,
@@ -130,6 +131,11 @@ async function seedTenant(label: string) {
     })
     .returning();
   const [contact] = await db.insert(contacts).values({ workspaceId: ws, name: `Contato ${label}` }).returning();
+  const [client] = await db
+    .insert(contacts)
+    .values({ workspaceId: ws, kind: 'client', name: `Cliente ${label}`, taxRegime: 'simples_nacional', simplesAnnex: 'III', contractStartDate: '2025-01-10' })
+    .returning();
+  const [fee] = await db.insert(clientFees).values({ workspaceId: ws, clientId: client!.id, periodIndex: 0, amount: 90000 }).returning();
   const [goal] = await db
     .insert(goals)
     .values({ workspaceId: ws, name: 'Meta', targetAmount: 1000, icon: 'wallet', color: '#000000', accountId: account!.id })
@@ -196,6 +202,8 @@ async function seedTenant(label: string) {
     subcategory: subcategory!.id,
     card: card!.id,
     contact: contact!.id,
+    client: client!.id,
+    fee: fee!.id,
     goal: goal!.id,
     contribution: contribution!.id,
     series: series!.id,
@@ -472,6 +480,12 @@ describe('foreign keys never cross workspaces', () => {
           column === 'accountId' ? a.account : column === 'creditCardId' ? a.card : a.connection,
         ],
       ),
+      // Migration 0007: client fees.
+      [
+        'client_fees.client_id',
+        (tx, id) => tx.insert(clientFees).values({ workspaceId: b.ws, clientId: id, periodIndex: 5, amount: 100 }),
+        a.client,
+      ],
       [
         'import_tombstones.account_id',
         (tx, id) => tx.insert(importTombstones).values({ workspaceId: b.ws, accountId: id, externalId: randomUUID() }),
@@ -523,12 +537,14 @@ describe('foreign keys never cross workspaces', () => {
 
     await withTenant(app.db, a.ws, async (tx) => {
       await tx.delete(contacts).where(eq(contacts.id, a.contact));
+      await tx.delete(contacts).where(eq(contacts.id, a.client));
       await tx.delete(recurrences).where(eq(recurrences.id, a.series));
       await tx.delete(goals).where(eq(goals.id, a.goal));
     });
     const [txRow] = await admin().select().from(transactions).where(eq(transactions.id, a.tx));
     expect(txRow).toMatchObject({ workspaceId: a.ws, contactId: null, recurrenceId: null, accountId: a.account });
     expect(await countRows('goal_contributions', a.ws)).toBe(0);
+    expect(await countRows('client_fees', a.ws)).toBe(0); // fees go with the client
 
     // The account is still used by a transaction: deleting it is refused (inside the tenant only).
     expect((await pgFailure(withTenant(app.db, a.ws, (tx) => tx.delete(accounts).where(eq(accounts.id, a.account)))))?.code).toBe('23503');
@@ -600,6 +616,19 @@ describe('domain checks', () => {
       ['platform key name', sql`insert into platform_keys (name, wrapped_key) values ('Bad Name!', 'x')`],
       ['tombstone without destination', sql`update import_tombstones set account_id = null where id = ${a.tombstone}`],
       ['tombstone with two destinations', sql`update import_tombstones set credit_card_id = ${a.card} where id = ${a.tombstone}`],
+      // Migration 0007: clients and fees.
+      ['contact kind', sql`update contacts set kind = 'partner' where id = ${a.contact}`],
+      ['tax regime', sql`update contacts set tax_regime = 'flat_tax' where id = ${a.client}`],
+      ['client without regime', sql`update contacts set tax_regime = null where id = ${a.client}`],
+      ['client without contract start', sql`update contacts set contract_start_date = null where id = ${a.client}`],
+      ['annex outside the Simples', sql`update contacts set tax_regime = 'real_profit' where id = ${a.client}`],
+      ['simples annex', sql`update contacts set simples_annex = 'VI' where id = ${a.client}`],
+      ['inactive without reason', sql`update contacts set status = 'inactive', inactivated_at = '2026-01-01' where id = ${a.client}`],
+      ['reason while active', sql`update contacts set inactivated_at = '2026-01-01', inactivation_reason = 'contract_end' where id = ${a.client}`],
+      ['inactivation reason', sql`update contacts set status = 'inactive', inactivated_at = '2026-01-01', inactivation_reason = 'moved' where id = ${a.client}`],
+      ['fee amount', sql`update client_fees set amount = 0 where id = ${a.fee}`],
+      ['employee fee', sql`update client_fees set employee_fee = -1 where id = ${a.fee}`],
+      ['fee period', sql`update client_fees set period_index = -1 where id = ${a.fee}`],
       [
         'invite as owner',
         sql`insert into workspace_invites (workspace_id, email, role, token_hash, expires_at)

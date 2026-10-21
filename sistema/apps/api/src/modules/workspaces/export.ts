@@ -5,6 +5,7 @@ import type { DbExecutor } from '../../db/client';
 import {
   accounts,
   categories,
+  clientFees,
   contacts,
   creditCards,
   goalContributions,
@@ -15,7 +16,7 @@ import {
 } from '../../db/schema';
 import { getCipher } from '../../lib/crypto/keyring';
 import { withTenant } from '../../lib/tenant';
-import { CONTACT_ENCRYPTED_FIELDS } from '../contacts/service';
+import { CONTACT_ALL_ENCRYPTED_FIELDS } from '../contacts/service';
 import { exportOpenFinance } from '../open-finance/service';
 import { getSubscriptionRow, listMembers } from './service';
 import { summarizeSubscription } from '../billing/entitlements';
@@ -33,13 +34,14 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
   ]);
 
   const data = await withTenant(db, access.workspaceId, async (tx) => {
-    const [cats, accs, cards, goalRows, contributionRows, contactRows, seriesRows, txRows] = await Promise.all([
+    const [cats, accs, cards, goalRows, contributionRows, contactRows, feeRows, seriesRows, txRows] = await Promise.all([
       tx.select().from(categories).orderBy(asc(categories.createdAt)),
       tx.select().from(accounts).orderBy(asc(accounts.createdAt)),
       tx.select().from(creditCards).orderBy(asc(creditCards.createdAt)),
       tx.select().from(goals).orderBy(asc(goals.createdAt)),
       tx.select().from(goalContributions).orderBy(asc(goalContributions.date)),
       tx.select().from(contacts).orderBy(asc(contacts.name)),
+      tx.select().from(clientFees).orderBy(asc(clientFees.clientId), asc(clientFees.periodIndex)),
       tx.select().from(recurrences).orderBy(asc(recurrences.createdAt)),
       tx.select().from(transactions).orderBy(asc(transactions.date), asc(transactions.createdAt)),
     ]);
@@ -55,8 +57,10 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
         contributionRows.map(async (c) => ({ ...c, note: await decrypt('goal_contributions', 'note', c.note) })),
       ),
       contacts: await Promise.all(
-        contactRows.map(async ({ documentHash: _hash, ...c }) => cipher.decryptFields('contacts', c, CONTACT_ENCRYPTED_FIELDS)),
+        contactRows.map(async ({ documentHash: _hash, ...c }) => cipher.decryptFields('contacts', c, CONTACT_ALL_ENCRYPTED_FIELDS)),
       ),
+      // Fee periods (honorários): dates derive from the client's contract start + period index.
+      clientFees: feeRows,
       recurrences: await Promise.all(
         seriesRows.map(async (r) => ({
           ...r,

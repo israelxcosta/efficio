@@ -24,15 +24,20 @@ import type {
   BankConnectionStatus,
   CardBrand,
   CategoryType,
+  ClientStatus,
+  ContactKind,
   Frequency,
   IconName,
   ImportFormat,
+  InactivationReason,
   MemberRole,
   OpenFinanceProvider,
   PaymentMethod,
   PlanCode,
   RecurrenceKind,
+  SimplesAnnex,
   SubscriptionStatus,
+  TaxRegime,
   TransactionOrigin,
   TransactionType,
   TransferKind,
@@ -414,11 +419,16 @@ export const goalContributions = pgTable(
   ],
 );
 
+/**
+ * Suppliers and clients (migration 0007: `kind`). Client-only columns stay null for suppliers;
+ * personal data of the client's responsible person is encrypted like the other contact fields.
+ */
 export const contacts = pgTable(
   'contacts',
   {
     id: id(),
     workspaceId: workspaceRef().notNull(),
+    kind: text().$type<ContactKind>().notNull().default('supplier'),
     name: text().notNull(),
     document: text(),
     email: text(),
@@ -433,12 +443,83 @@ export const contacts = pgTable(
     notes: text(),
     /** HMAC (per-workspace key) of the CPF/CNPJ digits: exact search over the encrypted document. */
     documentHash: text(),
+    // Clients only (migration 0007).
+    tradeName: text(),
+    openedAt: calendarDate(),
+    mainActivity: text(),
+    responsibleName: text(),
+    responsibleEmail: text(),
+    responsiblePhone: text(),
+    taxRegime: text().$type<TaxRegime>(),
+    simplesAnnex: text().$type<SimplesAnnex>(),
+    contractStartDate: calendarDate(),
+    status: text().$type<ClientStatus>().notNull().default('active'),
+    inactivatedAt: calendarDate(),
+    inactivationReason: text().$type<InactivationReason>(),
+    inactivationNotes: text(),
     createdAt: createdAt(),
   },
   (t) => [
     index('contacts_workspace_idx').on(t.workspaceId, t.name),
     index('contacts_document_hash_idx').on(t.workspaceId, t.documentHash),
+    index('contacts_kind_idx').on(t.workspaceId, t.kind, t.name),
+    // One client per CNPJ in the workspace (blind index of the encrypted document).
+    uniqueIndex('contacts_client_document_uq')
+      .on(t.workspaceId, t.documentHash)
+      .where(sql`${t.kind} = 'client'`),
     tenantUnique('contacts', t),
+    check('contacts_kind_chk', sql`${t.kind} in ('client', 'supplier')`),
+    check('contacts_status_chk', sql`${t.status} in ('active', 'inactive')`),
+    check(
+      'contacts_tax_regime_chk',
+      sql`${t.taxRegime} in ('simples_nacional', 'mei', 'presumed_profit', 'real_profit', 'exempt', 'other')`,
+    ),
+    check('contacts_simples_annex_chk', sql`${t.simplesAnnex} in ('I', 'II', 'III', 'IV', 'V')`),
+    check(
+      'contacts_inactivation_reason_chk',
+      sql`${t.inactivationReason} in ('accounting_transfer', 'contract_end', 'company_closure', 'default', 'other')`,
+    ),
+    // A client always has a regime and a contract start; the Simples annex only under the Simples.
+    check(
+      'contacts_client_chk',
+      sql`${t.kind} <> 'client' or (${t.taxRegime} is not null and ${t.contractStartDate} is not null and (${t.simplesAnnex} is null or ${t.taxRegime} = 'simples_nacional'))`,
+    ),
+    // Inactive ⇔ date and reason recorded.
+    check(
+      'contacts_inactivation_chk',
+      sql`(${t.status} = 'inactive') = (${t.inactivatedAt} is not null and ${t.inactivationReason} is not null)`,
+    ),
+  ],
+);
+
+/**
+ * Fees of a client (honorários), one row per yearly period (vigência). Only the 0-based period index
+ * is stored: dates derive from the client's contract start (shared `feePeriod`).
+ */
+export const clientFees = pgTable(
+  'client_fees',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    clientId: uuid().notNull(),
+    periodIndex: integer().notNull(),
+    /** Honorário mensal (cents). */
+    amount: money().notNull(),
+    /** Taxa por empregado (cents). */
+    employeeFee: money().notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('client_fees', t),
+    uniqueIndex('client_fees_period_uq').on(t.clientId, t.periodIndex),
+    check('client_fees_period_chk', sql`${t.periodIndex} >= 0`),
+    check('client_fees_amount_chk', sql`${t.amount} > 0 and ${t.employeeFee} >= 0`),
+    foreignKey({
+      name: 'client_fees_client_fk',
+      columns: [t.workspaceId, t.clientId],
+      foreignColumns: [contacts.workspaceId, contacts.id],
+    }).onDelete('cascade'),
   ],
 );
 
@@ -893,6 +974,7 @@ export type CreditCardRow = typeof creditCards.$inferSelect;
 export type GoalRow = typeof goals.$inferSelect;
 export type GoalContributionRow = typeof goalContributions.$inferSelect;
 export type ContactRow = typeof contacts.$inferSelect;
+export type ClientFeeRow = typeof clientFees.$inferSelect;
 export type RecurrenceRow = typeof recurrences.$inferSelect;
 export type TransactionRow = typeof transactions.$inferSelect;
 export type NewTransactionRow = typeof transactions.$inferInsert;

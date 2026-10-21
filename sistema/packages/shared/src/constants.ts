@@ -96,6 +96,68 @@ export const SERIES_SCOPE_LABELS: Record<SeriesScope, string> = {
   all: 'Todos da série',
 };
 
+// ---------------------------------------------------------------------------
+// Clients and suppliers (cadastros da empresa)
+// ---------------------------------------------------------------------------
+
+/** Every contact is either a client (company served under contract) or a supplier. */
+export const CONTACT_KINDS = ['client', 'supplier'] as const;
+export type ContactKind = (typeof CONTACT_KINDS)[number];
+
+export const CONTACT_KIND_LABELS: Record<ContactKind, string> = {
+  client: 'Cliente',
+  supplier: 'Fornecedor',
+};
+
+export const TAX_REGIMES = ['simples_nacional', 'mei', 'presumed_profit', 'real_profit', 'exempt', 'other'] as const;
+export type TaxRegime = (typeof TAX_REGIMES)[number];
+
+export const TAX_REGIME_LABELS: Record<TaxRegime, string> = {
+  simples_nacional: 'Simples Nacional',
+  mei: 'MEI',
+  presumed_profit: 'Lucro Presumido',
+  real_profit: 'Lucro Real',
+  exempt: 'Imune / Isenta',
+  other: 'Outro',
+};
+
+/** Annexes of the Simples Nacional (LC 123/2006). Required when the regime is simples_nacional. */
+export const SIMPLES_ANNEXES = ['I', 'II', 'III', 'IV', 'V'] as const;
+export type SimplesAnnex = (typeof SIMPLES_ANNEXES)[number];
+
+export const SIMPLES_ANNEX_LABELS: Record<SimplesAnnex, string> = {
+  I: 'Anexo I — Comércio',
+  II: 'Anexo II — Indústria',
+  III: 'Anexo III — Serviços',
+  IV: 'Anexo IV — Serviços',
+  V: 'Anexo V — Serviços',
+};
+
+export const CLIENT_STATUSES = ['active', 'inactive'] as const;
+export type ClientStatus = (typeof CLIENT_STATUSES)[number];
+
+export const CLIENT_STATUS_LABELS: Record<ClientStatus, string> = {
+  active: 'Ativo',
+  inactive: 'Inativo',
+};
+
+export const INACTIVATION_REASONS = [
+  'accounting_transfer',
+  'contract_end',
+  'company_closure',
+  'default',
+  'other',
+] as const;
+export type InactivationReason = (typeof INACTIVATION_REASONS)[number];
+
+export const INACTIVATION_REASON_LABELS: Record<InactivationReason, string> = {
+  accounting_transfer: 'Transferência de contabilidade',
+  contract_end: 'Encerramento de contrato',
+  company_closure: 'Encerramento da empresa',
+  default: 'Inadimplência',
+  other: 'Outro motivo',
+};
+
 export const TRANSACTION_STATUSES = ['all', 'paid', 'pending', 'overdue'] as const;
 export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
 
