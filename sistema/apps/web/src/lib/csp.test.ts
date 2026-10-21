@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { contentSecurityPolicy, inlineScriptHashes, PLUGGY_CONNECT_ORIGIN, THEME_SCRIPT_HASH } from './csp';
+import { BRASILAPI_ORIGIN, contentSecurityPolicy, inlineScriptHashes, PLUGGY_CONNECT_ORIGIN, THEME_SCRIPT_HASH } from './csp';
 
 const indexHtml = readFileSync(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
 
@@ -60,6 +60,8 @@ describe('Content Security Policy', () => {
     expect(csp.get('script-src')).toEqual(["'self'", "'wasm-unsafe-eval'", THEME_SCRIPT_HASH]);
     // Simulated Open Finance provider in the demo: no third-party frame at all.
     expect(csp.get('frame-src')).toEqual(["'none'"]);
+    // The demo's in-page API looks up CNPJs at BrasilAPI; nothing else leaves the page.
+    expect(csp.get('connect-src')).toEqual(["'self'", BRASILAPI_ORIGIN]);
   });
 
   it('frame-src matches the origin the installed Pluggy Connect SDK frames', () => {

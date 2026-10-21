@@ -150,7 +150,9 @@ describe('inactivation', () => {
 
     expect((await c.post(`/clients/${id}/inactivate`, { date: '2026-10-01', reason: 'contract_end' })).status).toBe(409);
     expect((await c.get('/clients?status=active')).body.total).toBe(0);
-    expect((await c.get('/clients?status=inactive')).body.total).toBe(1);
+    const inactive = await c.get('/clients?status=inactive');
+    expect(inactive.body.total).toBe(1);
+    expect(inactive.body.summary).toEqual({ active: 0, inactive: 1, monthlyFees: 0, withoutCurrentFee: 0 });
 
     const back = await c.post(`/clients/${id}/reactivate`);
     expect(back.status).toBe(200);
@@ -256,7 +258,9 @@ describe('fees', () => {
     const client = await c.get(`/clients/${id}`);
     expect(client.body.currentFee).toMatchObject({ index: 2, amount: 85000 });
     expect(client.body.latestFee).toMatchObject({ index: 2 });
-    expect((await c.get('/clients')).body.items[0].currentFee.amount).toBe(85000);
+    const listed = await c.get('/clients');
+    expect(listed.body.items[0].currentFee.amount).toBe(85000);
+    expect(listed.body.summary).toEqual({ active: 1, inactive: 0, monthlyFees: 85000, withoutCurrentFee: 0 });
 
     // Values can be corrected; only the latest period can be removed.
     const fixed = await c.put(`/clients/${id}/fees/${first.body.id}`, { amount: 76000, employeeFee: 3000 });
@@ -277,6 +281,16 @@ describe('fees', () => {
       ['2025-04-01', '2026-03-31'],
     ]);
     expect(moved.body.current).toMatchObject({ index: 1, amount: 80000 });
+  });
+
+  it('has no fee in force after the inactivation', async () => {
+    const { id } = await createClient({ contractStartDate: '2026-03-15' });
+    await c.post(`/clients/${id}/fees`, { amount: 75000 });
+    expect((await c.get(`/clients/${id}`)).body.currentFee).toMatchObject({ amount: 75000 });
+    await c.post(`/clients/${id}/inactivate`, { date: '2026-09-30', reason: 'accounting_transfer' });
+    const inactive = await c.get(`/clients/${id}`);
+    expect(inactive.body).toMatchObject({ currentFee: null, latestFee: { amount: 75000 } });
+    expect((await c.get(`/clients/${id}/fees`)).body.current).toBeNull();
   });
 
   it('does not open a period after the client was inactivated', async () => {

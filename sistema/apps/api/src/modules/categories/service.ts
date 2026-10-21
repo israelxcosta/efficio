@@ -5,13 +5,14 @@ import type {
   CategoryWithChildren,
   categoryInputSchema,
   categoryUpdateSchema,
+  WorkspaceKind,
 } from '@effinance/shared';
 import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
 import { categories, transactions, type CategoryRow } from '../../db/schema';
 import { ConflictError, ValidationError } from '../../lib/errors';
 import { getCategoryOrThrow } from '../common/ownership';
-import { DEFAULT_CATEGORIES } from './defaults';
+import { BUSINESS_CATEGORIES, DEFAULT_CATEGORIES } from './defaults';
 
 type CategoryInput = z.output<typeof categoryInputSchema>;
 type CategoryUpdate = z.output<typeof categoryUpdateSchema>;
@@ -98,8 +99,9 @@ export async function deleteCategory(db: DbExecutor, workspaceId: string, id: st
 }
 
 /** Creates the default category tree for a new workspace. */
-export async function seedDefaultCategories(db: DbExecutor, workspaceId: string): Promise<void> {
-  for (const def of DEFAULT_CATEGORIES) {
+/** Default categories of a new workspace: business ones for companies, household ones otherwise. */
+export async function seedDefaultCategories(db: DbExecutor, workspaceId: string, kind: WorkspaceKind = 'personal'): Promise<void> {
+  for (const def of kind === 'business' ? BUSINESS_CATEGORIES : DEFAULT_CATEGORIES) {
     const [parent] = await db
       .insert(categories)
       .values({ workspaceId, name: def.name, type: def.type, icon: def.icon, color: def.color })

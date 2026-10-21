@@ -34,6 +34,7 @@ import { useAccounts } from '@/features/accounts/api';
 import { useCards } from '@/features/cards/api';
 import { CategoryPicker } from '@/features/categories/category-picker';
 import { useContactOptions } from '@/features/contacts/api';
+import { contactOptions } from '@/features/contacts/contact-options';
 import { useCreateTransaction, useUpdateTransaction } from './api';
 import { ScopeDialog } from './scope-dialog';
 import { SplitEditor, evenSplit, newSplitRow, validateSplits, type SplitRow, type SplitRowErrors } from './components/split-editor';
@@ -491,28 +492,20 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
                 <Input type="date" {...register('paidAt')} />
               </Field>
             ) : (
-              <Field label="Contato" hint="Opcional">
+              <Field label={type === 'income' ? 'Cliente' : 'Fornecedor'} hint="Opcional">
                 <Select {...register('contactId')}>
                   <option value="">Nenhum</option>
-                  {(contacts.data?.items ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  {contactOptions(contacts.data?.items ?? [], { type, selected: values.contactId })}
                 </Select>
               </Field>
             )}
           </div>
 
           {values.paid && !isCard ? (
-            <Field label="Contato" hint="Opcional">
+            <Field label={type === 'income' ? 'Cliente' : 'Fornecedor'} hint="Opcional">
               <Select {...register('contactId')}>
                 <option value="">Nenhum</option>
-                {(contacts.data?.items ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {contactOptions(contacts.data?.items ?? [], { type, selected: values.contactId })}
               </Select>
             </Field>
           ) : null}

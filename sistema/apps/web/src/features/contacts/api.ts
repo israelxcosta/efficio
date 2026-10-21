@@ -1,9 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Contact, ContactInput, Paginated } from '@effinance/shared';
+import type { Contact, ContactInput, ContactKind, Paginated } from '@effinance/shared';
 import { api } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 
-export function useContacts(params: { search?: string; page?: number; pageSize?: number } = {}) {
+export function useContacts(params: { search?: string; kind?: ContactKind; page?: number; pageSize?: number } = {}) {
   return useQuery({
     queryKey: qk.contacts(params),
     queryFn: () => api<Paginated<Contact>>('/contacts', { query: params }),
@@ -11,7 +11,7 @@ export function useContacts(params: { search?: string; page?: number; pageSize?:
   });
 }
 
-/** Up to 200 contacts for selects. */
+/** Up to 200 contacts (clients and suppliers) for selects. */
 export function useContactOptions() {
   return useContacts({ pageSize: 200 });
 }

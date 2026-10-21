@@ -28,7 +28,9 @@ import {
 import { randomToken, sha256Hex } from '../../lib/crypto/encoding';
 import { forgetWorkspaceKey, newWorkspaceKey } from '../../lib/crypto/keyring';
 import { ConflictError, ForbiddenError, NotFoundError, TooManyRequestsError, ValidationError } from '../../lib/errors';
+import { withTenant } from '../../lib/tenant';
 import { maxMembersFor, summarizeSubscription } from '../billing/entitlements';
+import { seedDefaultCategories } from '../categories/service';
 import type { Access } from './access';
 
 const DAY_MS = 86_400_000;
@@ -147,7 +149,12 @@ export async function createSharedWorkspace(
       `Você já é proprietário de ${MAX_OWNED_WORKSPACES} espaços. Exclua um espaço que não usa mais para criar outro.`,
     );
   }
-  return db.transaction((tx) => createWorkspace(tx, { name: input.name, kind: input.kind, ownerId: userId }));
+  return db.transaction(async (tx) => {
+    const workspaceId = await createWorkspace(tx, { name: input.name, kind: input.kind, ownerId: userId });
+    // Financial rows go through the tenant role (RLS). Last step: the role lasts until commit.
+    await withTenant(tx, workspaceId, (t) => seedDefaultCategories(t, workspaceId, input.kind));
+    return workspaceId;
+  });
 }
 
 export async function renameWorkspace(db: DbExecutor, access: Access, name: string): Promise<void> {

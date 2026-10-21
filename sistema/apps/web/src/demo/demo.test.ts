@@ -27,9 +27,42 @@ describe('demo api (PGlite)', () => {
     expect(ok.status).toBe(200);
     const me = (await call('GET', '/auth/me')).body;
     expect(me.user.email).toBe(DEMO_EMAIL);
-    expect(me.workspace).toMatchObject({ name: 'Pessoal', kind: 'personal', role: 'owner' });
-    expect(me.workspace.subscription).toMatchObject({ status: 'trialing', canWrite: true });
-    expect(me.workspaces.map((w: { name: string }) => w.name)).toEqual(['Pessoal', 'Família Costa']);
+    // The office (business workspace) opens first.
+    expect(me.workspace).toMatchObject({ name: 'Efficio Contabilidade', kind: 'business', role: 'owner' });
+    expect(me.workspace.subscription).toMatchObject({ status: 'active', canWrite: true });
+    expect(me.workspaces.map((w: { name: string }) => w.name)).toEqual(['Pessoal', 'Efficio Contabilidade', 'Família Costa']);
+  });
+
+  it('has the office clients, fee periods, suppliers and receivables (migration 0007 applied)', async () => {
+    const all = (await call('GET', '/clients?status=all&pageSize=50')).body;
+    expect(all.total).toBe(10);
+    expect(all.summary).toMatchObject({ active: 8, inactive: 2, withoutCurrentFee: 1 });
+    expect(all.summary.monthlyFees).toBeGreaterThan(0);
+
+    const pending = all.items.find((c: { tradeName: string }) => c.tradeName === 'Alicerce');
+    expect(pending).toMatchObject({ status: 'active', currentFee: null });
+    expect(pending.latestFee.endDate < todayISO()).toBe(true);
+
+    const bakery = all.items.find((c: { tradeName: string }) => c.tradeName === 'Pão Quente');
+    expect(bakery.currentFee).toMatchObject({ amount: 78000, employeeFee: 3500 });
+    const fees = (await call('GET', `/clients/${bakery.id}/fees`)).body;
+    expect(fees.items[0].startDate <= todayISO() && todayISO() <= fees.items[0].endDate).toBe(true);
+    expect(fees.items.at(-1).startDate).toBe(bakery.contractStartDate);
+    expect(bakery.transactionCount).toBeGreaterThan(0);
+    expect((await call('DELETE', `/clients/${bakery.id}`)).status).toBe(409);
+
+    const transferred = all.items.find((c: { tradeName: string }) => c.tradeName === 'Bom Preço');
+    expect(transferred).toMatchObject({ status: 'inactive', inactivation: { reason: 'accounting_transfer' } });
+    expect(transferred.transactionCount).toBe(4);
+
+    expect((await call('GET', '/contacts?kind=supplier')).body.total).toBe(5);
+    const receivables = (await call('GET', `/transactions?type=income&contactId=${bakery.id}&from=${from}&to=${to}`)).body;
+    expect(receivables.items[0]).toMatchObject({ contactId: bakery.id, amount: 78000 });
+
+    // The rest of the suite runs in Marina's personal workspace (cards, goals, integrations).
+    const me = (await call('GET', '/auth/me')).body;
+    const personal = me.workspaces.find((w: { kind: string }) => w.kind === 'personal');
+    expect((await call('POST', '/auth/switch-workspace', { workspaceId: personal.id })).status).toBe(200);
   });
 
   it('serves dashboard, statement and every report', async () => {

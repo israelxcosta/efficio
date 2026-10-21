@@ -45,7 +45,7 @@ export function ContactSheet({ open, onOpenChange, contact }: { open: boolean; o
   const onSubmit = handleSubmit(async (input) => {
     try {
       await save.mutateAsync({ id: contact?.id, input });
-      toast.success(contact ? 'Contato atualizado' : 'Contato criado');
+      toast.success(contact ? 'Fornecedor atualizado' : 'Fornecedor cadastrado');
       onOpenChange(false);
     } catch (error) {
       toastError(error);
@@ -66,8 +66,8 @@ export function ContactSheet({ open, onOpenChange, contact }: { open: boolean; o
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
-      title={contact ? 'Editar contato' : 'Novo contato'}
-      description="Pessoas e empresas ligadas aos seus lançamentos"
+      title={contact ? 'Editar fornecedor' : 'Novo fornecedor'}
+      description="Empresas e pessoas que fornecem para o escritório"
       width="lg"
       footer={
         <>

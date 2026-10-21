@@ -7,12 +7,18 @@ import { and, eq, inArray, lte, sql } from 'drizzle-orm';
 import {
   addDays,
   addMonthKey,
+  addMonths,
+  clientInputSchema,
+  contactInputSchema,
   daysInMonth,
+  feePeriodIndexAt,
   getInvoiceDates,
   monthKey,
   parseISODate,
   todayISO,
   transactionInputSchema,
+  type ClientInput,
+  type InactivationReason,
   type ISODate,
   type TransactionInput,
 } from '@effinance/shared';
@@ -25,6 +31,7 @@ import { createWorkspace } from '../modules/workspaces/service';
 import { createAccount } from '../modules/accounts/service';
 import { createCreditCard, payInvoice } from '../modules/credit-cards/service';
 import { createContact } from '../modules/contacts/service';
+import { addFee, createClient, inactivateClient } from '../modules/clients/service';
 import { addContribution, createGoal } from '../modules/goals/service';
 import { createTransaction } from '../modules/transactions/service';
 import { createTransfer } from '../modules/transfers/service';
@@ -37,6 +44,8 @@ export const DEMO_PASSWORD = 'demo12345';
 /** Second member of the shared "Família Costa" workspace. */
 export const DEMO_PARTNER_EMAIL = 'rafael@effinance.app';
 export const FAMILY_WORKSPACE_NAME = 'Família Costa';
+/** Business workspace opened at login: the accounting office, its clients, fees and suppliers. */
+export const COMPANY_WORKSPACE_NAME = 'Efficio Contabilidade';
 
 /** Deterministic PRNG so every seed run produces the same numbers. */
 function mulberry32(seed: number) {
@@ -651,6 +660,394 @@ async function seedPersonal(db: DbExecutor, workspaceId: string): Promise<number
   return count?.n ?? 0;
 }
 
+interface DemoClient {
+  input: Omit<ClientInput, 'contractStartDate'>;
+  /** Contract start, in months before today (day 1 of that month). */
+  startedMonthsAgo: number;
+  /** Monthly fee of the current period (cents); earlier periods were ~7% cheaper each. */
+  fee: number;
+  employeeFee: number;
+  /** The current period was not registered yet (readjustment pending). */
+  renewalPending?: boolean;
+  inactive?: { monthsAgo: number; reason: InactivationReason; notes?: string };
+}
+
+const DEMO_CLIENTS: DemoClient[] = [
+  {
+    input: {
+      name: 'Padaria Pão Quente Ltda',
+      tradeName: 'Pão Quente',
+      document: '11222333000181',
+      openedAt: '2015-04-06',
+      mainActivity: '1091-1/02 — Fabricação de produtos de padaria e confeitaria',
+      email: 'financeiro@paoquente.com.br',
+      phone: '1932345678',
+      responsibleName: 'Marina Albuquerque',
+      responsibleEmail: 'marina@paoquente.com.br',
+      responsiblePhone: '19998765432',
+      taxRegime: 'simples_nacional',
+      simplesAnnex: 'I',
+      zipCode: '13010111',
+      street: 'Rua Barão de Jaguara',
+      number: '1200',
+      district: 'Centro',
+      city: 'Campinas',
+      state: 'SP',
+    },
+    startedMonthsAgo: 43,
+    fee: 78000,
+    employeeFee: 3500,
+  },
+  {
+    input: {
+      name: 'Tecnova Soluções em Software Ltda',
+      tradeName: 'Tecnova',
+      document: '45723174000110',
+      openedAt: '2019-09-16',
+      mainActivity: '6201-5/01 — Desenvolvimento de programas de computador sob encomenda',
+      email: 'contato@tecnova.dev',
+      phone: '19987654321',
+      responsibleName: 'Renato Siqueira',
+      responsibleEmail: 'renato@tecnova.dev',
+      responsiblePhone: '19987654321',
+      taxRegime: 'presumed_profit',
+      city: 'Campinas',
+      state: 'SP',
+    },
+    startedMonthsAgo: 30,
+    fee: 240000,
+    employeeFee: 4500,
+  },
+  {
+    input: {
+      name: 'Clínica Odontológica Sorriso Pleno Ltda',
+      tradeName: 'Sorriso Pleno',
+      document: makeCnpj('279310120001'),
+      mainActivity: '8630-5/04 — Atividade odontológica',
+      email: 'adm@sorrisopleno.com.br',
+      phone: '1933221144',
+      responsibleName: 'Paula Menezes',
+      responsibleEmail: 'paula@sorrisopleno.com.br',
+      responsiblePhone: '19991234567',
+      taxRegime: 'simples_nacional',
+      simplesAnnex: 'III',
+      city: 'Valinhos',
+      state: 'SP',
+    },
+    startedMonthsAgo: 26,
+    fee: 125000,
+    employeeFee: 4000,
+  },
+  {
+    input: {
+      name: 'Transportadora Rota Sul Ltda',
+      tradeName: 'Rota Sul',
+      document: makeCnpj('190340680001'),
+      mainActivity: '4930-2/02 — Transporte rodoviário de carga',
+      email: 'financeiro@rotasul.com.br',
+      phone: '1932567890',
+      responsibleName: 'Sérgio Bittencourt',
+      responsiblePhone: '19992345678',
+      taxRegime: 'real_profit',
+      city: 'Hortolândia',
+      state: 'SP',
+    },
+    startedMonthsAgo: 20,
+    fee: 480000,
+    employeeFee: 5000,
+  },
+  {
+    input: {
+      name: 'Juliana Prado Design 31847759806',
+      tradeName: 'Ju Prado Design',
+      document: '34028316000103',
+      mainActivity: '7410-2/02 — Design de interiores',
+      phone: '19991112233',
+      responsibleName: 'Juliana Prado',
+      responsibleEmail: 'ju@juprado.design',
+      responsiblePhone: '19991112233',
+      taxRegime: 'mei',
+      city: 'Campinas',
+      state: 'SP',
+    },
+    startedMonthsAgo: 14,
+    fee: 18000,
+    employeeFee: 0,
+  },
+  {
+    input: {
+      name: 'Construtora Alicerce Engenharia Ltda',
+      tradeName: 'Alicerce',
+      document: makeCnpj('082417390001'),
+      mainActivity: '4120-4/00 — Construção de edifícios',
+      email: 'obras@alicerce.eng.br',
+      phone: '1932109876',
+      responsibleName: 'Fábio Laranjeira',
+      responsibleEmail: 'fabio@alicerce.eng.br',
+      taxRegime: 'presumed_profit',
+      city: 'Campinas',
+      state: 'SP',
+      notes: 'Proposta de reajuste enviada; aguardando aprovação do sócio.',
+    },
+    startedMonthsAgo: 38,
+    fee: 190000,
+    employeeFee: 4000,
+    renewalPending: true,
+  },
+  {
+    input: {
+      name: 'Farmácia Vida Saudável Ltda',
+      tradeName: 'Vida Saudável',
+      document: makeCnpj('517830150001'),
+      mainActivity: '4771-7/01 — Comércio varejista de produtos farmacêuticos',
+      email: 'compras@farmaciavida.com.br',
+      phone: '1933445566',
+      responsibleName: 'Camila Rocha',
+      responsiblePhone: '19993456789',
+      taxRegime: 'simples_nacional',
+      simplesAnnex: 'I',
+      city: 'Sumaré',
+      state: 'SP',
+    },
+    startedMonthsAgo: 2,
+    fee: 95000,
+    employeeFee: 3500,
+  },
+  {
+    input: {
+      name: 'Instituto Aprender Educação Ltda',
+      tradeName: 'Instituto Aprender',
+      document: makeCnpj('623904440001'),
+      mainActivity: '8599-6/04 — Treinamento em desenvolvimento profissional e gerencial',
+      email: 'secretaria@institutoaprender.com.br',
+      responsibleName: 'Lúcia Andrade',
+      responsibleEmail: 'lucia@institutoaprender.com.br',
+      taxRegime: 'simples_nacional',
+      simplesAnnex: 'III',
+      city: 'Campinas',
+      state: 'SP',
+    },
+    startedMonthsAgo: 9,
+    fee: 110000,
+    employeeFee: 4000,
+  },
+  {
+    input: {
+      name: 'Mercadinho Bom Preço Ltda',
+      tradeName: 'Bom Preço',
+      document: makeCnpj('734421980001'),
+      email: 'bompreco@exemplo.com.br',
+      responsibleName: 'José Batista',
+      taxRegime: 'simples_nacional',
+      simplesAnnex: 'I',
+      city: 'Paulínia',
+      state: 'SP',
+    },
+    startedMonthsAgo: 50,
+    fee: 62000,
+    employeeFee: 3000,
+    inactive: { monthsAgo: 2, reason: 'accounting_transfer', notes: 'Migrou para um escritório no próprio bairro.' },
+  },
+  {
+    input: {
+      name: 'Studio Arte & Forma Ltda',
+      tradeName: 'Arte & Forma',
+      document: makeCnpj('305571260001'),
+      responsibleName: 'Ana Ferraz',
+      taxRegime: 'simples_nacional',
+      simplesAnnex: 'III',
+      city: 'Campinas',
+      state: 'SP',
+    },
+    startedMonthsAgo: 28,
+    fee: 54000,
+    employeeFee: 0,
+    inactive: { monthsAgo: 6, reason: 'company_closure' },
+  },
+];
+
+/**
+ * The accounting office (business plan): clients with yearly fee periods (one awaiting its
+ * readjustment, two inactive), suppliers, monthly fees receivable linked to each client and the
+ * office's fixed costs. Past occurrences are paid, except one overdue fee.
+ */
+async function seedCompany(db: DbExecutor, ownerId: string): Promise<string> {
+  const workspaceId = await db.transaction((tx) =>
+    createWorkspace(tx, { name: COMPANY_WORKSPACE_NAME, kind: 'business', ownerId }),
+  );
+  const periodEnd = new Date();
+  periodEnd.setUTCMonth(periodEnd.getUTCMonth() + 1);
+  await db
+    .update(subscriptions)
+    .set({ planCode: 'business_monthly', status: 'active', provider: 'fake', trialEndsAt: null, currentPeriodEnd: periodEnd })
+    .where(eq(subscriptions.workspaceId, workspaceId));
+
+  await withTenant(db, workspaceId, async (tx) => {
+    await seedDefaultCategories(tx, workspaceId, 'business');
+    const cats = await tx.select().from(categories).where(eq(categories.workspaceId, workspaceId));
+    const find = (name: string, sub?: string) => {
+      const parent = cats.find((c) => c.name === name && !c.parentId);
+      if (!parent) throw new Error(`category ${name} not found`);
+      const child = sub ? cats.find((c) => c.parentId === parent.id && c.name === sub) : undefined;
+      if (sub && !child) throw new Error(`subcategory ${sub} not found`);
+      return { categoryId: parent.id, subcategoryId: child?.id ?? null };
+    };
+    const today = todayISO();
+    const month = monthKey(today);
+    const firstMonth = addMonthKey(month, -5);
+
+    const bank = await createAccount(tx, workspaceId, {
+      name: 'Conta PJ Inter',
+      type: 'checking',
+      bank: 'inter',
+      color: '#FF7A00',
+      icon: 'landmark',
+      initialBalance: 1850000,
+      includeInTotal: true,
+      archived: false,
+    });
+    await createAccount(tx, workspaceId, {
+      name: 'Reserva PJ (CDB)',
+      type: 'investment',
+      bank: 'itau',
+      color: '#EC7000',
+      icon: 'piggy-bank',
+      initialBalance: 4500000,
+      includeInTotal: true,
+      archived: false,
+    });
+
+    const supplier = (input: Parameters<typeof contactInputSchema.parse>[0]) =>
+      createContact(tx, workspaceId, contactInputSchema.parse(input));
+    const landlord = await supplier({
+      name: 'Barão Imóveis e Administração Ltda',
+      document: makeCnpj('402187650001'),
+      email: 'locacao@baraoimoveis.com.br',
+      phone: '1932321010',
+      city: 'Campinas',
+      state: 'SP',
+    });
+    const software = await supplier({
+      name: 'ContaSoft Sistemas Contábeis Ltda',
+      document: makeCnpj('218765430001'),
+      email: 'cobranca@contasoft.com.br',
+      phone: '1140041234',
+      city: 'São Paulo',
+      state: 'SP',
+    });
+    const telecom = await supplier({ name: 'Conecta Fibra Telecom', document: makeCnpj('563219870001'), phone: '1930303030' });
+    const energy = await supplier({ name: 'Energia Paulista Distribuidora', document: makeCnpj('117654320001') });
+    await supplier({ name: 'Papelaria Central Campinas', email: 'vendas@papelariacentral.com.br', city: 'Campinas', state: 'SP' });
+
+    const base = { accountId: bank.id, creditCardId: null, paymentMethod: 'pix' as const, notes: null };
+    const add = (input: Record<string, unknown>) => createTransaction(tx, workspaceId, transactionInputSchema.parse({ ...base, ...input }));
+    const fixed = (
+      type: 'income' | 'expense',
+      description: string,
+      amount: number,
+      startMonth: string,
+      day: number,
+      cat: ReturnType<typeof find>,
+      contactId: string | null = null,
+      paymentMethod: 'pix' | 'bank_slip' | 'auto_debit' = 'pix',
+    ) =>
+      add({
+        ...cat,
+        type,
+        description,
+        amount,
+        date: `${startMonth}-${String(day).padStart(2, '0')}`,
+        paid: false,
+        contactId,
+        paymentMethod,
+        recurrenceKind: 'fixed',
+        frequency: 'monthly',
+      });
+
+    // --- clients, fee periods and the monthly fees receivable --------------------------------------
+    const fees = find('Honorários', 'Honorários mensais');
+    let overdue: string | null = null;
+    for (const demo of DEMO_CLIENTS) {
+      const contractStartDate = `${addMonthKey(month, -demo.startedMonthsAgo)}-01`;
+      const client = await createClient(tx, workspaceId, clientInputSchema.parse({ ...demo.input, contractStartDate }));
+      const until = demo.inactive ? `${addMonthKey(month, -demo.inactive.monthsAgo)}-01` : today;
+      const last = feePeriodIndexAt(contractStartDate, until) - (demo.renewalPending ? 1 : 0);
+      for (let i = 0; i <= last; i++) {
+        const factor = Math.pow(1.07, last - i);
+        await addFee(tx, workspaceId, client.id, {
+          amount: Math.round(demo.fee / factor / 1000) * 1000,
+          employeeFee: Math.round(demo.employeeFee / factor / 100) * 100,
+        });
+      }
+      const name = demo.input.tradeName ?? demo.input.name;
+      const startMonth = monthKey(contractStartDate) > firstMonth ? monthKey(addMonths(contractStartDate, 1)) : firstMonth;
+      if (demo.inactive) {
+        // Former client: the last fees before the transfer stay as history (and block deletion).
+        if (demo.inactive.reason === 'accounting_transfer') {
+          for (let m = 4; m >= 1; m--) {
+            await add({
+              ...fees,
+              type: 'income',
+              description: `Honorários — ${name}`,
+              amount: demo.fee,
+              date: `${addMonthKey(month, -demo.inactive.monthsAgo - m)}-10`,
+              paid: true,
+              contactId: client.id,
+              paymentMethod: 'bank_slip',
+            });
+          }
+        }
+        await inactivateClient(tx, workspaceId, client.id, {
+          date: until,
+          reason: demo.inactive.reason,
+          notes: demo.inactive.notes ?? null,
+        });
+        continue;
+      }
+      const rows = await fixed('income', `Honorários — ${name}`, demo.fee, startMonth, 10, fees, client.id, 'bank_slip');
+      if (demo.input.tradeName === 'Rota Sul') overdue = rows.find((r) => r.date.startsWith(addMonthKey(month, -1)))?.id ?? null;
+    }
+    await add({
+      ...find('Honorários', 'Serviços avulsos'),
+      type: 'income',
+      description: 'Abertura de filial — Vida Saudável',
+      amount: 150000,
+      date: addDays(today, -12),
+      paid: true,
+      contactId: null,
+    });
+
+    // --- fixed costs of the office --------------------------------------------------------------------
+    await fixed('expense', 'Aluguel do escritório', 320000, firstMonth, 5, find('Ocupação', 'Aluguel'), landlord.id, 'bank_slip');
+    await fixed('expense', 'Sistema contábil', 89000, firstMonth, 15, find('Tecnologia', 'Sistema contábil'), software.id, 'auto_debit');
+    await fixed('expense', 'Internet e telefone', 24990, firstMonth, 20, find('Ocupação', 'Internet e telefone'), telecom.id, 'auto_debit');
+    await fixed('expense', 'Energia elétrica', 41000, firstMonth, 12, find('Ocupação', 'Energia'), energy.id, 'auto_debit');
+    await fixed('expense', 'Salários da equipe', 1450000, firstMonth, 5, find('Pessoal', 'Salários'));
+    await fixed('expense', 'Pró-labore dos sócios', 800000, firstMonth, 5, find('Pessoal', 'Pró-labore'));
+    await fixed('expense', 'INSS e FGTS', 390000, firstMonth, 20, find('Pessoal', 'Encargos (INSS/FGTS)'), null, 'bank_slip');
+    await fixed('expense', 'Simples Nacional (DAS)', 285000, firstMonth, 20, find('Impostos e taxas', 'Simples Nacional (DAS)'), null, 'bank_slip');
+    await add({
+      ...find('Tecnologia', 'Certificado digital'),
+      type: 'expense',
+      description: 'Renovação de certificados digitais A1',
+      amount: 54000,
+      date: addDays(today, -20),
+      paid: true,
+      contactId: null,
+      recurrenceKind: 'installment',
+      installments: 3,
+    });
+
+    // Everything due until today was paid or received, except one client's last fee.
+    await tx
+      .update(transactions)
+      .set({ paid: true, paidAt: sql`${transactions.date}` })
+      .where(and(eq(transactions.workspaceId, workspaceId), lte(transactions.date, today)));
+    if (overdue) await tx.update(transactions).set({ paid: false, paidAt: null }).where(eq(transactions.id, overdue));
+  });
+  return workspaceId;
+}
+
 /** Removes the demo users and every workspace they own (data cascades). */
 async function removeDemoUsers(db: DbExecutor) {
   const demoUsers = await db
@@ -803,8 +1200,9 @@ export async function seedDemo(db: DbExecutor) {
     acceptTerms: true,
   });
   const familyId = await seedFamily(db, user.id, partner.user.id);
-  // Marina opens her personal workspace; Rafael opens the family one.
-  await db.update(users).set({ lastWorkspaceId: workspaceId }).where(eq(users.id, user.id));
+  const companyId = await seedCompany(db, user.id);
+  // Marina opens the office (business) workspace; Rafael opens the family one.
+  await db.update(users).set({ lastWorkspaceId: companyId }).where(eq(users.id, user.id));
   await db.update(users).set({ lastWorkspaceId: familyId }).where(eq(users.id, partner.user.id));
-  return { userId: user.id, workspaceId, familyWorkspaceId: familyId, transactions: n };
+  return { userId: user.id, workspaceId, familyWorkspaceId: familyId, companyWorkspaceId: companyId, transactions: n };
 }

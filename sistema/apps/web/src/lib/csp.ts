@@ -17,6 +17,12 @@ export const THEME_SCRIPT_HASH = "'sha256-Tx3gv5eNbn+Hf+VoVYfVEoj6NuvY41vj9EhirV
  */
 export const PLUGGY_CONNECT_ORIGIN = 'https://connect.pluggy.ai';
 
+/**
+ * Receita Federal lookups (CNPJ) of the demo build, where the API code runs in the page. The
+ * regular build asks our API, which calls BrasilAPI server side.
+ */
+export const BRASILAPI_ORIGIN = 'https://brasilapi.com.br';
+
 export interface CspOptions {
   /** `'sha256-…'` sources of the inline scripts of index.html. */
   scriptHashes: string[];
@@ -35,7 +41,7 @@ export function contentSecurityPolicy({ scriptHashes, header = false, demo = fal
     ['style-src', "'self'", "'unsafe-inline'"],
     ['img-src', "'self'", 'data:', 'blob:'],
     ['font-src', "'self'"],
-    ['connect-src', "'self'"],
+    ['connect-src', "'self'", ...(demo ? [BRASILAPI_ORIGIN] : [])],
     ['worker-src', "'self'", 'blob:'],
     ['manifest-src', "'self'"],
     // Only the bank consent widget may be framed (Open Finance). The demo uses the simulated

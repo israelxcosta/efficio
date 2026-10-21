@@ -3,7 +3,7 @@ import { Command } from 'cmdk';
 import { Dialog } from 'radix-ui';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeftRight, FileUp, Landmark, Minus, Plus, Search, TrendingUp, UserRound } from 'lucide-react';
+import { ArrowLeftRight, Building2, FileUp, Landmark, Minus, Plus, Search, TrendingUp, Truck } from 'lucide-react';
 import { formatBRL, formatDateBR, type SearchResponse } from '@effinance/shared';
 import { api } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
@@ -57,7 +57,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] data-[state=open]:animate-fade-in" />
         <Dialog.Content className="fixed top-[12vh] left-1/2 z-50 w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-lg outline-none data-[state=open]:animate-fade-in">
           <Dialog.Title className="sr-only">Buscar</Dialog.Title>
-          <Dialog.Description className="sr-only">Busque transações, contas, categorias, contatos ou navegue</Dialog.Description>
+          <Dialog.Description className="sr-only">Busque transações, contas, categorias, clientes, fornecedores ou navegue</Dialog.Description>
           <Command shouldFilter={!q || q.length < 2} label="Busca global">
             <div className="flex items-center gap-3 border-b border-border px-4">
               <Search className="size-4 text-muted" />
@@ -114,11 +114,17 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                     </Command.Group>
                   ) : null}
                   {r.contacts.length ? (
-                    <Command.Group heading="Contatos" className="[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-subtle">
+                    <Command.Group heading="Clientes e fornecedores" className="[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-subtle">
                       {r.contacts.map((c) => (
-                        <Command.Item key={c.id} value={`ct-${c.id}`} className={itemClass} onSelect={() => run(() => navigate(`/contatos?editar=${c.id}`))}>
-                          <UserRound />
+                        <Command.Item
+                          key={c.id}
+                          value={`ct-${c.id}`}
+                          className={itemClass}
+                          onSelect={() => run(() => navigate(c.kind === 'client' ? `/clientes?consultar=${c.id}` : `/fornecedores?editar=${c.id}`))}
+                        >
+                          {c.kind === 'client' ? <Building2 /> : <Truck />}
                           <span className="flex-1 truncate">{c.name}</span>
+                          <span className="text-xs text-muted">{c.kind === 'client' ? 'Cliente' : 'Fornecedor'}</span>
                         </Command.Item>
                       ))}
                     </Command.Group>

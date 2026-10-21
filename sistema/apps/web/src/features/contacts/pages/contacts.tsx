@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Ellipsis, HandCoins, Mail, Pencil, Phone, Plus, Receipt, Search, Trash2, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Ellipsis, HandCoins, Mail, Pencil, Phone, Plus, Receipt, Search, Trash2, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatPhone, type Contact } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
@@ -49,9 +49,9 @@ export default function ContactsPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const contacts = useContacts({ search: search || undefined, page, pageSize: PAGE_SIZE });
+  const contacts = useContacts({ search: search || undefined, kind: 'supplier', page, pageSize: PAGE_SIZE });
 
-  // Deep link from the command palette: /contatos?editar=<id>
+  // Deep link from the command palette: /fornecedores?editar=<id>
   const editParam = params.get('editar');
   const editId = isUuid(editParam) ? editParam : null;
   const editing = useQuery({
@@ -76,18 +76,18 @@ export default function ContactsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         overline="Cadastros"
-        title="Contatos"
-        description="Clientes, fornecedores e pessoas vinculadas às suas contas a pagar e a receber."
-        actions={<WriteGate><Button onClick={() => setSheet({ open: true, contact: null })}><Plus /> Novo contato</Button></WriteGate>}
+        title="Fornecedores"
+        description="Empresas e pessoas que fornecem para o escritório, vinculadas às contas a pagar."
+        actions={<WriteGate><Button onClick={() => setSheet({ open: true, contact: null })}><Plus /> Novo fornecedor</Button></WriteGate>}
       />
 
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <div className="relative w-full max-w-sm">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
-            <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por nome, CPF, e-mail ou telefone" className="h-10 pl-9" aria-label="Buscar contatos" />
+            <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por nome ou CPF/CNPJ" className="h-10 pl-9" aria-label="Buscar fornecedores" />
           </div>
-          {data ? <span className="text-xs text-muted">{data.total} contato(s)</span> : null}
+          {data ? <span className="text-xs text-muted">{data.total} fornecedor(es)</span> : null}
         </div>
 
         {contacts.isPending ? (
@@ -97,10 +97,10 @@ export default function ContactsPage() {
         ) : data!.items.length === 0 ? (
           <EmptyState
             className="m-4"
-            icon={<Users />}
-            title={search ? 'Nenhum contato encontrado' : 'Nenhum contato cadastrado'}
-            description="Vincule contatos aos lançamentos para ver totais e evolução por pessoa ou empresa nos relatórios."
-            action={<WriteGate><Button variant="outline" onClick={() => setSheet({ open: true, contact: null })}>Adicionar contato</Button></WriteGate>}
+            icon={<Truck />}
+            title={search ? 'Nenhum fornecedor encontrado' : 'Nenhum fornecedor cadastrado'}
+            description="Vincule fornecedores às contas a pagar para ver totais e evolução por fornecedor nos relatórios."
+            action={<WriteGate><Button variant="outline" onClick={() => setSheet({ open: true, contact: null })}>Adicionar fornecedor</Button></WriteGate>}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -170,14 +170,14 @@ export default function ContactsPage() {
       <ConfirmDialog
         open={Boolean(toDelete)}
         onOpenChange={(o) => !o && setToDelete(null)}
-        title="Excluir contato?"
-        description={`"${toDelete?.name}" será excluído. Os lançamentos vinculados ficarão sem contato.`}
+        title="Excluir fornecedor?"
+        description={`"${toDelete?.name}" será excluído. Os lançamentos vinculados ficarão sem fornecedor.`}
         confirmLabel="Excluir"
         loading={del.isPending}
         onConfirm={async () => {
           try {
             await del.mutateAsync(toDelete!.id);
-            toast.success('Contato excluído');
+            toast.success('Fornecedor excluído');
             setToDelete(null);
           } catch (error) {
             toastError(error);

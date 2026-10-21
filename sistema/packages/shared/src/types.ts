@@ -239,6 +239,18 @@ export interface Client {
   createdAt: string;
 }
 
+export interface ClientListResponse extends Paginated<Client> {
+  /** Whole workspace, regardless of filters and page. */
+  summary: {
+    active: number;
+    inactive: number;
+    /** Sum of the current monthly fees of active clients (cents). */
+    monthlyFees: number;
+    /** Active clients without a registered fee period covering today (new or due for renewal). */
+    withoutCurrentFee: number;
+  };
+}
+
 export interface ClientFeesResponse {
   /** Period that contains today, when registered. */
   current: ClientFee | null;

@@ -11,7 +11,7 @@ import {
   type Client,
   type ClientFee,
   type ClientFeesResponse,
-  type Paginated,
+  type ClientListResponse,
   type clientFeeInputSchema,
   type clientInactivationSchema,
   type clientInputSchema,
@@ -54,11 +54,15 @@ function toFee(row: ClientFeeRow, contractStart: string): ClientFee {
   };
 }
 
-/** The period containing `on` and the most recent registered one. */
-function pickFees(fees: ClientFee[], contractStart: string, on: string) {
-  const index = feePeriodIndexAt(contractStart, on);
+/**
+ * The period containing `on` and the most recent registered one. Nothing is in force after the
+ * client was inactivated.
+ */
+function pickFees(fees: ClientFee[], client: Pick<ContactRow, 'contractStartDate' | 'inactivatedAt'>, on: string) {
   let latest: ClientFee | null = null;
   for (const fee of fees) if (!latest || fee.index > latest.index) latest = fee;
+  if (client.inactivatedAt && client.inactivatedAt < on) return { current: null, latest };
+  const index = feePeriodIndexAt(client.contractStartDate!, on);
   return { current: fees.find((f) => f.index === index) ?? null, latest };
 }
 
@@ -66,7 +70,7 @@ async function toClient(cipher: FieldCipher, row: ContactRow, feeRows: ClientFee
   const plain = await cipher.decryptFields(TABLE, row, CONTACT_ALL_ENCRYPTED_FIELDS);
   const contractStart = plain.contractStartDate!;
   const fees = feeRows.map((f) => toFee(f, contractStart));
-  const { current, latest } = pickFees(fees, contractStart, today());
+  const { current, latest } = pickFees(fees, plain, today());
   return {
     id: plain.id,
     name: plain.name,
@@ -155,8 +159,36 @@ async function assertUniqueDocument(db: DbExecutor, workspaceId: string, documen
 // Clients
 // ---------------------------------------------------------------------------
 
+/** Counts and the monthly fees currently in force, over every client of the workspace. */
+async function summarize(db: DbExecutor, workspaceId: string): Promise<ClientListResponse['summary']> {
+  const [rows, fees] = await Promise.all([
+    db
+      .select({ id: contacts.id, status: contacts.status, contractStartDate: contacts.contractStartDate })
+      .from(contacts)
+      .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client'))),
+    db
+      .select({ clientId: clientFees.clientId, periodIndex: clientFees.periodIndex, amount: clientFees.amount })
+      .from(clientFees)
+      .where(eq(clientFees.workspaceId, workspaceId)),
+  ]);
+  const byPeriod = new Map(fees.map((f) => [`${f.clientId}:${f.periodIndex}`, f.amount]));
+  const now = today();
+  const summary = { active: 0, inactive: 0, monthlyFees: 0, withoutCurrentFee: 0 };
+  for (const row of rows) {
+    if (row.status === 'inactive') {
+      summary.inactive += 1;
+      continue;
+    }
+    summary.active += 1;
+    const amount = byPeriod.get(`${row.id}:${feePeriodIndexAt(row.contractStartDate!, now)}`);
+    if (amount === undefined) summary.withoutCurrentFee += 1;
+    else summary.monthlyFees += amount;
+  }
+  return summary;
+}
+
 /** Search: razão social / nome fantasia (partial) or CNPJ (exact, through the blind index). */
-export async function listClients(db: DbExecutor, workspaceId: string, q: ClientQuery): Promise<Paginated<Client>> {
+export async function listClients(db: DbExecutor, workspaceId: string, q: ClientQuery): Promise<ClientListResponse> {
   let search;
   if (q.search) {
     const digits = onlyDigits(q.search);
@@ -174,17 +206,19 @@ export async function listClients(db: DbExecutor, workspaceId: string, q: Client
     q.taxRegime ? eq(contacts.taxRegime, q.taxRegime) : undefined,
     search,
   );
-  const [rows, [count]] = await Promise.all([
+  const [rows, [count], summary] = await Promise.all([
     db
       .select()
       .from(contacts)
       .where(where)
-      .orderBy(asc(contacts.name), asc(contacts.id))
+      // As listed: trade name when there is one, else the legal name.
+      .orderBy(sql`lower(coalesce(${contacts.tradeName}, ${contacts.name}))`, asc(contacts.id))
       .limit(q.pageSize)
       .offset((q.page - 1) * q.pageSize),
     db.select({ total: countAll() }).from(contacts).where(where),
+    summarize(db, workspaceId),
   ]);
-  return { items: await hydrate(db, workspaceId, rows), total: count?.total ?? 0, page: q.page, pageSize: q.pageSize };
+  return { items: await hydrate(db, workspaceId, rows), total: count?.total ?? 0, page: q.page, pageSize: q.pageSize, summary };
 }
 
 export async function getClient(db: DbExecutor, workspaceId: string, id: string): Promise<Client> {
@@ -297,7 +331,7 @@ export async function listFees(db: DbExecutor, workspaceId: string, clientId: st
   const rows = await feeRows(db, workspaceId, clientId);
   const items = rows.map((r) => toFee(r, start));
   return {
-    current: pickFees(items, start, today()).current,
+    current: pickFees(items, client, today()).current,
     items,
     next: feePeriod(start, rows.length > 0 ? rows[0]!.periodIndex + 1 : 0),
   };

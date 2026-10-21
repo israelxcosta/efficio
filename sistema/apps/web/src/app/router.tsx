@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { createBrowserRouter, createHashRouter, Link } from 'react-router';
+import { createBrowserRouter, createHashRouter, Link, Navigate, useLocation } from 'react-router';
 import { AppShell } from '@/components/layout/app-shell';
 import { Button } from '@/components/ui/button';
 import { IS_DEMO } from '@/lib/demo';
@@ -22,6 +22,7 @@ const CardDetailPage = lazy(() => import('@/features/cards/pages/card-detail'));
 const CategoriesPage = lazy(() => import('@/features/categories/pages/categories'));
 const GoalsPage = lazy(() => import('@/features/goals/pages/goals'));
 const ContactsPage = lazy(() => import('@/features/contacts/pages/contacts'));
+const ClientsPage = lazy(() => import('@/features/clients/pages/clients'));
 const ReportsPage = lazy(() => import('@/features/reports/pages/reports'));
 const SettingsPage = lazy(() => import('@/features/settings/pages/settings'));
 
@@ -36,6 +37,12 @@ function NotFound() {
       </Button>
     </div>
   );
+}
+
+/** /contatos became /fornecedores (clients have their own page): keep the query (?editar=<id>). */
+function LegacyContactsRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/fornecedores${search}`} replace />;
 }
 
 // The demo build is served from a single static page, so it routes on the URL hash.
@@ -63,7 +70,10 @@ export const router = (IS_DEMO ? createHashRouter : createBrowserRouter)([
       { path: 'cartoes/:id', element: <CardDetailPage /> },
       { path: 'categorias', element: <CategoriesPage /> },
       { path: 'metas', element: <GoalsPage /> },
-      { path: 'contatos', element: <ContactsPage /> },
+      { path: 'clientes', element: <ClientsPage /> },
+      { path: 'fornecedores', element: <ContactsPage /> },
+      // Old address of the suppliers page (bookmarks, links in e-mails).
+      { path: 'contatos', element: <LegacyContactsRedirect /> },
       { path: 'relatorios', element: <ReportsPage /> },
       { path: 'configuracoes', element: <SettingsPage /> },
       { path: '*', element: <NotFound /> },

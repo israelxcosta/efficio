@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Building2,
   ChartLine,
   CreditCard,
   HandCoins,
@@ -10,7 +11,7 @@ import {
   Settings,
   Tags,
   Target,
-  Users,
+  Truck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -33,7 +34,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/cartoes', label: 'Cartões de crédito', icon: CreditCard, keywords: 'fatura limite' },
   { to: '/metas', label: 'Metas', icon: Target, keywords: 'objetivos reserva' },
   { to: '/categorias', label: 'Categorias', icon: Tags, keywords: 'subcategorias' },
-  { to: '/contatos', label: 'Contatos', icon: Users, keywords: 'clientes fornecedores pessoas cpf' },
+  { to: '/clientes', label: 'Clientes', icon: Building2, keywords: 'empresas cnpj honorarios contrato regime simples inativar receita federal' },
+  { to: '/fornecedores', label: 'Fornecedores', icon: Truck, keywords: 'contatos pessoas cpf cnpj prestadores' },
   { to: '/relatorios', label: 'Relatórios', icon: ChartLine, mobile: true, keywords: 'analises fluxo de caixa comparacao insights' },
 ];
 

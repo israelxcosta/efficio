@@ -17,6 +17,7 @@ import { useAccounts } from '@/features/accounts/api';
 import { useCards } from '@/features/cards/api';
 import { useCategories } from '@/features/categories/api';
 import { useContactOptions } from '@/features/contacts/api';
+import { contactOptions } from '@/features/contacts/contact-options';
 import { useTransactions } from '../api';
 import { useTransactionActions } from '../transaction-actions';
 import { TransactionRow } from './transaction-row';
@@ -174,13 +175,9 @@ export function TransactionListPage({ type }: { type: 'expense' | 'income' }) {
               </option>
             ))}
           </Select>
-          <Select size_="sm" value={contactId} onChange={(e) => update({ contato: e.target.value })} aria-label="Contato">
-            <option value="">Todos os contatos</option>
-            {(contacts.data?.items ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+          <Select size_="sm" value={contactId} onChange={(e) => update({ contato: e.target.value })} aria-label={type === 'income' ? 'Cliente' : 'Fornecedor'}>
+            <option value="">{type === 'income' ? 'Todos os clientes' : 'Todos os fornecedores'}</option>
+            {contactOptions(contacts.data?.items ?? [], { type, selected: contactId })}
           </Select>
           <Select size_="sm" value={source} onChange={(e) => update({ origem: e.target.value })} aria-label="Conta ou cartão">
             <option value="">Todas as contas</option>

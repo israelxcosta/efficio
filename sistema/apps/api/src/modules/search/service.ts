@@ -46,7 +46,11 @@ export async function search(db: DbExecutor, workspaceId: string, q: string): Pr
       .where(
         and(
           eq(contacts.workspaceId, workspaceId),
-          or(ilike(contacts.name, pattern), documentHash ? eq(contacts.documentHash, documentHash) : undefined),
+          or(
+            ilike(contacts.name, pattern),
+            ilike(contacts.tradeName, pattern),
+            documentHash ? eq(contacts.documentHash, documentHash) : undefined,
+          ),
         ),
       )
       .limit(5),

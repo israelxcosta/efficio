@@ -174,3 +174,123 @@ export const DEFAULT_CATEGORIES: DefaultCategory[] = [
     ],
   },
 ];
+
+/** Categories of a business workspace (service company, e.g. an accounting office). */
+export const BUSINESS_CATEGORIES: DefaultCategory[] = [
+  {
+    name: 'Honorários',
+    type: 'income',
+    icon: 'briefcase',
+    color: '#12A150',
+    subcategories: [
+      { name: 'Honorários mensais', icon: 'briefcase' },
+      { name: 'Taxa por empregado', icon: 'hand-coins' },
+      { name: '13º honorário', icon: 'gift' },
+      { name: 'Serviços avulsos', icon: 'receipt' },
+    ],
+  },
+  {
+    name: 'Outras receitas',
+    type: 'income',
+    icon: 'coins',
+    color: '#3F64BE',
+    subcategories: [
+      { name: 'Rendimentos financeiros', icon: 'trending-up' },
+      { name: 'Reembolsos', icon: 'hand-coins' },
+    ],
+  },
+  {
+    name: 'Pessoal',
+    type: 'expense',
+    icon: 'briefcase',
+    color: '#7C3AED',
+    subcategories: [
+      { name: 'Salários', icon: 'banknote' },
+      { name: 'Pró-labore', icon: 'wallet' },
+      { name: 'Encargos (INSS/FGTS)', icon: 'receipt' },
+      { name: 'Benefícios', icon: 'heart-pulse' },
+      { name: 'Treinamentos', icon: 'graduation-cap' },
+    ],
+  },
+  {
+    name: 'Impostos e taxas',
+    type: 'expense',
+    icon: 'receipt',
+    color: '#64748B',
+    subcategories: [
+      { name: 'Simples Nacional (DAS)', icon: 'receipt' },
+      { name: 'ISS', icon: 'receipt' },
+      { name: 'Taxas e alvarás', icon: 'flag' },
+      { name: 'Tarifas bancárias', icon: 'landmark' },
+    ],
+  },
+  {
+    name: 'Ocupação',
+    type: 'expense',
+    icon: 'building-2',
+    color: '#152B61',
+    subcategories: [
+      { name: 'Aluguel', icon: 'house' },
+      { name: 'Condomínio', icon: 'building-2' },
+      { name: 'Energia', icon: 'lightbulb' },
+      { name: 'Água', icon: 'droplet' },
+      { name: 'Internet e telefone', icon: 'wifi' },
+      { name: 'Limpeza e manutenção', icon: 'wrench' },
+    ],
+  },
+  {
+    name: 'Tecnologia',
+    type: 'expense',
+    icon: 'laptop',
+    color: '#0EA5E9',
+    subcategories: [
+      { name: 'Sistema contábil', icon: 'laptop' },
+      { name: 'Softwares e licenças', icon: 'laptop' },
+      { name: 'Certificado digital', icon: 'shield' },
+      { name: 'Equipamentos', icon: 'smartphone' },
+    ],
+  },
+  {
+    name: 'Administrativo',
+    type: 'expense',
+    icon: 'store',
+    color: '#F97316',
+    subcategories: [
+      { name: 'Material de escritório', icon: 'shopping-bag' },
+      { name: 'Cartório e correios', icon: 'receipt' },
+      { name: 'Serviços de terceiros', icon: 'briefcase' },
+    ],
+  },
+  {
+    name: 'Marketing',
+    type: 'expense',
+    icon: 'sparkles',
+    color: '#EC4899',
+    subcategories: [
+      { name: 'Anúncios', icon: 'target' },
+      { name: 'Site e redes sociais', icon: 'smartphone' },
+      { name: 'Eventos e brindes', icon: 'gift' },
+    ],
+  },
+  {
+    name: 'Deslocamento',
+    type: 'expense',
+    icon: 'car',
+    color: '#3F64BE',
+    subcategories: [
+      { name: 'Combustível', icon: 'fuel' },
+      { name: 'App de transporte', icon: 'car' },
+    ],
+  },
+  {
+    name: 'Despesas financeiras',
+    type: 'expense',
+    icon: 'landmark',
+    color: '#E5484D',
+    subcategories: [
+      { name: 'Juros e multas', icon: 'receipt' },
+      { name: 'Empréstimos', icon: 'landmark' },
+    ],
+  },
+  { name: 'Outras despesas', type: 'expense', icon: 'tag', color: '#78716C' },
+];

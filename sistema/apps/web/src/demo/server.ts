@@ -17,6 +17,7 @@ import { tenantRoutes } from '@api/lib/tenant-routes';
 import { setSessionWorkspace } from '@api/modules/auth/sessions';
 import { FakeBillingProvider } from '@api/modules/billing/providers/fake';
 import { billingRoutes } from '@api/modules/billing/routes';
+import { BrasilApiCnpjProvider } from '@api/modules/clients/providers/brasilapi';
 import { FakeOpenFinanceProvider } from '@api/modules/open-finance/providers/fake';
 import { loadAccess } from '@api/modules/workspaces/access';
 import { inviteRoutes, workspaceRoutes } from '@api/modules/workspaces/routes';
@@ -119,6 +120,8 @@ async function boot() {
     mailer: new ConsoleMailer(),
     billing: new FakeBillingProvider(appUrl),
     openFinance: { provider: new FakeOpenFinanceProvider(), webhookUrl: null, webhookSecret: null },
+    // Real public registry: the browser calls BrasilAPI directly (CORS enabled, no credentials).
+    cnpj: new BrasilApiCnpjProvider(),
   };
 
   const router = new DemoRouter({
