@@ -1,4 +1,4 @@
-import { inArray } from 'drizzle-orm';
+import { and, inArray, isNotNull } from 'drizzle-orm';
 import {
   getInvoiceDates,
   type RefAccount,
@@ -12,6 +12,7 @@ import {
   categories,
   contacts,
   creditCards,
+  transactions,
   type AccountRow,
   type CategoryRow,
   type CreditCardRow,
@@ -27,6 +28,8 @@ export interface RefMaps {
   contacts: Map<string, { id: string; name: string }>;
   /** Decrypted notes by transaction id. */
   notes: Map<string, string | null>;
+  /** Interest and fine charged on each transaction settled late (by the original's id). */
+  lateFees: Map<string, { interest: number; fine: number }>;
 }
 
 function collect(rows: TransactionRow[], pick: (r: TransactionRow) => (string | null)[]): string[] {
@@ -41,8 +44,10 @@ export async function loadRefMaps(db: DbExecutor, rows: TransactionRow[]): Promi
   const accountIds = collect(rows, (r) => [r.accountId, r.toAccountId]);
   const cardIds = collect(rows, (r) => [r.creditCardId]);
   const contactIds = collect(rows, (r) => [r.contactId]);
+  // Only settled rows can carry late fees.
+  const paidIds = rows.filter((r) => r.paid && r.type !== 'transfer').map((r) => r.id);
 
-  const [cats, accs, cards, conts, notes] = await Promise.all([
+  const [cats, accs, cards, conts, notes, fees] = await Promise.all([
     categoryIds.length ? db.select().from(categories).where(inArray(categories.id, categoryIds)) : [],
     accountIds.length ? db.select().from(accounts).where(inArray(accounts.id, accountIds)) : [],
     cardIds.length ? db.select().from(creditCards).where(inArray(creditCards.id, cardIds)) : [],
@@ -50,7 +55,21 @@ export async function loadRefMaps(db: DbExecutor, rows: TransactionRow[]): Promi
       ? db.select({ id: contacts.id, name: contacts.name }).from(contacts).where(inArray(contacts.id, contactIds))
       : [],
     Promise.all(rows.map(async (r) => [r.id, await decryptNotes(r.workspaceId, r.notes)] as const)),
+    paidIds.length
+      ? db
+          .select({ of: transactions.lateFeeOf, kind: transactions.lateFeeKind, amount: transactions.amount })
+          .from(transactions)
+          .where(and(isNotNull(transactions.lateFeeOf), inArray(transactions.lateFeeOf, paidIds)))
+      : [],
   ]);
+
+  const lateFees = new Map<string, { interest: number; fine: number }>();
+  for (const f of fees) {
+    if (!f.of || !f.kind) continue;
+    const entry = lateFees.get(f.of) ?? { interest: 0, fine: 0 };
+    entry[f.kind] += f.amount;
+    lateFees.set(f.of, entry);
+  }
 
   return {
     categories: new Map(cats.map((c) => [c.id, c])),
@@ -58,6 +77,7 @@ export async function loadRefMaps(db: DbExecutor, rows: TransactionRow[]): Promi
     cards: new Map(cards.map((c) => [c.id, c])),
     contacts: new Map(conts.map((c) => [c.id, c])),
     notes: new Map(notes),
+    lateFees,
   };
 }
 
@@ -119,6 +139,9 @@ export function toTransaction(row: TransactionRow, refs: RefMaps, now: string = 
     splitGroupId: row.splitGroupId,
     origin: row.origin,
     importBatchId: row.importBatchId,
+    lateFeeOf: row.lateFeeOf,
+    lateFeeKind: row.lateFeeKind,
+    lateFees: refs.lateFees.get(row.id) ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     category: refCategory(get(refs.categories, row.categoryId)),

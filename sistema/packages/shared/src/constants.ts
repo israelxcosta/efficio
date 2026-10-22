@@ -17,6 +17,26 @@ export const TRANSFER_KIND_LABELS: Record<TransferKind, string> = {
   card_payment: 'Pagamento de fatura',
 };
 
+/** Extra charged on a payment made after the due date (recorded as its own linked transaction). */
+export const LATE_FEE_KINDS = ['interest', 'fine'] as const;
+export type LateFeeKind = (typeof LATE_FEE_KINDS)[number];
+
+export const LATE_FEE_KIND_LABELS: Record<LateFeeKind, string> = {
+  interest: 'Juros',
+  fine: 'Multa',
+};
+
+/** Payment risk of a client, from the delinquency score (see utils/delinquency.ts). */
+export const DELINQUENCY_RISKS = ['baixo', 'moderado', 'alto', 'critico'] as const;
+export type DelinquencyRisk = (typeof DELINQUENCY_RISKS)[number];
+
+export const DELINQUENCY_RISK_LABELS: Record<DelinquencyRisk, string> = {
+  baixo: 'Bom pagador',
+  moderado: 'Atenção',
+  alto: 'Risco alto',
+  critico: 'Crítico',
+};
+
 export const ACCOUNT_TYPES = [
   'checking',
   'savings',

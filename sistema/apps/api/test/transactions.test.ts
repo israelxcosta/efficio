@@ -238,6 +238,54 @@ describe('paid toggle and balances', () => {
     expect(res.body).toMatchObject({ accountId: account, paidAt: '2026-10-02', account: { name: 'Itaú' } });
   });
 
+  it('records interest and fine of a late payment as linked transactions', async () => {
+    // today = 2026-10-20
+    const client = await c.post('/contacts', { name: 'Padaria Pão Dourado' });
+    const fee = await c.post('/transactions', {
+      type: 'income',
+      description: 'Honorários',
+      amount: 35000,
+      date: '2026-09-15',
+      accountId: account,
+      contactId: client.body.id,
+    });
+    const id = fee.body[0].id;
+
+    // Only after the due date, only when confirming, never on card purchases.
+    expect((await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-09-15', interest: 100 })).status).toBe(422);
+    expect((await c.patch(`/transactions/${id}/paid`, { paid: false, fine: 100 })).status).toBe(422);
+    expect((await c.patch(`/transactions/${id}/paid`, { paid: true, interest: -1 })).status).toBe(400);
+
+    const paid = await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-05', interest: 700, fine: 1050 });
+    expect(paid.status).toBe(200);
+    expect(paid.body).toMatchObject({ paid: true, paidAt: '2026-10-05', lateFees: { interest: 700, fine: 1050 } });
+
+    const linked = (await c.get('/transactions?type=income&from=2026-10-05&to=2026-10-05')).body.items;
+    expect(linked.map((t: any) => [t.description, t.amount, t.lateFeeKind, t.lateFeeOf, t.paid, t.contactId]).sort()).toEqual([
+      ['Juros — Honorários', 700, 'interest', id, true, client.body.id],
+      ['Multa — Honorários', 1050, 'fine', id, true, client.body.id],
+    ]);
+    expect((await c.get(`/accounts/${account}`)).body.balance).toBe(1000000 + 35000 + 700 + 1050);
+
+    // Confirming again with other amounts replaces them; zero removes one.
+    const again = await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-05', interest: 900, fine: 0 });
+    expect(again.body.lateFees).toEqual({ interest: 900, fine: 0 });
+    expect((await c.get('/transactions?type=income&from=2026-10-05&to=2026-10-05')).body.total).toBe(1);
+
+    // Reopening the payment removes them (also when reopened through the edit form).
+    const reopened = await c.patch(`/transactions/${id}/paid`, { paid: false });
+    expect(reopened.body.lateFees).toBeNull();
+    expect((await c.get('/transactions?type=income&from=2026-10-05&to=2026-10-05')).body.total).toBe(0);
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-05', fine: 500 });
+    await c.put(`/transactions/${id}?scope=one`, { paid: false });
+    expect((await c.get('/transactions?type=income&from=2026-10-05&to=2026-10-05')).body.total).toBe(0);
+
+    // Deleting the original deletes them.
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-05', interest: 300 });
+    expect((await c.del(`/transactions/${id}?scope=one`)).status).toBe(204);
+    expect((await c.get('/transactions?type=income&from=2026-10-05&to=2026-10-05')).body.total).toBe(0);
+  });
+
   it('filters, searches, paginates and expands references', async () => {
     const cat = await firstCategory(c, 'expense', 'Alimentação');
     const contact = await c.post('/contacts', { name: 'Padaria do Zé' });

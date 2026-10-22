@@ -8,6 +8,7 @@ import {
   feePeriodIndexAt,
   formatDateBR,
   onlyDigits,
+  TAX_REGIMES,
   type Client,
   type ClientFee,
   type ClientFeesResponse,
@@ -16,6 +17,7 @@ import {
   type clientInactivationSchema,
   type clientInputSchema,
   type clientQuerySchema,
+  type TaxRegime,
 } from '@effinance/shared';
 import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
@@ -134,6 +136,16 @@ async function hydrate(db: DbExecutor, workspaceId: string, rows: ContactRow[]):
   );
 }
 
+/** Clients by id with their decrypted data (ids outside the workspace or not clients are ignored). */
+export async function getClientsByIds(db: DbExecutor, workspaceId: string, ids: string[]): Promise<Client[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select()
+    .from(contacts)
+    .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client'), inArray(contacts.id, ids)));
+  return hydrate(db, workspaceId, rows);
+}
+
 async function encryptClientInput(cipher: FieldCipher, input: ClientInput) {
   const encrypted = await cipher.encryptFields(TABLE, input, CLIENT_INPUT_ENCRYPTED_FIELDS);
   return { ...encrypted, documentHash: await documentIndex(cipher, input.document) };
@@ -163,7 +175,7 @@ async function assertUniqueDocument(db: DbExecutor, workspaceId: string, documen
 async function summarize(db: DbExecutor, workspaceId: string): Promise<ClientListResponse['summary']> {
   const [rows, fees] = await Promise.all([
     db
-      .select({ id: contacts.id, status: contacts.status, contractStartDate: contacts.contractStartDate })
+      .select({ id: contacts.id, status: contacts.status, contractStartDate: contacts.contractStartDate, taxRegime: contacts.taxRegime })
       .from(contacts)
       .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client'))),
     db
@@ -173,17 +185,21 @@ async function summarize(db: DbExecutor, workspaceId: string): Promise<ClientLis
   ]);
   const byPeriod = new Map(fees.map((f) => [`${f.clientId}:${f.periodIndex}`, f.amount]));
   const now = today();
-  const summary = { active: 0, inactive: 0, monthlyFees: 0, withoutCurrentFee: 0 };
+  const byRegime = Object.fromEntries(TAX_REGIMES.map((r) => [r, 0])) as Record<TaxRegime, number>;
+  const summary = { active: 0, inactive: 0, monthlyFees: 0, withoutCurrentFee: 0, byRegime, averageFee: 0 };
   for (const row of rows) {
     if (row.status === 'inactive') {
       summary.inactive += 1;
       continue;
     }
     summary.active += 1;
+    if (row.taxRegime) byRegime[row.taxRegime] += 1;
     const amount = byPeriod.get(`${row.id}:${feePeriodIndexAt(row.contractStartDate!, now)}`);
     if (amount === undefined) summary.withoutCurrentFee += 1;
     else summary.monthlyFees += amount;
   }
+  const withFee = summary.active - summary.withoutCurrentFee;
+  summary.averageFee = withFee > 0 ? Math.round(summary.monthlyFees / withFee) : 0;
   return summary;
 }
 

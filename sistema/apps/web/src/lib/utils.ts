@@ -1,5 +1,11 @@
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+// The custom `--text-*` sizes (index.css) are font sizes, not text colors: without this,
+// `cn('text-caption', 'text-muted')` would drop one of them.
+const twMerge = extendTailwindMerge({
+  extend: { classGroups: { 'font-size': [{ text: ['micro', 'mini', 'caption', 'body-sm', 'title-sm', 'kpi'] }] } },
+});
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));

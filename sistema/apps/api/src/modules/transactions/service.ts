@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, gt, gte, ilike, inArray, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   buildOccurrenceDates,
+  LATE_FEE_KIND_LABELS,
+  LATE_FEE_KINDS,
   minISO,
   splitInstallments,
   type AnticipateInstallmentsInput,
@@ -14,7 +16,14 @@ import {
 } from '@effinance/shared';
 import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
-import { creditCards, recurrences, transactions, type NewTransactionRow, type RecurrenceTemplate } from '../../db/schema';
+import {
+  creditCards,
+  recurrences,
+  transactions,
+  type NewTransactionRow,
+  type RecurrenceTemplate,
+  type TransactionRow,
+} from '../../db/schema';
 import { today } from '../../lib/clock';
 import { ValidationError } from '../../lib/errors';
 import { countAll, likePattern, sumOf } from '../../lib/sql';
@@ -366,6 +375,8 @@ export async function updateTransaction(
 
   await db.transaction(async (tx) => {
     await tx.update(transactions).set(ownPatch).where(eq(transactions.id, row.id));
+    // Reopened: the interest and fine charged with the payment were not received/paid either.
+    if (row.paid && !paid) await tx.delete(transactions).where(eq(transactions.lateFeeOf, row.id));
 
     if (scope === 'one' || !row.recurrenceId) return;
     const seriesPatch: SeriesPatch = pickSeriesPatch(input);
@@ -429,8 +440,53 @@ export async function setPaid(
     if (row.type !== 'transfer') patch.accountId = input.accountId;
   }
 
-  await db.update(transactions).set(patch).where(eq(transactions.id, row.id));
+  const fees = lateFeeRows(row, patch, input);
+
+  await db.transaction(async (tx) => {
+    await tx.update(transactions).set(patch).where(eq(transactions.id, row.id));
+    // Reopening removes the late fees; sending new ones replaces them.
+    if (!input.paid || fees) await tx.delete(transactions).where(eq(transactions.lateFeeOf, row.id));
+    if (fees?.length) await tx.insert(transactions).values(fees);
+  });
   return getTransaction(db, workspaceId, id);
+}
+
+/**
+ * Interest and fine of a late payment as their own paid rows, linked to the original (same type,
+ * account, contact and category; dated on the payment). Undefined when the request sends none.
+ */
+function lateFeeRows(
+  row: TransactionRow,
+  patch: Partial<NewTransactionRow>,
+  input: SetPaidInput,
+): NewTransactionRow[] | undefined {
+  if (input.interest === undefined && input.fine === undefined) return undefined;
+  const amounts = { interest: input.interest ?? 0, fine: input.fine ?? 0 };
+  if (amounts.interest === 0 && amounts.fine === 0) return [];
+  if (!input.paid) throw new ValidationError('Juros e multa só são lançados ao confirmar o pagamento');
+  if (row.type === 'transfer' || row.creditCardId) {
+    throw new ValidationError('Juros e multa valem só para contas a pagar e a receber');
+  }
+  if (row.lateFeeOf) throw new ValidationError('Este lançamento já é de juros ou multa');
+  const paidAt = patch.paidAt!;
+  if (paidAt <= row.date) throw new ValidationError('Juros e multa só valem para pagamento depois do vencimento');
+
+  return LATE_FEE_KINDS.filter((kind) => amounts[kind] > 0).map((kind) => ({
+    workspaceId: row.workspaceId,
+    type: row.type,
+    description: `${LATE_FEE_KIND_LABELS[kind]} — ${row.description}`,
+    amount: amounts[kind],
+    date: paidAt,
+    paid: true,
+    paidAt,
+    accountId: patch.accountId ?? row.accountId,
+    categoryId: row.categoryId,
+    subcategoryId: row.subcategoryId,
+    contactId: row.contactId,
+    paymentMethod: row.paymentMethod,
+    lateFeeOf: row.id,
+    lateFeeKind: kind,
+  }));
 }
 
 export async function deleteTransaction(

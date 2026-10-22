@@ -30,6 +30,7 @@ import type {
   IconName,
   ImportFormat,
   InactivationReason,
+  LateFeeKind,
   MemberRole,
   OpenFinanceProvider,
   PaymentMethod,
@@ -612,10 +613,17 @@ export const transactions = pgTable(
      * hash. Unique per account/card, so re-importing never duplicates a transaction.
      */
     externalId: text(),
+    /**
+     * Interest or fine charged on a late payment (migration 0008): its own paid transaction pointing
+     * to the one that was settled late. Removed with it (cascade) and when the payment is reopened.
+     */
+    lateFeeOf: uuid(),
+    lateFeeKind: text().$type<LateFeeKind>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
+    tenantUnique('transactions', t),
     index('transactions_workspace_date_idx').on(t.workspaceId, t.date),
     index('transactions_account_idx').on(t.accountId),
     index('transactions_to_account_idx').on(t.toAccountId),
@@ -701,6 +709,15 @@ export const transactions = pgTable(
     uniqueIndex('transactions_card_external_uq')
       .on(t.workspaceId, t.creditCardId, t.externalId)
       .where(sql`${t.externalId} is not null`),
+    // Migration 0008: late-payment interest and fines.
+    foreignKey({
+      name: 'transactions_late_fee_fk',
+      columns: [t.workspaceId, t.lateFeeOf],
+      foreignColumns: [t.workspaceId, t.id],
+    }).onDelete('cascade'),
+    check('transactions_late_fee_kind_chk', sql`${t.lateFeeKind} in ('interest', 'fine')`),
+    check('transactions_late_fee_chk', sql`(${t.lateFeeOf} is null) = (${t.lateFeeKind} is null)`),
+    index('transactions_late_fee_idx').on(t.lateFeeOf).where(sql`${t.lateFeeOf} is not null`),
   ],
 );
 

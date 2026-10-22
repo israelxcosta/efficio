@@ -1,10 +1,20 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { formatBRL, formatMonthKey, todayISO, type Transaction, type TransactionListResponse } from '@effinance/shared';
+import {
+  daysLate,
+  formatBRL,
+  formatDateBR,
+  formatMonthKey,
+  suggestLateFees,
+  todayISO,
+  type Transaction,
+  type TransactionListResponse,
+} from '@effinance/shared';
 import { ConfirmDialog, Modal } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Select } from '@/components/ui/select';
 import { useAccounts } from '@/features/accounts/api';
 import { useDeleteTransfer } from '@/features/transfers/api';
@@ -108,7 +118,7 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
   );
 
   const applyPaid = useCallback(
-    async (tx: Transaction, paid: boolean, extra: { accountId?: string | null; paidAt?: string | null } = {}) => {
+    async (tx: Transaction, paid: boolean, extra: PaymentExtra = {}) => {
       setSavingPaidId(tx.id);
       // Optimistic update of every cached transaction list.
       const snapshots = qc.getQueriesData<TransactionListResponse>({ queryKey: ['transactions'] });
@@ -120,10 +130,17 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
       try {
         await setPaid.mutateAsync({
           id: tx.id,
-          input: { paid, paidAt: paid ? (extra.paidAt ?? todayISO()) : null, accountId: extra.accountId ?? undefined },
+          input: {
+            paid,
+            paidAt: paid ? (extra.paidAt ?? todayISO()) : null,
+            accountId: extra.accountId ?? undefined,
+            interest: extra.interest,
+            fine: extra.fine,
+          },
         });
         const label = tx.type === 'income' ? (paid ? 'Recebimento confirmado 👍' : 'Marcado como a receber') : paid ? 'Pagamento confirmado 👍' : 'Marcado como pendente';
-        toast.success(label);
+        const fees = (extra.interest ?? 0) + (extra.fine ?? 0);
+        toast.success(label, fees > 0 ? { description: `Juros e multa de ${formatBRL(fees)} lançados.` } : undefined);
       } catch (error) {
         for (const [key, data] of snapshots) qc.setQueryData(key, data);
         toastError(error);
@@ -141,7 +158,9 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
         toast.info('Compras no cartão são quitadas ao pagar a fatura.');
         return;
       }
-      if (paid && !tx.accountId && tx.type !== 'transfer') {
+      // No account yet, or settled after the due date (interest and fine may be charged): ask first.
+      const late = tx.type !== 'transfer' && tx.date < todayISO();
+      if (paid && tx.type !== 'transfer' && (!tx.accountId || late)) {
         setPayTarget(tx);
         return;
       }
@@ -208,13 +227,13 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
         loading={deleteTx.isPending || deleteTransfer.isPending}
         onConfirm={() => void confirmDelete('one')}
       />
-      <PayWithAccountDialog
+      <ConfirmPaymentDialog
         tx={payTarget}
         onClose={() => setPayTarget(null)}
-        onConfirm={(accountId, paidAt) => {
+        onConfirm={(extra) => {
           const tx = payTarget!;
           setPayTarget(null);
-          void applyPaid(tx, true, { accountId, paidAt });
+          void applyPaid(tx, true, extra);
         }}
       />
       <AnticipateDialog tx={anticipateTarget} onClose={() => setAnticipateTarget(null)} />
@@ -229,19 +248,40 @@ function useStickyTrue(value: boolean): boolean {
   return sticky || value;
 }
 
-function PayWithAccountDialog({
+interface PaymentExtra {
+  accountId?: string | null;
+  paidAt?: string | null;
+  /** Late payment: interest (juros) and fine (multa) in cents. */
+  interest?: number;
+  fine?: number;
+}
+
+/** Confirms a payment: the account when the transaction has none, the date and, when late, interest and fine. */
+function ConfirmPaymentDialog({
   tx,
   onClose,
   onConfirm,
 }: {
   tx: Transaction | null;
   onClose: () => void;
-  onConfirm: (accountId: string | null, paidAt: string) => void;
+  onConfirm: (extra: PaymentExtra) => void;
 }) {
   const accounts = useAccounts();
   const [accountId, setAccountId] = useState('');
   const [paidAt, setPaidAt] = useState(todayISO());
+  const [interest, setInterest] = useState(0);
+  const [fine, setFine] = useState(0);
   const income = tx?.type === 'income';
+  const late = tx ? daysLate(tx.date, paidAt) : 0;
+  const total = (tx?.amount ?? 0) + (late > 0 ? interest + fine : 0);
+
+  function suggest() {
+    if (!tx) return;
+    const s = suggestLateFees(tx.amount, tx.date, paidAt);
+    setInterest(s.interest);
+    setFine(s.fine);
+  }
+
   return (
     <Modal
       open={Boolean(tx)}
@@ -250,35 +290,78 @@ function PayWithAccountDialog({
         else {
           setAccountId('');
           setPaidAt(todayISO());
+          setInterest(0);
+          setFine(0);
         }
       }}
       title={income ? 'Confirmar recebimento' : 'Confirmar pagamento'}
-      description={tx ? `${tx.description} · ${formatBRL(tx.amount)}` : undefined}
+      description={tx ? `${tx.description} · ${formatBRL(tx.amount)} · venc. ${formatDateBR(tx.date)}` : undefined}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={() => onConfirm(accountId || null, paidAt)}>Confirmar 👍</Button>
+          <Button
+            onClick={() =>
+              onConfirm({
+                accountId: tx?.accountId ? undefined : accountId || null,
+                paidAt,
+                ...(late > 0 ? { interest, fine } : {}),
+              })
+            }
+          >
+            Confirmar 👍
+          </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label={income ? 'Receber em qual conta?' : 'Pagar com qual conta?'} hint="O saldo da conta será atualizado.">
-          <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-            <option value="">Sem conta vinculada</option>
-            {(accounts.data ?? [])
-              .filter((a) => !a.archived)
-              .map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} · {formatBRL(a.balance)}
-                </option>
-              ))}
-          </Select>
-        </Field>
+        {tx && !tx.accountId ? (
+          <Field label={income ? 'Receber em qual conta?' : 'Pagar com qual conta?'} hint="O saldo da conta será atualizado.">
+            <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+              <option value="">Sem conta vinculada</option>
+              {(accounts.data ?? [])
+                .filter((a) => !a.archived)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} · {formatBRL(a.balance)}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        ) : null}
         <Field label={income ? 'Recebido em' : 'Pago em'}>
           <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
         </Field>
+        {late > 0 ? (
+          <div className="flex flex-col gap-3 rounded-lg border border-warning/40 bg-warning-soft/40 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] font-semibold text-fg">
+                {late === 1 ? '1 dia de atraso' : `${late} dias de atraso`}
+                <span className="block text-caption font-normal text-muted">
+                  {income ? 'Lance os juros e a multa cobrados do cliente, se houver.' : 'Lance os juros e a multa pagos, se houver.'}
+                </span>
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={suggest}>
+                Sugerir 2% + 1% a.m.
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Juros">
+                <MoneyInput value={interest} onChange={setInterest} />
+              </Field>
+              <Field label="Multa">
+                <MoneyInput value={fine} onChange={setFine} />
+              </Field>
+            </div>
+            {interest + fine > 0 ? (
+              <p className="flex items-center justify-between border-t border-border pt-2 text-[13px]">
+                <span className="text-muted">{income ? 'Total recebido' : 'Total pago'}</span>
+                <span className="tabular font-semibold text-fg">{formatBRL(total)}</span>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </Modal>
   );

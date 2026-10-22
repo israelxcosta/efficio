@@ -7,10 +7,12 @@ import type {
   CategoryType,
   ClientStatus,
   ContactKind,
+  DelinquencyRisk,
   Frequency,
   IconName,
   InactivationReason,
   InvoiceStatus,
+  LateFeeKind,
   PaymentMethod,
   RecurrenceKind,
   SimplesAnnex,
@@ -248,6 +250,10 @@ export interface ClientListResponse extends Paginated<Client> {
     monthlyFees: number;
     /** Active clients without a registered fee period covering today (new or due for renewal). */
     withoutCurrentFee: number;
+    /** Active clients per tax regime. */
+    byRegime: Record<TaxRegime, number>;
+    /** Average current monthly fee of the active clients that have one (cents; 0 when none). */
+    averageFee: number;
   };
 }
 
@@ -358,6 +364,11 @@ export interface Transaction {
   origin: TransactionOrigin;
   /** Import batch (file or Open Finance sync) that created the row; undoing the batch removes it. */
   importBatchId: string | null;
+  /** Interest or fine of a late payment: the transaction it was charged on, and which one. */
+  lateFeeOf: string | null;
+  lateFeeKind: LateFeeKind | null;
+  /** Interest and fine charged when this transaction was settled late (null when none). */
+  lateFees: { interest: number; fine: number } | null;
 
   createdAt: string;
   updatedAt: string;
@@ -543,6 +554,91 @@ export interface ContactSeries {
 export interface ContactReportResponse {
   periods: ReportPeriod[];
   items: ContactSeries[];
+}
+
+/** Open receivable of a client, past its due date. */
+export interface DelinquencyOverdueItem {
+  id: string;
+  description: string;
+  /** Due date. */
+  date: ISODate;
+  amount: number;
+  daysLate: number;
+}
+
+export interface DelinquencyClient {
+  contactId: string;
+  /** Razão social. */
+  name: string;
+  tradeName: string | null;
+  /** CNPJ, digits only. */
+  document: string | null;
+  responsibleName: string | null;
+  /** Best number for WhatsApp: the responsible person's, else the company's. */
+  phone: string | null;
+  status: ClientStatus;
+  /** Receivables due in the period (paid, or unpaid and past due). */
+  dueCount: number;
+  onTimeCount: number;
+  /** Paid after the due date, or still open past it. */
+  lateCount: number;
+  /** Open and past due, any date (also before the period). */
+  openCount: number;
+  openAmount: number;
+  /** Average days late of the late ones (open ones count until today); null when never late. */
+  avgDaysLate: number | null;
+  maxDaysLate: number;
+  /** Late payments settled with interest / with a fine, and the amounts charged. */
+  interestCount: number;
+  fineCount: number;
+  interestTotal: number;
+  fineTotal: number;
+  /** Chance (0..1) of paying the next receivable late, from the history (recent months weigh more). */
+  probability: number;
+  /** 0..1000, higher is a better payer. */
+  score: number;
+  risk: DelinquencyRisk;
+  /** Fewer than 3 receivables in the period: the score leans on the default. */
+  lowHistory: boolean;
+  /** Open past-due receivables, oldest first (for the collection message). */
+  overdue: DelinquencyOverdueItem[];
+}
+
+export interface DelinquencyMonth {
+  month: MonthKey;
+  dueCount: number;
+  lateCount: number;
+  /** lateCount / dueCount (0 when nothing was due). */
+  lateRate: number;
+  avgDaysLate: number | null;
+  dueAmount: number;
+  lateAmount: number;
+}
+
+export interface DelinquencyReportResponse {
+  from: ISODate;
+  to: ISODate;
+  summary: {
+    dueCount: number;
+    lateCount: number;
+    lateRate: number;
+    avgDaysLate: number | null;
+    openCount: number;
+    openAmount: number;
+    /** Clients with something open past due. */
+    openClients: number;
+    interestTotal: number;
+    fineTotal: number;
+    /** Late payments settled with interest or a fine. */
+    paidWithFeesCount: number;
+    /** Average chance of paying late over the clients in the report, weighted by their history. */
+    probability: number;
+    /** Clients with risk 'alto' or 'critico'. */
+    clientsAtRisk: number;
+  };
+  monthly: DelinquencyMonth[];
+  /** Clients with receivables in the period or open past due; most open amount first. */
+  clients: DelinquencyClient[];
 }
 
 export interface PeriodTotals {

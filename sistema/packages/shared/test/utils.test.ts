@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   addMonths,
+  daysLate,
+  delinquencyScore,
+  riskOf,
+  suggestLateFees,
   enumeratePeriods,
   getInvoiceForPurchase,
   isValidCPF,
@@ -90,5 +94,60 @@ describe('schemas', () => {
     expect(transactionInputSchema.safeParse({ ...base, type: 'expense', recurrenceKind: 'installment' }).success).toBe(false);
     const ok = transactionInputSchema.parse({ ...base, type: 'expense' });
     expect(ok).toMatchObject({ paid: false, recurrenceKind: 'single', frequency: 'monthly', accountId: null });
+  });
+});
+
+describe('late fees', () => {
+  it('counts the days after the due date', () => {
+    expect(daysLate('2026-01-15', '2026-01-15')).toBe(0);
+    expect(daysLate('2026-01-15', '2026-01-10')).toBe(0);
+    expect(daysLate('2026-01-15', '2026-02-14')).toBe(30);
+  });
+
+  it('suggests a 2% fine and 1% a month of interest, pro rata', () => {
+    expect(suggestLateFees(35000, '2026-01-15', '2026-02-14')).toEqual({ fine: 700, interest: 350, days: 30 });
+    expect(suggestLateFees(37800, '2026-01-15', '2026-01-25')).toEqual({ fine: 756, interest: 126, days: 10 });
+    expect(suggestLateFees(35000, '2026-01-15', '2026-01-15')).toEqual({ fine: 0, interest: 0, days: 0 });
+  });
+});
+
+describe('delinquency score', () => {
+  const months = (n: number, daysLate: (i: number) => number) => Array.from({ length: n }, (_, i) => ({ monthsAgo: i, daysLate: daysLate(i) }));
+
+  it('starts a client without history at 20% (good payer, low history)', () => {
+    expect(delinquencyScore([], 0)).toEqual({ probability: 0.2, score: 800, risk: 'baixo', lowHistory: true });
+  });
+
+  it('rewards a year paid on time', () => {
+    const s = delinquencyScore(months(12, () => 0), 0);
+    expect(s.probability).toBeLessThan(0.1);
+    expect(s.score).toBeGreaterThan(900);
+    expect(s.risk).toBe('baixo');
+    expect(s.lowHistory).toBe(false);
+  });
+
+  it('weighs recent delays more than old ones', () => {
+    const recent = delinquencyScore(months(12, (i) => (i < 3 ? 10 : 0)), 0);
+    const old = delinquencyScore(months(12, (i) => (i >= 9 ? 10 : 0)), 0);
+    expect(recent.probability).toBeGreaterThan(old.probability);
+    expect(recent.score).toBeLessThan(old.score);
+  });
+
+  it('penalizes long delays and what is still open', () => {
+    const short = delinquencyScore(months(12, (i) => (i % 3 === 0 ? 5 : 0)), 0);
+    const long = delinquencyScore(months(12, (i) => (i % 3 === 0 ? 60 : 0)), 0);
+    expect(short.probability).toBeCloseTo(long.probability);
+    expect(long.score).toBe(short.score - 138); // 150 × (60 − 5) / 60
+    expect(delinquencyScore(months(12, () => 0), 2).score).toBe(delinquencyScore(months(12, () => 0), 0).score - 120);
+  });
+
+  it('flags a client with months open as critical', () => {
+    const s = delinquencyScore(months(10, (i) => (i < 8 ? 30 * (8 - i) : 0)), 8);
+    expect(s.risk).toBe('critico');
+    expect(s.score).toBe(0);
+  });
+
+  it('maps scores to risk bands', () => {
+    expect([1000, 800, 799, 600, 599, 400, 399, 0].map(riskOf)).toEqual(['baixo', 'baixo', 'moderado', 'moderado', 'alto', 'alto', 'critico', 'critico']);
   });
 });

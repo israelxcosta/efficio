@@ -484,12 +484,21 @@ export const transactionUpdateSchema = transactionBaseSchema
   });
 export type TransactionUpdateInput = z.input<typeof transactionUpdateSchema>;
 
+/** Late-payment extra in cents (0 = none). */
+const lateFeeAmountSchema = z.int({ message: 'Valor inválido' }).min(0, { message: 'Valor inválido' }).max(100_000_000_000);
+
 /** Quick 👍/👎 toggle. */
 export const setPaidSchema = z.object({
   paid: z.boolean(),
   paidAt: isoDateSchema.nullish(),
   /** Account used to pay/receive when the transaction had none. */
   accountId: idSchema.nullish(),
+  /**
+   * Paid after the due date: interest (juros) and fine (multa) charged on top. Each becomes a paid
+   * transaction linked to this one; sending them again replaces the previous ones.
+   */
+  interest: lateFeeAmountSchema.optional(),
+  fine: lateFeeAmountSchema.optional(),
 });
 export type SetPaidInput = z.infer<typeof setPaidSchema>;
 
@@ -583,6 +592,12 @@ export const contactReportQuerySchema = z.object({
   status: z.enum(['all', 'paid']).default('all'),
 });
 export type ContactReportQuery = z.input<typeof contactReportQuerySchema>;
+
+/** Late payments of clients over the last `months` months (by due date, up to today). */
+export const delinquencyReportQuerySchema = z.object({
+  months: z.coerce.number().int().min(3).max(24).default(12),
+});
+export type DelinquencyReportQuery = z.input<typeof delinquencyReportQuerySchema>;
 
 export const comparisonReportQuerySchema = z.object({
   aFrom: isoDateSchema,

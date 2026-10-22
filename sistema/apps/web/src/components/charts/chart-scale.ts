@@ -64,7 +64,7 @@ export function agingBuckets(items: Pick<Transaction, 'date' | 'amount'>[], toda
   const buckets: AgingBucket[] = [
     { key: 'ate30', label: 'Até 30 dias', amount: 0, count: 0 },
     { key: 'ate60', label: '31 a 60 dias', amount: 0, count: 0 },
-    { key: 'mais60', label: 'Mais de 60 dias', amount: 0, count: 0 },
+    { key: 'mais60', label: 'Acima de 60 dias', amount: 0, count: 0 },
   ];
   for (const item of items) {
     const late = diffInDays(today, item.date);
