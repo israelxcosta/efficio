@@ -3,7 +3,8 @@
 // items used by the collection message. Receivables = income linked to a client, without the
 // interest/fine rows themselves.
 
-import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import {
   addMonthKey,
   delinquencyScore,
@@ -12,6 +13,7 @@ import {
   type DelinquencyClient,
   type DelinquencyMonth,
   type DelinquencyReportResponse,
+  type LateFeeKind,
   type MonthKey,
   type delinquencyReportQuerySchema,
 } from '@effinance/shared';
@@ -19,7 +21,7 @@ import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
 import { contacts, transactions } from '../../db/schema';
 import { today } from '../../lib/clock';
-import { getClientsByIds } from '../clients/service';
+import { getClientContacts } from '../clients/service';
 
 type DelinquencyQuery = z.output<typeof delinquencyReportQuerySchema>;
 
@@ -31,6 +33,11 @@ interface Receivable {
   amount: number;
   paid: boolean;
   paidAt: string | null;
+  /** Competence month of a generated fee (or employee charge). */
+  competence: MonthKey | null;
+  /** Interest and fine charged when it was settled late (0 when none). */
+  interest: number;
+  fine: number;
 }
 
 /** Days late: paid → payment date − due date; open → today − due date (never negative). */
@@ -47,64 +54,45 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
   const firstMonth = addMonthKey(currentMonth, -(q.months - 1));
   const from = `${firstMonth}-01`;
 
-  const clientRows = await db
-    .select({ id: contacts.id })
-    .from(contacts)
-    .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client')));
-  const clientIds = clientRows.map((c) => c.id);
+  // Late fees of each receivable, summed per row through the partial index on late_fee_of (no id
+  // lists: a long period of a large office would exceed the bind-parameter limit).
+  const fee = alias(transactions, 'fee');
+  const feeSum = (kind: LateFeeKind) =>
+    sql<number>`(select coalesce(sum(${fee.amount}), 0) from ${transactions} as ${sql.identifier('fee')}
+      where ${fee.workspaceId} = ${transactions.workspaceId} and ${fee.lateFeeOf} = ${transactions.id} and ${fee.lateFeeKind} = ${kind})`.mapWith(Number);
 
-  const rows: Receivable[] = clientIds.length
-    ? ((await db
-        .select({
-          id: transactions.id,
-          contactId: transactions.contactId,
-          description: transactions.description,
-          date: transactions.date,
-          amount: transactions.amount,
-          paid: transactions.paid,
-          paidAt: transactions.paidAt,
-        })
-        .from(transactions)
-        .where(
-          and(
-            eq(transactions.workspaceId, workspaceId),
-            eq(transactions.type, 'income'),
-            isNull(transactions.lateFeeOf),
-            isNull(transactions.creditCardId),
-            inArray(transactions.contactId, clientIds),
-            or(
-              // In the period: settled, or due before today (due today is not late yet).
-              and(gte(transactions.date, from), lte(transactions.date, now), or(eq(transactions.paid, true), lt(transactions.date, now))),
-              // Anything still open past due, whatever the date.
-              and(eq(transactions.paid, false), lt(transactions.date, now)),
-            ),
-          ),
-        )) as Receivable[])
-    : [];
+  const rows: Receivable[] = await db
+    .select({
+      id: transactions.id,
+      contactId: sql<string>`${transactions.contactId}`,
+      description: transactions.description,
+      date: transactions.date,
+      amount: transactions.amount,
+      paid: transactions.paid,
+      paidAt: transactions.paidAt,
+      competence: transactions.feeCompetence,
+      interest: feeSum('interest'),
+      fine: feeSum('fine'),
+    })
+    .from(transactions)
+    .innerJoin(contacts, and(eq(contacts.workspaceId, transactions.workspaceId), eq(contacts.id, transactions.contactId)))
+    .where(
+      and(
+        eq(transactions.workspaceId, workspaceId),
+        eq(contacts.kind, 'client'),
+        eq(transactions.type, 'income'),
+        isNull(transactions.lateFeeOf),
+        isNull(transactions.creditCardId),
+        or(
+          // In the period: settled, or due before today (due today is not late yet).
+          and(gte(transactions.date, from), lte(transactions.date, now), or(eq(transactions.paid, true), lt(transactions.date, now))),
+          // Anything still open past due, whatever the date.
+          and(eq(transactions.paid, false), lt(transactions.date, now)),
+        ),
+      ),
+    );
 
-  const fees = rows.length
-    ? await db
-        .select({ of: transactions.lateFeeOf, kind: transactions.lateFeeKind, amount: transactions.amount })
-        .from(transactions)
-        .where(
-          and(
-            eq(transactions.workspaceId, workspaceId),
-            isNotNull(transactions.lateFeeOf),
-            inArray(
-              transactions.lateFeeOf,
-              rows.filter((r) => r.paid).map((r) => r.id),
-            ),
-            ne(transactions.type, 'transfer'),
-          ),
-        )
-    : [];
-  const feesOf = new Map<string, { interest: number; fine: number }>();
-  for (const f of fees) {
-    if (!f.of || !f.kind) continue;
-    const entry = feesOf.get(f.of) ?? { interest: 0, fine: 0 };
-    entry[f.kind] += f.amount;
-    feesOf.set(f.of, entry);
-  }
+  const feesOf = (r: Receivable) => (r.interest > 0 || r.fine > 0 ? { interest: r.interest, fine: r.fine } : undefined);
 
   const inPeriod = (r: Receivable) => r.date >= from;
 
@@ -132,7 +120,7 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
     list.push(r);
     byClient.set(r.contactId, list);
   }
-  const details = new Map((await getClientsByIds(db, workspaceId, [...byClient.keys()])).map((c) => [c.id, c]));
+  const details = new Map((await getClientContacts(db, workspaceId, [...byClient.keys()])).map((c) => [c.id, c]));
 
   const clients: DelinquencyClient[] = [];
   for (const [contactId, list] of byClient) {
@@ -141,7 +129,7 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
     const period = list.filter(inPeriod);
     const late = period.filter((r) => lateDays(r, now) > 0);
     const open = list.filter((r) => !r.paid).sort((a, b) => a.date.localeCompare(b.date));
-    const withFees = period.map((r) => feesOf.get(r.id)).filter((f): f is { interest: number; fine: number } => Boolean(f));
+    const withFees = period.map(feesOf).filter((f): f is { interest: number; fine: number } => Boolean(f));
     const history = period.map((r) => ({
       daysLate: lateDays(r, now),
       monthsAgo: Math.max(0, months.length - 1 - months.indexOf(monthKey(r.date))),
@@ -167,7 +155,14 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
       interestTotal: withFees.reduce((a, f) => a + f.interest, 0),
       fineTotal: withFees.reduce((a, f) => a + f.fine, 0),
       ...score,
-      overdue: open.map((r) => ({ id: r.id, description: r.description, date: r.date, amount: r.amount, daysLate: lateDays(r, now) })),
+      overdue: open.map((r) => ({
+        id: r.id,
+        description: r.description,
+        date: r.date,
+        amount: r.amount,
+        daysLate: lateDays(r, now),
+        competence: r.competence,
+      })),
     });
   }
   clients.sort((a, b) => b.openAmount - a.openAmount || a.score - b.score || a.name.localeCompare(b.name, 'pt-BR'));
@@ -176,7 +171,7 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
   const period = rows.filter(inPeriod);
   const late = period.filter((r) => lateDays(r, now) > 0);
   const open = rows.filter((r) => !r.paid);
-  const allFees = period.map((r) => feesOf.get(r.id)).filter((f): f is { interest: number; fine: number } => Boolean(f));
+  const allFees = period.map(feesOf).filter((f): f is { interest: number; fine: number } => Boolean(f));
   const weight = clients.reduce((a, c) => a + c.dueCount, 0);
   return {
     from,

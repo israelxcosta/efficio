@@ -64,6 +64,8 @@ const UNIQUE_CONFLICTS: Record<string, string> = {
   workspace_members_single_owner_uq: 'Este espaço já tem um proprietário',
   contacts_client_document_uq: 'Já existe um cliente cadastrado com este CNPJ',
   client_fees_period_uq: 'Esta vigência já foi cadastrada. Atualize a página e tente novamente.',
+  transactions_fee_competence_uq: 'O honorário deste cliente já foi gerado para esta competência.',
+  transactions_fee_of_uq: 'Os empregados deste honorário já foram lançados. Atualize a página e tente novamente.',
 };
 
 /**

@@ -334,6 +334,10 @@ function pickSeriesPatch(input: TransactionUpdate): SeriesPatch {
   return patch as SeriesPatch;
 }
 
+/** A late fee is settled with its original; it is never reopened on its own. */
+const LATE_FEE_REOPEN_MESSAGE =
+  'Juros e multa acompanham o pagamento do lançamento original: reabra o original ou exclua este lançamento';
+
 export async function updateTransaction(
   db: DbExecutor,
   workspaceId: string,
@@ -364,6 +368,7 @@ export async function updateTransaction(
 
   const date = input.date ?? row.date;
   const paid = input.paid ?? row.paid;
+  if (row.lateFeeOf && !paid) throw new ValidationError(LATE_FEE_REOPEN_MESSAGE);
   const ownPatch: Partial<NewTransactionRow> = {
     ...pickSeriesPatch(input),
     subcategoryId: merged.subcategoryId,
@@ -374,9 +379,16 @@ export async function updateTransaction(
   };
 
   await db.transaction(async (tx) => {
-    await tx.update(transactions).set(ownPatch).where(eq(transactions.id, row.id));
-    // Reopened: the interest and fine charged with the payment were not received/paid either.
-    if (row.paid && !paid) await tx.delete(transactions).where(eq(transactions.lateFeeOf, row.id));
+    await tx.update(transactions).set(ownPatch).where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, row.id)));
+    // Interest and fine follow the payment: gone when reopened or now on time, else moved with it.
+    if (row.paid) await syncLateFees(tx, workspaceId, { ...row, ...ownPatch, creditCardId: merged.creditCardId });
+    // A generated fee's employee charge ("+ Empregados") keeps its due date and client while open.
+    if (row.feeKind === 'fee' && (date !== row.date || merged.contactId !== row.contactId)) {
+      await tx
+        .update(transactions)
+        .set({ date, contactId: merged.contactId })
+        .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.feeOf, row.id), eq(transactions.paid, false)));
+    }
 
     if (scope === 'one' || !row.recurrenceId) return;
     const seriesPatch: SeriesPatch = pickSeriesPatch(input);
@@ -428,6 +440,7 @@ export async function setPaid(
   if (row.transferKind === 'card_payment') {
     throw new ValidationError('Pagamentos de fatura são gerenciados pela fatura do cartão');
   }
+  if (row.lateFeeOf && !input.paid) throw new ValidationError(LATE_FEE_REOPEN_MESSAGE);
   const patch: Partial<NewTransactionRow> = input.paid
     ? { paid: true, paidAt: input.paidAt ?? defaultPaidAt(row.date) }
     : { paid: false, paidAt: null };
@@ -443,12 +456,53 @@ export async function setPaid(
   const fees = lateFeeRows(row, patch, input);
 
   await db.transaction(async (tx) => {
-    await tx.update(transactions).set(patch).where(eq(transactions.id, row.id));
-    // Reopening removes the late fees; sending new ones replaces them.
-    if (!input.paid || fees) await tx.delete(transactions).where(eq(transactions.lateFeeOf, row.id));
-    if (fees?.length) await tx.insert(transactions).values(fees);
+    await tx.update(transactions).set(patch).where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, row.id)));
+    if (fees) {
+      // Sent with the payment: they replace the previous ones.
+      await tx.delete(transactions).where(lateFeesOf(workspaceId, row.id));
+      if (fees.length) await tx.insert(transactions).values(fees);
+    } else if (row.paid) {
+      // Not sent: reopening removes them; confirming again moves them to the new payment.
+      await syncLateFees(tx, workspaceId, { ...row, ...patch });
+    }
   });
   return getTransaction(db, workspaceId, id);
+}
+
+/** The interest/fine rows charged on a transaction. */
+function lateFeesOf(workspaceId: string, id: string): SQL {
+  return and(eq(transactions.workspaceId, workspaceId), eq(transactions.lateFeeOf, id))!;
+}
+
+/**
+ * Keeps the interest and fine of a transaction in step with its payment: removed when it is reopened,
+ * paid on time or moved to a card; otherwise dated on the payment, in its account, contact and category.
+ */
+async function syncLateFees(
+  tx: DbExecutor,
+  workspaceId: string,
+  original: Pick<
+    NewTransactionRow,
+    'id' | 'date' | 'paid' | 'paidAt' | 'accountId' | 'creditCardId' | 'contactId' | 'categoryId' | 'subcategoryId'
+  >,
+) {
+  const where = lateFeesOf(workspaceId, original.id!);
+  const { paid, paidAt, date } = original;
+  if (!paid || !paidAt || paidAt <= date || original.creditCardId) {
+    await tx.delete(transactions).where(where);
+    return;
+  }
+  await tx
+    .update(transactions)
+    .set({
+      date: paidAt,
+      paidAt,
+      accountId: original.accountId,
+      contactId: original.contactId,
+      categoryId: original.categoryId,
+      subcategoryId: original.subcategoryId,
+    })
+    .where(where);
 }
 
 /**

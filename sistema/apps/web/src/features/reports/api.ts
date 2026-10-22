@@ -8,6 +8,7 @@ import type {
   ComparisonReportResponse,
   ContactReportQuery,
   ContactReportResponse,
+  DelinquencyReportResponse,
   OverviewReportQuery,
   OverviewReportResponse,
 } from '@effinance/shared';
@@ -31,3 +32,5 @@ export const useContactReport = (p: ContactReportQuery, enabled = true) => useRe
 export const useComparisonReport = (p: ComparisonReportQuery) => useReport<ComparisonReportResponse>('comparison', p);
 export const useCashflowReport = (p: CashflowReportQuery, enabled = true) =>
   useReport<CashflowReportResponse>('cashflow', p, enabled);
+/** Late payments of clients over the last `months` months (3..24), by due date up to today. */
+export const useDelinquencyReport = (months: number) => useReport<DelinquencyReportResponse>('delinquency', { months });

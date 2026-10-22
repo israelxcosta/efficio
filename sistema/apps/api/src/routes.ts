@@ -5,6 +5,7 @@ import { clientRoutes, cnpjRoutes } from './modules/clients/routes';
 import { contactRoutes } from './modules/contacts/routes';
 import { creditCardRoutes } from './modules/credit-cards/routes';
 import { dashboardRoutes } from './modules/dashboard/routes';
+import { feeChargeRoutes } from './modules/fee-charges/routes';
 import { goalRoutes } from './modules/goals/routes';
 import { importRoutes } from './modules/imports/routes';
 import { openFinanceRoutes } from './modules/open-finance/routes';
@@ -26,6 +27,7 @@ export const domainRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] =
   { prefix: '/contacts', plugin: contactRoutes },
   { prefix: '/clients', plugin: clientRoutes },
   { prefix: '/transactions', plugin: transactionRoutes },
+  { prefix: '/fee-charges', plugin: feeChargeRoutes },
   { prefix: '/transfers', plugin: transferRoutes },
   { prefix: '/statement', plugin: statementRoutes },
   { prefix: '/dashboard', plugin: dashboardRoutes },

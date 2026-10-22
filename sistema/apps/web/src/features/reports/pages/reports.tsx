@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { GitCompareArrows, LayoutDashboard, Tags, Users, Waves } from 'lucide-react';
+import { AlarmClock, GitCompareArrows, LayoutDashboard, Tags, Users, Waves } from 'lucide-react';
 import { PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { CashflowTab } from '../components/cashflow-tab';
 import { CategoriesTab } from '../components/categories-tab';
 import { ComparisonTab } from '../components/comparison-tab';
 import { ContactsTab } from '../components/contacts-tab';
+import { DelinquencyMonthsControl, DelinquencyTab } from '../components/delinquency-tab';
 import { OverviewTab } from '../components/overview-tab';
 import { useActiveMonth } from '@/lib/active-month';
 import { PeriodFilter, presetRange, type ReportPeriod } from '../components/period-filter';
 
-type Tab = 'overview' | 'categories' | 'contacts' | 'comparison' | 'cashflow';
+type Tab = 'overview' | 'categories' | 'contacts' | 'comparison' | 'cashflow' | 'inadimplencia';
 
 /**
  * Each report keeps its own period while the app is open. The default ("Mês") follows the
@@ -48,7 +49,9 @@ export default function ReportsPage() {
         title="Relatórios"
         description="Evolução, projeções, comparações e fluxo de caixa para decidir com contexto."
         actions={
-          tab !== 'comparison' ? (
+          tab === 'inadimplencia' ? (
+            <DelinquencyMonthsControl />
+          ) : tab !== 'comparison' ? (
             <PeriodFilter value={period} activeMonth={activeMonth} onChange={setPeriod} onMonthChange={setActiveMonth} />
           ) : null
         }
@@ -59,13 +62,14 @@ export default function ReportsPage() {
           variant="solid"
           ariaLabel="Relatório"
           value={tab}
-          onChange={(t) => update({ aba: t === 'overview' ? null : t })}
+          onChange={(t) => update({ aba: t === 'overview' ? null : t, meses: null })}
           options={[
             { value: 'overview', label: 'Visão geral', icon: <LayoutDashboard /> },
             { value: 'categories', label: 'Categorias', icon: <Tags /> },
             { value: 'contacts', label: 'Contatos', icon: <Users /> },
             { value: 'comparison', label: 'Comparação', icon: <GitCompareArrows /> },
             { value: 'cashflow', label: 'Fluxo de caixa', icon: <Waves /> },
+            { value: 'inadimplencia', label: 'Inadimplência', icon: <AlarmClock /> },
           ]}
         />
       </div>
@@ -75,6 +79,7 @@ export default function ReportsPage() {
       {tab === 'contacts' ? <ContactsTab from={range.from} to={range.to} /> : null}
       {tab === 'comparison' ? <ComparisonTab /> : null}
       {tab === 'cashflow' ? <CashflowTab from={range.from} to={range.to} /> : null}
+      {tab === 'inadimplencia' ? <DelinquencyTab /> : null}
     </div>
   );
 }

@@ -26,12 +26,14 @@ import type {
   CategoryType,
   ClientStatus,
   ContactKind,
+  FeeEntryKind,
   Frequency,
   IconName,
   ImportFormat,
   InactivationReason,
   LateFeeKind,
   MemberRole,
+  MonthKey,
   OpenFinanceProvider,
   PaymentMethod,
   PlanCode,
@@ -619,6 +621,15 @@ export const transactions = pgTable(
      */
     lateFeeOf: uuid(),
     lateFeeKind: text().$type<LateFeeKind>(),
+    /**
+     * "Gerar honorários" (migration 0009): the competence month a generated receivable refers to
+     * (due in the following month) and whether it is the client's fee or the employee charge.
+     */
+    feeCompetence: text().$type<MonthKey>(),
+    feeKind: text().$type<FeeEntryKind>(),
+    /** Employee charge ("+ Empregados"): the generated fee it belongs to (cascade) and the headcount. */
+    feeOf: uuid(),
+    employees: integer(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -718,6 +729,27 @@ export const transactions = pgTable(
     check('transactions_late_fee_kind_chk', sql`${t.lateFeeKind} in ('interest', 'fine')`),
     check('transactions_late_fee_chk', sql`(${t.lateFeeOf} is null) = (${t.lateFeeKind} is null)`),
     index('transactions_late_fee_idx').on(t.lateFeeOf).where(sql`${t.lateFeeOf} is not null`),
+    // Migration 0009: fees generated per competence month and their employee charges.
+    foreignKey({
+      name: 'transactions_fee_of_fk',
+      columns: [t.workspaceId, t.feeOf],
+      foreignColumns: [t.workspaceId, t.id],
+    }).onDelete('cascade'),
+    check('transactions_fee_kind_chk', sql`${t.feeKind} in ('fee', 'employees')`),
+    check('transactions_fee_competence_chk', sql`${t.feeCompetence} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+    check('transactions_employees_chk', sql`${t.employees} > 0`),
+    // Generated rows are income with a competence; only the employee charge points to a fee and
+    // carries the headcount (`is not distinct from`: a NULL kind must not pass the comparison).
+    check(
+      'transactions_fee_chk',
+      sql`(${t.feeKind} is null) = (${t.feeCompetence} is null) and (${t.feeKind} is null or ${t.type} = 'income') and (${t.feeKind} is not distinct from 'employees') = (${t.feeOf} is not null) and (${t.feeOf} is null) = (${t.employees} is null)`,
+    ),
+    // A client is billed once per competence; a fee has at most one employee charge. The fee_of
+    // index also backs the foreign key (fee_of is only set on employee charges, see the CHECK).
+    uniqueIndex('transactions_fee_competence_uq')
+      .on(t.workspaceId, t.contactId, t.feeCompetence)
+      .where(sql`${t.feeKind} = 'fee'`),
+    uniqueIndex('transactions_fee_of_uq').on(t.feeOf).where(sql`${t.feeOf} is not null`),
   ],
 );
 

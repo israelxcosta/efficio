@@ -26,6 +26,27 @@ export const LATE_FEE_KIND_LABELS: Record<LateFeeKind, string> = {
   fine: 'Multa',
 };
 
+/**
+ * Receivables made by "Gerar honorários": the monthly fee of a client for a competence month, and
+ * the employee charge added to it ("+ Empregados").
+ */
+export const FEE_ENTRY_KINDS = ['fee', 'employees'] as const;
+export type FeeEntryKind = (typeof FEE_ENTRY_KINDS)[number];
+
+/** Why "Gerar honorários" left a client out. */
+export const GENERATE_FEES_SKIP_REASONS = ['already_generated', 'no_current_fee', 'not_started', 'inactive'] as const;
+export type GenerateFeesSkipReason = (typeof GENERATE_FEES_SKIP_REASONS)[number];
+
+export const GENERATE_FEES_SKIP_LABELS: Record<GenerateFeesSkipReason, string> = {
+  already_generated: 'Já gerado nesta competência',
+  no_current_fee: 'Sem honorário vigente na competência',
+  not_started: 'Contrato começa depois da competência',
+  inactive: 'Cliente inativo antes da competência',
+};
+
+/** Income categories used by the fee generation (found by name, created when missing). */
+export const FEE_CATEGORY = { name: 'Serviços Prestados', fee: 'Honorários contábeis', employees: 'Folha de pagamento' } as const;
+
 /** Payment risk of a client, from the delinquency score (see utils/delinquency.ts). */
 export const DELINQUENCY_RISKS = ['baixo', 'moderado', 'alto', 'critico'] as const;
 export type DelinquencyRisk = (typeof DELINQUENCY_RISKS)[number];

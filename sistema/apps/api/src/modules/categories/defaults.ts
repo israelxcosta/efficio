@@ -1,4 +1,4 @@
-import type { CategoryType, IconName } from '@effinance/shared';
+import { FEE_CATEGORY, type CategoryType, type IconName } from '@effinance/shared';
 
 export interface DefaultCategory {
   name: string;
@@ -178,13 +178,15 @@ export const DEFAULT_CATEGORIES: DefaultCategory[] = [
 /** Categories of a business workspace (service company, e.g. an accounting office). */
 export const BUSINESS_CATEGORIES: DefaultCategory[] = [
   {
-    name: 'Honorários',
+    // FEE_CATEGORY: "Gerar honorários" bills into the first two subcategories (and creates them in a
+    // workspace that renamed or removed them).
+    name: FEE_CATEGORY.name,
     type: 'income',
     icon: 'briefcase',
     color: '#12A150',
     subcategories: [
-      { name: 'Honorários mensais', icon: 'briefcase' },
-      { name: 'Taxa por empregado', icon: 'hand-coins' },
+      { name: FEE_CATEGORY.fee, icon: 'briefcase' },
+      { name: FEE_CATEGORY.employees, icon: 'hand-coins' },
       { name: '13º honorário', icon: 'gift' },
       { name: 'Serviços avulsos', icon: 'receipt' },
     ],

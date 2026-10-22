@@ -9,12 +9,20 @@ ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "late_fee_of" uuid;
 --> statement-breakpoint
 ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "late_fee_kind" text;
 --> statement-breakpoint
--- Target of the composite foreign key below (every tenant parent has it).
+-- Target of the composite foreign key below (every tenant parent has it). Created only when missing:
+-- later self references (0009) depend on it, so a re-run must not drop it.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conrelid = 'public.transactions'::regclass AND conname = 'transactions_workspace_id_id_uq'
+  ) THEN
+    ALTER TABLE "transactions" ADD CONSTRAINT "transactions_workspace_id_id_uq" UNIQUE("workspace_id","id");
+  END IF;
+END
+$$;
+--> statement-breakpoint
 ALTER TABLE "transactions" DROP CONSTRAINT IF EXISTS "transactions_late_fee_fk";
---> statement-breakpoint
-ALTER TABLE "transactions" DROP CONSTRAINT IF EXISTS "transactions_workspace_id_id_uq";
---> statement-breakpoint
-ALTER TABLE "transactions" ADD CONSTRAINT "transactions_workspace_id_id_uq" UNIQUE("workspace_id","id");
 --> statement-breakpoint
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_late_fee_fk" FOREIGN KEY ("workspace_id","late_fee_of") REFERENCES "public"."transactions"("workspace_id","id") ON DELETE cascade;
 --> statement-breakpoint

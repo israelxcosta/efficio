@@ -64,6 +64,13 @@
       "when": 1792685921007,
       "tag": "0008_late_fees",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792703872216,
+      "tag": "0009_fee_charges",
+      "breakpoints": true
     }
   ]
 }

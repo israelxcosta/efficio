@@ -484,6 +484,28 @@ export const transactionUpdateSchema = transactionBaseSchema
   });
 export type TransactionUpdateInput = z.input<typeof transactionUpdateSchema>;
 
+/**
+ * "Gerar honorários": one receivable per client for the competence month, due on `dueDay` of the
+ * following month (the fee due in November refers to October). Uses the fee period in force at the
+ * end of the competence month. `dryRun` only computes what would be created.
+ */
+export const generateFeesSchema = z.object({
+  competence: monthKeySchema,
+  dueDay: z.int().min(1).max(31).default(10),
+  dryRun: z.boolean().default(false),
+});
+export type GenerateFeesInput = z.input<typeof generateFeesSchema>;
+
+/**
+ * "+ Empregados" on a generated fee: employees × the client's employee fee (same fee period), as its
+ * own receivable with the same due date. Sending again replaces it; 0 removes it.
+ */
+export const feeEmployeesSchema = z.object({
+  employees: z.int({ message: 'Informe um número inteiro' }).min(0).max(100_000),
+  dryRun: z.boolean().default(false),
+});
+export type FeeEmployeesInput = z.input<typeof feeEmployeesSchema>;
+
 /** Late-payment extra in cents (0 = none). */
 const lateFeeAmountSchema = z.int({ message: 'Valor inválido' }).min(0, { message: 'Valor inválido' }).max(100_000_000_000);
 

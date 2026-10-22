@@ -26,7 +26,7 @@ import { today } from '../../lib/clock';
 import { getCipher } from '../../lib/crypto/keyring';
 import type { FieldCipher } from '../../lib/crypto/field-cipher';
 import { ConflictError, NotFoundError, ValidationError } from '../../lib/errors';
-import { countAll, likePattern } from '../../lib/sql';
+import { countAll, inChunks, likePattern } from '../../lib/sql';
 import { getClientOrThrow } from '../common/ownership';
 import { CONTACT_ALL_ENCRYPTED_FIELDS, CONTACT_ENCRYPTED_FIELDS, documentIndex } from '../contacts/service';
 
@@ -136,14 +136,43 @@ async function hydrate(db: DbExecutor, workspaceId: string, rows: ContactRow[]):
   );
 }
 
-/** Clients by id with their decrypted data (ids outside the workspace or not clients are ignored). */
-export async function getClientsByIds(db: DbExecutor, workspaceId: string, ids: string[]): Promise<Client[]> {
+/** What a report needs of a client: names, document, phones and status (no fees or counts). */
+export type ClientContact = Pick<
+  Client,
+  'id' | 'name' | 'tradeName' | 'document' | 'phone' | 'responsibleName' | 'responsiblePhone' | 'status'
+>;
+
+/**
+ * Clients by id with their contact data decrypted. Ids outside the workspace or not clients are
+ * ignored; the list goes in chunks (it grows with the office's client base).
+ */
+export async function getClientContacts(db: DbExecutor, workspaceId: string, ids: string[]): Promise<ClientContact[]> {
   if (ids.length === 0) return [];
-  const rows = await db
-    .select()
-    .from(contacts)
-    .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client'), inArray(contacts.id, ids)));
-  return hydrate(db, workspaceId, rows);
+  const columns = {
+    id: contacts.id,
+    name: contacts.name,
+    tradeName: contacts.tradeName,
+    document: contacts.document,
+    phone: contacts.phone,
+    responsibleName: contacts.responsibleName,
+    responsiblePhone: contacts.responsiblePhone,
+    status: contacts.status,
+  };
+  const parts = await Promise.all(
+    inChunks(ids).map((chunk) =>
+      db
+        .select(columns)
+        .from(contacts)
+        .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client'), inArray(contacts.id, chunk))),
+    ),
+  );
+  const cipher = await getCipher(workspaceId);
+  return Promise.all(
+    parts.flat().map(async (row) => {
+      const plain = await cipher.decryptFields(TABLE, row, ['document', 'phone', 'responsibleName', 'responsiblePhone']);
+      return { ...plain, document: plain.document ?? '' };
+    }),
+  );
 }
 
 async function encryptClientInput(cipher: FieldCipher, input: ClientInput) {

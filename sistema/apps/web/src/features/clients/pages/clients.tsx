@@ -32,7 +32,7 @@ import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
-import { ErrorState, MiniStat, PageHeader } from '@/components/ui/misc';
+import { ErrorState, PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { SkeletonRows } from '@/components/ui/skeleton';
@@ -44,6 +44,7 @@ import { cn, initials } from '@/lib/utils';
 import { useClient, useClients, useDeleteClient, useReactivateClient } from '../api';
 import { ClientDetailsDialog } from '../client-details-dialog';
 import { ClientSheet } from '../client-sheet';
+import { ClientsSummary } from '../clients-summary';
 import { FeesDialog } from '../fees-dialog';
 import { InactivateDialog } from '../inactivate-dialog';
 
@@ -254,24 +255,7 @@ export default function ClientsPage() {
         }
       />
 
-      {summary ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MiniStat label="Clientes ativos" value={summary.active} tone="brand" />
-          <MiniStat
-            label="Honorários vigentes / mês"
-            value={formatBRL(summary.monthlyFees)}
-            tone="success"
-            hint="Soma dos clientes ativos"
-          />
-          <MiniStat
-            label="Sem vigência atual"
-            value={summary.withoutCurrentFee}
-            tone={summary.withoutCurrentFee > 0 ? 'warning' : undefined}
-            hint="Honorário a cadastrar ou reajustar"
-          />
-          <MiniStat label="Inativos" value={summary.inactive} />
-        </div>
-      ) : null}
+      {clients.isError && !summary ? null : <ClientsSummary summary={summary} />}
 
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">

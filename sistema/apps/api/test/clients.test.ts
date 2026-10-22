@@ -39,6 +39,9 @@ const PADARIA = {
   state: 'SP',
 };
 
+/** `summary.byRegime` with every regime at zero. */
+const NO_REGIMES = { simples_nacional: 0, mei: 0, presumed_profit: 0, real_profit: 0, exempt: 0, other: 0 };
+
 async function createClient(overrides: Record<string, unknown> = {}) {
   const res = await c.post('/clients', { ...PADARIA, ...overrides });
   if (res.status !== 201) throw new Error(`client failed: ${JSON.stringify(res.body)}`);
@@ -152,7 +155,7 @@ describe('inactivation', () => {
     expect((await c.get('/clients?status=active')).body.total).toBe(0);
     const inactive = await c.get('/clients?status=inactive');
     expect(inactive.body.total).toBe(1);
-    expect(inactive.body.summary).toEqual({ active: 0, inactive: 1, monthlyFees: 0, withoutCurrentFee: 0 });
+    expect(inactive.body.summary).toEqual({ active: 0, inactive: 1, monthlyFees: 0, withoutCurrentFee: 0, byRegime: NO_REGIMES, averageFee: 0 });
 
     const back = await c.post(`/clients/${id}/reactivate`);
     expect(back.status).toBe(200);
@@ -260,7 +263,14 @@ describe('fees', () => {
     expect(client.body.latestFee).toMatchObject({ index: 2 });
     const listed = await c.get('/clients');
     expect(listed.body.items[0].currentFee.amount).toBe(85000);
-    expect(listed.body.summary).toEqual({ active: 1, inactive: 0, monthlyFees: 85000, withoutCurrentFee: 0 });
+    expect(listed.body.summary).toEqual({
+      active: 1,
+      inactive: 0,
+      monthlyFees: 85000,
+      withoutCurrentFee: 0,
+      byRegime: { ...NO_REGIMES, simples_nacional: 1 },
+      averageFee: 85000,
+    });
 
     // Values can be corrected; only the latest period can be removed.
     const fixed = await c.put(`/clients/${id}/fees/${first.body.id}`, { amount: 76000, employeeFee: 3000 });
@@ -281,6 +291,37 @@ describe('fees', () => {
       ['2025-04-01', '2026-03-31'],
     ]);
     expect(moved.body.current).toMatchObject({ index: 1, amount: 80000 });
+  });
+
+  it('summarizes active clients per tax regime and the average current fee', async () => {
+    const bakery = await createClient({ contractStartDate: '2026-03-15' });
+    await c.post(`/clients/${bakery.id}/fees`, { amount: 75000 });
+    const software = await createClient({
+      name: 'Tecnova Soluções em Software Ltda',
+      tradeName: 'Tecnova',
+      document: '45.723.174/0001-10',
+      taxRegime: 'presumed_profit',
+      contractStartDate: '2026-01-10',
+    });
+    await c.post(`/clients/${software.id}/fees`, { amount: 240001 });
+    // Active without a fee in force: counted in its regime, not in the average.
+    await createClient({ name: 'Ju Prado Design', tradeName: 'Ju Prado', document: '28.051.496/0001-41', taxRegime: 'mei' });
+    // Inactive: in neither.
+    const former = await createClient({ name: 'Rota Sul Ltda', tradeName: 'Rota Sul', document: '61.370.925/0001-19', taxRegime: 'real_profit' });
+    await c.post(`/clients/${former.id}/fees`, { amount: 480000 });
+    await c.post(`/clients/${former.id}/inactivate`, { date: '2026-09-30', reason: 'contract_end' });
+
+    const summary = (await c.get('/clients?status=all')).body.summary;
+    expect(summary).toEqual({
+      active: 3,
+      inactive: 1,
+      monthlyFees: 315001,
+      withoutCurrentFee: 1,
+      byRegime: { ...NO_REGIMES, simples_nacional: 1, presumed_profit: 1, mei: 1 },
+      averageFee: 157501, // 315001 / 2, rounded
+    });
+    // The summary covers the whole workspace, whatever the list filter.
+    expect((await c.get('/clients?taxRegime=mei')).body.summary).toEqual(summary);
   });
 
   it('has no fee in force after the inactivation', async () => {

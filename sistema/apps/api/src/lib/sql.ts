@@ -25,3 +25,13 @@ export async function executeRows<T>(db: DbExecutor, query: SQL): Promise<T[]> {
   const result: unknown = await db.execute(query);
   return Array.isArray(result) ? (result as T[]) : ((result as { rows?: T[] }).rows ?? []);
 }
+
+/**
+ * Splits an id list for `IN (...)` filters: Postgres takes at most 65 535 bind parameters per
+ * query, and lists that grow with the data (a statement, a long report) must stay far below it.
+ */
+export function inChunks<T>(values: readonly T[], size = 1000): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < values.length; i += size) out.push(values.slice(i, i + size));
+  return out;
+}

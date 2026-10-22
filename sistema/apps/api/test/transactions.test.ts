@@ -286,6 +286,106 @@ describe('paid toggle and balances', () => {
     expect((await c.get('/transactions?type=income&from=2026-10-05&to=2026-10-05')).body.total).toBe(0);
   });
 
+  it('keeps interest and fine in step with the payment when it is confirmed again or edited', async () => {
+    const client = await c.post('/contacts', { name: 'Padaria Pão Dourado' });
+    const other = await createAccount(c, { name: 'Inter', initialBalance: 0 });
+    const fee = await c.post('/transactions', {
+      type: 'income',
+      description: 'Honorários',
+      amount: 35000,
+      date: '2026-09-15',
+      accountId: account,
+      contactId: client.body.id,
+    });
+    const id = fee.body[0].id;
+    const linked = async () =>
+      (await c.get('/transactions?type=income&search=Honor&pageSize=50')).body.items
+        .filter((t: any) => t.lateFeeOf === id)
+        .map((t: any) => [t.lateFeeKind, t.amount, t.date, t.paidAt, t.accountId])
+        .sort();
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-05', interest: 700, fine: 1050 });
+
+    // Confirmed again with another date (no fees sent): they move with the payment.
+    const moved = await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-08' });
+    expect(moved.body.lateFees).toEqual({ interest: 700, fine: 1050 });
+    expect(await linked()).toEqual([
+      ['fine', 1050, '2026-10-08', '2026-10-08', account],
+      ['interest', 700, '2026-10-08', '2026-10-08', account],
+    ]);
+
+    // Edited to another account: the fees were received there too.
+    expect((await c.put(`/transactions/${id}?scope=one`, { accountId: other })).status).toBe(200);
+    expect((await linked()).map((f: any) => f[4])).toEqual([other, other]);
+    expect((await c.get(`/accounts/${other}`)).body.balance).toBe(35000 + 700 + 1050);
+    expect((await c.get(`/accounts/${account}`)).body.balance).toBe(1000000);
+
+    // A fee row is settled with its original: it is not reopened alone, nor charged fees itself.
+    const [fine] = (await c.get(`/transactions?type=income&search=Multa`)).body.items;
+    for (const res of [
+      await c.patch(`/transactions/${fine.id}/paid`, { paid: false }),
+      await c.put(`/transactions/${fine.id}?scope=one`, { paid: false }),
+      await c.patch(`/transactions/${fine.id}/paid`, { paid: true, paidAt: '2026-10-09', interest: 100 }),
+    ]) {
+      expect(res.status).toBe(422);
+    }
+    expect((await c.patch(`/transactions/${fine.id}/paid`, { paid: false })).body.message).toContain('reabra o original');
+    // ...but can be deleted on its own.
+    expect((await c.del(`/transactions/${fine.id}?scope=one`)).status).toBe(204);
+    expect((await c.get(`/transactions/${id}`)).body.lateFees).toEqual({ interest: 700, fine: 0 });
+
+    // Payment date edited to the due date: no longer late, so no interest.
+    const onTime = await c.put(`/transactions/${id}?scope=one`, { paidAt: '2026-09-15' });
+    expect(onTime.body).toMatchObject({ paid: true, paidAt: '2026-09-15', lateFees: null });
+    expect(await linked()).toEqual([]);
+
+    // Same when confirmed again before the due date through PATCH /paid.
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-05', fine: 500 });
+    expect(await linked()).toHaveLength(1);
+    const early = await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-09-10' });
+    expect(early.body).toMatchObject({ paidAt: '2026-09-10', lateFees: null });
+    expect(await linked()).toEqual([]);
+  });
+
+  it('charges late fees only on bills and receivables, and removes them with the series', async () => {
+    const other = await createAccount(c, { name: 'Reserva', initialBalance: 0 });
+    const transfer = await c.post('/transfers', { fromAccountId: account, toAccountId: other, amount: 1000, date: '2026-09-01', paid: false });
+    const onTransfer = await c.patch(`/transactions/${transfer.body.id}/paid`, { paid: true, paidAt: '2026-10-01', interest: 100 });
+    expect(onTransfer.status).toBe(422);
+
+    const card = await c.post('/credit-cards', { name: 'Nubank', bank: 'nubank', brand: 'mastercard', limit: 500000, closingDay: 3, dueDay: 10, defaultAccountId: account });
+    const purchase = await c.post('/transactions', { type: 'expense', description: 'Livros', amount: 9000, date: '2026-08-20', creditCardId: card.body.id });
+    const onCard = await c.patch(`/transactions/${purchase.body[0].id}/paid`, { paid: true, paidAt: '2026-10-01', fine: 100 });
+    expect(onCard.status).toBe(422);
+    expect(onCard.body.message).toContain('contas a pagar e a receber');
+
+    // Monthly fee: July and August paid late with fees.
+    const series = await c.post('/transactions', {
+      type: 'income',
+      description: 'Honorários mensais',
+      amount: 50000,
+      date: '2026-07-10',
+      accountId: account,
+      recurrenceKind: 'fixed',
+    });
+    expect(series.status).toBe(201);
+    const [july, august] = series.body;
+    expect([july.date, august.date]).toEqual(['2026-07-10', '2026-08-10']);
+    await c.patch(`/transactions/${july.id}/paid`, { paid: true, paidAt: '2026-07-20', interest: 150, fine: 1000 });
+    await c.patch(`/transactions/${august.id}/paid`, { paid: true, paidAt: '2026-08-20', interest: 150, fine: 1000 });
+    const feeRows = async () => (await c.get('/transactions?type=income&from=2026-07-01&to=2026-08-31&pageSize=50')).body.items.filter((t: any) => t.lateFeeOf);
+    expect(await feeRows()).toHaveLength(4);
+
+    // This and the next ones: August's fees go with it; July (history) keeps its own.
+    expect((await c.del(`/transactions/${august.id}?scope=future`)).status).toBe(204);
+    expect((await feeRows()).map((t: any) => t.lateFeeOf)).toEqual([july.id, july.id]);
+    // The whole series: nothing left.
+    expect((await c.del(`/transactions/${july.id}?scope=all`)).status).toBe(204);
+    expect(await feeRows()).toEqual([]);
+    // Nothing was charged on the refused attempts (the transfer is still pending).
+    expect((await c.get(`/accounts/${account}`)).body.balance).toBe(1000000);
+    expect((await c.get(`/transactions/${transfer.body.id}`)).body.paid).toBe(false);
+  });
+
   it('filters, searches, paginates and expands references', async () => {
     const cat = await firstCategory(c, 'expense', 'Alimentação');
     const contact = await c.post('/contacts', { name: 'Padaria do Zé' });

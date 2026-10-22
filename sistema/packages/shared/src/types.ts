@@ -8,6 +8,8 @@ import type {
   ClientStatus,
   ContactKind,
   DelinquencyRisk,
+  FeeEntryKind,
+  GenerateFeesSkipReason,
   Frequency,
   IconName,
   InactivationReason,
@@ -369,6 +371,12 @@ export interface Transaction {
   lateFeeKind: LateFeeKind | null;
   /** Interest and fine charged when this transaction was settled late (null when none). */
   lateFees: { interest: number; fine: number } | null;
+  /** Made by "Gerar honorários": the competence month ('YYYY-MM') and whether it is the fee or the employee charge. */
+  feeCompetence: MonthKey | null;
+  feeKind: FeeEntryKind | null;
+  /** Employee charge: the fee it belongs to, and how many employees were billed. */
+  feeOf: string | null;
+  employees: number | null;
 
   createdAt: string;
   updatedAt: string;
@@ -564,6 +572,29 @@ export interface DelinquencyOverdueItem {
   date: ISODate;
   amount: number;
   daysLate: number;
+  /** Competence month of generated fees; null for other receivables (the message then uses the month before the due date). */
+  competence: MonthKey | null;
+}
+
+export interface GenerateFeesResponse {
+  competence: MonthKey;
+  dueDate: ISODate;
+  dryRun: boolean;
+  /** Fees created (or that would be created on a dry run, with `transactionId` null). */
+  created: { clientId: string; name: string; amount: number; transactionId: string | null }[];
+  skipped: { clientId: string; name: string; reason: GenerateFeesSkipReason }[];
+  /** Sum of `created`. */
+  total: number;
+}
+
+export interface FeeEmployeesResponse {
+  employees: number;
+  /** Client's employee fee for the fee period of the competence (cents). */
+  rate: number;
+  amount: number;
+  dryRun: boolean;
+  /** The employee receivable; null when removed (employees = 0) or on a dry run. */
+  transaction: Transaction | null;
 }
 
 export interface DelinquencyClient {
