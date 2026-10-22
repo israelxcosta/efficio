@@ -23,6 +23,8 @@ interface KpiCardProps {
   icon?: ReactNode;
   /** Dashboard strip: 12px label, 22px value, tighter padding. */
   compact?: boolean;
+  /** Extra content under the value (full width, left-aligned), e.g. a breakdown band. */
+  children?: ReactNode;
 }
 
 export function KpiCard({
@@ -38,6 +40,7 @@ export function KpiCard({
   footerContent,
   icon,
   compact = false,
+  children,
 }: KpiCardProps) {
   const hasChange = change !== undefined;
   const up = (change ?? 0) >= 0;
@@ -78,9 +81,11 @@ export function KpiCard({
             </Tooltip>
           ) : null}
         </div>
-        <div className={cn('tabular leading-tight font-semibold tracking-tight text-fg', compact ? 'mt-1 truncate text-kpi' : 'mt-1.5 text-[26px]', valueClassName)}>
+        {/* Numbers sit on the right edge of the card (label stays on the left). */}
+        <div className={cn('tabular flex justify-end text-right leading-tight font-semibold tracking-tight text-fg', compact ? 'mt-1 truncate text-kpi' : 'mt-1.5 text-[26px]', valueClassName)}>
           {value}
         </div>
+        {children}
       </div>
       {footer}
     </>

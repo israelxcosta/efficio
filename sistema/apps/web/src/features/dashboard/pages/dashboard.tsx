@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { ArrowUpCircle, ChevronLeft, ChevronRight, Coins, Gauge as GaugeIcon, HandCoins, SlidersHorizontal, Sparkles, Wallet } from 'lucide-react';
-import { MONTH_NAMES, addMonthKey, formatBRL, type DashboardResponse, type WorkspaceKind } from '@effinance/shared';
+import { ChevronLeft, ChevronRight, Gauge as GaugeIcon, Percent, SlidersHorizontal, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { MONTH_NAMES, addMonthKey, formatBRL, formatPercent, percentChange, type DashboardResponse, type WorkspaceKind } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { ErrorState } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import { useActiveMonth } from '@/lib/active-month';
 import { useAuth } from '@/features/auth/auth-context';
 import { useDashboard } from '../api';
@@ -20,7 +19,6 @@ import { hiddenCount } from '../layout/layout';
 import { useDashboardLayout } from '../layout/layout-store';
 import { WIDGET_SPECS } from '../layout/specs';
 import { CUSTOMIZE_BUTTON_ID, DashboardBoard } from '../layout/widget-grid';
-import { useOverdueTotal } from '../widgets/data';
 
 type Tab = 'dashboard' | 'insights';
 
@@ -139,55 +137,56 @@ function Overview({ d, loading, month, kind }: { d: DashboardResponse | undefine
   );
 }
 
-/** Fixed strip above the grid (Effy's order): balance, result, payables, receivables. Same breakpoints as the grid. */
+/** Fixed strip above the grid: income, expenses, efficiency and net worth (same breakpoints as the grid). */
 function DashboardKpis({ d, loading }: { d: DashboardResponse | undefined; loading: boolean }) {
   const s = d?.summary;
-  const overdueOut = useOverdueTotal('expense').data?.summary.overdue;
-  const overdueIn = useOverdueTotal('income').data?.summary.overdue;
-  const value = (v: number | undefined) => (loading || v === undefined ? <Skeleton className="h-7 w-32" /> : formatBRL(v));
-  const late = (amount: number | undefined) =>
-    amount === undefined ? '—' : amount > 0 ? <span><span className="font-semibold text-danger">{formatBRL(amount)}</span> em atraso</span> : 'nada em atraso';
-  const accounts = (d?.accounts ?? []).filter((a) => !a.archived).length;
-  const net = s?.net ?? 0;
+  const p = d?.previous;
+  const money = (v: number | undefined) => (loading || v === undefined ? <Skeleton className="ml-auto h-7 w-32" /> : formatBRL(v));
 
   return (
     <div className="grid grid-cols-1 gap-3 @[420px]:grid-cols-2 @[1000px]:grid-cols-4">
       <KpiCard
         compact
-        icon={<Wallet className="text-brand-text" />}
-        label="Saldo em conta"
-        info="Saldo das contas incluídas no total (sem investimentos)"
-        value={value(d?.balances.accounts)}
-        footerContent={<span>{d ? `${accounts} conta(s) ativa(s)` : '—'}</span>}
-        href="/contas"
+        icon={<TrendingUp className="text-success" />}
+        label="Receitas"
+        info="Receitas do mês (recebidas + a receber)"
+        value={money(s?.income)}
+        change={s && p ? percentChange(s.income, p.income) : undefined}
+        href="/contas-a-receber"
       />
       <KpiCard
         compact
-        icon={<Coins className={net < 0 ? 'text-danger' : 'text-success'} />}
-        label="Resultado do mês"
-        info="Receitas − despesas do mês (competência)"
-        value={value(s?.net)}
-        valueClassName={cn(s && (net < 0 ? 'text-danger' : 'text-success'))}
-        footerContent={<span className="truncate">{s ? `entradas ${formatBRL(s.income)} · saídas ${formatBRL(s.expense)}` : '—'}</span>}
+        icon={<TrendingDown className="text-danger" />}
+        label="Despesas"
+        info="Despesas do mês, incluindo compras no cartão"
+        value={money(s?.expense)}
+        change={s && p ? percentChange(s.expense, p.expense) : undefined}
+        invert
+        href="/contas-a-pagar"
+      />
+      <KpiCard
+        compact
+        icon={<Percent className="text-brand-text" />}
+        label="Eficiência"
+        info="Taxa de economia: quanto da receita sobrou no mês"
+        value={s ? formatPercent(s.savingsRate ?? 0, 0) : <Skeleton className="ml-auto h-7 w-20" />}
+        change={s && p && s.savingsRate !== null && p.savingsRate !== null ? s.savingsRate - p.savingsRate : undefined}
         href="/relatorios"
       />
       <KpiCard
         compact
-        icon={<ArrowUpCircle className="text-danger" />}
-        label="A pagar"
-        info="Despesas do mês ainda não pagas"
-        value={value(s?.pendingExpense)}
-        footerContent={late(overdueOut)}
-        href={overdueOut ? '/contas-a-pagar?status=overdue&modo=year' : '/contas-a-pagar'}
-      />
-      <KpiCard
-        compact
-        icon={<HandCoins className="text-success" />}
-        label="A receber"
-        info="Receitas do mês ainda não recebidas"
-        value={value(s?.pendingIncome)}
-        footerContent={late(overdueIn)}
-        href={overdueIn ? '/contas-a-receber?status=overdue&modo=year' : '/contas-a-receber'}
+        icon={<Wallet className="text-brand-text" />}
+        label="Patrimônio"
+        info="Saldo em contas + investimentos − dívida de cartão"
+        value={money(d?.balances.netWorth)}
+        footerContent={
+          d ? (
+            <span>
+              Investido: <span className="font-semibold text-brand-text">{formatBRL(d.balances.investments)}</span>
+            </span>
+          ) : undefined
+        }
+        href="/contas"
       />
     </div>
   );
