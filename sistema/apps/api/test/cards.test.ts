@@ -64,6 +64,17 @@ describe('credit cards', () => {
     expect(overdue.body.items.map((t: any) => t.amount)).toEqual([10000]);
   });
 
+  it('lists closed or overdue unpaid invoices on the dashboard', async () => {
+    // today = 2026-10-20; Nubank closes on 3 and is due on 10, Itaú closes on 25.
+    await buy(nubankCard, '2026-10-02', 10000); // invoice 2026-10, due 10/10 → overdue
+    await buy(nubankCard, '2026-10-15', 20000); // invoice 2026-11 → open
+    await buy(itauCard, '2026-10-10', 30000); // still open
+    const d = (await c.get('/dashboard?month=2026-10')).body;
+    expect(d.invoicesToPay.map((i: any) => [i.cardId, i.month, i.unpaidTotal, i.status])).toEqual([[nubankCard, '2026-10', 10000, 'overdue']]);
+    // Card purchases stay out of the upcoming list and its totals.
+    expect(d.upcomingTotals).toEqual({ incomeCount: 0, income: 0, expenseCount: 0, expense: 0 });
+  });
+
   it('assigns purchases to invoices by closing day', async () => {
     const before = await buy(nubankCard, '2026-10-02', 10000);
     const onClosing = await buy(nubankCard, '2026-10-03', 20000);

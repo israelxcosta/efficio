@@ -57,6 +57,10 @@
   --app-chart-2: var(--brand-500);
   --app-chart-3: var(--brand-300);
   --app-chart-accent: var(--brand-500);
+  /* Overdue age bands (até 30 / 31–60 / mais de 60 dias), light → dark red. */
+  --app-aging-1: #f3c88e;
+  --app-aging-2: #c9612f;
+  --app-aging-3: #8e2f1b;
 
   /* Gradient "hero" cards (insights, highlights) with white text. */
   --app-hero-from: var(--brand-700);
@@ -125,6 +129,9 @@
   --app-chart-2: #b5b4ae;
   --app-chart-3: #73726f;
   --app-chart-accent: #d1d0ca;
+  --app-aging-1: #7a5a32;
+  --app-aging-2: #d97b45;
+  --app-aging-3: #e8916f;
 
   --app-hero-from: #4a4a49;
   --app-hero-via: #3b3b3b;
@@ -136,6 +143,26 @@
   --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.55);
 
   color-scheme: dark;
+}
+
+/*
+ * Compact type scale of dashboard widgets (Effy): the chart grows with the card, the text does not.
+ * micro: Y-axis ticks and footnotes · mini: X labels, list meta, counts · caption: legends,
+ * subtitles, "+ N" · body-sm: list rows and values · title-sm: card title · kpi: hero numbers.
+ */
+@theme {
+  --text-micro: 10px;
+  --text-micro--line-height: 14px;
+  --text-mini: 10.5px;
+  --text-mini--line-height: 14px;
+  --text-caption: 11.5px;
+  --text-caption--line-height: 16px;
+  --text-body-sm: 12.5px;
+  --text-body-sm--line-height: 18px;
+  --text-title-sm: 14px;
+  --text-title-sm--line-height: 20px;
+  --text-kpi: 22px;
+  --text-kpi--line-height: 28px;
 }
 
 @theme inline {
@@ -185,6 +212,9 @@
 
   --color-chart-income: var(--app-chart-income);
   --color-chart-expense: var(--app-chart-expense);
+  --color-aging-1: var(--app-aging-1);
+  --color-aging-2: var(--app-aging-2);
+  --color-aging-3: var(--app-aging-3);
 
   --radius-sm: 8px;
   --radius-md: 12px;

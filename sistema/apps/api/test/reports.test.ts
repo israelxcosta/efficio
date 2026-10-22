@@ -141,6 +141,8 @@ describe('reports', () => {
     // Oct salary (05) and rent (10) are pending and overdue.
     expect(d.overdue).toMatchObject({ count: 1, amount: 150000 });
     expect(d.upcoming.map((t: any) => t.description)).toEqual(['Salário', 'Aluguel']);
+    expect(d.upcomingTotals).toEqual({ incomeCount: 1, income: 500000, expenseCount: 1, expense: 150000 });
+    expect(d.invoicesToPay).toEqual([]);
     expect(d.health.score).toBeGreaterThan(0);
     expect(d.health.score).toBeLessThanOrEqual(1000);
     expect(d.health.factors).toHaveLength(5);

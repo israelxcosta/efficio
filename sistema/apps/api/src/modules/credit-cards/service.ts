@@ -125,6 +125,24 @@ export async function toCreditCards(db: DbExecutor, rows: CreditCardRow[]): Prom
   });
 }
 
+/**
+ * Closed or overdue invoices still unpaid (up to 3 months before the current one), oldest due
+ * date first. These are the ones that need a payment now.
+ */
+export async function listInvoicesToPay(db: DbExecutor, rows: CreditCardRow[], now = today()): Promise<InvoiceSummary[]> {
+  if (rows.length === 0) return [];
+  const months = new Map<string, MonthKey[]>();
+  for (const row of rows) {
+    const current = getInvoiceForPurchase(now, row.closingDay, row.dueDay).month;
+    months.set(row.id, [-3, -2, -1, 0].map((delta) => addMonthKey(current, delta)));
+  }
+  const totals = await invoiceTotals(db, rows.map((r) => r.id), [...new Set([...months.values()].flat())]);
+  return rows
+    .flatMap((row) => months.get(row.id)!.map((m) => buildInvoiceSummary(row, m, totals.get(`${row.id}:${m}`), now)))
+    .filter((inv) => inv.unpaidTotal > 0 && (inv.status === 'closed' || inv.status === 'overdue'))
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+}
+
 export async function listCreditCards(db: DbExecutor, workspaceId: string, includeArchived = false) {
   await ensureMaterialized(db, workspaceId);
   const rows = await db

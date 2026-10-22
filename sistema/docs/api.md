@@ -112,6 +112,11 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
   delas vence (não pela data da compra).
 - **Fatura**: identificada pelo mês de vencimento. Compra entra na primeira fatura cujo fechamento é
   posterior à data da compra. Pagar a fatura marca as compras como pagas e cria a transferência.
+- **Dashboard** (`GET /dashboard`): `upcoming` traz até 50 pendentes (vencidos e próximos 15 dias,
+  sem compras no cartão, mais antigos primeiro) e `upcomingTotals` conta e soma todos eles por tipo
+  (a lista é cortada, os totais não). `overdue` são despesas vencidas fora do cartão. `invoicesToPay`
+  lista as faturas de cartão fechadas ou vencidas ainda em aberto (até 3 meses antes da atual),
+  pelo vencimento mais antigo.
 - **Relatórios por competência** (categorias, contatos, comparação, visão geral) usam `date` e
   incluem compras no cartão; **fluxo de caixa** usa a data efetiva e só movimentos de contas, com
   faturas pendentes projetadas no vencimento.

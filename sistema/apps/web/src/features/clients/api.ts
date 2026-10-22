@@ -28,11 +28,12 @@ export type ClientListParams = {
   pageSize?: number;
 };
 
-export function useClients(params: ClientListParams = {}) {
+export function useClients(params: ClientListParams = {}, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.clients(params),
     queryFn: () => api<ClientListResponse>('/clients', { query: params }),
     placeholderData: keepPreviousData,
+    enabled: options.enabled ?? true,
   });
 }
 

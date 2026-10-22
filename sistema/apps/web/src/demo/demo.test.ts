@@ -70,6 +70,10 @@ describe('demo api (PGlite)', () => {
     expect(dash.status).toBe(200);
     expect(dash.body.accounts.length).toBeGreaterThan(0);
     expect(typeof dash.body.balances.netWorth).toBe('number');
+    // Dashboard widgets: totals behind the capped upcoming list and the card invoices to pay.
+    expect(dash.body.upcoming.length).toBeLessThanOrEqual(50);
+    expect(dash.body.upcomingTotals.incomeCount + dash.body.upcomingTotals.expenseCount).toBeGreaterThanOrEqual(dash.body.upcoming.length);
+    expect(Array.isArray(dash.body.invoicesToPay)).toBe(true);
 
     const paths = [
       `/statement?from=${from}&to=${to}`,
@@ -78,6 +82,9 @@ describe('demo api (PGlite)', () => {
       `/reports/categories?from=${from}&to=${to}`,
       `/reports/contacts?from=${from}&to=${to}`,
       `/reports/cashflow?from=${from}&to=${to}&granularity=week`,
+      `/reports/cashflow?from=${from}&to=${to}&granularity=day`,
+      `/transactions?type=income&status=overdue&sort=date_asc&pageSize=200&page=1`,
+      '/clients?status=all&pageSize=200',
       `/reports/comparison?aFrom=${from}&aTo=${to}&bFrom=${from}&bTo=${to}`,
       '/credit-cards',
       '/goals',

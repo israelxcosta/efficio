@@ -16,7 +16,7 @@ import { categories, creditCards, transactions } from '../../db/schema';
 import { today } from '../../lib/clock';
 import { countAll, sumOf } from '../../lib/sql';
 import { listAccountsWithBalances } from '../accounts/service';
-import { committedCardDebt, toCreditCards } from '../credit-cards/service';
+import { committedCardDebt, listInvoicesToPay, toCreditCards } from '../credit-cards/service';
 import { listGoals } from '../goals/service';
 import { buildInsights } from '../reports/insights';
 import { toCategoryAmounts, toCategoryTotalMap, totalsByCategory } from '../reports/service';
@@ -141,6 +141,9 @@ export function computeHealth(input: {
   return { score, label, factors };
 }
 
+/** Rows of `upcoming` (the totals cover everything). */
+const UPCOMING_LIMIT = 50;
+
 export async function getDashboard(db: DbExecutor, workspaceId: string, month: MonthKey): Promise<DashboardResponse> {
   const now = today();
   const { from, to } = monthRange(month);
@@ -153,7 +156,7 @@ export async function getDashboard(db: DbExecutor, workspaceId: string, month: M
     isNull(transactions.creditCardId),
   );
 
-  const [accounts, cardRows, goals, monthlyAll, expenseTotals, incomeTotals, prevExpenseTotals, upcomingRows, overdueRow, upcomingWeekRow, fixedRows, cats] =
+  const [accounts, cardRows, goals, monthlyAll, expenseTotals, incomeTotals, prevExpenseTotals, upcomingRows, upcomingTotalRows, overdueRow, upcomingWeekRow, fixedRows, cats] =
     await Promise.all([
       listAccountsWithBalances(db, workspaceId),
       db
@@ -171,7 +174,12 @@ export async function getDashboard(db: DbExecutor, workspaceId: string, month: M
         .from(transactions)
         .where(and(pendingBase, lte(transactions.date, addDays(now, 15))))
         .orderBy(asc(transactions.date), asc(transactions.createdAt))
-        .limit(10),
+        .limit(UPCOMING_LIMIT),
+      db
+        .select({ type: transactions.type, count: countAll(), amount: sumOf(transactions.amount) })
+        .from(transactions)
+        .where(and(pendingBase, lte(transactions.date, addDays(now, 15))))
+        .groupBy(transactions.type),
       db
         .select({ count: countAll(), amount: sumOf(transactions.amount) })
         .from(transactions)
@@ -216,7 +224,19 @@ export async function getDashboard(db: DbExecutor, workspaceId: string, month: M
   const fixedExpenseTotal = fixedRows.filter((r) => r.type === 'expense').reduce((a, r) => a + r.amount, 0);
   const overdue = { count: overdueRow[0]?.count ?? 0, amount: overdueRow[0]?.amount ?? 0 };
 
-  const [upcoming, fixed] = await Promise.all([toTransactions(db, upcomingRows), toTransactions(db, fixedRows)]);
+  const totalsOf = (type: 'income' | 'expense') => upcomingTotalRows.find((r) => r.type === type);
+  const upcomingTotals = {
+    incomeCount: totalsOf('income')?.count ?? 0,
+    income: totalsOf('income')?.amount ?? 0,
+    expenseCount: totalsOf('expense')?.count ?? 0,
+    expense: totalsOf('expense')?.amount ?? 0,
+  };
+
+  const [upcoming, fixed, invoicesToPay] = await Promise.all([
+    toTransactions(db, upcomingRows),
+    toTransactions(db, fixedRows),
+    listInvoicesToPay(db, cardRows, now),
+  ]);
 
   return {
     month,
@@ -232,7 +252,9 @@ export async function getDashboard(db: DbExecutor, workspaceId: string, month: M
     expensesByCategory,
     incomeByCategory,
     upcoming,
+    upcomingTotals,
     overdue,
+    invoicesToPay,
     fixedExpenses: fixed.filter((t) => t.type === 'expense'),
     fixedIncome: fixed.filter((t) => t.type === 'income'),
     goals,

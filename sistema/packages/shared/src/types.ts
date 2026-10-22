@@ -478,9 +478,14 @@ export interface DashboardResponse {
   monthly: MonthSummary[];
   expensesByCategory: CategoryAmount[];
   incomeByCategory: CategoryAmount[];
-  /** Pending transactions overdue or due in the next 15 days. */
+  /** Pending transactions (no card purchases) overdue or due in the next 15 days, oldest first (up to 50). */
   upcoming: Transaction[];
+  /** Totals of everything `upcoming` covers (the list itself is capped). */
+  upcomingTotals: { incomeCount: number; income: number; expenseCount: number; expense: number };
+  /** Overdue expenses (no card purchases). */
   overdue: { count: number; amount: number };
+  /** Closed or overdue card invoices still unpaid, oldest due date first. */
+  invoicesToPay: InvoiceSummary[];
   fixedExpenses: Transaction[];
   fixedIncome: Transaction[];
   goals: Goal[];

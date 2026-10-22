@@ -19,6 +19,9 @@ export function Gauge({ score, size = 200 }: GaugeProps) {
   const arc = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
   const length = Math.PI * r;
   const progress = (clamped / 1000) * length;
+  // The score is drawn at 20–28px on screen whatever the gauge size (viewBox is 200 wide).
+  const scale = size / 200;
+  const fontSize = Math.min(28, Math.max(20, 30 * scale)) / scale;
   return (
     <svg viewBox="0 0 200 110" width={size} height={size * 0.55} role="img" aria-label={`Pontuação ${Math.round(clamped)} de 1000`}>
       <defs>
@@ -40,7 +43,7 @@ export function Gauge({ score, size = 200 }: GaugeProps) {
         style={{ transition: 'stroke-dasharray 700ms cubic-bezier(.2,.8,.2,1)' }}
       />
       <circle cx={mx} cy={my} r="9" fill="var(--app-surface)" stroke="var(--app-fg)" strokeWidth="3" />
-      <text x={cx} y={cy - 6} textAnchor="middle" fontSize="30" fontWeight="700" fill="var(--app-fg)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+      <text x={cx} y={cy - 6} textAnchor="middle" fontSize={fontSize} fontWeight="700" fill="var(--app-fg)" style={{ fontVariantNumeric: 'tabular-nums' }}>
         {Math.round(clamped)}
       </text>
     </svg>

@@ -82,6 +82,20 @@ clareadas no modo escuro por `useTone()` (`src/lib/theme.tsx`) para continuarem 
 | Small        | 12–13px / 400–500                | legendas, rodapés de KPI              |
 | Overline     | 11px / 600, uppercase, 0.12em    | "PLANEJAMENTO", "OPORTUNIDADE"        |
 
+Escala compacta dos cards do dashboard (tokens `--text-*` em `index.css`, classes Tailwind):
+
+| Classe           | Tamanho | Uso                                                        |
+| ---------------- | ------- | ---------------------------------------------------------- |
+| `text-micro`     | 10px    | eixos dos gráficos, metadados de linha, notas de rodapé    |
+| `text-mini`      | 10.5px  | rótulos de categoria, contadores, selos                    |
+| `text-caption`   | 11.5px  | subtítulos de card, tooltips, links "Ver todos →"          |
+| `text-body-sm`   | 12.5px  | linhas de lista e valores secundários                      |
+| `text-title-sm`  | 14px    | título do card                                             |
+| `text-kpi`       | 22px    | um número-herói por card e a faixa de KPIs                 |
+
+Nos gráficos os textos têm tamanho fixo (`CHART_TEXT`: eixo 10px, categoria 10.5px, valor 11.5px)
+e não acompanham o tamanho do card; quem cresce é o desenho.
+
 ### Forma e profundidade
 
 - Raio: `sm 8px` (chips), `md 12px` (inputs, botões), `lg 16px` (cards internos), `xl 20px`
@@ -125,13 +139,30 @@ clareadas no modo escuro por `useTone()` (`src/lib/theme.tsx`) para continuarem 
 | InsightCard        | gradiente `brand-700 → brand-900`, texto branco, cartão interno vidro (`white/8`, borda `white/12`), chip overline |
 | BankLogo           | círculo com cor oficial aproximada do banco e sigla (Nu, Itaú, BB, Cx...) — sem marcas registradas |
 | CategoryIcon       | quadrado raio md com fundo `cor/12%` e ícone lucide na cor da categoria |
+| WidgetCard         | card de widget do dashboard (`features/dashboard/layout/widget-card.tsx`): cabeçalho fixo (título 14px, subtítulo 11.5px, ação à direita que desce para uma 2ª linha abaixo de 384px, alça de mover e olho "Ocultar card" que aparecem no hover/foco), corpo `flex-1` que ocupa a altura restante; variante `hero` (gradiente); com alerta, ponto vermelho no título e barra vermelha de 3px à esquerda |
+| FitList            | lista cortada às linhas que cabem no card (mede cada linha a cada redimensionamento) com a linha "+ N …"; aceita o total real do servidor |
+| ChartBox           | envolve um gráfico Recharts e ocupa a altura restante do card (mínimo 96px), para o gráfico crescer junto |
+| DonutChart `fill`  | rosca que se dimensiona pelo espaço (legenda ao lado a partir de 448px, embaixo antes), número central ajustado ao furo, cauda agrupada em "Outras (N)" |
 
 ## 4. Padrões de tela
 
-- **Dashboard**: abas (Dashboard / Insights); "Resumo do período" com seletor mês/ano; KPIs
-  (Receitas, Despesas, Saldo do mês, Taxa de economia); Fluxo de caixa (barras listradas, seletor
-  D/S/M/A); Saúde financeira (gauge 0–1000); InsightCard; gastos por categoria (donut); próximos
-  vencimentos; metas; cartões (uso do limite); saldo por conta.
+- **Dashboard**: abas (Dashboard / Dashboard inteligente), navegação ‹ mês/ano › e botão
+  "Personalizar" (com o selo "N ocultos"). Faixa fixa de KPIs (Saldo em conta, Resultado do mês,
+  A pagar, A receber) e, abaixo, a grade de widgets portada do Effy:
+  - grade de 4 colunas (2 abaixo de 1000px de largura, 1 abaixo de 560px), linhas de 86px (80px
+    fora do desktop), gap 12px, empacotamento `dense`; cada widget tem tamanho C × R entre o mínimo
+    e o máximo do catálogo (`layout/specs.ts`);
+  - cinco seções recolhíveis (Visão geral, Receber e pagar, Análises do mês, Clientes e honorários,
+    Metas e recorrentes) com o selo "N exigem atenção", que abre a lista do que precisa de ação;
+  - redimensionar pelo canto (selo "C × R" durante o arraste; setas do teclado; Esc cancela);
+  - reordenar arrastando pelo cabeçalho ou pela alça (toque pela alça; setas, Home e End no
+    teclado), só dentro da própria seção, com o aviso "Cards reorganizados.";
+  - ocultar pelo olho (aviso com "Desfazer"); reexibir em "Personalizar" ou em Configurações →
+    Dashboard; "Restaurar layout padrão" volta tamanhos, ordem, ocultos, seções e opções dos cards;
+  - o layout fica no navegador, por espaço e usuário (`effinance.dashboardLayout.v1:<espaço>:<usuário>`),
+    e é sempre validado ao ler;
+  - os cards de clientes aparecem por padrão só em espaços empresariais (nos outros, ficam em
+    "Personalizar").
 - **Listas** (contas a pagar/receber, extrato): filtros em linha (período segmentado + navegação
   ‹ mês ›, conta, status), totais no topo em mini-KPIs, linhas com CategoryIcon, descrição, contato,
   vencimento, valor colorido e PaidToggle; ações por linha em menu "⋯".

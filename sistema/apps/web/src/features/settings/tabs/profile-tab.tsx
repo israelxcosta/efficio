@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, SlidersHorizontal, Sun } from 'lucide-react';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
 import type { z } from 'zod';
 import { updateProfileSchema } from '@effinance/shared';
@@ -79,6 +80,17 @@ export function ProfileTab() {
               { value: 'system', label: 'Sistema', icon: <Monitor /> },
             ]}
           />
+        </Card>
+      </Cell>
+
+      <Cell>
+        <Card className="p-6">
+          <CardHeader title="Dashboard" subtitle="Cards exibidos, tamanhos, ordem e cards ocultos pelo botão de olho" />
+          <Button className="mt-5" variant="outline" asChild>
+            <Link to="/?personalizar=1">
+              <SlidersHorizontal /> Personalizar dashboard
+            </Link>
+          </Button>
         </Card>
       </Cell>
     </TabGrid>

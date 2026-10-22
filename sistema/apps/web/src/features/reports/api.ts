@@ -26,8 +26,8 @@ function useReport<T>(name: string, params: object, enabled = true) {
 }
 
 export const useOverviewReport = (p: OverviewReportQuery) => useReport<OverviewReportResponse>('overview', p);
-export const useCategoryReport = (p: CategoryReportQuery) => useReport<CategoryReportResponse>('categories', p);
-export const useContactReport = (p: ContactReportQuery) => useReport<ContactReportResponse>('contacts', p);
+export const useCategoryReport = (p: CategoryReportQuery, enabled = true) => useReport<CategoryReportResponse>('categories', p, enabled);
+export const useContactReport = (p: ContactReportQuery, enabled = true) => useReport<ContactReportResponse>('contacts', p, enabled);
 export const useComparisonReport = (p: ComparisonReportQuery) => useReport<ComparisonReportResponse>('comparison', p);
 export const useCashflowReport = (p: CashflowReportQuery, enabled = true) =>
   useReport<CashflowReportResponse>('cashflow', p, enabled);

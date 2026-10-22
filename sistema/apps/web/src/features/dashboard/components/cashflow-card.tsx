@@ -9,6 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { axisProps, LegendDot, moneyAxisFormatter, MoneyTooltip, StripeDefs, CHART_COLORS } from '@/components/charts/chart-utils';
 import { useCashflowReport } from '@/features/reports/api';
 import { formatMonthKey } from '@effinance/shared';
+import type { WidgetProps } from '../layout/types';
+import { WidgetCard } from '../layout/widget-card';
 
 type Mode = 'D' | 'S' | 'M' | 'A';
 
@@ -84,5 +86,14 @@ export function CashflowCard({ monthly, loading, anchorMonth }: { monthly: Month
         )}
       </div>
     </Card>
+  );
+}
+
+// Placeholder: replaced by the real widget.
+export function CashflowWidget({ alert }: WidgetProps) {
+  return (
+    <WidgetCard alert={alert}>
+      <p className="text-caption text-muted">Em construção</p>
+    </WidgetCard>
   );
 }
