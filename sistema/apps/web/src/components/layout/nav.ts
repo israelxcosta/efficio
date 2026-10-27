@@ -42,3 +42,21 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const SETTINGS_ITEM: NavItem = { to: '/configuracoes', label: 'Configurações', icon: Settings, keywords: 'perfil tema senha seguranca 2fa sessoes membros convites assinatura plano integracoes open finance importacoes privacidade exportar lgpd' };
+
+/** Rail geometry (px): a 44px icon button every 50px (6px gap). */
+export const RAIL_ITEM_PX = 44;
+export const RAIL_GAP_PX = 6;
+
+/**
+ * Splits the rail's items by the height available: everything fits, or the last visible slot
+ * becomes the "more" button (chevron) that opens the rest in a menu beside the rail. Never a
+ * scrollbar in the rail.
+ */
+export function splitRail<T>(items: readonly T[], height: number): { visible: T[]; hidden: T[] } {
+  // Not measured yet: show everything (the rail is laid out before the first measure).
+  if (height <= 0) return { visible: [...items], hidden: [] };
+  const slots = Math.max(1, Math.floor((height + RAIL_GAP_PX) / (RAIL_ITEM_PX + RAIL_GAP_PX)));
+  if (items.length <= slots) return { visible: [...items], hidden: [] };
+  const keep = Math.max(0, slots - 1);
+  return { visible: items.slice(0, keep), hidden: items.slice(keep) };
+}

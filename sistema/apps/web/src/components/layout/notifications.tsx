@@ -53,7 +53,7 @@ export function Notifications({ className }: { className?: string }) {
           ) : null}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-80" side="bottom" align="end" sideOffset={8}>
+      <DropdownMenuContent className="w-80" side="top" align="end" sideOffset={12}>
         <DropdownMenuLabel>Vencidas</DropdownMenuLabel>
         {count === 0 ? (
           <p className="px-2.5 py-3 text-sm text-muted">Tudo em dia por aqui.</p>
