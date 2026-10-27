@@ -39,7 +39,7 @@ export function SegmentedControl<T extends string>({
       className={cn(
         'inline-flex items-center gap-1',
         variant === 'subtle' && 'rounded-md bg-bg-subtle p-1',
-        variant === 'solid' && 'rounded-lg border border-border bg-surface p-1 shadow-xs',
+        variant === 'solid' && 'rounded-lg border border-border bg-surface p-1',
         variant === 'card' && 'rounded-xl bg-bg-subtle p-1.5',
         fullWidth && 'flex w-full',
         className,
@@ -64,15 +64,15 @@ export function SegmentedControl<T extends string>({
             title={opt.title}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'inline-flex items-center justify-center gap-1.5 font-semibold whitespace-nowrap transition-all duration-150 [&_svg]:size-4',
+              'inline-flex items-center justify-center gap-1.5 font-semibold whitespace-nowrap transition-colors duration-150 [&_svg]:size-4',
               fullWidth && 'flex-1',
               size === 'sm' ? 'h-7 rounded-[8px] px-2.5 text-xs' : 'h-9 rounded-[10px] px-3.5 text-[13px]',
               variant === 'card' && 'h-12 rounded-lg text-[15px]',
               active
                 ? (opt.activeClassName ??
                     (variant === 'solid'
-                      ? 'bg-primary text-primary-fg shadow-xs'
-                      : 'bg-surface text-fg shadow-sm'))
+                      ? 'bg-bg-subtle text-fg'
+                      : 'bg-surface text-fg shadow-xs'))
                 : 'text-muted hover:text-fg',
             )}
           >

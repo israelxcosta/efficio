@@ -135,7 +135,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
                 <col className="w-[100px] xl:w-[196px]" />
               </colgroup>
               <thead>
-                <tr className="border-b border-border bg-surface-muted text-left text-[11px] font-semibold tracking-wide text-muted uppercase">
+                <tr className="border-b border-border text-left text-xs font-medium text-muted">
                   <th className="px-4 py-2.5">Cliente</th>
                   <th className="px-3 py-2.5" aria-sort={ariaSort('late')}>
                     Atrasos
@@ -237,7 +237,7 @@ export function DelinquencyClientsEmpty() {
 function Stat({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-micro font-semibold tracking-wide text-subtle uppercase">{label}</dt>
+      <dt className="text-caption font-medium text-subtle">{label}</dt>
       <dd className="mt-0.5">{children}</dd>
     </div>
   );
@@ -317,7 +317,7 @@ function ScoreCell({ client: c, compact }: { client: DelinquencyClient; compact?
   return (
     <div className={cn('flex flex-col gap-1', compact ? 'w-[132px] shrink-0 items-end text-right' : 'min-w-0')}>
       <div className={cn('flex items-baseline gap-1.5', compact && 'justify-end')}>
-        <span className={cn('tabular text-[15px] leading-none font-bold', RISK_TONE[c.risk].text)}>{c.score}</span>
+        <span className={cn('tabular text-[15px] leading-none font-bold', c.risk === 'baixo' ? 'text-fg' : RISK_TONE[c.risk].text)}>{c.score}</span>
         <RiskBadge risk={c.risk} className="h-4 px-1.5" />
       </div>
       <ScoreBar score={c.score} risk={c.risk} />
@@ -335,29 +335,14 @@ function ScoreCell({ client: c, compact }: { client: DelinquencyClient; compact?
   );
 }
 
+/** Only for clients with something overdue: the others have nothing to collect, so no button at all. */
 function MessageButton({ client: c, onMessage, label }: { client: DelinquencyClient; onMessage: (c: DelinquencyClient) => void; label: ReactNode }) {
-  const disabled = c.overdue.length === 0;
-  const button = (
-    <Button
-      variant={disabled ? 'ghost' : 'outline'}
-      size="sm"
-      disabled={disabled}
-      onClick={() => onMessage(c)}
-      aria-label={`Gerar mensagem de cobrança para ${collectionName(c)}`}
-      className={cn(disabled && 'disabled:opacity-45')}
-    >
-      <MessageCircle /> {label}
-    </Button>
-  );
+  if (c.overdue.length === 0) return null;
   return (
-    <Tooltip content={disabled ? 'Nada vencido em aberto' : 'Mensagem com os meses vencidos para copiar ou enviar pelo WhatsApp'}>
-      {disabled ? (
-        <span tabIndex={0} className="inline-flex cursor-not-allowed rounded-[10px] outline-none focus-visible:ring-[3px] focus-visible:ring-brand-500/25">
-          {button}
-        </span>
-      ) : (
-        button
-      )}
+    <Tooltip content="Mensagem com os meses vencidos para copiar ou enviar pelo WhatsApp">
+      <Button variant="outline" size="sm" onClick={() => onMessage(c)} aria-label={`Gerar mensagem de cobrança para ${collectionName(c)}`}>
+        <MessageCircle /> {label}
+      </Button>
     </Tooltip>
   );
 }
@@ -368,7 +353,7 @@ function OpenItems({ client: c }: { client: DelinquencyClient }) {
     <div className="rounded-lg border border-border bg-surface p-3">
       {c.overdue.length > 0 ? (
         <>
-          <p className="mb-1.5 text-micro font-semibold tracking-wide text-subtle uppercase">Vencidos em aberto</p>
+          <p className="mb-1.5 text-caption font-medium text-subtle">Vencidos em aberto</p>
           <ul className="divide-y divide-border">
             {c.overdue.map((item) => (
               // Phones: description and amount, then the due date below. Wider: one line.

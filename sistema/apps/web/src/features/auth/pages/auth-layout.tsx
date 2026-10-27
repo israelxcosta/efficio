@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react';
-import { ArrowDown, ArrowRight, ChartLine, CreditCard, Landmark, Receipt, Target, Wallet } from 'lucide-react';
+import { ArrowDown, ArrowRight, Building2, ChartLine, HandCoins, Landmark, Receipt, Truck } from 'lucide-react';
 
 const NODES = [
-  { icon: Landmark, title: 'Contas', text: 'Saldos e carteiras' },
-  { icon: CreditCard, title: 'Cartões', text: 'Faturas e limites' },
+  { icon: Building2, title: 'Clientes', text: 'Contratos e vigências' },
+  { icon: HandCoins, title: 'Honorários', text: 'Gerados por competência' },
   { icon: Receipt, title: 'A pagar', text: 'Vencimentos em dia' },
-  { icon: Wallet, title: 'A receber', text: 'Entradas previstas' },
-  { icon: Target, title: 'Metas', text: 'Seu próximo passo' },
-  { icon: ChartLine, title: 'Relatórios', text: 'Decida com contexto' },
+  { icon: Truck, title: 'Fornecedores', text: 'Quem a empresa paga' },
+  { icon: Landmark, title: 'Contas', text: 'Saldos e conciliação' },
+  { icon: ChartLine, title: 'Relatórios', text: 'Competência e caixa' },
 ];
 
 export function AuthLayout({ title, subtitle, children, footer }: { title: string; subtitle: string; children: ReactNode; footer: ReactNode }) {
@@ -24,19 +24,14 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
         <p className="text-xs text-subtle">© {new Date().getFullYear()} Efficio Contabilidade</p>
       </div>
       <div className="relative hidden overflow-hidden border-l border-border bg-surface-muted lg:block">
-        <div className="dot-grid absolute inset-0 opacity-60" aria-hidden />
         <div className="relative flex h-full flex-col justify-center px-14 py-12">
-          <p className="eyebrow text-brand-text">Tudo se conecta</p>
-          <h2 className="mt-3 max-w-md text-[28px] leading-tight font-semibold tracking-tight">
-            Conheça seu dinheiro. <span className="text-muted">Organize cada parte e decida com contexto.</span>
-          </h2>
+          <h2 className="max-w-md text-[28px] leading-tight font-semibold tracking-tight">O financeiro da empresa num lugar só</h2>
+          <p className="mt-2 max-w-md text-sm text-muted">Honorários, cobrança, contas a pagar e relatórios pelo regime de competência e de caixa.</p>
           <div className="mt-10 grid max-w-md grid-cols-2 gap-x-10 gap-y-8">
             {NODES.map((n, i) => (
-              <div key={n.title} className="relative rounded-lg border border-brand-700/40 bg-surface p-3.5 shadow-xs">
+              <div key={n.title} className="relative rounded-lg border border-border bg-surface p-3.5">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex size-8 items-center justify-center rounded-[10px] bg-primary-soft text-primary-soft-fg">
-                    <n.icon className="size-4" />
-                  </span>
+                  <n.icon className="size-4 text-muted" aria-hidden />
                   <span className="text-sm font-semibold">{n.title}</span>
                 </div>
                 <p className="mt-2 text-xs text-muted">{n.text}</p>
@@ -48,10 +43,10 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
               </div>
             ))}
           </div>
-          <div className="mt-12 max-w-md rounded-xl bg-gradient-to-br from-hero-from to-hero-to p-5 text-white shadow-lg">
-            <span className="eyebrow rounded-full bg-white/10 px-2 py-1 text-[10px] text-white/90">Oportunidade</span>
-            <p className="mt-3 text-[15px] font-semibold">Sua reserva avançou neste mês</p>
-            <p className="mt-1 text-xs text-white/70">Acompanhe metas, projeções e insights automáticos sobre suas finanças.</p>
+          <div className="mt-12 max-w-md rounded-xl bg-hero-from p-5 text-white">
+            <p className="text-xs text-white/75">Competência 10/2026</p>
+            <p className="mt-1 text-[15px] font-semibold">7 honorários gerados, vencimentos de 05 a 20/11</p>
+            <p className="mt-1 text-xs text-white/75">Cada cliente vence no dia do cadastro; quem paga em dia recebe o desconto combinado.</p>
           </div>
         </div>
       </div>

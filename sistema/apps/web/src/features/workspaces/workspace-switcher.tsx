@@ -2,14 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Building2, Check, House, Plus } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import type { z } from 'zod';
 import { MEMBER_ROLE_LABELS, PLANS, TRIAL_DAYS, workspaceInputSchema, type WorkspaceSummary } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Field, Input } from '@/components/ui/input';
-import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Sheet } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { toastError } from '@/lib/notify';
@@ -68,7 +67,7 @@ export function WorkspaceMenuItems({ onCreate }: { onCreate: () => void }) {
   const { switchTo } = useSwitchWorkspace();
   return (
     <>
-      <DropdownMenuLabel>Espaços</DropdownMenuLabel>
+      <DropdownMenuLabel>Empresas</DropdownMenuLabel>
       <div className="scrollbar-thin max-h-64 overflow-y-auto">
         {workspaces.map((ws) => (
           <DropdownMenuItem key={ws.id} className="py-1.5" onSelect={() => void switchTo(ws)} aria-current={ws.id === workspace?.id ? 'true' : undefined}>
@@ -77,7 +76,7 @@ export function WorkspaceMenuItems({ onCreate }: { onCreate: () => void }) {
         ))}
       </div>
       <DropdownMenuItem icon={<Plus />} onSelect={onCreate}>
-        Novo espaço (Família/Empresa)
+        Nova empresa
       </DropdownMenuItem>
     </>
   );
@@ -88,7 +87,7 @@ export function WorkspaceList({ onCreate, onSwitched }: { onCreate: () => void; 
   const { workspace, workspaces } = useAuth();
   const { switchTo, switching } = useSwitchWorkspace();
   return (
-    <div className="flex flex-col gap-1" role="list" aria-label="Espaços">
+    <div className="flex flex-col gap-1" role="list" aria-label="Empresas">
       {workspaces.map((ws) => (
         <button
           key={ws.id}
@@ -106,7 +105,7 @@ export function WorkspaceList({ onCreate, onSwitched }: { onCreate: () => void; 
         </button>
       ))}
       <button type="button" onClick={onCreate} className="flex items-center gap-3 rounded-md px-3 py-3 text-sm font-semibold text-brand-text hover:bg-bg-subtle">
-        <Plus className="size-5" /> Novo espaço (Família/Empresa)
+        <Plus className="size-5" /> Nova empresa
       </button>
     </div>
   );
@@ -114,24 +113,23 @@ export function WorkspaceList({ onCreate, onSwitched }: { onCreate: () => void; 
 
 type WorkspaceForm = z.input<typeof workspaceInputSchema>;
 
-/** "Novo espaço": a family or business workspace with its own data, members and subscription. */
+/** "Nova empresa": a business workspace with its own data, members and subscription. */
 export function WorkspaceSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const create = useCreateWorkspace();
   const { switchTo } = useSwitchWorkspace();
   const form = useForm<WorkspaceForm, unknown, z.output<typeof workspaceInputSchema>>({
     resolver: zodResolver(workspaceInputSchema),
-    defaultValues: { name: '', kind: 'family' },
+    defaultValues: { name: '', kind: 'business' },
   });
-  const kind = form.watch('kind');
-  const plan = PLANS.find((p) => p.workspaceKinds.includes(kind));
+  const plan = PLANS.find((p) => p.workspaceKinds.includes('business'));
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      const ws = await create.mutateAsync(values);
+      const ws = await create.mutateAsync({ ...values, kind: 'business' });
       onOpenChange(false);
-      form.reset({ name: '', kind: 'family' });
+      form.reset({ name: '', kind: 'business' });
       await switchTo(ws, { to: '/configuracoes?aba=membros', silent: true });
-      toast.success(`${ws.name} criado com ${TRIAL_DAYS} dias grátis. Convide quem vai participar.`);
+      toast.success(`${ws.name} criada com ${TRIAL_DAYS} dias grátis. Convide quem vai participar.`);
     } catch (error) {
       toastError(error);
     }
@@ -141,46 +139,29 @@ export function WorkspaceSheet({ open, onOpenChange }: { open: boolean; onOpenCh
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
-      title="Novo espaço"
-      description="Um espaço separado, com dados, membros e assinatura próprios."
+      title="Nova empresa"
+      description="Uma empresa separada, com dados, membros e assinatura próprios."
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button type="submit" form="workspace-form" loading={form.formState.isSubmitting}>
-            Criar espaço
+            Criar empresa
           </Button>
         </>
       }
     >
       <form id="workspace-form" onSubmit={onSubmit} className="flex flex-col gap-5" noValidate>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-fg">Tipo</span>
-          <SegmentedControl
-            variant="card"
-            fullWidth
-            ariaLabel="Tipo de espaço"
-            value={kind}
-            onChange={(v) => form.setValue('kind', v)}
-            options={[
-              { value: 'family', label: 'Família', icon: <House /> },
-              { value: 'business', label: 'Empresa', icon: <Building2 /> },
-            ]}
-          />
-        </div>
-        <Field label="Nome do espaço" error={form.formState.errors.name?.message}>
-          <Input placeholder={kind === 'family' ? 'Ex.: Família Costa' : 'Ex.: Costa Design Ltda.'} {...form.register('name')} />
+        <Field label="Nome da empresa" error={form.formState.errors.name?.message}>
+          <Input placeholder="Ex.: Costa Contabilidade Ltda." {...form.register('name')} />
         </Field>
         <div className="rounded-xl border border-border bg-surface-muted px-4 py-3.5 text-[13px]">
           <p className="font-semibold text-fg">{TRIAL_DAYS} dias grátis, sem cartão</p>
           <p className="mt-1 text-muted">
-            {kind === 'family'
-              ? 'Organize as contas da casa com quem mora com você.'
-              : 'Contas a pagar e a receber da empresa com a sua equipe.'}{' '}
+            Contas a pagar e a receber da empresa com a sua equipe.{' '}
             {plan ? `Depois, plano ${plan.name} com até ${plan.maxMembers} membros.` : null}
           </p>
-          <p className="mt-1 text-muted">Seus dados pessoais continuam separados no espaço Pessoal.</p>
         </div>
       </form>
     </Sheet>

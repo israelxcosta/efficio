@@ -23,8 +23,9 @@ import { Cell, TabGrid } from './layout';
 
 export function PrivacyTab() {
   const { isOwner } = usePermissions();
-  const { workspace } = useAuth();
-  const canDeleteWorkspace = isOwner && workspace?.kind !== 'personal';
+  const { workspace, workspaces } = useAuth();
+  // The last company stays (the account needs one); it goes only with the account itself.
+  const canDeleteWorkspace = isOwner && workspace?.kind !== 'personal' && workspaces.length > 1;
   return (
     <TabGrid>
       <Cell wide>
@@ -285,7 +286,7 @@ function DeleteAccountCard() {
     <Card className="border-danger/30 p-6">
       <CardHeader
         title="Excluir minha conta"
-        subtitle="Remove sua conta, seu espaço pessoal e os espaços em que você é o único proprietário. Nos demais, você deixa de ser membro."
+        subtitle="Remove sua conta e as empresas em que você é o único proprietário. Nas demais, você deixa de ser membro."
         icon={<UserX />}
       />
       <div className="mt-5">

@@ -9,7 +9,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { axisProps, CHART_COLORS, LegendDot, moneyAxisFormatter, MoneyTooltip, StripeDefs } from '@/components/charts/chart-utils';
+import { axisProps, CHART_COLORS, LegendDot, moneyAxisFormatter, MoneyTooltip } from '@/components/charts/chart-utils';
 import { useAccounts } from '@/features/accounts/api';
 import { useCashflowReport } from '../api';
 import { GRANULARITY_OPTIONS } from './categories-tab';
@@ -50,15 +50,15 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MiniStat label="Saldo inicial" value={r ? formatBRL(r.openingBalance) : '—'} />
         <MiniStat label="Entradas" value={r ? formatBRL(totals.in) : '—'} tone="success" hint={totals.pin ? `${formatBRL(totals.pin)} previsto` : undefined} />
-        <MiniStat label="Saídas" value={r ? formatBRL(totals.out) : '—'} tone="danger" hint={totals.pout ? `${formatBRL(totals.pout)} previsto` : undefined} />
-        <MiniStat label="Saldo final projetado" value={r ? formatBRL(r.closingBalance) : '—'} tone={r && r.closingBalance < 0 ? 'danger' : 'brand'} />
+        <MiniStat label="Saídas" value={r ? formatBRL(totals.out) : '—'} hint={totals.pout ? `${formatBRL(totals.pout)} previsto` : undefined} />
+        <MiniStat label="Saldo final projetado" value={r ? formatBRL(r.closingBalance) : '—'} tone={r && r.closingBalance < 0 ? 'danger' : undefined} />
       </div>
 
       <Card className="p-5">
         <CardHeader title="Fluxo de caixa" subtitle="Entradas e saídas por período com saldo acumulado" icon={<Waves />} />
         <div className="mt-3 flex flex-wrap gap-4">
-          <LegendDot color={CHART_COLORS.success} label="Entradas" striped />
-          <LegendDot color={CHART_COLORS.danger} label="Saídas" striped />
+          <LegendDot color={CHART_COLORS.income} label="Entradas" />
+          <LegendDot color={CHART_COLORS.expense} label="Saídas" />
           <LegendDot color={CHART_COLORS.brand} label="Saldo acumulado" />
         </div>
         <div className="mt-2 h-80">
@@ -69,7 +69,6 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={data} margin={{ left: -4, right: 8, top: 8 }} stackOffset="sign">
-                <StripeDefs />
                 <CartesianGrid vertical={false} stroke="var(--app-chart-grid)" strokeDasharray="4 4" />
                 <XAxis dataKey="label" {...axisProps} />
                 <YAxis {...axisProps} tickFormatter={moneyAxisFormatter} width={60} />
@@ -86,9 +85,9 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
                   />
                 ) : null}
                 <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ entradas: 'Entradas', saidas: 'Saídas', saldo: 'Saldo acumulado' }} />} />
-                <Bar dataKey="entradas" name="entradas" stackId="flow" fill="url(#stripe-success)" radius={[6, 6, 0, 0]} maxBarSize={34} />
-                <Bar dataKey="saidas" name="saidas" stackId="flow" fill="url(#stripe-danger)" radius={[6, 6, 0, 0]} maxBarSize={34} />
-                <Line type="monotone" dataKey="saldo" name="saldo" stroke={CHART_COLORS.brand} strokeWidth={2.5} dot={{ r: 3 }} />
+                <Bar dataKey="entradas" name="entradas" stackId="flow" fill={CHART_COLORS.income} radius={[3, 3, 0, 0]} maxBarSize={34} />
+                <Bar dataKey="saidas" name="saidas" stackId="flow" fill={CHART_COLORS.expense} radius={[3, 3, 0, 0]} maxBarSize={34} />
+                <Line type="linear" dataKey="saldo" name="saldo" stroke="var(--app-fg)" strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
@@ -100,7 +99,7 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
-                <tr className="border-b border-border bg-surface-muted text-left text-[11px] font-semibold tracking-wide text-muted uppercase">
+                <tr className="border-b border-border text-left text-xs font-medium text-muted">
                   <th className="px-4 py-2.5">Período</th>
                   <th className="px-4 py-2.5 text-right">Entradas realizadas</th>
                   <th className="px-4 py-2.5 text-right">Saídas realizadas</th>
@@ -116,8 +115,8 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
                     <td className="px-4 py-3 font-semibold">
                       {p.label} {p.projected ? <Badge tone="brand" className="ml-1">Projeção</Badge> : null}
                     </td>
-                    <td className="tabular px-4 py-3 text-right text-success">{formatBRL(p.realizedInflow)}</td>
-                    <td className="tabular px-4 py-3 text-right text-danger">{formatBRL(p.realizedOutflow)}</td>
+                    <td className="tabular px-4 py-3 text-right">{formatBRL(p.realizedInflow)}</td>
+                    <td className="tabular px-4 py-3 text-right">{formatBRL(p.realizedOutflow)}</td>
                     <td className="tabular px-4 py-3 text-right text-muted">{formatBRL(p.pendingInflow)}</td>
                     <td className="tabular px-4 py-3 text-right text-muted">{formatBRL(p.pendingOutflow)}</td>
                     <td className="px-4 py-3 text-right"><Money value={p.net} signed /></td>

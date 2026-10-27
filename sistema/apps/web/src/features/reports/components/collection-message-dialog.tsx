@@ -97,7 +97,7 @@ export function CollectionMessageDialog({ client, onClose }: { client: Delinquen
           </>
         ) : null
       }
-      className="max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto p-5 sm:p-6"
+      className="max-w-xl"
       footer={
         <div className="flex w-full flex-wrap items-center justify-end gap-2">
           {href ? (

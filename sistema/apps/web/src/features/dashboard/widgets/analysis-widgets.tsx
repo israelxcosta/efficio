@@ -428,7 +428,6 @@ function ResultTooltip({ d, ...props }: TooltipProps & { d: DashboardResponse })
 /** "Resultado mês a mês": receitas − despesas of the last 6 months, green above zero, red below. */
 export function MonthlyResultWidget({ d, alert }: WidgetProps) {
   const resizing = useWidgetResizing();
-  const scope = useStripeScope();
   const body = useElementSize();
   const chart = useElementSize();
 
@@ -484,7 +483,6 @@ export function MonthlyResultWidget({ d, alert }: WidgetProps) {
         >
           <ChartBox>
             <BarChart data={rows} barCategoryGap="22%" margin={{ top: 18, right: 4, bottom: 0, left: 0 }} accessibilityLayer={false}>
-              <StripeDefs scope={scope} />
               <CartesianGrid vertical={false} stroke="var(--app-chart-grid)" strokeDasharray="4 4" />
               <XAxis
                 dataKey="label"
@@ -497,9 +495,9 @@ export function MonthlyResultWidget({ d, alert }: WidgetProps) {
               <YAxis {...axisProps} width={yWidth} tickCount={4} tickFormatter={moneyAxisFormatter} />
               <Tooltip cursor={{ fill: 'var(--app-bg-subtle)', radius: 8 }} content={<ResultTooltip d={d} />} />
               <ReferenceLine y={0} stroke="var(--app-border-strong)" />
-              <Bar dataKey="net" name="net" radius={[6, 6, 6, 6]} maxBarSize={44} isAnimationActive={!resizing}>
+              <Bar dataKey="net" name="net" radius={[3, 3, 3, 3]} maxBarSize={44} isAnimationActive={!resizing}>
                 {rows.map((r) => (
-                  <Cell key={r.month} fill={stripeFill(r.net < 0 ? 'danger' : 'success', scope)} />
+                  <Cell key={r.month} fill={r.net < 0 ? CHART_COLORS.danger : CHART_COLORS.income} />
                 ))}
                 <LabelList dataKey="net" content={(p) => <PeakLabel {...p} peak={peak} />} />
               </Bar>

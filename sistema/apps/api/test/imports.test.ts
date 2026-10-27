@@ -53,7 +53,7 @@ describe('OFX into an account', () => {
   it('previews with period, hints, duplicates in the file, bill payments and suggested categories', async () => {
     const user = await registerUser(app, 'Importa OFX');
     const accountId = await createAccount(user);
-    const groceries = await firstCategory(user, 'expense', 'Alimentação');
+    const groceries = await firstCategory(user, 'expense', 'Administrativo');
     const sub = groceries.subcategories[0]!;
     // History: the same merchant categorized before (description written differently).
     await user.post('/transactions', {
@@ -203,7 +203,7 @@ describe('CSV into a credit card', () => {
   it('turns a subcategory into category + subcategory and validates types and ownership', async () => {
     const user = await registerUser(app, 'Categorias Import');
     const cardId = (await user.post('/credit-cards', CARD)).body.id as string;
-    const food = await firstCategory(user, 'expense', 'Alimentação');
+    const food = await firstCategory(user, 'expense', 'Administrativo');
     const income = await firstCategory(user, 'income');
     const p = (await preview(user, { fileName: 'n.csv', content: fixture('nubank-cartao.csv'), target: { kind: 'credit_card', creditCardId: cardId } })).body;
     const body = commitBody(p);

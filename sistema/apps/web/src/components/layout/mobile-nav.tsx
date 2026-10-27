@@ -27,7 +27,7 @@ export function MobileNav({ onSearch }: { onSearch: () => void }) {
   const overdue = useOverdueBills().data?.filter((t) => t.type === 'expense').length ?? 0;
   const items = NAV_ITEMS.filter((i) => i.mobile);
   const link = ({ isActive }: { isActive: boolean }) =>
-    cn('flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-semibold', isActive ? 'text-primary dark:text-fg' : 'text-muted');
+    cn('flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-semibold', isActive ? 'text-fg' : 'text-muted');
 
   return (
     <>
@@ -39,7 +39,7 @@ export function MobileNav({ onSearch }: { onSearch: () => void }) {
         {items.slice(0, 2).map((i) => (
           <NavLink key={i.to} to={i.to} end={i.to === '/'} className={link}>
             <i.icon className="size-5" />
-            {i.label.split(' ')[0]}
+            {i.short ?? i.label.split(' ')[0]}
           </NavLink>
         ))}
         <DropdownMenu>
@@ -73,10 +73,10 @@ export function MobileNav({ onSearch }: { onSearch: () => void }) {
         {items.slice(2, 3).map((i) => (
           <NavLink key={i.to} to={i.to} className={link}>
             <i.icon className="size-5" />
-            {i.label.split(' ')[0]}
+            {i.short ?? i.label.split(' ')[0]}
           </NavLink>
         ))}
-        <button type="button" className="flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-semibold text-muted" onClick={() => setMenuOpen(true)}>
+        <button type="button" className="flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-semibold text-muted" onClick={() => setMenuOpen(true)}>
           <Menu className="size-5" />
           Mais
         </button>

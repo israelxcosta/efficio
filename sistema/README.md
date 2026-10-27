@@ -51,8 +51,8 @@ cp apps/api/.env.example apps/api/.env
 
 # migrações + dados de demonstração
 pnpm db:migrate
-pnpm db:seed          # demo@efficio.app / demo12345 — abre no escritório "Efficio Contabilidade"
-                      # (também: espaço pessoal e "Família Costa" com rafael@efficio.app)
+pnpm db:seed          # demo@efficio.app / demo12345 — a empresa "Efficio Contabilidade"
+                      # (único espaço da conta demo, plano Empresa ativo)
 
 # API (3333) + Web (5173)
 pnpm dev
@@ -67,10 +67,12 @@ do sistema: as mesmas rotas e regras da API rodam no navegador sobre o PGlite (P
 WebAssembly). Cada navegador ganha sua própria base, salva no IndexedDB e já preenchida com os dados
 de demonstração; o login vem preenchido com a conta demo e um aviso permite restaurar os dados.
 
-O escritório "Efficio Contabilidade" do demo traz honorários gerados para os 10 meses anteriores
-(com "+ Empregados" em alguns clientes), clientes que pagam em dia, clientes que atrasam (alguns
-pagos com juros e multa) e um cliente com 6 meses em aberto. A competência atual fica livre para
-testar **Contas a receber → Gerar honorários**. Ao mudar esses dados, aumente `SEED_VERSION` em
+O escritório "Efficio Contabilidade" (a empresa criada com a conta demo, seu único espaço) traz
+honorários gerados para os 10 meses anteriores, cada cliente com seu dia de vencimento (5, 10, 15 ou
+20), "+ Empregados" em alguns clientes, clientes que pagam em dia (Tecnova, Sorriso Pleno e Pão
+Quente com desconto por pontualidade de 5%, 3% e 2%), clientes que atrasam (alguns pagos com juros e
+multa) e um cliente com 6 meses em aberto. A competência atual fica livre para testar **Contas a
+receber → Gerar honorários**. Ao mudar esses dados, aumente `SEED_VERSION` em
 `apps/web/src/demo/server.ts` para que navegadores com dados antigos recriem a base.
 
 A pasta pode ser publicada em qualquer hospedagem estática (Netlify, Vercel, GitHub Pages, S3).
@@ -107,11 +109,16 @@ cookie httpOnly e dados no servidor.
   encerramento da empresa, inadimplência ou outro (com observação).
 - **Honorários**: janela com o honorário vigente em destaque, a lista simples de vigências e o botão
   **+ Nova vigência**. Cada vigência dura 1 ano; a primeira começa na data de início do contrato e as
-  seguintes emendam ano a ano. Cada uma tem honorário mensal e taxa por empregado.
+  seguintes emendam ano a ano. Cada uma tem honorário mensal, taxa por empregado e, opcionalmente,
+  **desconto por pontualidade** (%): ao confirmar o recebimento até o vencimento, o desconto vira
+  uma despesa paga vinculada ("Despesas financeiras › Descontos concedidos").
+- **Vencimento por cliente**: cada cliente tem o dia de vencimento do honorário (padrão 10), no mês
+  seguinte à competência; dia 31 em mês curto vira o último dia.
 - **Fornecedores** (`/fornecedores`) com nome, CPF/CNPJ, endereço, e-mail e telefone.
 - Contas a receber se vinculam ao cliente e contas a pagar ao fornecedor (seletores agrupados).
-- Espaços do tipo **Empresa** recebem categorias empresariais (Honorários, Pessoal, Impostos e
-  taxas, Ocupação, Tecnologia, Administrativo, Marketing...).
+- **Somente empresarial**: o cadastro cria a empresa do usuário (nome informado ou "Minha
+  empresa"), com categorias empresariais (Honorários, Pessoal, Impostos e taxas, Ocupação,
+  Tecnologia, Administrativo, Marketing, Despesas financeiras...) e a conta "Caixa".
 
 ### Base financeira
 
@@ -134,8 +141,9 @@ cookie httpOnly e dados no servidor.
 
 ## SaaS e segurança
 
-- **Assinantes (workspaces)**: cada pessoa tem um espaço pessoal e pode criar espaços de Família ou
-  Empresa e convidar membros como Editor ou Leitor. Todo dado financeiro pertence a um workspace.
+- **Assinantes (workspaces)**: cada conta nasce com a sua empresa e pode criar outras empresas e
+  convidar membros como Editor ou Leitor; a última empresa da conta não pode ser excluída (para sair
+  de vez, exclua a conta). Todo dado financeiro pertence a um workspace.
 - **Isolamento no banco**: PostgreSQL compartilhado com **Row Level Security** forçado nas tabelas
   financeiras. Cada requisição roda numa transação com o papel `effinance_app` e o workspace ativo
   fixado em `app.workspace_id`; mesmo uma consulta sem filtro não enxerga outro assinante. O login

@@ -105,7 +105,7 @@ export function CategorySheet({
     >
       <form className="flex flex-col gap-5" onSubmit={(e) => { e.preventDefault(); void onSubmit(); }} noValidate>
         <div className="flex items-center gap-3 rounded-lg bg-surface-muted p-4">
-          <CategoryIcon icon={icon} color={color} size="lg" />
+          <CategoryIcon tinted icon={icon} color={color} size="lg" />
           <div>
             <p className="text-sm font-semibold">{name || 'Nome da categoria'}</p>
             <p className="text-xs text-muted">Pré-visualização</p>

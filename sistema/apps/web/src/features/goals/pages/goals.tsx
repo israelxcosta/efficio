@@ -46,7 +46,6 @@ export default function GoalsPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Planejamento"
         title="Metas"
         description="Trace seu caminho: defina objetivos, guarde dinheiro e acompanhe o progresso."
         actions={<WriteGate><Button onClick={() => setSheet({ open: true, goal: null })}><Plus /> Nova meta</Button></WriteGate>}

@@ -13,7 +13,7 @@ const TERMS: Section[] = [
   {
     title: '1. O serviço',
     paragraphs: [
-      'O Efficio é um sistema on-line de organização financeira pessoal, familiar e empresarial: contas, cartões, contas a pagar e a receber, metas, contatos e relatórios.',
+      'O Efficio é um sistema on-line de gestão financeira empresarial: contas, cartões, contas a pagar e a receber, metas, contatos e relatórios.',
       'O Efficio não é instituição financeira, não movimenta dinheiro e não presta consultoria de investimentos. As informações e projeções exibidas são estimativas baseadas nos dados que você cadastra.',
     ],
   },
@@ -21,7 +21,7 @@ const TERMS: Section[] = [
     title: '2. Conta e segurança',
     paragraphs: [
       'Você é responsável pelas informações cadastradas e por manter sua senha em sigilo. Recomendamos ativar a verificação em duas etapas.',
-      'Cada espaço (pessoal, família ou empresa) tem um proprietário, que define quem participa e com qual permissão (editor ou leitor).',
+      'Cada empresa cadastrada tem um proprietário, que define quem participa e com qual permissão (editor ou leitor).',
     ],
   },
   {

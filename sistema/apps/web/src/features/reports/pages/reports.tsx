@@ -15,17 +15,33 @@ import { PeriodFilter, presetRange, type ReportPeriod } from '../components/peri
 type Tab = 'overview' | 'categories' | 'contacts' | 'comparison' | 'cashflow' | 'inadimplencia';
 
 /**
- * Each report keeps its own period while the app is open. The default ("Mês") follows the
- * active month and moving it moves the active month everywhere; multi-month choices stay local.
+ * Each report keeps its own period while the app is open. "Mês" follows the active month and
+ * moving it moves the active month everywhere; multi-month choices stay local. Reports about a
+ * trend (categories, contacts, cash flow) open on the last 12 months: one month is a single bar.
  */
 const savedPeriods = new Map<Tab, ReportPeriod>();
+const DEFAULT_PERIOD: Partial<Record<Tab, ReportPeriod>> = {
+  categories: { preset: 'last-12' },
+  contacts: { preset: 'last-12' },
+  cashflow: { preset: 'last-12' },
+};
+
+/** What each report counts, in the office's words (competência vs caixa). */
+const DESCRIPTIONS: Record<Tab, string> = {
+  overview: 'Receitas, despesas e resultado do período pelo regime de competência (data de vencimento).',
+  categories: 'Despesas e receitas por categoria, mês a mês, pelo regime de competência.',
+  contacts: 'Movimentação por cliente e fornecedor, pelo regime de competência.',
+  comparison: 'Dois períodos lado a lado, pelo regime de competência.',
+  cashflow: 'Dinheiro que entrou e saiu das contas (regime de caixa), com o previsto adiante.',
+  inadimplencia: 'Recebimentos em atraso, juros e multas cobrados e o risco de cada cliente.',
+};
 
 export default function ReportsPage() {
   const [params, setParams] = useSearchParams();
   const tab = (params.get('aba') as Tab) || 'overview';
   const [activeMonth, setActiveMonth] = useActiveMonth();
   const [periods, setPeriods] = useState(() => new Map(savedPeriods));
-  const period = periods.get(tab) ?? { preset: 'month' };
+  const period = periods.get(tab) ?? DEFAULT_PERIOD[tab] ?? { preset: 'month' };
   const range = presetRange(period, activeMonth);
 
   function setPeriod(next: ReportPeriod) {
@@ -45,9 +61,8 @@ export default function ReportsPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Análises"
         title="Relatórios"
-        description="Evolução, projeções, comparações e fluxo de caixa para decidir com contexto."
+        description={DESCRIPTIONS[tab]}
         actions={
           tab === 'inadimplencia' ? (
             <DelinquencyMonthsControl />
@@ -59,7 +74,6 @@ export default function ReportsPage() {
 
       <div className="-mx-1 overflow-x-auto px-1 pb-1">
         <SegmentedControl
-          variant="solid"
           ariaLabel="Relatório"
           value={tab}
           onChange={(t) => update({ aba: t === 'overview' ? null : t, meses: null })}

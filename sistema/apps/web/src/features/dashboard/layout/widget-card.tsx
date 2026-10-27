@@ -85,7 +85,7 @@ interface WidgetCardProps {
   children: ReactNode;
   bodyClassName?: string;
   className?: string;
-  /** Navy gradient (insights). */
+  /** Flat navy surface with white text. */
   variant?: 'default' | 'hero';
 }
 
@@ -100,9 +100,8 @@ export function WidgetCard({ title, subtitle, info, action, alert, footer, child
   return (
     <section
       className={cn(
-        '@container relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border p-4 shadow-xs',
-        hero ? 'border-transparent bg-gradient-to-br from-hero-from via-hero-via to-hero-to text-white' : 'border-border bg-surface',
-        alert && 'shadow-[inset_3px_0_0_0_var(--app-danger)]',
+        '@container relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border p-5',
+        hero ? 'border-transparent bg-hero-from text-white' : 'border-border bg-surface',
         className,
       )}
       aria-label={typeof heading === 'string' ? heading : undefined}
@@ -125,8 +124,8 @@ export function WidgetCard({ title, subtitle, info, action, alert, footer, child
         {action ? <div className="order-last flex basis-full items-center gap-1 @sm:order-none @sm:basis-auto @sm:shrink-0">{action}</div> : null}
         {chrome ? <ChromeButtons chrome={chrome} onDark={hero} /> : null}
       </header>
-      <div className={cn('mt-2.5 flex min-h-0 flex-1 flex-col', bodyClassName)}>{children}</div>
-      {footer ? <div className="mt-2 shrink-0">{footer}</div> : null}
+      <div className={cn('mt-3.5 flex min-h-0 flex-1 flex-col', bodyClassName)}>{children}</div>
+      {footer ? <div className="mt-3 shrink-0">{footer}</div> : null}
     </section>
   );
 }

@@ -6,6 +6,7 @@ import {
   SIMPLES_ANNEX_LABELS,
   TAX_REGIME_LABELS,
   formatBRL,
+  formatBps,
   formatCEP,
   formatCNPJ,
   formatDateBR,
@@ -70,7 +71,7 @@ export function ClientDetailsDialog({
       onOpenChange={(o) => !o && onClose()}
       title={c?.tradeName || c?.name || 'Cliente'}
       description={c ? `${c.name} · CNPJ ${formatCNPJ(c.document)}` : undefined}
-      className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto"
+      className="max-w-2xl"
       footer={
         c ? (
           <div className="flex w-full flex-wrap justify-end gap-2">
@@ -142,11 +143,17 @@ export function ClientDetailsDialog({
               {c.simplesAnnex ? SIMPLES_ANNEX_LABELS[c.simplesAnnex] : null}
             </Item>
             <Item label="Início do contrato">{formatDateBR(c.contractStartDate)}</Item>
+            <Item label="Vencimento do honorário">Dia {c.feeDueDay} do mês seguinte à competência</Item>
             <Item label="Honorário vigente">
               {fee ? (
                 <span>
                   <span className="tabular font-semibold">{formatBRL(fee.amount)}</span>/mês ·{' '}
                   <span className="tabular">{formatBRL(fee.employeeFee)}</span> por empregado
+                  {fee.discountBps > 0 ? (
+                    <span className="block text-xs text-muted">
+                      {formatBps(fee.discountBps)} de desconto para pagamento até o vencimento
+                    </span>
+                  ) : null}
                   <span className="block text-xs text-muted">até {formatDateBR(fee.endDate)}</span>
                 </span>
               ) : c.latestFee ? (

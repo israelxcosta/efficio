@@ -64,7 +64,6 @@ export default function AccountsPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Cadastros"
         title="Contas e carteiras"
         description="Contas bancárias, carteiras, vale-benefício e investimentos."
         actions={

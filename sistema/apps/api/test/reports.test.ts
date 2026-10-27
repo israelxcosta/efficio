@@ -20,9 +20,9 @@ beforeEach(async () => {
   await resetDb(app);
   c = await registerUser(app);
   account = await createAccount(c, { name: 'Conta', initialBalance: 100000 });
-  food = await firstCategory(c, 'expense', 'Alimentação');
-  home = await firstCategory(c, 'expense', 'Moradia');
-  salary = await firstCategory(c, 'income', 'Salário');
+  food = await firstCategory(c, 'expense', 'Administrativo');
+  home = await firstCategory(c, 'expense', 'Ocupação');
+  salary = await firstCategory(c, 'income', 'Serviços Prestados');
   landlord = (await c.post('/contacts', { name: 'Imobiliária Lar' })).body.id;
 
   const tx = (body: Record<string, unknown>) => c.post('/transactions', { accountId: account, paid: true, ...body });
@@ -124,7 +124,7 @@ describe('reports', () => {
       ['Cartão de débito', 20000],
     ]);
     expect(res.topExpenses[0]).toMatchObject({ description: 'Aluguel', amount: 150000 });
-    expect(res.insights.map((i: any) => i.title)).toContain('Gastos com Alimentação subiram 60%');
+    expect(res.insights.map((i: any) => i.title)).toContain('Gastos com Administrativo subiram 60%');
   });
 
   it('dashboard summary, health score and insights', async () => {
@@ -155,7 +155,7 @@ describe('reports', () => {
     expect(res.contacts.map((x: any) => x.name)).toEqual(['Imobiliária Lar']);
     const tx = (await c.get('/search?q=mercado')).body;
     expect(tx.transactions).toHaveLength(2);
-    const cat = (await c.get('/search?q=aliment')).body;
-    expect(cat.categories.map((x: any) => x.name)).toContain('Alimentação');
+    const cat = (await c.get('/search?q=administ')).body;
+    expect(cat.categories.map((x: any) => x.name)).toContain('Administrativo');
   });
 });

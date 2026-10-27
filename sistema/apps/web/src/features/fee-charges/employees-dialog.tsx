@@ -65,7 +65,6 @@ export function EmployeesDialog({ fee, open, onOpenChange }: EmployeesDialogProp
       onOpenChange={onOpenChange}
       title="Lançar empregados"
       description={`${client} · honorários ref. ${competenceLabel(feeCompetenceOf(fee))} · venc. ${formatDateBR(fee.date)}`}
-      className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
     >
       {open ? <EmployeesForm fee={fee} onClose={() => onOpenChange(false)} /> : null}
     </Modal>

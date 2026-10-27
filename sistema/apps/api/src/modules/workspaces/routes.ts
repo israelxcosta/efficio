@@ -24,6 +24,7 @@ import { exportWorkspace } from './export';
 import {
   acceptInvite,
   changeMemberRole,
+  countOwnedWorkspaces,
   createInvite,
   createSharedWorkspace,
   deleteWorkspaceRow,
@@ -67,8 +68,13 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.delete('/current', { schema: { body: deleteWorkspaceSchema } }, async (req, reply) => {
     assertOwner(req.access);
+    // Legacy personal workspaces go only with the account.
     if (req.access.workspaceKind === 'personal') {
       throw new ValidationError('O espaço pessoal só pode ser excluído junto com a sua conta');
+    }
+    // Every account keeps a company of its own (sessions always have somewhere to open).
+    if ((await countOwnedWorkspaces(app.db, req.userId)) <= 1) {
+      throw new ValidationError('Mantenha ao menos uma empresa; para sair de vez, exclua sua conta em Privacidade');
     }
     if (req.body.confirmName.trim() !== req.access.workspaceName.trim()) {
       throw new ValidationError('Digite o nome do espaço exatamente como aparece para confirmar');

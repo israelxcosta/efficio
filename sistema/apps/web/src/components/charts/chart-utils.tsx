@@ -16,20 +16,23 @@ export const CHART_COLORS = {
   danger: 'var(--app-danger)',
 } as const;
 
-/** Fallback palette for categories without a color / "Outros". */
-export const SERIES_PALETTE = ['#152B61', '#3F64BE', '#0EA5E9', '#14B8A6', '#12A150', '#EAB308', '#F97316', '#E5484D', '#EC4899', '#A855F7', '#64748B'];
+/**
+ * Categorical series by rank: one blue ramp (largest first) then greys, so a chart reads as one
+ * subject in one hue instead of a rainbow. Category colours stay for icons in their own editor.
+ */
+export const SERIES_PALETTE = ['#1E3F8A', '#2F5FBF', '#5B82D1', '#8FA9DD', '#B9C9EA', '#6B7280', '#8D939D', '#AEB3BC', '#C9CDD4', '#DDE1E6'];
 
-/** Chart text sizes (px): small and fixed, whatever the size of the chart. */
-export const CHART_TEXT = { axis: 10, category: 10.5, value: 11.5 } as const;
+/** Chart text sizes (px): small and fixed, whatever the size of the chart (11px floor). */
+export const CHART_TEXT = { axis: 11, category: 11, value: 12 } as const;
 
-/** Value axis (Y): 10px ticks. */
+/** Value axis (Y): 11px ticks. */
 export const axisProps = {
   tickLine: false,
   axisLine: false,
   tick: { fill: CHART_COLORS.axis, fontSize: CHART_TEXT.axis },
 } as const;
 
-/** Category axis (X): 10.5px labels, first and last always shown, the rest as space allows. */
+/** Category axis (X): 11px labels, first and last always shown, the rest as space allows. */
 export const categoryAxisProps = {
   tickLine: false,
   axisLine: false,
@@ -174,7 +177,8 @@ export function LegendDot({ color, label, striped, size = 'md' }: { color: strin
       <span
         className={cn('shrink-0 rounded-full', size === 'sm' ? 'size-2' : 'size-2.5')}
         style={{
-          background: striped ? `repeating-linear-gradient(45deg, ${color} 0 2px, color-mix(in oklab, ${color} 55%, transparent) 2px 4px)` : color,
+          // The swatch of a hatched (open/forecast) series is the same hatch, drawn small.
+          background: striped ? `repeating-linear-gradient(45deg, ${color} 0 2px, color-mix(in oklab, ${color} 55%, transparent) 2px 4px)` : color, // taste-skill-ignore
         }}
       />
       {label}

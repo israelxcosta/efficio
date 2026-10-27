@@ -1,12 +1,12 @@
 // In-browser API for the demo build: PGlite (Postgres in WASM) + the real API route plugins,
 // including Row Level Security, field encryption (fixed demo key), workspaces, fake billing, file
 // imports and Open Finance with the simulated provider (no webhooks in the browser).
-// Data persists per browser in IndexedDB; the demo users are seeded on first boot.
+// Data persists per browser in IndexedDB; the demo user and her company are seeded on first boot.
 
 import type {} from '@api/app'; // brings Fastify type augmentations (app.db, req.workspaceId) into scope
 import { backfillEncryption, needsBackfill } from '@api/db/backfill';
 import { createPgliteDb } from '@api/db/pglite';
-import { DEMO_EMAIL, DEMO_PARTNER_EMAIL, DEMO_PASSWORD, seedDemo } from '@api/db/demo-seed';
+import { DEMO_EMAIL, DEMO_PASSWORD, seedDemo } from '@api/db/demo-seed';
 import { sha256Hex } from '@api/lib/crypto/encoding';
 import { LocalKeyProvider } from '@api/lib/crypto/key-provider';
 import { configureKeyring } from '@api/lib/crypto/keyring';
@@ -26,12 +26,12 @@ import { demoAuthRoutes } from './auth-routes';
 import { DemoRouter, type DemoReply, type DemoRequest } from './fake-fastify';
 import { getSession, setSession } from './session';
 
-export { DEMO_EMAIL, DEMO_PARTNER_EMAIL, DEMO_PASSWORD };
+export { DEMO_EMAIL, DEMO_PASSWORD };
 
 const DATA_DIR = 'idb://effinance-demo';
 const IDB_NAME = '/pglite/effinance-demo';
 /** Bump to reseed browsers that hold demo data from an older version. */
-const SEED_VERSION = 'seed:office-v3';
+const SEED_VERSION = 'seed:office-v4';
 
 // Drizzle migrations, applied in order and tracked in a local table.
 const migrations = import.meta.glob('../../../api/drizzle/*.sql', {

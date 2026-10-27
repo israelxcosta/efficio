@@ -76,7 +76,7 @@ describe('Mercado Pago subscriptions', () => {
   it('creates the preapproval, then activates only from a signed webhook (status re-fetched)', async () => {
     const owner = await registerUser(app, 'Assinante');
     const me = (await owner.get('/auth/me')).body;
-    const checkout = await owner.post('/billing/checkout', { planCode: 'individual_yearly' });
+    const checkout = await owner.post('/billing/checkout', { planCode: 'business_monthly' });
     expect(checkout.status).toBe(200);
     expect(checkout.body.checkoutUrl).toContain('preapproval_id=pre_1');
     const created = mp.calls.find((c) => c.method === 'POST')!;
@@ -84,7 +84,7 @@ describe('Mercado Pago subscriptions', () => {
       external_reference: me.workspace.id,
       payer_email: owner.email,
       status: 'pending',
-      auto_recurring: { frequency: 12, frequency_type: 'months', transaction_amount: 199, currency_id: 'BRL' },
+      auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: 79.9, currency_id: 'BRL' },
     });
     expect(created.body.back_url).toBe('http://localhost:5173/configuracoes?aba=assinatura');
     // Still in trial while the payment is pending.
@@ -104,7 +104,7 @@ describe('Mercado Pago subscriptions', () => {
     mp.preapprovals.get('pre_1')!.next_payment_date = '2027-10-20T12:00:00.000Z';
     expect((await signedWebhook({ dataId: 'pre_1', eventId: 'e2' })).statusCode).toBe(200);
     const active = (await owner.get('/billing/subscription')).body;
-    expect(active).toMatchObject({ status: 'active', canWrite: true, provider: 'mercadopago', plan: { code: 'individual_yearly' } });
+    expect(active).toMatchObject({ status: 'active', canWrite: true, provider: 'mercadopago', plan: { code: 'business_monthly' } });
     expect(active.currentPeriodEnd).toBe('2027-10-20T12:00:00.000Z');
 
     // Same notification twice is processed once.
@@ -121,7 +121,7 @@ describe('Mercado Pago subscriptions', () => {
     const canceled = await owner.post('/billing/cancel');
     expect(canceled.body).toMatchObject({ cancelAtPeriodEnd: true, canWrite: true });
     expect(mp.calls.at(-1)).toMatchObject({ method: 'PUT', body: { status: 'cancelled' } });
-    expect((await owner.post('/billing/dev/activate', { planCode: 'individual_monthly' })).status).toBe(404);
+    expect((await owner.post('/billing/dev/activate', { planCode: 'business_monthly' })).status).toBe(404);
 
     const events = await executeRows<{ n: number }>(app.db, sql`select count(*)::int as n from billing_events`);
     expect(events[0]!.n).toBe(4); // e1..e4; the duplicate e2 is not stored twice

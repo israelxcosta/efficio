@@ -75,7 +75,6 @@ export default function ContactsPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Cadastros"
         title="Fornecedores"
         description="Empresas e pessoas que fornecem para o escritório, vinculadas às contas a pagar."
         actions={<WriteGate><Button onClick={() => setSheet({ open: true, contact: null })}><Plus /> Novo fornecedor</Button></WriteGate>}
@@ -106,7 +105,7 @@ export default function ContactsPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
-                <tr className="border-b border-border bg-surface-muted text-left text-[11px] font-semibold tracking-wide text-muted uppercase">
+                <tr className="border-b border-border text-left text-xs font-medium text-muted">
                   <th className="px-4 py-2.5">Nome</th>
                   <th className="px-4 py-2.5">CPF / CNPJ</th>
                   <th className="px-4 py-2.5">Contato</th>

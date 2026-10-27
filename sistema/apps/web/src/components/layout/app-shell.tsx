@@ -70,7 +70,8 @@ export function AppShell() {
       <div className="min-h-dvh">
         <Sidebar />
         <div className="lg:pl-[76px]">
-          <main className="mx-auto max-w-[1440px] px-4 pt-6 pb-28 sm:px-6 lg:pt-8 lg:pb-32">
+          <main className="mx-auto max-w-[1440px] px-4 pt-6 pb-28 sm:px-6 lg:pt-6 lg:pb-16">
+            <QuickBar onSearch={() => setPaletteOpen(true)} />
             <DemoBanner />
             <SubscriptionBanner key={workspace?.id} />
             <Suspense fallback={<PageLoader />}>
@@ -78,7 +79,6 @@ export function AppShell() {
             </Suspense>
           </main>
         </div>
-        <QuickBar onSearch={() => setPaletteOpen(true)} />
         <MobileNav onSearch={() => setPaletteOpen(true)} />
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>

@@ -50,6 +50,7 @@ function defaults(c?: Client | null): FormIn {
     taxRegime: (c?.taxRegime ?? '') as TaxRegime,
     simplesAnnex: c?.simplesAnnex ?? '',
     contractStartDate: c?.contractStartDate ?? '',
+    feeDueDay: c?.feeDueDay ?? 10,
     zipCode: c?.zipCode ? formatCEP(c.zipCode) : '',
     street: c?.street ?? '',
     number: c?.number ?? '',
@@ -360,17 +361,32 @@ export function ClientSheet({
             </Field>
           ) : null}
         </div>
-        <Field
-          label="Início do contrato"
-          error={e.contractStartDate?.message}
-          hint={
-            client
-              ? 'Alterar a data reposiciona as vigências de honorários'
-              : 'A primeira vigência de honorários começa nesta data'
-          }
-        >
-          <Input type="date" className="sm:max-w-[220px]" {...register('contractStartDate')} />
-        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field
+            label="Início do contrato"
+            error={e.contractStartDate?.message}
+            hint={
+              client
+                ? 'Alterar a data reposiciona as vigências de honorários'
+                : 'A primeira vigência de honorários começa nesta data'
+            }
+          >
+            <Input type="date" {...register('contractStartDate')} />
+          </Field>
+          <Field
+            label="Vencimento do honorário"
+            error={e.feeDueDay?.message}
+            hint="No mês seguinte à competência (dia 31 vira o último dia em meses curtos)"
+          >
+            <Select {...register('feeDueDay', { valueAsNumber: true })}>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                <option key={day} value={day}>
+                  Dia {day}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
 
         <p className="eyebrow mt-2 flex items-center gap-1.5 text-brand-text">
           <UserRound className="size-3.5" /> Responsável

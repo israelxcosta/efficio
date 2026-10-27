@@ -59,7 +59,6 @@ export default function StatementPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Movimentações"
         title="Extrato"
         description="Selecione a conta e o período para ver entradas, saídas e o saldo dia a dia."
         actions={

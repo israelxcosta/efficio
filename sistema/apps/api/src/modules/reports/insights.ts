@@ -45,21 +45,21 @@ export function buildInsights(ctx: InsightContext): Insight[] {
     push(95, {
       kind: 'warning',
       title: 'Despesas acima das receitas',
-      description: `Suas despesas superaram as receitas em ${formatBRL(-net)} neste período.`,
-      href: '/relatorios?tab=fluxo',
+      description: `As despesas superaram as receitas em ${formatBRL(-net)} neste período.`,
+      href: '/relatorios?aba=cashflow',
     });
   } else if (savingsRate !== null && savingsRate >= 0.2) {
     push(60, {
       kind: 'achievement',
-      title: 'Ótima taxa de economia',
-      description: `Você guardou ${formatPercent(savingsRate, 0)} da sua renda neste período. Continue assim!`,
+      title: 'Boa margem no período',
+      description: `A margem foi de ${formatPercent(savingsRate, 0)} das receitas neste período.`,
     });
   } else if (savingsRate !== null && savingsRate >= 0 && savingsRate < 0.1) {
     push(70, {
       kind: 'opportunity',
-      title: 'Espaço para economizar mais',
-      description: `Você economizou ${formatPercent(savingsRate, 0)} da renda. A meta recomendada é 20% — revise os gastos variáveis.`,
-      href: '/relatorios?tab=categorias',
+      title: 'Margem apertada',
+      description: `A margem foi de ${formatPercent(savingsRate, 0)} das receitas. Revise as despesas variáveis e os honorários em atraso.`,
+      href: '/relatorios?aba=categories',
     });
   }
 
@@ -86,7 +86,7 @@ export function buildInsights(ctx: InsightContext): Insight[] {
       kind: 'warning',
       title: `Gastos com ${worst.name} subiram ${formatPercent(worst.ratio, 0)}`,
       description: `Foram ${formatBRL(worst.cur)} contra ${formatBRL(worst.prev)} no ${ctx.previousLabel}.`,
-      href: '/relatorios?tab=comparacao',
+      href: '/relatorios?aba=comparison',
     });
   }
   if (best) {
@@ -140,8 +140,8 @@ export function buildInsights(ctx: InsightContext): Insight[] {
     if (share >= 0.5) {
       push(50, {
         kind: 'info',
-        title: `Gastos fixos comprometem ${formatPercent(share, 0)} da renda`,
-        description: 'O ideal é manter os custos fixos abaixo de 50% para ter folga no orçamento.',
+        title: `Custos fixos são ${formatPercent(share, 0)} das receitas`,
+        description: 'Folha, aluguel e sistemas pesam no resultado: acompanhe a margem a cada reajuste de honorário.',
         href: '/contas-a-pagar',
       });
     }
@@ -153,7 +153,7 @@ export function buildInsights(ctx: InsightContext): Insight[] {
       kind: 'info',
       title: `${top.name} concentra ${formatPercent(top.amount / ctx.expense, 0)} das despesas`,
       description: `Foram ${formatBRL(top.amount)} neste período. Vale revisar se há espaço para reduzir.`,
-      href: '/relatorios?tab=categorias',
+      href: '/relatorios?aba=categories',
     });
   }
 

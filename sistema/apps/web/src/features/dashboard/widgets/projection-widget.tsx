@@ -72,7 +72,7 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
   );
 
   const failed = [projection, receivables, payables].filter((q) => q.isError);
-  const color = summary?.negativeFrom ? 'var(--app-danger)' : 'var(--app-success)';
+  const color = summary?.negativeFrom ? 'var(--app-danger)' : 'var(--app-data)';
 
   const action = (
     <SegmentedControl
@@ -151,7 +151,7 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
             <AreaChart data={points} margin={{ top: 6, right: 2, bottom: 0, left: 0 }} accessibilityLayer={false}>
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.22 }} />
+                  <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.14 }} />
                   <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
                 </linearGradient>
               </defs>

@@ -9,13 +9,13 @@ import { invalidateFinancialData } from '@/lib/query-keys';
  */
 export const feeChargeKeys = {
   all: ['fee-charges'] as const,
-  generatePreview: (competence: MonthKey, dueDay: number) => ['fee-charges', 'generate', competence, dueDay] as const,
+  generatePreview: (competence: MonthKey) => ['fee-charges', 'generate', competence] as const,
   employeesPreview: (feeId: string, employees: number) => ['fee-charges', 'employees', feeId, employees] as const,
 };
 
+/** Each fee falls due on its client's `feeDueDay` (client registration). */
 export interface GenerateFeesParams {
   competence: MonthKey;
-  dueDay: number;
 }
 
 const employeesPath = (feeId: string) => `/fee-charges/${encodeURIComponent(feeId)}/employees`;
@@ -29,11 +29,11 @@ function afterWrite(qc: QueryClient) {
 /** What "Gerar honorários" would create for `params` (null while the inputs are invalid). */
 export function useGenerateFeesPreview(params: GenerateFeesParams | null) {
   return useQuery({
-    queryKey: feeChargeKeys.generatePreview(params?.competence ?? '', params?.dueDay ?? 0),
+    queryKey: feeChargeKeys.generatePreview(params?.competence ?? ''),
     queryFn: ({ signal }) =>
       api<GenerateFeesResponse>('/fee-charges/generate', { method: 'POST', body: { ...params!, dryRun: true }, signal }),
     enabled: params !== null,
-    // Changing the competence or the due day keeps the previous plan on screen (dimmed) until the new one arrives.
+    // Changing the competence keeps the previous plan on screen (dimmed) until the new one arrives.
     placeholderData: keepPreviousData,
     staleTime: 0,
     gcTime: 60_000,

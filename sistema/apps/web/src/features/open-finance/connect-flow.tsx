@@ -423,7 +423,7 @@ function LinkAccountsDialog({ connection, initial, onClose }: { connection: Bank
     <Modal
       open
       onOpenChange={(o) => !o && !saving && onClose()}
-      className="flex max-h-[calc(100dvh-2rem)] max-w-2xl flex-col"
+      className="max-w-2xl"
       title="Vincular contas"
       description={`Escolha onde entram os lançamentos de cada conta do ${institution}.`}
       footer={
@@ -437,7 +437,7 @@ function LinkAccountsDialog({ connection, initial, onClose }: { connection: Bank
         </>
       }
     >
-      <div className="-mx-6 max-h-[60dvh] overflow-y-auto px-6">
+      <div>
         {!ready || !rows ? (
           accounts.isError || cards.isError ? (
             <ErrorState error={accounts.error ?? cards.error} onRetry={() => void Promise.all([accounts.refetch(), cards.refetch()])} />

@@ -47,6 +47,9 @@ export const GENERATE_FEES_SKIP_LABELS: Record<GenerateFeesSkipReason, string> =
 /** Income categories used by the fee generation (found by name, created when missing). */
 export const FEE_CATEGORY = { name: 'Serviços Prestados', fee: 'Honorários contábeis', employees: 'Folha de pagamento' } as const;
 
+/** Expense category of the discounts granted for paying by the due date (found by name, created when missing). */
+export const DISCOUNT_CATEGORY = { name: 'Despesas financeiras', discount: 'Descontos concedidos' } as const;
+
 /** Payment risk of a client, from the delinquency score (see utils/delinquency.ts). */
 export const DELINQUENCY_RISKS = ['baixo', 'moderado', 'alto', 'critico'] as const;
 export type DelinquencyRisk = (typeof DELINQUENCY_RISKS)[number];

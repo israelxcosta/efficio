@@ -102,10 +102,12 @@ export const registerSchema = z.object({
     .min(10, { message: 'A senha deve ter ao menos 10 caracteres' })
     .max(128, { message: 'Senha muito longa' })
     .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), { message: 'Use letras e números' }),
+  /** Name of the company (business workspace) created with the account; "Minha empresa" when blank. */
+  companyName: optionalText(60),
   /** LGPD: explicit acceptance of the terms of use and privacy policy. */
   acceptTerms: z.literal(true, { message: 'Aceite os termos de uso e a política de privacidade' }),
 });
-export type RegisterInput = z.infer<typeof registerSchema>;
+export type RegisterInput = z.input<typeof registerSchema>;
 
 export const loginSchema = z.object({
   email: z.email({ message: 'E-mail inválido' }).trim().toLowerCase(),
@@ -318,6 +320,8 @@ export const clientInputSchema = z
       .transform((v) => (v ? v : null)),
     /** The first fee period starts on this date. */
     contractStartDate: requiredDate('Informe a data de início do contrato'),
+    /** Day of the month the fee is due (in the month after the competence); clamped to short months. */
+    feeDueDay: dayOfMonth.default(10),
     ...addressFields,
   })
   .superRefine((v, ctx) => {
@@ -354,6 +358,15 @@ export const clientFeeInputSchema = z.object({
     .int({ message: 'Valor inválido' })
     .min(0, { message: 'Valor inválido' })
     .max(100_000_000_000, { message: 'Valor muito alto' })
+    .default(0),
+  /**
+   * Discount for paying the fee by its due date, in basis points (500 = 5%); 0 = none. Copied into
+   * each fee generated in the period (`Transaction.feeDiscountBps`).
+   */
+  discountBps: z
+    .int({ message: 'Percentual inválido' })
+    .min(0, { message: 'Percentual inválido' })
+    .max(9_999, { message: 'O desconto deve ser menor que 100%' })
     .default(0),
 });
 export type ClientFeeInput = z.input<typeof clientFeeInputSchema>;
@@ -485,13 +498,12 @@ export const transactionUpdateSchema = transactionBaseSchema
 export type TransactionUpdateInput = z.input<typeof transactionUpdateSchema>;
 
 /**
- * "Gerar honorários": one receivable per client for the competence month, due on `dueDay` of the
- * following month (the fee due in November refers to October). Uses the fee period in force at the
- * end of the competence month. `dryRun` only computes what would be created.
+ * "Gerar honorários": one receivable per client for the competence month, due on the client's
+ * `feeDueDay` of the following month (the fee due in November refers to October). Uses the fee
+ * period in force at the end of the competence month. `dryRun` only computes what would be created.
  */
 export const generateFeesSchema = z.object({
   competence: monthKeySchema,
-  dueDay: z.int().min(1).max(31).default(10),
   dryRun: z.boolean().default(false),
 });
 export type GenerateFeesInput = z.input<typeof generateFeesSchema>;
@@ -521,6 +533,11 @@ export const setPaidSchema = z.object({
    */
   interest: lateFeeAmountSchema.optional(),
   fine: lateFeeAmountSchema.optional(),
+  /**
+   * Received by the due date: discount granted (desconto por pontualidade), at most the amount. It
+   * becomes a paid expense linked to this one ("Descontos concedidos"); sending it again replaces it.
+   */
+  discount: lateFeeAmountSchema.optional(),
 });
 export type SetPaidInput = z.infer<typeof setPaidSchema>;
 

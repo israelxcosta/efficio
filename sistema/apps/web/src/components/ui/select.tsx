@@ -195,7 +195,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
                 isGroup(e) ? (
                   <RS.Group key={`g-${e.label}-${i}`}>
                     {i > 0 ? <RS.Separator className="mx-2 my-1.5 h-px bg-border" /> : null}
-                    <RS.Label className="px-3 pt-1.5 pb-1 text-[11px] font-semibold tracking-[0.08em] text-subtle uppercase">
+                    <RS.Label className="px-3 pt-1.5 pb-1 text-xs font-semibold text-subtle">
                       {e.label}
                     </RS.Label>
                     {e.options.map(renderItem)}

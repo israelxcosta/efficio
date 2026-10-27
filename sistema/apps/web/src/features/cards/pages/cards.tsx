@@ -44,7 +44,6 @@ export default function CardsPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Cadastros"
         title="Cartões de crédito"
         description="Limites, faturas e compras parceladas em um só lugar."
         actions={

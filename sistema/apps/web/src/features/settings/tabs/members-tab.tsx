@@ -293,7 +293,7 @@ function InvitesCard() {
           <p className="font-semibold text-fg">Limite de membros do plano atingido ({max})</p>
           <p className="mt-0.5 text-muted">
             {workspace?.kind === 'personal'
-              ? 'O espaço pessoal é individual. Crie um espaço Família ou Empresa para compartilhar.'
+              ? 'Este espaço é individual. Crie uma empresa para compartilhar com a equipe.'
               : upgrade
                 ? `Mude para o plano ${upgrade.name} para convidar até ${upgrade.maxMembers} membros.`
                 : 'Remova um membro ou um convite pendente para convidar outra pessoa.'}

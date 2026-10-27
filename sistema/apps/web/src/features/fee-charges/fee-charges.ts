@@ -1,17 +1,13 @@
 // Pure helpers of "Gerar honorários" and "+ Empregados" (no React, unit tested).
 
 import {
-  addMonthKey,
-  daysInMonth,
   formatBRL,
   formatMonthKey,
-  toISODate,
   type ISODate,
   type MonthKey,
   type Transaction,
 } from '@effinance/shared';
 
-export const DEFAULT_DUE_DAY = 10;
 /** Same bound as `feeEmployeesSchema`. */
 export const MAX_EMPLOYEES = 100_000;
 
@@ -19,16 +15,6 @@ const MONTH_KEY = /^(\d{4})-(0[1-9]|1[0-2])$/;
 
 export function isMonthKey(value: unknown): value is MonthKey {
   return typeof value === 'string' && MONTH_KEY.test(value);
-}
-
-/**
- * Due date of the fee of `competence`: day `dueDay` of the following month (the fee due on 10/11
- * refers to October), clamped to that month's last day (31 → 30/11, 28 or 29 in February).
- */
-export function feeDueDate(competence: MonthKey, dueDay: number): ISODate {
-  const [year, month] = addMonthKey(competence, 1).split('-').map(Number) as [number, number];
-  const day = Math.min(Math.max(Math.trunc(dueDay) || 1, 1), daysInMonth(year, month));
-  return toISODate(year, month, day);
 }
 
 /** "10/2026" — the reference used in descriptions ("Honorários ref. 10/2026 - CLIENTE"). */
@@ -42,12 +28,18 @@ export function competenceLongLabel(competence: MonthKey): string {
   return formatMonthKey(competence, 'long');
 }
 
-/** Due day typed by the user: an integer 1..31, else null. */
-export function parseDueDay(input: string): number | null {
-  const text = input.trim();
-  if (!/^\d{1,2}$/.test(text)) return null;
-  const day = Number(text);
-  return day >= 1 && day <= 31 ? day : null;
+/**
+ * Due dates of a generation (each client has its own due day): "10/11/2026" when they all fall on
+ * one day, else "05/11 a 20/11/2026"; null when there are none.
+ */
+export function dueDatesLabel(dueDates: Iterable<ISODate>): string | null {
+  const sorted = [...new Set(dueDates)].sort();
+  if (sorted.length === 0) return null;
+  const first = sorted[0]!;
+  const last = sorted[sorted.length - 1]!;
+  const br = (d: ISODate) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+  if (first === last) return br(first);
+  return first.slice(0, 4) === last.slice(0, 4) ? `${br(first).slice(0, 5)} a ${br(last)}` : `${br(first)} a ${br(last)}`;
 }
 
 /** Employee count typed by the user: an integer 0..100.000, else null (empty, decimals, negatives). */

@@ -70,7 +70,7 @@ export function DashboardBoard({ month, d, loading, kind, components, alerts }: 
 
   // The wrapper always renders; the sections wait for its width so charts mount once, at the right size.
   return (
-    <div ref={ref} className="flex flex-col gap-6">
+    <div ref={ref} className="flex flex-col gap-8">
       {width === 0 ? null : SECTIONS.map((section) => {
         const items = resolveSection(api.layout, section.id, WIDGET_SPECS, kind);
         if (items.length === 0) return null;
@@ -229,7 +229,7 @@ function DashboardSection({ section, items, cols, api, collapsed, alerts, compon
   };
 
   return (
-    <section aria-labelledby={`${gridId}-titulo`} className="flex flex-col gap-3">
+    <section aria-labelledby={`${gridId}-titulo`} className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -237,7 +237,7 @@ function DashboardSection({ section, items, cols, api, collapsed, alerts, compon
           aria-expanded={!collapsed}
           aria-controls={collapsed ? undefined : gridId}
           onClick={() => api.toggleSection(section.id)}
-          className="flex items-center gap-1.5 rounded-md py-0.5 pr-1.5 text-[15px] font-semibold tracking-tight text-fg hover:text-brand-text"
+          className="flex items-center gap-1.5 rounded-md py-0.5 pr-1.5 text-[17px] font-semibold tracking-tight text-fg hover:text-brand-text"
         >
           <ChevronDown className={cn('size-4 text-muted transition-transform', collapsed && '-rotate-90')} aria-hidden />
           {section.title}
@@ -257,7 +257,7 @@ function DashboardSection({ section, items, cols, api, collapsed, alerts, compon
         <div
           id={gridId}
           data-widget-grid
-          className="grid grid-flow-row-dense gap-3"
+          className="grid grid-flow-row-dense gap-4"
           style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: `${rowPxFor(cols)}px` }}
         >
           {items.map(({ spec, size }) => {

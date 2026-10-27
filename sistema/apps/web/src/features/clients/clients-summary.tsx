@@ -1,19 +1,19 @@
 import { Building2, CalendarClock, HandCoins, UserX } from 'lucide-react';
 import { TAX_REGIMES, TAX_REGIME_LABELS, formatBRL, type ClientListResponse, type TaxRegime } from '@effinance/shared';
-import { SERIES_PALETTE } from '@/components/charts/chart-utils';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTone } from '@/lib/theme';
 import { cn, pluralize } from '@/lib/utils';
 
 /** One hue per tax regime (series palette; lifted in dark mode by useTone). */
+/** One hue per tax regime (the regime band asks for colour; no violet). */
 export const REGIME_COLORS: Record<TaxRegime, string> = {
-  simples_nacional: SERIES_PALETTE[0]!,
-  mei: SERIES_PALETTE[2]!,
-  presumed_profit: SERIES_PALETTE[3]!,
-  real_profit: SERIES_PALETTE[9]!,
-  exempt: SERIES_PALETTE[5]!,
-  other: SERIES_PALETTE[10]!,
+  simples_nacional: '#1E3F8A',
+  mei: '#0EA5E9',
+  presumed_profit: '#14B8A6',
+  real_profit: '#B45309',
+  exempt: '#6B7280',
+  other: '#AEB3BC',
 };
 
 type Summary = ClientListResponse['summary'];

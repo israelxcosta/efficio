@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router';
 import { categoryListHref } from '@/features/transactions/links';
-import { ArrowUpRight, CircleAlert, Lightbulb, Sparkles, Trophy, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   formatBRL,
@@ -22,35 +22,32 @@ import { TransactionRow } from '@/features/transactions/components/transaction-r
 import { INSIGHT_LABELS } from './insight-card';
 import { HealthCard } from './health-card';
 
-const KIND_STYLE: Record<InsightKind, { icon: React.ReactNode; className: string }> = {
-  opportunity: { icon: <TrendingUp />, className: 'bg-primary-soft text-primary-soft-fg' },
-  warning: { icon: <CircleAlert />, className: 'bg-danger-soft text-danger' },
-  achievement: { icon: <Trophy />, className: 'bg-success-soft text-success' },
-  info: { icon: <Lightbulb />, className: 'bg-warning-soft text-warning' },
+/** Kind in words; red only for a warning (the one kind that asks for action). */
+const KIND_TONE: Record<InsightKind, string> = {
+  warning: 'text-danger',
+  opportunity: 'text-muted',
+  achievement: 'text-muted',
+  info: 'text-muted',
 };
 
 export function InsightList({ insights }: { insights: Insight[] }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {insights.map((ins, i) => {
-        const style = KIND_STYLE[ins.kind];
-        return (
-          <div key={i} className="flex gap-3 rounded-lg border border-border bg-surface p-4">
-            <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-md [&_svg]:size-4', style.className)}>{style.icon}</span>
-            <div className="min-w-0 flex-1">
-              <p className="eyebrow text-subtle">{INSIGHT_LABELS[ins.kind]}</p>
-              <p className="mt-0.5 text-sm font-semibold">{ins.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">{ins.description}</p>
-            </div>
-            {ins.href ? (
-              <Link to={ins.href} className="text-subtle hover:text-fg" aria-label="Abrir análise">
-                <ArrowUpRight className="size-4" />
-              </Link>
-            ) : null}
+    <ul className="grid gap-x-6 md:grid-cols-2">
+      {insights.map((ins, i) => (
+        <li key={i} className="flex gap-3 border-t border-border py-3.5 first:border-t-0 md:[&:nth-child(2)]:border-t-0">
+          <div className="min-w-0 flex-1">
+            <p className={cn('text-xs font-medium', KIND_TONE[ins.kind])}>{INSIGHT_LABELS[ins.kind]}</p>
+            <p className="mt-0.5 text-sm font-semibold text-fg">{ins.title}</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">{ins.description}</p>
           </div>
-        );
-      })}
-    </div>
+          {ins.href ? (
+            <Link to={ins.href} className="text-subtle hover:text-fg" aria-label={`Abrir análise: ${ins.title}`}>
+              <ArrowUpRight className="size-4" />
+            </Link>
+          ) : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -73,24 +70,22 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-hero-from via-hero-via to-hero-to p-6 text-white">
-        <div className="pointer-events-none absolute -top-24 -right-10 size-72 rounded-full bg-white/5" aria-hidden />
-        <p className="eyebrow text-white/70">Dashboard inteligente</p>
-        <h2 className="mt-2 max-w-2xl text-[22px] leading-snug font-semibold tracking-tight">
+      <section className="rounded-xl border border-border bg-surface p-6">
+        <h2 className="max-w-3xl text-[20px] leading-snug font-semibold tracking-tight text-fg">
           {o ? (
-            o.savingsRate !== null && o.savingsRate > 0 ? (
-              <>Você economizou <span className="text-hero-accent">{formatPercent(o.savingsRate, 0)}</span> da sua receita neste mês.</>
-            ) : o.income === 0 && o.expense === 0 ? (
-              <>Registre suas movimentações para receber análises personalizadas.</>
+            o.income === 0 && o.expense === 0 ? (
+              'Lance as receitas e despesas do mês para ver as análises.'
+            ) : o.net >= 0 ? (
+              `A margem do mês foi de ${formatPercent(o.savingsRate ?? 0, 1)} das receitas: ${formatBRL(o.net)} de resultado.`
             ) : (
-              <>Neste mês suas despesas superaram as receitas em <span className="text-hero-accent">{formatBRL(Math.abs(o.net))}</span>.</>
+              `As despesas superaram as receitas em ${formatBRL(Math.abs(o.net))} neste mês.`
             )
           ) : (
-            'Analisando suas finanças…'
+            'Analisando os números do mês…'
           )}
         </h2>
-        <p className="mt-2 text-sm text-white/70">Insights automáticos com base nos seus lançamentos, metas e cartões.</p>
-      </div>
+        <p className="mt-2 text-sm text-muted">Análises automáticas dos lançamentos, honorários e contas do mês, pela competência.</p>
+      </section>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Gasto médio diário" value={o ? formatBRL(o.averageDailyExpense) : <Skeleton className="h-8 w-28" />} footerContent={<span>Despesas ÷ dias do mês</span>} />
@@ -101,7 +96,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
 
       <div className="grid gap-4 lg:grid-cols-12">
         <Card className="p-5 lg:col-span-8">
-          <CardHeader title="Insights do mês" subtitle="O que chamou atenção nos seus números" icon={<Sparkles />} />
+          <CardHeader title="Insights do mês" subtitle="O que chamou atenção nos números do mês" />
           <div className="mt-4">
             {loading || overview.isPending ? (
               <SkeletonRows rows={3} />
@@ -138,7 +133,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
           </div>
         </Card>
         <Card className="p-5">
-          <CardHeader title="Formas de pagamento" subtitle="Como você pagou suas despesas" />
+          <CardHeader title="Formas de pagamento" subtitle="Como as despesas foram pagas" />
           <div className="mt-4">
             {overview.isPending ? (
               <Skeleton className="h-40" />
@@ -150,7 +145,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
                   categoryId: m.method ?? `none-${i}`,
                   name: m.label,
                   icon: 'credit-card',
-                  color: ['#152B61', '#3F64BE', '#9AB2E6', '#14B8A6', '#F59E0B', '#E5484D', '#A855F7', '#64748B'][i % 8]!,
+                  color: '',
                   amount: m.amount,
                   share: m.share,
                 }))}

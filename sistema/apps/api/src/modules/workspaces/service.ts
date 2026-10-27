@@ -35,8 +35,9 @@ import type { Access } from './access';
 
 const DAY_MS = 86_400_000;
 export const INVITE_TTL_MS = 7 * DAY_MS;
-export const PERSONAL_WORKSPACE_NAME = 'Pessoal';
-/** Workspaces a user may own (personal included): each is a new trial and a new KMS data key. */
+/** Name of the company created with an account when the sign-up form leaves it blank. */
+export const DEFAULT_COMPANY_NAME = 'Minha empresa';
+/** Workspaces a user may own (the first company included): each is a new trial and a new KMS data key. */
 export const MAX_OWNED_WORKSPACES = 10;
 /** Invite e-mails per workspace per hour (re-inviting replaces the pending invite, so no other cap applies). */
 export const MAX_INVITES_PER_HOUR = 20;
@@ -109,13 +110,12 @@ export async function getMe(db: DbExecutor, userId: string, workspaceId: string)
 
 /**
  * Workspace a session should open: the preferred one if the user is a member, else the last used,
- * else the personal one, else any.
+ * else the oldest one the user owns (any kind), else any.
  */
 export async function resolveWorkspaceFor(db: DbExecutor, userId: string, preferred?: string | null): Promise<string | null> {
   const memberships = await db
-    .select({ workspaceId: workspaceMembers.workspaceId, kind: workspaces.kind, role: workspaceMembers.role })
+    .select({ workspaceId: workspaceMembers.workspaceId, role: workspaceMembers.role })
     .from(workspaceMembers)
-    .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
     .where(eq(workspaceMembers.userId, userId))
     .orderBy(asc(workspaceMembers.createdAt));
   if (memberships.length === 0) return null;
@@ -123,7 +123,7 @@ export async function resolveWorkspaceFor(db: DbExecutor, userId: string, prefer
   if (preferred && ids.has(preferred)) return preferred;
   const [user] = await db.select({ last: users.lastWorkspaceId }).from(users).where(eq(users.id, userId));
   if (user?.last && ids.has(user.last)) return user.last;
-  return (memberships.find((m) => m.kind === 'personal' && m.role === 'owner') ?? memberships[0]!).workspaceId;
+  return (memberships.find((m) => m.role === 'owner') ?? memberships[0]!).workspaceId;
 }
 
 export async function switchWorkspace(db: DbExecutor, userId: string, workspaceId: string): Promise<void> {
@@ -135,16 +135,21 @@ export async function switchWorkspace(db: DbExecutor, userId: string, workspaceI
   await db.update(users).set({ lastWorkspaceId: workspaceId }).where(eq(users.id, userId));
 }
 
+/** Workspaces the user owns (any kind). */
+export async function countOwnedWorkspaces(db: DbExecutor, userId: string): Promise<number> {
+  const [owned] = await db
+    .select({ n: count() })
+    .from(workspaceMembers)
+    .where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.role, 'owner')));
+  return owned?.n ?? 0;
+}
+
 export async function createSharedWorkspace(
   db: DbExecutor,
   userId: string,
   input: { name: string; kind: 'family' | 'business' },
 ): Promise<string> {
-  const [owned] = await db
-    .select({ n: count() })
-    .from(workspaceMembers)
-    .where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.role, 'owner')));
-  if ((owned?.n ?? 0) >= MAX_OWNED_WORKSPACES) {
+  if ((await countOwnedWorkspaces(db, userId)) >= MAX_OWNED_WORKSPACES) {
     throw new ValidationError(
       `Você já é proprietário de ${MAX_OWNED_WORKSPACES} espaços. Exclua um espaço que não usa mais para criar outro.`,
     );

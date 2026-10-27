@@ -16,7 +16,7 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | Método | Rota | Entrada | Resposta |
 | --- | --- | --- | --- |
 | GET | `/api/health` | — | `{ status: 'ok' }` |
-| POST | `/api/auth/register` | `registerSchema` | `AuthResponse` (201) — cria categorias padrão e a conta "Carteira" |
+| POST | `/api/auth/register` | `registerSchema` (`companyName` opcional) | `AuthResponse` (201) — cria a empresa (`business`, "Minha empresa" se em branco) com categorias empresariais e a conta "Caixa" |
 | POST | `/api/auth/login` | `loginSchema` | `AuthResponse` |
 | POST | `/api/auth/logout` | — | 204 |
 | GET | `/api/auth/me` | — | `MeResponse` (usuário + workspace ativo + lista) |
@@ -51,13 +51,13 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | DELETE | `/api/contacts/:id` | — | 204 (lançamentos ficam sem fornecedor; séries deixam de apontar para ele) |
 | GET | `/api/clients` | `clientQuerySchema` (`search`, `status`: `active` \| `inactive` \| `all`, `taxRegime`) | `ClientListResponse` (página + `summary`) |
 | GET | `/api/clients/:id` | — | `Client` |
-| POST | `/api/clients` | `clientInputSchema` | `Client` (201); 409 se o CNPJ já é cliente |
-| PUT | `/api/clients/:id` | `clientInputSchema` | `Client` |
+| POST | `/api/clients` | `clientInputSchema` (inclui `feeDueDay` 1–31, padrão 10) | `Client` (201); 409 se o CNPJ já é cliente |
+| PUT | `/api/clients/:id` | `clientInputSchema` | `Client` (o novo `feeDueDay` vale para os próximos honorários gerados) |
 | DELETE | `/api/clients/:id` | — | 204; **409 se há lançamentos ou séries vinculados** |
 | POST | `/api/clients/:id/inactivate` | `clientInactivationSchema` (`date`, `reason`, `notes`) | `Client`; 409 se já inativo |
 | POST | `/api/clients/:id/reactivate` | — | `Client` |
 | GET | `/api/clients/:id/fees` | — | `ClientFeesResponse` (`current`, `items` mais recente primeiro, `next`) |
-| POST | `/api/clients/:id/fees` | `clientFeeInputSchema` (`amount`, `employeeFee`) | `ClientFee` (201) — próxima vigência |
+| POST | `/api/clients/:id/fees` | `clientFeeInputSchema` (`amount`, `employeeFee`, `discountBps` 0–9999, padrão 0) | `ClientFee` (201) — próxima vigência |
 | PUT | `/api/clients/:id/fees/:feeId` | `clientFeeInputSchema` | `ClientFee` |
 | DELETE | `/api/clients/:id/fees/:feeId` | — | 204; 422 se não for a vigência mais recente |
 | GET | `/api/cnpj/:cnpj` | `cnpjParamsSchema` (14 dígitos válidos) | `CnpjLookupResult`; 404 não encontrado, 502 Receita indisponível, 503 desabilitado |
@@ -65,10 +65,10 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/transactions/:id` | — | `Transaction` |
 | POST | `/api/transactions` | `transactionInputSchema` | `Transaction[]` (201) — todas as ocorrências criadas (e todas as partes, se dividido) |
 | PUT | `/api/transactions/:id?scope=one\|future\|all` | `transactionUpdateSchema` | `Transaction` |
-| PATCH | `/api/transactions/:id/paid` | `setPaidSchema` (`paid`, `paidAt`, `accountId`, `interest`, `fine`) | `Transaction` — juros e multa viram lançamentos vinculados (veja "Juros e multa") |
+| PATCH | `/api/transactions/:id/paid` | `setPaidSchema` (`paid`, `paidAt`, `accountId`, `interest`, `fine`, `discount`) | `Transaction` — juros, multa e desconto viram lançamentos vinculados (veja "Juros e multa" e "Desconto por pontualidade") |
 | DELETE | `/api/transactions/:id?scope=one\|future\|all` | — | 204 |
 | POST | `/api/transactions/:id/anticipate` | `anticipateInstallmentsSchema` | `Transaction[]` — parcelas antecipadas |
-| POST | `/api/fee-charges/generate` | `generateFeesSchema` (`competence`, `dueDay` = 10, `dryRun`) | `GenerateFeesResponse` (201 se criou algo; 200 na simulação ou sem novidades) |
+| POST | `/api/fee-charges/generate` | `generateFeesSchema` (`competence`, `dryRun`) | `GenerateFeesResponse` (201 se criou algo; 200 na simulação ou sem novidades) — cada item com `dueDate` (dia do cliente) e `discountBps` |
 | POST | `/api/fee-charges/:id/employees` | `feeEmployeesSchema` (`employees`, `dryRun`) | `FeeEmployeesResponse`; 422 se não for honorário gerado, sem taxa por empregado ou já recebido |
 | GET | `/api/transfers` | `transferQuerySchema` | `Paginated<Transaction>` |
 | POST | `/api/transfers` | `transferInputSchema` | `Transaction` (201) — `transferKind` derivado (aplicação/resgate) |
@@ -142,6 +142,31 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
   reabra o original ou exclua-o). Excluir o original (qualquer escopo de série) leva os vinculados
   (FK em cascata).
 
+## Desconto por pontualidade
+
+- A vigência do honorário pode oferecer desconto para pagamento até o vencimento
+  (`client_fees.discount_bps`, pontos-base: 500 = 5%; 0 = nenhum). "Gerar honorários" copia o valor
+  para cada honorário gerado (`Transaction.feeDiscountBps`, `null` sem desconto); a cobrança de
+  empregados não tem desconto. Utilitários do contrato: `discountAmount(amount, bps)`,
+  `earnsDiscount(dueDate, paidAt)` e `formatBps(bps)`.
+- Confirmar uma **receita** até o vencimento (`PATCH /transactions/:id/paid` com `paid: true` e
+  `paidAt <= date`) aceita `discount` (centavos, até o valor do lançamento). O desconto vira uma
+  **despesa paga** própria vinculada ao recebível (`discountOf` = o recebível), descrição
+  "Desconto — <descrição>", mesma conta (a do pagamento), contato e forma de pagamento, datada no
+  pagamento, categoria **Despesas financeiras / Descontos concedidos** (procurada pelo nome sem
+  diferenciar maiúsculas e criada quando falta; espaços empresariais já nascem com ela). O recebível
+  expõe o valor em `discount` (`null` sem desconto). Saldo, extrato e relatórios ficam certos sem
+  regra nova: entra o valor cheio e sai o desconto.
+- Enviar `discount` de novo **substitui**; `0` remove. Sem enviar, o desconto acompanha o pagamento
+  como juros/multa: reabrir, re-datar o pagamento para depois do vencimento (ou antecipar o
+  vencimento para antes do pagamento) ou mover para o cartão remove; mudar data de pagamento, conta
+  ou contato acompanha. Um por recebível (índice único parcial).
+- 422 (mensagens em pt-BR): desconto com `paid: false`; em despesa, transferência, compra no cartão
+  ou lançamento de juros/multa ("vale só para contas a receber"); recebimento depois do vencimento;
+  valor maior que o lançamento; junto com juros/multa > 0. A linha de desconto não é reaberta
+  sozinha nem recebe juros/multa/desconto (422 — reabra o original ou exclua-a). Excluir o recebível
+  leva o desconto (FK em cascata).
+
 ## Relatório de inadimplência
 
 `GET /reports/delinquency?months=N` (3–24, padrão 12): período = do dia 1 do mês `hoje − (N−1)`
@@ -175,17 +200,20 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
 
 ## Gerar honorários e "+ Empregados"
 
-- **Competência** `M` (`YYYY-MM`): o honorário de `M` vence no dia `dueDay` (padrão 10, limitado ao
-  fim do mês) de `M+1` — o que vence em 10/11 é de 10/2026. `POST /fee-charges/generate` percorre os
-  clientes por nome de exibição (fantasia, senão razão social) e cria, para cada um, uma receita a
-  receber: valor = `amount` da vigência que contém o **último dia de `M`**; sem conta, boleto,
-  "Honorários ref. MM/AAAA - <cliente>", categoria **Serviços Prestados / Honorários contábeis**,
-  `feeKind: 'fee'`, `feeCompetence: M`.
+- **Competência** `M` (`YYYY-MM`): o honorário de `M` vence no **dia de vencimento do cliente**
+  (`feeDueDay`, padrão 10; dia 31 em mês curto vira o último dia) de `M+1` — o que vence em 10/11 é
+  de 10/2026. `POST /fee-charges/generate` percorre os clientes por nome de exibição (fantasia, senão
+  razão social) e cria, para cada um, uma receita a receber: valor = `amount` da vigência que contém
+  o **último dia de `M`**; sem conta, boleto, "Honorários ref. MM/AAAA - <cliente>", categoria
+  **Serviços Prestados / Honorários contábeis**, `feeKind: 'fee'`, `feeCompetence: M` e
+  `feeDiscountBps` = desconto da vigência (`null` se 0). A resposta não tem mais um `dueDate` geral:
+  cada item de `created` traz `dueDate` e `discountBps`. Mudar o `feeDueDay` do cliente vale para as
+  próximas gerações (os honorários já gerados mantêm a data).
 - Fica de fora, com motivo (`skipped`): `already_generated` (já existe o honorário do cliente em
   `M`), `not_started` (contrato começa depois do fim de `M`), `inactive` (inativado antes do dia 1º
   de `M`; inativado durante `M` ainda é cobrado), `no_current_fee` (sem vigência cadastrada para
   `M`, ex.: reajuste pendente). `dryRun: true` calcula sem gravar nada (nem categorias;
-  `transactionId: null`).
+  `transactionId: null`). Um `dueDay` antigo no corpo é ignorado.
 - Concorrência: as escritas de honorários do espaço são serializadas por um advisory lock da
   transação e o insert usa `ON CONFLICT DO NOTHING` no índice único `(workspace_id, contact_id,
   fee_competence) WHERE fee_kind = 'fee'` — quem perde a corrida volta como `already_generated`.
@@ -212,7 +240,8 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
   razão social, nome fantasia, abertura, CNAE, contatos da empresa e do **responsável** (nome, e-mail
   e telefone cifrados), **regime tributário** (Simples Nacional, MEI, Lucro Presumido, Lucro Real,
   Imune/Isenta, Outro), **anexo do Simples** (I–V, obrigatório só no Simples; descartado nos demais)
-  e **data de início do contrato** (obrigatória).
+  e **data de início do contrato** (obrigatória), e o **dia de vencimento do honorário**
+  (`feeDueDay`, 1–31, padrão 10; no mês seguinte à competência).
 - **Importar da Receita** (`GET /cnpj/:cnpj`): consulta a BrasilAPI (dados públicos da Receita
   Federal) **fora** da transação do banco e devolve os dados normalizados para o formulário — nada é
   gravado. A Receita só informa as opções pelo Simples/MEI; Presumido/Real e o anexo são escolhidos
@@ -226,8 +255,9 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
 - **Exclusão** só sem vínculos: com qualquer lançamento (`transactions.contact_id`) ou série
   (`recurrences.template.contactId`) do cliente a API responde 409 — use a inativação. As vigências
   vão junto com o cliente (FK em cascata).
-- **Honorários** (`client_fees`): uma linha por **vigência de 1 ano**, com honorário mensal e taxa
-  por empregado (centavos). Só o índice da vigência é gravado; as datas derivam do início do
+- **Honorários** (`client_fees`): uma linha por **vigência de 1 ano**, com honorário mensal, taxa
+  por empregado (centavos) e desconto por pontualidade (`discountBps`, pontos-base; veja "Desconto
+  por pontualidade"). Só o índice da vigência é gravado; as datas derivam do início do
   contrato (`feePeriod` no contrato: a 1ª começa no início do contrato, as seguintes emendam ano a
   ano; 29/02 vira 28/02 nos anos não bissextos). Alterar o início do contrato reposiciona todas. "+"
   cria sempre a próxima vigência; só a mais recente pode ser excluída. **Vigente** = a vigência que
@@ -247,9 +277,13 @@ Contrato em `packages/shared/src/saas.ts`.
 ## Modelo de isolamento
 
 - **Workspace = assinante (tenant).** Todo dado financeiro (categorias, contas, cartões, metas e
-  aportes, contatos, séries e lançamentos) pertence a um workspace (`workspace_id`). Um usuário pode
-  participar de vários workspaces (o pessoal, criado no cadastro, e de família/empresa) com papel
-  `owner`, `editor` ou `viewer`.
+  aportes, contatos, séries e lançamentos) pertence a um workspace (`workspace_id`). **Somente
+  empresarial**: o cadastro cria a empresa do usuário (`kind: 'business'`, nome `companyName` ou
+  "Minha empresa", categorias empresariais e a conta "Caixa"), e `POST /workspaces` cria empresas
+  (`kind` padrão `business`; `family` ainda é aceito por compatibilidade). Espaços `personal` e
+  `family` antigos continuam funcionando. Um usuário pode participar de vários workspaces com papel
+  `owner`, `editor` ou `viewer`; a sessão abre no último usado, senão no mais antigo do qual é
+  proprietário.
 - **Row Level Security (PostgreSQL)**: as tabelas de domínio têm `ENABLE` + `FORCE ROW LEVEL
   SECURITY` com a política `workspace_id = current_setting('app.workspace_id')::uuid`. Cada
   requisição autenticada roda numa transação que executa `SET LOCAL ROLE effinance_app` (papel sem
@@ -302,7 +336,7 @@ Contrato em `packages/shared/src/saas.ts`.
 
 | Método | Rota | Entrada | Resposta |
 | --- | --- | --- | --- |
-| POST | `/api/auth/register` | `registerSchema` (com `acceptTerms`) | `AuthResponse` (201) — cria o workspace pessoal em teste |
+| POST | `/api/auth/register` | `registerSchema` (com `acceptTerms`, `companyName` opcional) | `AuthResponse` (201) — cria a empresa do usuário em teste |
 | POST | `/api/auth/login` | `loginSchema` | `AuthResponse` ou `MfaChallengeResponse` |
 | POST | `/api/auth/mfa/verify` | `mfaVerifySchema` | `AuthResponse` |
 | POST | `/api/auth/refresh` | — (cookie) | 204 |
@@ -322,7 +356,7 @@ Contrato em `packages/shared/src/saas.ts`.
 | GET | `/api/workspaces` | — | `WorkspaceSummary[]` |
 | POST | `/api/workspaces` | `workspaceInputSchema` | `WorkspaceSummary` (201, em teste) |
 | PUT | `/api/workspaces/current` | `workspaceUpdateSchema` | `WorkspaceSummary` (owner) |
-| DELETE | `/api/workspaces/current` | `deleteWorkspaceSchema` | 204 (owner; cancela assinatura e destrói a chave) |
+| DELETE | `/api/workspaces/current` | `deleteWorkspaceSchema` | 204 (owner; cancela assinatura e destrói a chave); 422 se for o último espaço do qual é proprietário |
 | GET | `/api/workspaces/current/members` | — | `Member[]` |
 | PATCH | `/api/workspaces/current/members/:userId` | `memberRoleSchema` | `Member` (owner) |
 | DELETE | `/api/workspaces/current/members/:userId` | — | 204 (owner remove; membro pode sair) |
@@ -352,8 +386,11 @@ Contrato em `packages/shared/src/saas.ts`.
 - **Limite de membros**: plano pago → `maxMembers` do plano; em teste → 1 (pessoal), 5 (família),
   15 (empresa). Membros + convites pendentes acima do limite → `422`. Convites pedem assinatura
   com escrita liberada (`402`).
-- **Regras de exclusão**: o espaço pessoal só sai junto com a conta (`422`); o proprietário não pode
-  sair do próprio espaço (`422`); excluir/sair troca a sessão para outro espaço do usuário.
+- **Regras de exclusão**: o último espaço do qual o usuário é proprietário não pode ser excluído
+  (`422` "Mantenha ao menos uma empresa; para sair de vez, exclua sua conta em Privacidade" — ser
+  membro de outra empresa não conta); um espaço pessoal antigo só sai junto com a conta (`422`); o
+  proprietário não pode sair do próprio espaço (`422`); excluir/sair troca a sessão para outro
+  espaço do usuário.
 - **Convite**: `POST /invites/:token/accept` exige o mesmo e-mail do convite (`403` caso contrário),
   vale 7 dias e uso único; o token só existe no link (guardado como SHA-256).
 - **Assinatura**: o checkout grava `pending` (o teste continua valendo até acabar); cancelar mantém
@@ -571,7 +608,7 @@ provider_unavailable` (agregador não respondeu; detalhes só no log do servidor
   cliente com `ON DELETE CASCADE`, único `(client_id, period_index)`, CHECKs de valor e índice).
 - A exportação LGPD inclui os campos de cliente decifrados e `clientFees`.
 
-## Banco (migrações 0008 e 0009)
+## Banco (migrações 0008, 0009 e 0010)
 
 - 0008 (juros e multa): `transactions.late_fee_of` (FK composta `(workspace_id, late_fee_of) →
   transactions(workspace_id, id)` `ON DELETE CASCADE`, índice parcial) e `late_fee_kind` (CHECK
@@ -585,5 +622,13 @@ provider_unavailable` (agregador não respondeu; detalhes só no log do servidor
   `(workspace_id, contact_id, fee_competence) WHERE fee_kind = 'fee'` e `transactions_fee_of_uq`
   `(fee_of) WHERE fee_of IS NOT NULL` (equivale a `fee_kind = 'employees'` pelo CHECK e serve de
   índice da FK). Conflitos viram 409 com mensagem própria (`lib/errors.ts`).
-- As duas são re-executáveis (`IF NOT EXISTS`, `DROP … IF EXISTS` antes de cada constraint) e rodam
+- 0010 (vencimento por cliente e desconto): `contacts.fee_due_day` (CHECK 1–31; adicionada com
+  `DEFAULT 10` e o default removido em seguida, então todo contato existente ficou com 10 por DDL —
+  um `UPDATE` não veria linhas com o RLS forçado para o dono — e os novos fornecedores ficam `null`),
+  `client_fees.discount_bps` (`NOT NULL DEFAULT 0`, CHECK 0–9999), `transactions.fee_discount_bps`
+  (CHECK 1–9999 e só em `fee_kind = 'fee'`; 0 é gravado como `null`) e `transactions.discount_of`
+  (FK composta `(workspace_id, discount_of) → transactions(workspace_id, id)` `ON DELETE CASCADE`,
+  CHECK: só em despesa que não é juros/multa nem honorário gerado; único parcial
+  `transactions_discount_of_uq (discount_of) WHERE discount_of IS NOT NULL`, que também serve à FK).
+- As três são re-executáveis (`IF NOT EXISTS`, `DROP … IF EXISTS` antes de cada constraint) e rodam
   também no demo (PGlite).

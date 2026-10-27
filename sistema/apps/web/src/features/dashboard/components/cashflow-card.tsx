@@ -26,9 +26,6 @@ import {
   LegendDot,
   moneyAxisFormatter,
   MoneyTooltip,
-  StripeDefs,
-  stripeFill,
-  useStripeScope,
 } from '@/components/charts/chart-utils';
 import { yAxisWidth } from '@/components/charts/chart-scale';
 import { useCashflowReport } from '@/features/reports/api';
@@ -115,7 +112,6 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
   const mode = prefs.fluxoModo;
   const navigate = useNavigate();
   const resizing = useWidgetResizing();
-  const scope = useStripeScope();
   const box = useElementSize();
 
   const today = todayISO();
@@ -185,11 +181,11 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
       <>
         <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
           <span className="flex items-center gap-1.5">
-            <LegendDot size="sm" color={CHART_COLORS.income} label="Receitas" striped />
+            <LegendDot size="sm" color={CHART_COLORS.income} label="Receitas" />
             <span className="hidden text-caption font-medium text-fg tabular @md:inline">{formatBRL(totals.receita)}</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <LegendDot size="sm" color={CHART_COLORS.expense} label="Despesas" striped />
+            <LegendDot size="sm" color={CHART_COLORS.expense} label="Despesas" />
             <span className="hidden text-caption font-medium text-fg tabular @md:inline">{formatBRL(totals.despesa)}</span>
           </span>
         </div>
@@ -208,7 +204,6 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
               accessibilityLayer={false}
               onClick={(state) => openPeriod(state.activeTooltipIndex)}
             >
-              <StripeDefs scope={scope} />
               <CartesianGrid vertical={false} stroke="var(--app-chart-grid)" strokeDasharray="4 4" />
               <XAxis
                 dataKey="label"
@@ -223,16 +218,16 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
               <Bar
                 dataKey="receita"
                 name="receita"
-                fill={stripeFill('income', scope)}
-                radius={[8, 8, 8, 8]}
+                fill={CHART_COLORS.income}
+                radius={[4, 4, 0, 0]}
                 maxBarSize={44}
                 isAnimationActive={!resizing}
               />
               <Bar
                 dataKey="despesa"
                 name="despesa"
-                fill={stripeFill('expense', scope)}
-                radius={[8, 8, 8, 8]}
+                fill={CHART_COLORS.expense}
+                radius={[4, 4, 0, 0]}
                 maxBarSize={44}
                 isAnimationActive={!resizing}
               />

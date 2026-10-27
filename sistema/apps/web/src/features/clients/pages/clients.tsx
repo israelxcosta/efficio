@@ -243,7 +243,6 @@ export default function ClientsPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Cadastros"
         title="Clientes"
         description="Empresas atendidas pelo escritório: contrato, regime tributário e honorários."
         actions={
@@ -370,7 +369,7 @@ export default function ClientsPage() {
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[1000px] text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-surface-muted text-left text-[11px] font-semibold tracking-wide text-muted uppercase">
+                  <tr className="border-b border-border text-left text-xs font-medium text-muted">
                     <th className="px-4 py-2.5">Cliente</th>
                     <th className="px-4 py-2.5">CNPJ</th>
                     <th className="px-4 py-2.5">Regime</th>

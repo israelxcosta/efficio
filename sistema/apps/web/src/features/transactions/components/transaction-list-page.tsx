@@ -111,7 +111,6 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline={isExpense ? 'Despesas' : 'Receitas'}
         title={labels.title}
         description={
           isExpense
@@ -231,7 +230,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
       </Card>
 
       <Card className="@container overflow-hidden">
-        <div className="hidden items-center gap-3 border-b border-border bg-surface-muted px-5.5 py-2.5 text-[11px] font-semibold tracking-wide text-muted uppercase @xl:flex">
+        <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
           <span className="w-9">Status</span>
           <span className="flex-1">Descrição</span>
           <span className="hidden w-44 @3xl:block">Conta / Cartão</span>

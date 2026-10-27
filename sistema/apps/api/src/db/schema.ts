@@ -456,6 +456,11 @@ export const contacts = pgTable(
     taxRegime: text().$type<TaxRegime>(),
     simplesAnnex: text().$type<SimplesAnnex>(),
     contractStartDate: calendarDate(),
+    /**
+     * Clients only (migration 0010): day of the month the fee is due, in the month after the
+     * competence (clamped to short months). Contacts that existed before 0010 got 10.
+     */
+    feeDueDay: integer(),
     status: text().$type<ClientStatus>().notNull().default('active'),
     inactivatedAt: calendarDate(),
     inactivationReason: text().$type<InactivationReason>(),
@@ -492,6 +497,7 @@ export const contacts = pgTable(
       'contacts_inactivation_chk',
       sql`(${t.status} = 'inactive') = (${t.inactivatedAt} is not null and ${t.inactivationReason} is not null)`,
     ),
+    check('contacts_fee_due_day_chk', sql`${t.feeDueDay} between 1 and 31`),
   ],
 );
 
@@ -510,6 +516,8 @@ export const clientFees = pgTable(
     amount: money().notNull(),
     /** Taxa por empregado (cents). */
     employeeFee: money().notNull().default(0),
+    /** Discount for paying by the due date, in basis points (500 = 5%; migration 0010). */
+    discountBps: integer().notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -518,6 +526,7 @@ export const clientFees = pgTable(
     uniqueIndex('client_fees_period_uq').on(t.clientId, t.periodIndex),
     check('client_fees_period_chk', sql`${t.periodIndex} >= 0`),
     check('client_fees_amount_chk', sql`${t.amount} > 0 and ${t.employeeFee} >= 0`),
+    check('client_fees_discount_chk', sql`${t.discountBps} between 0 and 9999`),
     foreignKey({
       name: 'client_fees_client_fk',
       columns: [t.workspaceId, t.clientId],
@@ -630,6 +639,14 @@ export const transactions = pgTable(
     /** Employee charge ("+ Empregados"): the generated fee it belongs to (cascade) and the headcount. */
     feeOf: uuid(),
     employees: integer(),
+    /**
+     * Migration 0010. On a generated fee: the discount offered for paying by the due date (basis
+     * points, copied from the fee period; null = none). On a discount row: the receivable settled on
+     * time it was granted on — its own paid expense, removed with it (cascade) and when the payment
+     * is reopened or no longer on time.
+     */
+    feeDiscountBps: integer(),
+    discountOf: uuid(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -750,6 +767,24 @@ export const transactions = pgTable(
       .on(t.workspaceId, t.contactId, t.feeCompetence)
       .where(sql`${t.feeKind} = 'fee'`),
     uniqueIndex('transactions_fee_of_uq').on(t.feeOf).where(sql`${t.feeOf} is not null`),
+    // Migration 0010: discount for paying a fee by its due date.
+    // Only generated fees offer it; 0 is stored as null ("no discount").
+    check(
+      'transactions_fee_discount_chk',
+      sql`${t.feeDiscountBps} is null or (${t.feeDiscountBps} between 1 and 9999 and ${t.feeKind} = 'fee')`,
+    ),
+    foreignKey({
+      name: 'transactions_discount_of_fk',
+      columns: [t.workspaceId, t.discountOf],
+      foreignColumns: [t.workspaceId, t.id],
+    }).onDelete('cascade'),
+    // A discount is a plain expense (never a late fee nor a generated fee).
+    check(
+      'transactions_discount_chk',
+      sql`${t.discountOf} is null or (${t.type} = 'expense' and ${t.lateFeeOf} is null and ${t.feeKind} is null)`,
+    ),
+    // One discount per receivable; also the index the cascade from the receivable uses.
+    uniqueIndex('transactions_discount_of_uq').on(t.discountOf).where(sql`${t.discountOf} is not null`),
   ],
 );
 

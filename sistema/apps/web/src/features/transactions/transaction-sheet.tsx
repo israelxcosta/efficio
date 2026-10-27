@@ -656,7 +656,7 @@ function StatusOption({
       aria-checked={active}
       onClick={onClick}
       className={cn(
-        'flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-semibold transition-all',
+        'flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-semibold transition-colors',
         active
           ? tone === 'success'
             ? 'border-success/30 bg-success-soft text-success'

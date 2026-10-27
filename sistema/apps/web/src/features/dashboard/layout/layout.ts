@@ -5,7 +5,7 @@ import type { WorkspaceKind } from '@effinance/shared';
 import type { DashboardLayout, DashboardPrefs, SectionId, WidgetId, WidgetSize, WidgetSpec } from './types';
 
 /** Global limits: up to 4 columns, 2–7 rows of 86px (7 rows = 674px). */
-export const GRID = { maxCols: 4, minRow: 2, maxRow: 7, gap: 12 } as const;
+export const GRID = { maxCols: 4, minRow: 2, maxRow: 7, gap: 16 } as const;
 
 export const DEFAULT_PREFS: DashboardPrefs = {
   fluxoModo: 'M',
@@ -33,7 +33,7 @@ export function columnsForWidth(width: number): 1 | 2 | 4 {
 }
 
 export function rowPxFor(cols: number): number {
-  return cols === 4 ? 86 : 80;
+  return cols === 4 ? 96 : 88;
 }
 
 /** Pixel height of a widget spanning `rows` rows. */

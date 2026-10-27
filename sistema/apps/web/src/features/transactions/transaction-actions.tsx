@@ -1,9 +1,13 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  DISCOUNT_CATEGORY,
   daysLate,
+  discountAmount,
+  earnsDiscount,
   formatBRL,
+  formatBps,
   formatDateBR,
   formatMonthKey,
   suggestLateFees,
@@ -13,6 +17,7 @@ import {
 } from '@effinance/shared';
 import { ConfirmDialog, Modal } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Field, Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/ui/money-input';
 import { Select } from '@/components/ui/select';
@@ -136,11 +141,18 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
             accountId: extra.accountId ?? undefined,
             interest: extra.interest,
             fine: extra.fine,
+            discount: extra.discount,
           },
         });
-        const label = tx.type === 'income' ? (paid ? 'Recebimento confirmado 👍' : 'Marcado como a receber') : paid ? 'Pagamento confirmado 👍' : 'Marcado como pendente';
+        const label = tx.type === 'income' ? (paid ? 'Recebimento confirmado' : 'Marcado como a receber') : paid ? 'Pagamento confirmado' : 'Marcado como pendente';
         const fees = (extra.interest ?? 0) + (extra.fine ?? 0);
-        toast.success(label, fees > 0 ? { description: `Juros e multa de ${formatBRL(fees)} lançados.` } : undefined);
+        const description =
+          fees > 0
+            ? `Juros e multa de ${formatBRL(fees)} lançados.`
+            : extra.discount
+              ? `Desconto de ${formatBRL(extra.discount)} lançado em ${DISCOUNT_CATEGORY.discount}.`
+              : undefined;
+        toast.success(label, description ? { description } : undefined);
       } catch (error) {
         for (const [key, data] of snapshots) qc.setQueryData(key, data);
         toastError(error);
@@ -158,9 +170,11 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
         toast.info('Compras no cartão são quitadas ao pagar a fatura.');
         return;
       }
-      // No account yet, or settled after the due date (interest and fine may be charged): ask first.
+      // No account yet, settled after the due date (interest and fine may be charged) or a fee with a
+      // discount for paying on time (the discount is confirmed with the amount received): ask first.
       const late = tx.type !== 'transfer' && tx.date < todayISO();
-      if (paid && tx.type !== 'transfer' && (!tx.accountId || late)) {
+      const discount = tx.type === 'income' && Boolean(tx.feeDiscountBps) && !late;
+      if (paid && tx.type !== 'transfer' && (!tx.accountId || late || discount)) {
         setPayTarget(tx);
         return;
       }
@@ -254,9 +268,14 @@ interface PaymentExtra {
   /** Late payment: interest (juros) and fine (multa) in cents. */
   interest?: number;
   fine?: number;
+  /** Received by the due date: discount granted in cents (desconto por pontualidade). */
+  discount?: number;
 }
 
-/** Confirms a payment: the account when the transaction has none, the date and, when late, interest and fine. */
+/**
+ * Confirms a payment: the account when the transaction has none, the date and, when late, interest
+ * and fine; a fee received by its due date gets the client's discount (desconto por pontualidade).
+ */
 function ConfirmPaymentDialog({
   tx,
   onClose,
@@ -271,9 +290,25 @@ function ConfirmPaymentDialog({
   const [paidAt, setPaidAt] = useState(todayISO());
   const [interest, setInterest] = useState(0);
   const [fine, setFine] = useState(0);
+  const [giveDiscount, setGiveDiscount] = useState(true);
+  const [discount, setDiscount] = useState(0);
   const income = tx?.type === 'income';
   const late = tx ? daysLate(tx.date, paidAt) : 0;
-  const total = (tx?.amount ?? 0) + (late > 0 ? interest + fine : 0);
+  const discountBps = income ? (tx?.feeDiscountBps ?? 0) : 0;
+  const discountable = Boolean(tx && discountBps > 0 && earnsDiscount(tx.date, paidAt));
+  const granted = discountable && giveDiscount ? Math.min(discount, tx?.amount ?? 0) : 0;
+  const total = (tx?.amount ?? 0) + (late > 0 ? interest + fine : 0) - granted;
+
+  // Each opening starts clean: today, no late fees and the client's discount suggested.
+  useEffect(() => {
+    if (!tx) return;
+    setAccountId('');
+    setPaidAt(todayISO());
+    setInterest(0);
+    setFine(0);
+    setGiveDiscount(true);
+    setDiscount(discountAmount(tx.amount, tx.type === 'income' ? tx.feeDiscountBps : 0));
+  }, [tx]);
 
   function suggest() {
     if (!tx) return;
@@ -287,12 +322,6 @@ function ConfirmPaymentDialog({
       open={Boolean(tx)}
       onOpenChange={(o) => {
         if (!o) onClose();
-        else {
-          setAccountId('');
-          setPaidAt(todayISO());
-          setInterest(0);
-          setFine(0);
-        }
       }}
       title={income ? 'Confirmar recebimento' : 'Confirmar pagamento'}
       description={tx ? `${tx.description} · ${formatBRL(tx.amount)} · venc. ${formatDateBR(tx.date)}` : undefined}
@@ -307,10 +336,11 @@ function ConfirmPaymentDialog({
                 accountId: tx?.accountId ? undefined : accountId || null,
                 paidAt,
                 ...(late > 0 ? { interest, fine } : {}),
+                ...(discountable ? { discount: granted } : {}),
               })
             }
           >
-            Confirmar 👍
+            Confirmar
           </Button>
         </>
       }
@@ -361,6 +391,33 @@ function ConfirmPaymentDialog({
               </p>
             ) : null}
           </div>
+        ) : null}
+        {discountable ? (
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface-muted p-3">
+            <label className="flex cursor-pointer items-start gap-2.5 text-[13px] text-fg">
+              <Checkbox checked={giveDiscount} onCheckedChange={setGiveDiscount} aria-describedby="discount-hint" />
+              <span>
+                <span className="font-semibold">Conceder desconto de {formatBps(discountBps)}</span>
+                <span id="discount-hint" className="block text-caption text-muted">
+                  Recebido até o vencimento ({formatDateBR(tx!.date)}). O desconto vira uma despesa em {DISCOUNT_CATEGORY.name} ›{' '}
+                  {DISCOUNT_CATEGORY.discount}.
+                </span>
+              </span>
+            </label>
+            {giveDiscount ? (
+              <Field label="Valor do desconto">
+                <MoneyInput value={discount} onChange={setDiscount} />
+              </Field>
+            ) : null}
+            <p className="flex items-center justify-between border-t border-border pt-2 text-[13px]">
+              <span className="text-muted">Valor recebido</span>
+              <span className="tabular font-semibold text-fg">{formatBRL(total)}</span>
+            </p>
+          </div>
+        ) : tx && discountBps > 0 && late > 0 ? (
+          <p className="text-caption text-muted">
+            O desconto de {formatBps(discountBps)} valia só para recebimento até {formatDateBR(tx.date)}.
+          </p>
         ) : null}
       </div>
     </Modal>

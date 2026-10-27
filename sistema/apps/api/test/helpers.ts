@@ -3,6 +3,7 @@ import type { LightMyRequestResponse } from 'fastify';
 import { afterAll } from 'vitest';
 import { buildApp, type App } from '../src/app';
 import { createDb, type Database } from '../src/db/client';
+import { createWorkspace } from '../src/modules/workspaces/service';
 
 let adminConnection: ReturnType<typeof createDb> | null = null;
 
@@ -119,4 +120,15 @@ export async function firstCategory(c: Client, type: 'income' | 'expense', name?
   const cat = name ? list.find((x) => x.name === name) : list[0];
   if (!cat) throw new Error('category not found');
   return cat;
+}
+
+/**
+ * Legacy data: a personal workspace (in trial) like the ones the sign-up created before accounts came
+ * with a company. Switches the client to it (its plans are Individual and Família).
+ */
+export async function legacyPersonalWorkspace(app: App, c: Client): Promise<string> {
+  const workspaceId = await app.db.transaction((tx) => createWorkspace(tx, { name: 'Pessoal', kind: 'personal', ownerId: c.userId }));
+  const switched = await c.post('/auth/switch-workspace', { workspaceId });
+  if (switched.status !== 200) throw new Error(`switch failed: ${JSON.stringify(switched.body)}`);
+  return workspaceId;
 }

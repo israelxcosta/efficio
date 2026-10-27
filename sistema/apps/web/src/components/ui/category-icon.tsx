@@ -7,6 +7,8 @@ interface CategoryIconProps {
   color: string | null | undefined;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  /** Show the category's own colour (category editor and picker); lists use one neutral icon set. */
+  tinted?: boolean;
 }
 
 const SIZES = {
@@ -15,15 +17,15 @@ const SIZES = {
   lg: 'size-12 rounded-lg [&_svg]:size-5',
 } as const;
 
-export function CategoryIcon({ icon, color, size = 'md', className }: CategoryIconProps) {
+export function CategoryIcon({ icon, color, size = 'md', className, tinted = false }: CategoryIconProps) {
   const Icon = getIcon(icon);
   const tone = useTone();
   const c = tone(color ?? '#6B6F76');
   return (
     <span
       aria-hidden
-      className={cn('inline-flex shrink-0 items-center justify-center', SIZES[size], className)}
-      style={{ backgroundColor: alpha(c, 0.12), color: c }}
+      className={cn('inline-flex shrink-0 items-center justify-center', SIZES[size], !tinted && 'bg-bg-subtle text-muted', className)}
+      style={tinted ? { backgroundColor: alpha(c, 0.12), color: c } : undefined}
     >
       <Icon />
     </span>

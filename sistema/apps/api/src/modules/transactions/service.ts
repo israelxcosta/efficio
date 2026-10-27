@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, gt, gte, ilike, inArray, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   buildOccurrenceDates,
+  DISCOUNT_CATEGORY,
+  earnsDiscount,
   LATE_FEE_KIND_LABELS,
   LATE_FEE_KINDS,
   minISO,
@@ -43,6 +45,7 @@ import {
 } from './series';
 import { deleteTransfer } from '../transfers/service';
 import { addTombstones } from '../imports/writer';
+import { ensureCategoryPath } from '../categories/service';
 
 type TransactionQuery = z.output<typeof transactionQuerySchema>;
 type TransactionUpdate = z.output<typeof transactionUpdateSchema>;
@@ -337,6 +340,15 @@ function pickSeriesPatch(input: TransactionUpdate): SeriesPatch {
 /** A late fee is settled with its original; it is never reopened on its own. */
 const LATE_FEE_REOPEN_MESSAGE =
   'Juros e multa acompanham o pagamento do lançamento original: reabra o original ou exclua este lançamento';
+/** Same for the discount granted on a receivable received by its due date. */
+const DISCOUNT_REOPEN_MESSAGE =
+  'O desconto acompanha o recebimento do lançamento original: reabra o original ou exclua este lançamento';
+
+function assertNotReopeningLinked(row: TransactionRow, paid: boolean) {
+  if (paid) return;
+  if (row.lateFeeOf) throw new ValidationError(LATE_FEE_REOPEN_MESSAGE);
+  if (row.discountOf) throw new ValidationError(DISCOUNT_REOPEN_MESSAGE);
+}
 
 export async function updateTransaction(
   db: DbExecutor,
@@ -368,7 +380,7 @@ export async function updateTransaction(
 
   const date = input.date ?? row.date;
   const paid = input.paid ?? row.paid;
-  if (row.lateFeeOf && !paid) throw new ValidationError(LATE_FEE_REOPEN_MESSAGE);
+  assertNotReopeningLinked(row, paid);
   const ownPatch: Partial<NewTransactionRow> = {
     ...pickSeriesPatch(input),
     subcategoryId: merged.subcategoryId,
@@ -380,8 +392,13 @@ export async function updateTransaction(
 
   await db.transaction(async (tx) => {
     await tx.update(transactions).set(ownPatch).where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, row.id)));
-    // Interest and fine follow the payment: gone when reopened or now on time, else moved with it.
-    if (row.paid) await syncLateFees(tx, workspaceId, { ...row, ...ownPatch, creditCardId: merged.creditCardId });
+    // Interest, fine and discount follow the payment: gone when reopened, no longer late (interest and
+    // fine) or no longer on time (discount), else moved with it.
+    if (row.paid) {
+      const settled = { ...row, ...ownPatch, creditCardId: merged.creditCardId, contactId: merged.contactId };
+      await syncLateFees(tx, workspaceId, settled);
+      await syncDiscount(tx, workspaceId, settled);
+    }
     // A generated fee's employee charge ("+ Empregados") keeps its due date and client while open.
     if (row.feeKind === 'fee' && (date !== row.date || merged.contactId !== row.contactId)) {
       await tx
@@ -440,7 +457,7 @@ export async function setPaid(
   if (row.transferKind === 'card_payment') {
     throw new ValidationError('Pagamentos de fatura são gerenciados pela fatura do cartão');
   }
-  if (row.lateFeeOf && !input.paid) throw new ValidationError(LATE_FEE_REOPEN_MESSAGE);
+  assertNotReopeningLinked(row, input.paid);
   const patch: Partial<NewTransactionRow> = input.paid
     ? { paid: true, paidAt: input.paidAt ?? defaultPaidAt(row.date) }
     : { paid: false, paidAt: null };
@@ -453,6 +470,7 @@ export async function setPaid(
     if (row.type !== 'transfer') patch.accountId = input.accountId;
   }
 
+  const discount = discountAmountOf(row, patch, input);
   const fees = lateFeeRows(row, patch, input);
 
   await db.transaction(async (tx) => {
@@ -464,6 +482,13 @@ export async function setPaid(
     } else if (row.paid) {
       // Not sent: reopening removes them; confirming again moves them to the new payment.
       await syncLateFees(tx, workspaceId, { ...row, ...patch });
+    }
+    if (discount !== undefined) {
+      // Sent with the payment: it replaces the previous one (0 removes it).
+      await tx.delete(transactions).where(discountOf(workspaceId, row.id));
+      if (discount > 0) await tx.insert(transactions).values(await discountRow(tx, row, patch, discount));
+    } else if (row.paid) {
+      await syncDiscount(tx, workspaceId, { ...row, ...patch });
     }
   });
   return getTransaction(db, workspaceId, id);
@@ -522,6 +547,7 @@ function lateFeeRows(
     throw new ValidationError('Juros e multa valem só para contas a pagar e a receber');
   }
   if (row.lateFeeOf) throw new ValidationError('Este lançamento já é de juros ou multa');
+  if (row.discountOf) throw new ValidationError('Este lançamento é de desconto concedido');
   const paidAt = patch.paidAt!;
   if (paidAt <= row.date) throw new ValidationError('Juros e multa só valem para pagamento depois do vencimento');
 
@@ -541,6 +567,91 @@ function lateFeeRows(
     lateFeeOf: row.id,
     lateFeeKind: kind,
   }));
+}
+
+/** The discount row granted on a receivable. */
+function discountOf(workspaceId: string, id: string): SQL {
+  return and(eq(transactions.workspaceId, workspaceId), eq(transactions.discountOf, id))!;
+}
+
+/**
+ * Keeps the discount of a receivable in step with its payment: removed when it is reopened, received
+ * after the due date or moved to a card; otherwise dated on the payment, in its account and contact,
+ * and never above the receivable's amount.
+ */
+async function syncDiscount(
+  tx: DbExecutor,
+  workspaceId: string,
+  original: Pick<NewTransactionRow, 'id' | 'amount' | 'date' | 'paid' | 'paidAt' | 'accountId' | 'creditCardId' | 'contactId'>,
+) {
+  const where = discountOf(workspaceId, original.id!);
+  const { paid, paidAt, date } = original;
+  if (!paid || !paidAt || !earnsDiscount(date, paidAt) || original.creditCardId) {
+    await tx.delete(transactions).where(where);
+    return;
+  }
+  await tx
+    .update(transactions)
+    .set({
+      date: paidAt,
+      paidAt,
+      accountId: original.accountId,
+      contactId: original.contactId,
+      amount: sql`least(${transactions.amount}, ${original.amount})`,
+    })
+    .where(where);
+}
+
+/**
+ * Discount sent with a payment (desconto por pontualidade), validated; undefined when not sent. Only
+ * on receivables received by their due date, never together with interest or fine.
+ */
+function discountAmountOf(row: TransactionRow, patch: Partial<NewTransactionRow>, input: SetPaidInput): number | undefined {
+  const amount = input.discount;
+  if (amount === undefined || amount === 0) return amount;
+  if (!input.paid) throw new ValidationError('O desconto só é lançado ao confirmar o recebimento');
+  if (row.type !== 'income' || row.creditCardId || row.lateFeeOf) {
+    throw new ValidationError('O desconto por pontualidade vale só para contas a receber');
+  }
+  if ((input.interest ?? 0) > 0 || (input.fine ?? 0) > 0) {
+    throw new ValidationError('Desconto e juros/multa não podem ser lançados juntos');
+  }
+  if (!earnsDiscount(row.date, patch.paidAt!)) {
+    throw new ValidationError('O desconto só vale para recebimento até o vencimento');
+  }
+  if (amount > row.amount) throw new ValidationError('O desconto não pode ser maior que o valor do lançamento');
+  return amount;
+}
+
+/**
+ * The discount granted as its own paid expense, linked to the receivable ("Despesas financeiras ›
+ * Descontos concedidos", same account and contact, dated on the payment).
+ */
+async function discountRow(
+  tx: DbExecutor,
+  row: TransactionRow,
+  patch: Partial<NewTransactionRow>,
+  amount: number,
+): Promise<NewTransactionRow> {
+  const { categoryId, subcategories } = await ensureCategoryPath(tx, row.workspaceId, 'expense', DISCOUNT_CATEGORY.name, [
+    DISCOUNT_CATEGORY.discount,
+  ]);
+  const paidAt = patch.paidAt!;
+  return {
+    workspaceId: row.workspaceId,
+    type: 'expense',
+    description: `Desconto — ${row.description}`,
+    amount,
+    date: paidAt,
+    paid: true,
+    paidAt,
+    accountId: patch.accountId ?? row.accountId,
+    categoryId,
+    subcategoryId: subcategories[DISCOUNT_CATEGORY.discount],
+    contactId: row.contactId,
+    paymentMethod: row.paymentMethod,
+    discountOf: row.id,
+  };
 }
 
 export async function deleteTransaction(

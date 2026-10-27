@@ -6,6 +6,7 @@ import {
   TRANSFER_KIND_LABELS,
   diffInDays,
   formatBRL,
+  formatBps,
   formatDateBR,
   formatMonthKey,
   todayISO,
@@ -97,7 +98,31 @@ export function FeeBadges({ tx }: { tx: Transaction }) {
           {LATE_FEE_KIND_LABELS[tx.lateFeeKind]}
         </Badge>
       ) : null}
+      {tx.discountOf ? (
+        <Badge tone="neutral" className="shrink-0" title="Desconto concedido por pagamento até o vencimento">
+          Desconto
+        </Badge>
+      ) : null}
+      {/* Open fee with a discount for paying by the due date. */}
+      {tx.feeDiscountBps && !tx.paid ? (
+        <Badge tone="neutral" className="hidden shrink-0 @md:inline-flex" title={`Desconto de ${formatBps(tx.feeDiscountBps)} se pago até ${formatDateBR(tx.date)}`}>
+          {formatBps(tx.feeDiscountBps)} até o venc.
+        </Badge>
+      ) : null}
     </>
+  );
+}
+
+/** "− desconto R$ X" on a fee received by its due date with the client's discount. */
+export function DiscountBadge({ tx }: { tx: Transaction }) {
+  if (!tx.discount) return null;
+  return (
+    <Badge tone="neutral" className="shrink-0" title="Desconto concedido por pagamento até o vencimento">
+      <span className="@md:hidden" aria-hidden>
+        − {formatBRL(tx.discount)}
+      </span>
+      <span className="sr-only @md:not-sr-only">− desconto {formatBRL(tx.discount)}</span>
+    </Badge>
   );
 }
 
@@ -234,6 +259,7 @@ export function TransactionRow({ tx, amount, trailing, showDue = true, muted }: 
             {tx.type === 'transfer' && tx.transferKind ? <Badge tone="brand">{TRANSFER_KIND_LABELS[tx.transferKind]}</Badge> : null}
             <FeeBadges tx={tx} />
             <LateFeesBadge tx={tx} />
+            <DiscountBadge tx={tx} />
             <OriginBadge tx={tx} />
           </span>
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">

@@ -43,7 +43,6 @@ export default function CategoriesPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Cadastros"
         title="Categorias"
         description="Classifique receitas e despesas com ícones, cores e subcategorias."
         actions={
@@ -92,7 +91,7 @@ export default function CategoriesPage() {
           {categories.data.map((c) => (
             <Card key={c.id} className={cn('flex flex-col gap-4 p-5', c.archived && 'opacity-60')}>
               <div className="flex items-start gap-3">
-                <CategoryIcon icon={c.icon} color={c.color} size="lg" />
+                <CategoryIcon tinted icon={c.icon} color={c.color} size="lg" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] font-semibold">{c.name}</p>
                   <p className="text-xs text-muted">
@@ -124,7 +123,7 @@ export default function CategoriesPage() {
                     style={{ backgroundColor: alpha(tone(s.color), 0.1), borderColor: alpha(tone(s.color), 0.25), color: tone(s.color) }}
                     title="Editar subcategoria"
                   >
-                    <CategoryIcon icon={s.icon} color={s.color} className="!size-4 !bg-transparent [&_svg]:!size-3.5" />
+                    <CategoryIcon tinted icon={s.icon} color={s.color} className="!size-4 !bg-transparent [&_svg]:!size-3.5" />
                     {s.name}
                   </button>
                 ))}

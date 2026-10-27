@@ -25,15 +25,14 @@ interface PageHeaderProps {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
-  overline?: string;
   className?: string;
 }
 
-export function PageHeader({ title, description, actions, overline, className }: PageHeaderProps) {
+/** Page title (h1) with one plain line about the data under it; no label above the title. */
+export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
   return (
     <div className={cn('flex flex-wrap items-end justify-between gap-4', className)}>
       <div className="min-w-0">
-        {overline ? <p className="eyebrow mb-1.5 text-brand-text">{overline}</p> : null}
         <h1 className="text-[22px] font-semibold tracking-tight text-fg">{title}</h1>
         {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
       </div>
@@ -53,7 +52,7 @@ interface MoneyProps {
 }
 
 export function Money({ value, signed, tone, showPlus, className }: MoneyProps) {
-  const resolved = tone ?? (signed ? (value > 0 ? 'income' : value < 0 ? 'expense' : 'neutral') : 'neutral');
+  const resolved = tone ?? (signed ? (value > 0 ? 'income' : value < 0 ? 'expense' : 'muted') : 'neutral');
   return (
     <span
       className={cn(
@@ -91,20 +90,19 @@ export function StatPill({ label, value, tone = 'neutral', className }: { label:
 
 export function MiniStat({ label, value, tone, hint, className }: { label: string; value: ReactNode; tone?: 'success' | 'danger' | 'warning' | 'brand'; hint?: ReactNode; className?: string }) {
   return (
-    <div className={cn('rounded-lg border border-border bg-surface px-4 py-3 shadow-xs', className)}>
+    <div className={cn('rounded-lg border border-border bg-surface px-4 py-3', className)}>
       <p className="text-xs font-medium text-muted">{label}</p>
+      {/* Figures stay in ink; colour only flags a problem (a negative result, an overdue total). */}
       <p
         className={cn(
-          'tabular mt-1 text-lg font-semibold tracking-tight',
-          tone === 'success' && 'text-success',
+          'tabular mt-1 text-lg font-semibold tracking-tight text-fg',
           tone === 'danger' && 'text-danger',
           tone === 'warning' && 'text-warning',
-          tone === 'brand' && 'text-brand-text',
         )}
       >
         {value}
       </p>
-      {hint ? <p className="mt-0.5 text-[11px] text-subtle">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-subtle">{hint}</p> : null}
     </div>
   );
 }

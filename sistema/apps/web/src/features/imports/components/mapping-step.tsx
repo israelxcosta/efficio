@@ -179,7 +179,7 @@ export function MappingStep({ content, mapping, onChange, apiColumns, live }: Ma
           <div className={cn('overflow-x-auto', live.loading && 'opacity-60')}>
             <table className="w-full text-[13px]">
               <thead>
-                <tr className="text-left text-[11px] font-semibold tracking-wide text-muted uppercase">
+                <tr className="text-left text-xs font-medium text-muted">
                   <th scope="col" className="w-28 px-4 py-2 font-semibold">Data</th>
                   <th scope="col" className="px-2 py-2 font-semibold">Descrição</th>
                   <th scope="col" className="px-4 py-2 text-right font-semibold">Valor</th>

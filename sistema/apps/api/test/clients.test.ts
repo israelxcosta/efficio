@@ -67,6 +67,7 @@ describe('clients', () => {
       taxRegime: 'simples_nacional',
       simplesAnnex: 'I',
       contractStartDate: '2024-03-15',
+      feeDueDay: 10, // default
       status: 'active',
       inactivation: null,
       currentFee: null,
@@ -83,6 +84,25 @@ describe('clients', () => {
     const updated = await c.put(`/clients/${res.body.id}`, { ...PADARIA, taxRegime: 'presumed_profit', simplesAnnex: 'III' });
     expect(updated.status).toBe(200);
     expect(updated.body).toMatchObject({ taxRegime: 'presumed_profit', simplesAnnex: null });
+  });
+
+  it('keeps the fee due day of each client (1 to 31)', async () => {
+    const res = await c.post('/clients', { ...PADARIA, feeDueDay: 31 });
+    expect(res.status).toBe(201);
+    expect(res.body.feeDueDay).toBe(31);
+    expect((await c.get(`/clients/${res.body.id}`)).body.feeDueDay).toBe(31);
+    const updated = await c.put(`/clients/${res.body.id}`, { ...PADARIA, feeDueDay: 5 });
+    expect(updated.body.feeDueDay).toBe(5);
+    expect((await c.get('/clients')).body.items[0].feeDueDay).toBe(5);
+    for (const feeDueDay of [0, 32, 2.5, '5', null]) {
+      expect((await c.put(`/clients/${res.body.id}`, { ...PADARIA, feeDueDay })).status, String(feeDueDay)).toBe(400);
+    }
+    // Suppliers have no due day.
+    const [row] = await admin().select({ feeDueDay: contacts.feeDueDay }).from(contacts).where(eq(contacts.id, res.body.id));
+    expect(row!.feeDueDay).toBe(5);
+    const supplier = await c.post('/contacts', { name: 'Papelaria Central' });
+    const [plain] = await admin().select({ feeDueDay: contacts.feeDueDay }).from(contacts).where(eq(contacts.id, supplier.body.id));
+    expect(plain!.feeDueDay).toBeNull();
   });
 
   it('stores the CNPJ and the responsible person encrypted', async () => {
@@ -248,7 +268,7 @@ describe('fees', () => {
 
     const first = await c.post(`/clients/${id}/fees`, { amount: 75000, employeeFee: 3000 });
     expect(first.status).toBe(201);
-    expect(first.body).toMatchObject({ index: 0, startDate: '2024-03-15', endDate: '2025-03-14', amount: 75000, employeeFee: 3000 });
+    expect(first.body).toMatchObject({ index: 0, startDate: '2024-03-15', endDate: '2025-03-14', amount: 75000, employeeFee: 3000, discountBps: 0 });
     await c.post(`/clients/${id}/fees`, { amount: 80000, employeeFee: 3500 });
     const third = await c.post(`/clients/${id}/fees`, { amount: 85000 });
     expect(third.body).toMatchObject({ index: 2, startDate: '2026-03-15', endDate: '2027-03-14', employeeFee: 0 });
@@ -347,6 +367,30 @@ describe('fees', () => {
     const { id } = await createClient();
     expect((await c.post(`/clients/${id}/fees`, { amount: 0 })).status).toBe(400);
     expect((await c.post(`/clients/${id}/fees`, { amount: 1000, employeeFee: -1 })).status).toBe(400);
+    for (const discountBps of [-1, 10000, 2.5, '500']) {
+      expect((await c.post(`/clients/${id}/fees`, { amount: 1000, discountBps })).status, String(discountBps)).toBe(400);
+    }
+  });
+
+  it('keeps the discount for paying on time of each period', async () => {
+    const { id } = await createClient();
+    const first = await c.post(`/clients/${id}/fees`, { amount: 75000, discountBps: 500 });
+    expect(first.body).toMatchObject({ index: 0, discountBps: 500 });
+    const second = await c.post(`/clients/${id}/fees`, { amount: 80000 });
+    expect(second.body.discountBps).toBe(0);
+    const third = await c.post(`/clients/${id}/fees`, { amount: 85000, employeeFee: 4000, discountBps: 250 });
+    expect((await c.get(`/clients/${id}`)).body.currentFee).toMatchObject({ index: 2, amount: 85000, discountBps: 250 });
+
+    // Edited with the period; leaving it out sets it back to none.
+    const edited = await c.put(`/clients/${id}/fees/${third.body.id}`, { amount: 85000, employeeFee: 4000, discountBps: 9999 });
+    expect(edited.body.discountBps).toBe(9999);
+    const cleared = await c.put(`/clients/${id}/fees/${first.body.id}`, { amount: 75000 });
+    expect(cleared.body.discountBps).toBe(0);
+    expect((await c.get(`/clients/${id}/fees`)).body.items.map((f: any) => [f.index, f.discountBps])).toEqual([
+      [2, 9999],
+      [1, 0],
+      [0, 0],
+    ]);
   });
 });
 

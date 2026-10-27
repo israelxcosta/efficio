@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 import { CalendarRange, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   formatBRL,
+  formatBps,
   formatDateBR,
   todayISO,
   type Client,
@@ -11,8 +12,9 @@ import {
 } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog, Modal } from '@/components/ui/dialog';
-import { Field } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import { ErrorState } from '@/components/ui/misc';
 import { MoneyInput } from '@/components/ui/money-input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +22,7 @@ import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
 import { useClientFees, useSaveFee } from './api';
+import { bpsToPercentInput, parsePercentToBps } from './discount';
 
 type Editing = { period: FeePeriod; fee: ClientFee | null } | null;
 
@@ -43,7 +46,11 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
   const [editing, setEditing] = useState<Editing>(null);
   const [amount, setAmount] = useState(0);
   const [employeeFee, setEmployeeFee] = useState(0);
+  const [hasDiscount, setHasDiscount] = useState(false);
+  const [discountInput, setDiscountInput] = useState('');
   const [toDelete, setToDelete] = useState<ClientFee | null>(null);
+  const discountId = useId();
+  const discountBps = hasDiscount ? parsePercentToBps(discountInput) : 0;
   const today = todayISO();
 
   useEffect(() => {
@@ -60,13 +67,20 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
     // Readjustments usually start from the previous values.
     setAmount(latest?.amount ?? 0);
     setEmployeeFee(latest?.employeeFee ?? 0);
+    setDiscountFields(latest?.discountBps ?? 0);
     setEditing({ period: data.next, fee: null });
   }
 
   function startEdit(fee: ClientFee) {
     setAmount(fee.amount);
     setEmployeeFee(fee.employeeFee);
+    setDiscountFields(fee.discountBps);
     setEditing({ period: fee, fee });
+  }
+
+  function setDiscountFields(bps: number) {
+    setHasDiscount(bps > 0);
+    setDiscountInput(bpsToPercentInput(bps));
   }
 
   async function submit() {
@@ -75,11 +89,15 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
       toast.error('Informe o valor do honorário mensal');
       return;
     }
+    if (discountBps === null) {
+      toast.error('Informe o percentual do desconto (maior que 0 e menor que 100%)');
+      return;
+    }
     try {
       await save.mutateAsync({
         clientId: client.id,
         feeId: editing.fee?.id,
-        input: { amount, employeeFee },
+        input: { amount, employeeFee, discountBps },
       });
       toast.success(editing.fee ? 'Vigência atualizada' : 'Nova vigência cadastrada');
       setEditing(null);
@@ -125,6 +143,16 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
                   <span className="tabular font-semibold text-fg">
                     {formatBRL(current.employeeFee)}
                   </span>
+                </p>
+                <p className="mt-0.5 text-sm text-muted">
+                  {current.discountBps > 0 ? (
+                    <>
+                      Desconto de <span className="tabular font-semibold text-fg">{formatBps(current.discountBps)}</span> para
+                      pagamento até o vencimento
+                    </>
+                  ) : (
+                    'Sem desconto por pontualidade'
+                  )}
                 </p>
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
                   <CalendarRange className="size-3.5" /> {ordinal(current.index)}:{' '}
@@ -174,6 +202,42 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
                   <MoneyInput value={employeeFee} onChange={setEmployeeFee} />
                 </Field>
               </div>
+              <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
+                <label htmlFor={`${discountId}-check`} className="flex cursor-pointer items-start gap-2.5 pt-1 text-sm text-fg sm:pt-7">
+                  <Checkbox
+                    id={`${discountId}-check`}
+                    checked={hasDiscount}
+                    onCheckedChange={(checked) => {
+                      setHasDiscount(checked);
+                      if (checked && !discountInput) setDiscountInput('5');
+                    }}
+                  />
+                  <span>
+                    Cliente tem desconto
+                    <span className="block text-xs text-muted">Para pagamento até o vencimento</span>
+                  </span>
+                </label>
+                <Field
+                  label="Percentual do desconto"
+                  error={hasDiscount && discountBps === null ? 'Informe um percentual maior que 0 e menor que 100' : undefined}
+                  hint={hasDiscount && discountBps ? `${formatBRL(Math.round((amount * discountBps) / 10_000))} a menos no honorário pago em dia` : undefined}
+                >
+                  <div className="relative">
+                    <Input
+                      inputMode="decimal"
+                      placeholder="0"
+                      disabled={!hasDiscount}
+                      value={discountInput}
+                      onChange={(e) => setDiscountInput(e.target.value)}
+                      className="tabular pr-8"
+                      aria-label="Percentual do desconto"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted" aria-hidden>
+                      %
+                    </span>
+                  </div>
+                </Field>
+              </div>
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>
                   Cancelar
@@ -215,6 +279,7 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
                       </p>
                       <p className="tabular text-[11px] text-muted">
                         {formatBRL(fee.employeeFee)} / empregado
+                        {fee.discountBps > 0 ? ` · ${formatBps(fee.discountBps)} desc.` : ''}
                       </p>
                     </div>
                     {canWrite ? (

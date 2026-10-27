@@ -7,6 +7,7 @@ import {
   GENERATE_FEES_SKIP_LABELS,
   addMonthKey,
   formatBRL,
+  formatBps,
   formatDateBR,
   monthKey,
   type GenerateFeesResponse,
@@ -17,61 +18,60 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, Input } from '@/components/ui/input';
 import { ErrorState } from '@/components/ui/misc';
 import { Skeleton } from '@/components/ui/skeleton';
 import { setActiveMonth, useActiveMonth } from '@/lib/active-month';
 import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { useGenerateFees, useGenerateFeesPreview, type GenerateFeesParams } from './api';
-import { DEFAULT_DUE_DAY, competenceLabel, competenceLongLabel, feeDueDate, parseDueDay, plural } from './fee-charges';
+import { competenceLabel, competenceLongLabel, dueDatesLabel, plural } from './fee-charges';
 import { useDebounced } from './use-debounced';
 
 interface GenerateFeesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Competence to start on; the month active on the dashboard when omitted. */
+  competence?: MonthKey;
 }
 
 /**
  * "Gerar honorários": one receivable per client for a competence month, previewed with a dry run
  * before anything is created. Opens on the month active on the dashboard.
  */
-export function GenerateFeesDialog({ open, onOpenChange }: GenerateFeesDialogProps) {
+export function GenerateFeesDialog({ open, onOpenChange, competence }: GenerateFeesDialogProps) {
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
       title="Gerar honorários"
       description="Um lançamento a receber por cliente, com o honorário vigente na competência."
-      className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto"
+      className="max-w-lg"
     >
       {/* Mounted per opening, so it starts again from the active month and a fresh preview. */}
-      {open ? <GenerateFeesForm onClose={() => onOpenChange(false)} /> : null}
+      {open ? <GenerateFeesForm initialCompetence={competence} onClose={() => onOpenChange(false)} /> : null}
     </Modal>
   );
 }
 
-function GenerateFeesForm({ onClose }: { onClose: () => void }) {
+function GenerateFeesForm({ initialCompetence, onClose }: { initialCompetence?: MonthKey; onClose: () => void }) {
   const navigate = useNavigate();
   const [activeMonth] = useActiveMonth();
-  const [competence, setCompetence] = useState<MonthKey>(activeMonth);
-  const [dueDayInput, setDueDayInput] = useState(String(DEFAULT_DUE_DAY));
-  const dueDay = parseDueDay(dueDayInput);
+  const [competence, setCompetence] = useState<MonthKey>(initialCompetence ?? activeMonth);
 
-  const params = useMemo<GenerateFeesParams | null>(() => (dueDay === null ? null : { competence, dueDay }), [competence, dueDay]);
+  const params = useMemo<GenerateFeesParams>(() => ({ competence }), [competence]);
   const debounced = useDebounced(params, 350);
   const preview = useGenerateFeesPreview(debounced);
   const generate = useGenerateFees();
 
   // The plan on screen matches the inputs: not waiting for the debounce, nor a placeholder of other inputs.
-  const settled = params !== null && debounced?.competence === params.competence && debounced.dueDay === params.dueDay;
+  const settled = debounced?.competence === params.competence;
   const current = settled && preview.isSuccess && !preview.isPlaceholderData && !preview.isFetching;
   const plan = preview.data;
   const count = plan?.created.length ?? 0;
-  const dueDate = dueDay === null ? null : (current && plan ? plan.dueDate : feeDueDate(competence, dueDay));
+  const dueDates = current && plan ? dueDatesLabel(plan.created.map((c) => c.dueDate)) : null;
 
   async function confirm() {
-    if (!params || !current || count === 0) return;
+    if (!current || count === 0) return;
     try {
       const result = await generate.mutateAsync(params);
       const created = result.created.length;
@@ -80,9 +80,9 @@ function GenerateFeesForm({ onClose }: { onClose: () => void }) {
           description: `Os clientes de ${competenceLabel(result.competence)} já tinham honorário lançado.`,
         });
       } else {
-        const dueMonth = monthKey(result.dueDate);
+        const dueMonth = monthKey(result.created[0]!.dueDate);
         toast.success(created === 1 ? '1 honorário gerado' : `${created} honorários gerados`, {
-          description: `Ref. ${competenceLabel(result.competence)} · vencimento ${formatDateBR(result.dueDate)} · ${formatBRL(result.total)}`,
+          description: `Ref. ${competenceLabel(result.competence)} · vencimento ${dueDatesLabel(result.created.map((c) => c.dueDate))} · ${formatBRL(result.total)}`,
           // The fees fall due in the following month: offer to jump there to see them (and add employees).
           action:
             dueMonth !== activeMonth
@@ -111,36 +111,22 @@ function GenerateFeesForm({ onClose }: { onClose: () => void }) {
         void confirm();
       }}
     >
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8.5rem]">
-        <CompetenceField value={competence} activeMonth={activeMonth} onChange={setCompetence} />
-        <Field label="Dia do vencimento" error={dueDay === null ? 'Informe um dia de 1 a 31' : undefined}>
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={31}
-            step={1}
-            value={dueDayInput}
-            onChange={(e) => setDueDayInput(e.target.value)}
-            className="tabular"
-          />
-        </Field>
-      </div>
+      <CompetenceField value={competence} activeMonth={activeMonth} onChange={setCompetence} />
 
-      <div className="flex items-start gap-2.5 rounded-md bg-primary-soft px-3 py-2.5 text-[13px] text-primary-soft-fg" aria-live="polite">
-        <CalendarClock className="mt-px size-4 shrink-0" aria-hidden />
+      <div className="flex items-start gap-2.5 rounded-md bg-surface-muted px-3 py-2.5 text-[13px] text-fg" aria-live="polite">
+        <CalendarClock className="mt-px size-4 shrink-0 text-muted" aria-hidden />
         <p>
           <span className="font-semibold">
-            Vencimento: <span className="tabular">{dueDate ? formatDateBR(dueDate) : '—'}</span>
+            Vencimento: <span className="tabular">{dueDates ?? '—'}</span>
           </span>
-          <span className="block text-caption opacity-80">
-            Lançados como “Honorários ref. {competenceLabel(competence)} - Cliente” em {FEE_CATEGORY.name} › {FEE_CATEGORY.fee}.
+          <span className="block text-caption text-muted">
+            Cada honorário vence no dia cadastrado no cliente. Lançados como “Honorários ref. {competenceLabel(competence)} - Cliente” em{' '}
+            {FEE_CATEGORY.name} › {FEE_CATEGORY.fee}.
           </span>
         </p>
       </div>
 
       <PreviewSection
-        params={params}
         preview={preview}
         dimmed={!settled || preview.isPlaceholderData || (preview.isFetching && !preview.isPending)}
         competence={competence}
@@ -196,18 +182,14 @@ function CompetenceField({ value, activeMonth, onChange }: { value: MonthKey; ac
 }
 
 interface PreviewSectionProps {
-  params: GenerateFeesParams | null;
   preview: ReturnType<typeof useGenerateFeesPreview>;
   dimmed: boolean;
   competence: MonthKey;
 }
 
-function PreviewSection({ params, preview, dimmed, competence }: PreviewSectionProps) {
+function PreviewSection({ preview, dimmed, competence }: PreviewSectionProps) {
   if (!preview.data) {
     if (preview.isError) return <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />;
-    if (!params && !preview.isFetching) {
-      return <p className="rounded-lg border border-dashed border-border-strong/80 px-4 py-6 text-center text-xs text-muted">Informe o dia do vencimento para ver os clientes.</p>;
-    }
     return <PreviewSkeleton />;
   }
   if (preview.isError && !preview.isPlaceholderData) {
@@ -223,12 +205,18 @@ function PreviewSection({ params, preview, dimmed, competence }: PreviewSectionP
             <h3 className="text-[13px] font-semibold text-fg">
               A gerar <span className="font-medium text-muted">· {plan.created.length}</span>
             </h3>
-            <span className="tabular text-[13px] font-semibold text-success">{formatBRL(plan.total)}</span>
+            <span className="tabular text-[13px] font-semibold text-fg">{formatBRL(plan.total)}</span>
           </div>
-          <ul className="max-h-[min(15rem,34dvh)] divide-y divide-border overflow-y-auto rounded-lg border border-border" aria-label="Clientes a cobrar">
+          <ul className="max-h-[min(16rem,36dvh)] divide-y divide-border overflow-y-auto rounded-lg border border-border" aria-label="Clientes a cobrar">
             {plan.created.map((c) => (
               <li key={c.clientId} className="flex items-center justify-between gap-3 px-3 py-2 text-[13px]">
-                <span className="min-w-0 truncate text-fg">{c.name}</span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-fg">{c.name}</span>
+                  <span className="text-caption text-muted">
+                    vence <span className="tabular">{formatDateBR(c.dueDate)}</span>
+                    {c.discountBps > 0 ? ` · ${formatBps(c.discountBps)} de desconto até o vencimento` : null}
+                  </span>
+                </span>
                 <span className="tabular shrink-0 font-medium text-fg">{formatBRL(c.amount)}</span>
               </li>
             ))}

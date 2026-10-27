@@ -39,7 +39,7 @@ describe('categories', () => {
   });
 
   it('blocks deleting categories in use and supports archiving', async () => {
-    const cat = await firstCategory(c, 'expense', 'Moradia');
+    const cat = await firstCategory(c, 'expense', 'Ocupação');
     const sub = cat.subcategories[0]!;
     const tx = await c.post('/transactions', {
       type: 'expense',
@@ -53,7 +53,7 @@ describe('categories', () => {
     expect((await c.del(`/categories/${cat.id}`)).status).toBe(409);
     expect((await c.del(`/categories/${sub.id}`)).status).toBe(409);
 
-    const archived = await c.put(`/categories/${cat.id}`, { name: 'Moradia', archived: true });
+    const archived = await c.put(`/categories/${cat.id}`, { name: 'Ocupação', archived: true });
     expect(archived.body.archived).toBe(true);
     const visible = await c.get('/categories?type=expense');
     expect(visible.body.find((x: any) => x.id === cat.id)).toBeUndefined();
@@ -66,8 +66,8 @@ describe('categories', () => {
 
   it('rejects a category of the wrong type or a foreign subcategory', async () => {
     const income = await firstCategory(c, 'income');
-    const expense = await firstCategory(c, 'expense', 'Moradia');
-    const other = await firstCategory(c, 'expense', 'Alimentação');
+    const expense = await firstCategory(c, 'expense', 'Ocupação');
+    const other = await firstCategory(c, 'expense', 'Pessoal');
     const wrongType = await c.post('/transactions', {
       type: 'expense',
       description: 'x',

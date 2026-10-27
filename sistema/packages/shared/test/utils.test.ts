@@ -5,6 +5,9 @@ import {
   delinquencyScore,
   riskOf,
   suggestLateFees,
+  discountAmount,
+  earnsDiscount,
+  formatBps,
   enumeratePeriods,
   getInvoiceForPurchase,
   isValidCPF,
@@ -108,6 +111,28 @@ describe('late fees', () => {
     expect(suggestLateFees(35000, '2026-01-15', '2026-02-14')).toEqual({ fine: 700, interest: 350, days: 30 });
     expect(suggestLateFees(37800, '2026-01-15', '2026-01-25')).toEqual({ fine: 756, interest: 126, days: 10 });
     expect(suggestLateFees(35000, '2026-01-15', '2026-01-15')).toEqual({ fine: 0, interest: 0, days: 0 });
+  });
+});
+
+describe('discount for paying on time', () => {
+  it('computes basis points of an amount, rounded to the cent', () => {
+    expect(discountAmount(78000, 200)).toBe(1560);
+    expect(discountAmount(240000, 500)).toBe(12000);
+    expect(discountAmount(12345, 250)).toBe(309); // 308.625
+    expect(discountAmount(78000, 0)).toBe(0);
+    expect(discountAmount(78000, null)).toBe(0);
+  });
+
+  it('is earned up to the due date', () => {
+    expect(earnsDiscount('2026-11-10', '2026-11-09')).toBe(true);
+    expect(earnsDiscount('2026-11-10', '2026-11-10')).toBe(true);
+    expect(earnsDiscount('2026-11-10', '2026-11-11')).toBe(false);
+  });
+
+  it('formats basis points as a percentage', () => {
+    expect(formatBps(500)).toBe('5%');
+    expect(formatBps(250)).toBe('2,5%');
+    expect(formatBps(1)).toBe('0,01%');
   });
 });
 

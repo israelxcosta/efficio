@@ -201,6 +201,8 @@ export interface ClientFee extends FeePeriod {
   amount: number;
   /** Taxa por empregado (cents per employee, per month). */
   employeeFee: number;
+  /** Discount for paying by the due date, in basis points (500 = 5%); 0 = none. */
+  discountBps: number;
   createdAt: string;
 }
 
@@ -223,6 +225,8 @@ export interface Client {
   /** Only for the Simples Nacional. */
   simplesAnnex: SimplesAnnex | null;
   contractStartDate: ISODate;
+  /** Day of the month the fee is due (month after the competence). */
+  feeDueDay: number;
   zipCode: string | null;
   street: string | null;
   number: string | null;
@@ -377,6 +381,12 @@ export interface Transaction {
   /** Employee charge: the fee it belongs to, and how many employees were billed. */
   feeOf: string | null;
   employees: number | null;
+  /** Generated fee: discount offered for paying by the due date, in basis points (null = none). */
+  feeDiscountBps: number | null;
+  /** Discount row: the receivable it was granted on. */
+  discountOf: string | null;
+  /** Discount granted when this receivable was settled by the due date (cents; null when none). */
+  discount: number | null;
 
   createdAt: string;
   updatedAt: string;
@@ -446,7 +456,7 @@ export interface Insight {
   kind: InsightKind;
   title: string;
   description: string;
-  /** Optional deep link inside the web app, e.g. '/relatorios?tab=categorias'. */
+  /** Optional deep link inside the web app, e.g. '/relatorios?aba=categories'. */
   href?: string;
 }
 
@@ -578,10 +588,20 @@ export interface DelinquencyOverdueItem {
 
 export interface GenerateFeesResponse {
   competence: MonthKey;
-  dueDate: ISODate;
   dryRun: boolean;
-  /** Fees created (or that would be created on a dry run, with `transactionId` null). */
-  created: { clientId: string; name: string; amount: number; transactionId: string | null }[];
+  /**
+   * Fees created (or that would be created on a dry run, with `transactionId` null), each due on the
+   * client's `feeDueDay` and carrying the fee period's discount.
+   */
+  created: {
+    clientId: string;
+    name: string;
+    amount: number;
+    dueDate: ISODate;
+    /** Discount for paying by the due date (basis points; 0 = none). */
+    discountBps: number;
+    transactionId: string | null;
+  }[];
   skipped: { clientId: string; name: string; reason: GenerateFeesSkipReason }[];
   /** Sum of `created`. */
   total: number;

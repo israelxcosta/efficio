@@ -20,7 +20,11 @@ beforeEach(async () => {
 
 const BASE = { taxRegime: 'simples_nacional', simplesAnnex: 'III', contractStartDate: '2024-03-15' };
 
-async function createClient(as: Client, input: Record<string, unknown>, fees: { amount: number; employeeFee?: number }[] = []) {
+async function createClient(
+  as: Client,
+  input: Record<string, unknown>,
+  fees: { amount: number; employeeFee?: number; discountBps?: number }[] = [],
+) {
   const res = await as.post('/clients', { ...BASE, ...input });
   if (res.status !== 201) throw new Error(`client failed: ${JSON.stringify(res.body)}`);
   for (const fee of fees) {
@@ -31,17 +35,22 @@ async function createClient(as: Client, input: Record<string, unknown>, fees: { 
 }
 
 /**
- * Pão Quente: three yearly periods (the third starts on 15/03/2026). Tecnova: started in January,
- * no employee fee. Horizonte: starts in November. Rota Sul: inactivated on 30/09. Alicerce: its
- * only period ended in 2025 (renewal pending).
+ * Pão Quente: due on day 31, three yearly periods (the third starts on 15/03/2026 and offers 5% for
+ * paying on time). Tecnova: due on the default day 10, started in January, no employee fee.
+ * Horizonte: starts in November. Rota Sul: due on day 20, inactivated on 30/09. Alicerce: its only
+ * period ended in 2025 (renewal pending).
  */
 async function seedOffice(as: Client = c) {
   return {
-    bakery: await createClient(as, { name: 'Padaria Pão Quente Ltda', tradeName: 'Pão Quente', document: '11.222.333/0001-81' }, [
-      { amount: 75000, employeeFee: 3000 },
-      { amount: 80000, employeeFee: 3500 },
-      { amount: 85000, employeeFee: 4000 },
-    ]),
+    bakery: await createClient(
+      as,
+      { name: 'Padaria Pão Quente Ltda', tradeName: 'Pão Quente', document: '11.222.333/0001-81', feeDueDay: 31 },
+      [
+        { amount: 75000, employeeFee: 3000 },
+        { amount: 80000, employeeFee: 3500 },
+        { amount: 85000, employeeFee: 4000, discountBps: 500 },
+      ],
+    ),
     software: await createClient(
       as,
       { name: 'Tecnova Soluções em Software Ltda', tradeName: 'Tecnova', document: '45.723.174/0001-10', taxRegime: 'presumed_profit', contractStartDate: '2026-01-10' },
@@ -49,7 +58,7 @@ async function seedOffice(as: Client = c) {
     ),
     future: await createClient(as, { name: 'Horizonte Engenharia Ltda', document: '28.051.496/0001-41', contractStartDate: '2026-11-05' }, [{ amount: 50000 }]),
     former: await (async () => {
-      const id = await createClient(as, { name: 'Rota Sul Ltda', tradeName: 'Rota Sul', document: '61.370.925/0001-19', contractStartDate: '2025-01-10' }, [
+      const id = await createClient(as, { name: 'Rota Sul Ltda', tradeName: 'Rota Sul', document: '61.370.925/0001-19', contractStartDate: '2025-01-10', feeDueDay: 20 }, [
         { amount: 120000, employeeFee: 5000 },
         { amount: 130000, employeeFee: 5000 },
       ]);
@@ -66,19 +75,19 @@ const generate = (body: Record<string, unknown>, as: Client = c) => as.post('/fe
 const incomes = async (as: Client = c) => (await as.get('/transactions?type=income&pageSize=200')).body.items as any[];
 
 describe('Gerar honorários', () => {
-  it('bills each client for the competence with the fee in force at its end, due the next month', async () => {
+  it('bills each client for the competence with the fee in force at its end, due on its day of the next month', async () => {
     const ids = await seedOffice();
 
-    // Dry run: what would be created, nothing written (not even the categories).
-    const preview = await generate({ competence: '2026-10', dueDay: 31, dryRun: true });
+    // Dry run: what would be created, nothing written.
+    const preview = await generate({ competence: '2026-10', dryRun: true });
     expect(preview.status).toBe(200);
     expect(preview.body).toEqual({
       competence: '2026-10',
-      dueDate: '2026-11-30', // day 31 clamped to November
       dryRun: true,
       created: [
-        { clientId: ids.bakery, name: 'Pão Quente', amount: 85000, transactionId: null },
-        { clientId: ids.software, name: 'Tecnova', amount: 240000, transactionId: null },
+        // Day 31 clamped to November; the period in force offers 5% for paying on time.
+        { clientId: ids.bakery, name: 'Pão Quente', amount: 85000, dueDate: '2026-11-30', discountBps: 500, transactionId: null },
+        { clientId: ids.software, name: 'Tecnova', amount: 240000, dueDate: '2026-11-10', discountBps: 0, transactionId: null },
       ],
       skipped: [
         { clientId: ids.renewal, name: 'Alicerce', reason: 'no_current_fee' },
@@ -88,13 +97,12 @@ describe('Gerar honorários', () => {
       total: 325000,
     });
     expect(await incomes()).toEqual([]);
-    expect((await c.get('/categories?type=income')).body.map((x: any) => x.name)).not.toContain('Serviços Prestados');
 
-    const res = await generate({ competence: '2026-10', dueDay: 31 });
+    const res = await generate({ competence: '2026-10' });
     expect(res.status).toBe(201);
-    expect(res.body.created.map((x: any) => [x.name, x.amount])).toEqual([
-      ['Pão Quente', 85000],
-      ['Tecnova', 240000],
+    expect(res.body.created.map((x: any) => [x.name, x.amount, x.dueDate, x.discountBps])).toEqual([
+      ['Pão Quente', 85000, '2026-11-30', 500],
+      ['Tecnova', 240000, '2026-11-10', 0],
     ]);
     const rows = await incomes();
     expect(rows.map((t) => t.id).sort()).toEqual(res.body.created.map((x: any) => x.transactionId).sort());
@@ -112,64 +120,108 @@ describe('Gerar honorários', () => {
       feeCompetence: '2026-10',
       feeOf: null,
       employees: null,
+      feeDiscountBps: 500,
+      discountOf: null,
+      discount: null,
       category: { name: 'Serviços Prestados' },
       subcategory: { name: 'Honorários contábeis' },
     });
+    expect(rows.find((t) => t.contactId === ids.software)).toMatchObject({ date: '2026-11-10', feeDiscountBps: null });
 
     // Run again: nothing new.
     const again = await generate({ competence: '2026-10' });
     expect(again.status).toBe(200);
-    expect(again.body).toMatchObject({ dueDate: '2026-11-10', created: [], total: 0 });
+    expect(again.body).toMatchObject({ created: [], total: 0 });
     expect(again.body.skipped.filter((s: any) => s.reason === 'already_generated').map((s: any) => s.clientId).sort()).toEqual(
       [ids.bakery, ids.software].sort(),
     );
 
-    // Across a fee period change (15/03/2026): the period in force at the end of the month.
+    // Across a fee period change (15/03/2026): the period in force at the end of the month, with its
+    // discount (none before the third period). Each client keeps its own due day.
     const feb = await generate({ competence: '2026-02' });
     const mar = await generate({ competence: '2026-03' });
-    expect(feb.body.created.map((x: any) => [x.name, x.amount])).toEqual([
-      ['Pão Quente', 80000],
-      ['Rota Sul', 130000],
-      ['Tecnova', 240000],
+    expect(feb.body.created.map((x: any) => [x.name, x.amount, x.dueDate, x.discountBps])).toEqual([
+      ['Pão Quente', 80000, '2026-03-31', 0],
+      ['Rota Sul', 130000, '2026-03-20', 0],
+      ['Tecnova', 240000, '2026-03-10', 0],
     ]);
-    expect(feb.body.dueDate).toBe('2026-03-10');
-    expect(mar.body.created.find((x: any) => x.clientId === ids.bakery).amount).toBe(85000);
+    expect(mar.body.created.find((x: any) => x.clientId === ids.bakery)).toMatchObject({ amount: 85000, dueDate: '2026-04-30', discountBps: 500 });
     // Before Tecnova's contract (10/01/2026) and while Rota Sul was still a client.
     const dec = await generate({ competence: '2025-12' });
     expect(dec.body.skipped.find((s: any) => s.clientId === ids.software).reason).toBe('not_started');
     const sep = await generate({ competence: '2026-09' });
-    expect(sep.body.created.find((x: any) => x.clientId === ids.former)).toMatchObject({ name: 'Rota Sul', amount: 130000 });
+    expect(sep.body.created.find((x: any) => x.clientId === ids.former)).toMatchObject({ name: 'Rota Sul', amount: 130000, dueDate: '2026-10-20' });
 
-    // The categories were created once and reused.
+    // The office defaults were used: one "Serviços Prestados", the fees in "Honorários contábeis".
     const cats = (await c.get('/categories?type=income')).body.filter((x: any) => x.name === 'Serviços Prestados');
     expect(cats).toHaveLength(1);
-    expect(cats[0].subcategories.map((s: any) => s.name).sort()).toEqual(['Folha de pagamento', 'Honorários contábeis']);
+    expect(cats[0].subcategories.map((s: any) => s.name).sort()).toEqual(['13º honorário', 'Folha de pagamento', 'Honorários contábeis', 'Serviços avulsos']);
     expect(new Set((await incomes()).map((t) => t.subcategory.id)).size).toBe(1);
   });
 
-  it('reuses the categories whatever their case, and the office defaults', async () => {
+  it('follows the due day of each client, also when it changes', async () => {
+    const ids = await seedOffice();
+    const client = (await c.get(`/clients/${ids.software}`)).body;
+    expect(client.feeDueDay).toBe(10); // default
+    expect((await c.get(`/clients/${ids.bakery}`)).body.feeDueDay).toBe(31);
+
+    // Day 31: the last day of short months (February of a common year, November).
+    const january = await generate({ competence: '2027-01', dryRun: true });
+    expect(january.body.created.find((x: any) => x.clientId === ids.bakery).dueDate).toBe('2027-02-28');
+    const december = await generate({ competence: '2026-12', dryRun: true });
+    expect(december.body.created.map((x: any) => [x.name, x.dueDate])).toEqual([
+      ['Horizonte Engenharia Ltda', '2027-01-10'],
+      ['Pão Quente', '2027-01-31'],
+      ['Tecnova', '2027-01-10'],
+    ]);
+
+    // A new due day applies to the next generation; fees already generated keep theirs.
+    await generate({ competence: '2026-10' });
+    const input = { ...BASE, name: 'Tecnova Soluções em Software Ltda', tradeName: 'Tecnova', document: '45.723.174/0001-10', taxRegime: 'presumed_profit', contractStartDate: '2026-01-10' };
+    const updated = await c.put(`/clients/${ids.software}`, { ...input, feeDueDay: 25 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.feeDueDay).toBe(25);
+    expect((await incomes()).find((t) => t.contactId === ids.software).date).toBe('2026-11-10');
+    const november = await generate({ competence: '2026-11', dryRun: true });
+    expect(november.body.created.find((x: any) => x.clientId === ids.software).dueDate).toBe('2026-12-25');
+
+    for (const feeDueDay of [0, 32, 1.5, '10']) {
+      const res = await c.put(`/clients/${ids.software}`, { ...input, feeDueDay });
+      expect(res.status, String(feeDueDay)).toBe(400);
+    }
+  });
+
+  it('finds the categories whatever their case, and creates them when missing', async () => {
     await seedOffice();
-    const parent = await c.post('/categories', { name: 'serviços prestados', type: 'income', icon: 'briefcase', color: '#12A150' });
-    await c.post('/categories', { name: 'HONORÁRIOS CONTÁBEIS', type: 'income', icon: 'briefcase', color: '#12A150', parentId: parent.body.id });
+    // The office renamed its defaults: they are still the ones used.
+    const defaults = (await c.get('/categories?type=income')).body.find((x: any) => x.name === 'Serviços Prestados');
+    const feeSub = defaults.subcategories.find((s: any) => s.name === 'Honorários contábeis');
+    await c.put(`/categories/${defaults.id}`, { name: 'serviços prestados', icon: defaults.icon, color: defaults.color });
+    await c.put(`/categories/${feeSub.id}`, { name: 'HONORÁRIOS CONTÁBEIS', icon: feeSub.icon, color: feeSub.color });
     await generate({ competence: '2026-10' });
     const [fee] = await incomes();
-    expect(fee.category).toMatchObject({ id: parent.body.id, name: 'serviços prestados' });
-    expect(fee.subcategory.name).toBe('HONORÁRIOS CONTÁBEIS');
+    expect(fee.category).toMatchObject({ id: defaults.id, name: 'serviços prestados' });
+    expect(fee.subcategory).toMatchObject({ id: feeSub.id, name: 'HONORÁRIOS CONTÁBEIS' });
     expect((await c.get('/categories?type=income')).body.filter((x: any) => x.name.toLowerCase() === 'serviços prestados')).toHaveLength(1);
 
-    // A business workspace starts with them.
-    const office = await c.post('/workspaces', { name: 'Escritório', kind: 'business' });
+    // Another company that deleted them: a dry run creates nothing; generating creates them again.
+    const office = await c.post('/workspaces', { name: 'Escritório' });
     await c.post('/auth/switch-workspace', { workspaceId: office.body.id });
-    const defaults = (await c.get('/categories?type=income')).body.find((x: any) => x.name === 'Serviços Prestados');
-    expect(defaults.subcategories.map((s: any) => s.name).sort()).toEqual(['13º honorário', 'Folha de pagamento', 'Honorários contábeis', 'Serviços avulsos']);
+    const fresh = (await c.get('/categories?type=income')).body.find((x: any) => x.name === 'Serviços Prestados');
+    expect((await c.del(`/categories/${fresh.id}`)).status).toBe(204);
     await createClient(c, { name: 'Padaria Pão Quente Ltda', tradeName: 'Pão Quente', document: '11.222.333/0001-81' }, [
       { amount: 1000 },
       { amount: 1000 },
       { amount: 1000 },
     ]);
+    await generate({ competence: '2026-10', dryRun: true });
+    expect((await c.get('/categories?type=income')).body.map((x: any) => x.name)).not.toContain('Serviços Prestados');
     await generate({ competence: '2026-10' });
-    expect((await incomes())[0].subcategory.id).toBe(defaults.subcategories.find((s: any) => s.name === 'Honorários contábeis').id);
-    expect((await c.get('/categories?type=income')).body.filter((x: any) => x.name === 'Serviços Prestados')).toHaveLength(1);
+    const created = (await c.get('/categories?type=income')).body.filter((x: any) => x.name === 'Serviços Prestados');
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ icon: 'briefcase', color: '#12A150' });
+    expect(created[0].subcategories.map((s: any) => s.name).sort()).toEqual(['Folha de pagamento', 'Honorários contábeis']);
+    expect((await incomes())[0].subcategory.id).toBe(created[0].subcategories.find((s: any) => s.name === 'Honorários contábeis').id);
   });
 
   it('never bills a client twice for a month, also through an edit', async () => {
@@ -187,15 +239,16 @@ describe('Gerar honorários', () => {
     expect(regenerated.body.created.map((x: any) => x.clientId)).toEqual([ids.software]);
   });
 
-  it('validates the competence and the due day', async () => {
-    for (const body of [{ competence: '2026-13' }, { competence: '10/2026' }, { competence: '2026-10', dueDay: 0 }, { competence: '2026-10', dueDay: 32 }, {}]) {
+  it('validates the competence', async () => {
+    for (const body of [{ competence: '2026-13' }, { competence: '10/2026' }, { competence: '2026-10', dryRun: 'sim' }, {}]) {
       const res = await generate(body);
       expect(res.status, JSON.stringify(body)).toBe(400);
     }
-    const january = await generate({ competence: '2027-01', dueDay: 31, dryRun: true });
-    expect(january.body.dueDate).toBe('2027-02-28');
-    const december = await generate({ competence: '2026-12', dryRun: true });
-    expect(december.body.dueDate).toBe('2027-01-10');
+    // The due day comes from each client now: a dueDay in the request is ignored.
+    await seedOffice();
+    const res = await generate({ competence: '2026-10', dueDay: 5, dryRun: true });
+    expect(res.status).toBe(200);
+    expect(res.body.created.map((x: any) => x.dueDate)).toEqual(['2026-11-30', '2026-11-10']);
   });
 });
 
@@ -223,7 +276,8 @@ describe('+ Empregados', () => {
       type: 'income',
       description: 'Folha de pagamento ref. 10/2026 - Pão Quente (6 empregados)',
       amount: 24000,
-      date: '2026-11-10',
+      date: '2026-11-30', // the fee's due date
+      feeDiscountBps: null, // the discount is on the fee only
       paid: false,
       contactId: ids.bakery,
       feeKind: 'employees',
@@ -290,13 +344,13 @@ describe('+ Empregados', () => {
   });
 
   it('feeds the competence to the delinquency report', async () => {
-    const { ids, feeOf } = await generated('2026-08'); // due 10/09: 40 days late today
+    const { ids, feeOf } = await generated('2026-08'); // due 30/09: 20 days late today
     await c.post(`/fee-charges/${feeOf(ids.bakery)}/employees`, { employees: 2 });
     const report = (await c.get('/reports/delinquency?months=3')).body;
     const bakery = report.clients.find((x: any) => x.contactId === ids.bakery);
     expect(bakery.overdue.map((o: any) => [o.description, o.competence, o.daysLate])).toEqual([
-      ['Honorários ref. 08/2026 - Pão Quente', '2026-08', 40],
-      ['Folha de pagamento ref. 08/2026 - Pão Quente (2 empregados)', '2026-08', 40],
+      ['Honorários ref. 08/2026 - Pão Quente', '2026-08', 20],
+      ['Folha de pagamento ref. 08/2026 - Pão Quente (2 empregados)', '2026-08', 20],
     ]);
     expect(bakery.openAmount).toBe(85000 + 8000);
   });

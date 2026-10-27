@@ -38,8 +38,8 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
     const sorted = [...r.series].sort((a, b) => b.total - a.total);
     const head = sorted.slice(0, MAX_SERIES);
     const rest = sorted.slice(MAX_SERIES);
-    const series = head.map((s, i) => ({ key: `s${i}`, name: s.name, color: tone(s.color || SERIES_PALETTE[i % SERIES_PALETTE.length]!) }));
-    if (rest.length) series.push({ key: 'others', name: 'Outros', color: '#9A9EA5' });
+    const series = head.map((s, i) => ({ key: `s${i}`, name: s.name, color: tone(SERIES_PALETTE[i % SERIES_PALETTE.length]!) }));
+    if (rest.length) series.push({ key: 'others', name: 'Outros', color: '#C9CDD4' });
     const chartData = r.periods.map((p, pi) => {
       const row: Record<string, number | string | boolean> = { label: p.label, projected: p.projected, total: r.totals[pi] ?? 0 };
       head.forEach((s, i) => (row[`s${i}`] = s.values[pi] ?? 0));
@@ -94,7 +94,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label={`Total ${type === 'expense' ? 'de despesas' : 'de receitas'}`} value={r ? formatBRL(r.total) : '—'} tone={type === 'expense' ? 'danger' : 'success'} />
+        <MiniStat label={`Total ${type === 'expense' ? 'de despesas' : 'de receitas'}`} value={r ? formatBRL(r.total) : '—'} />
         <MiniStat label="Média por período" value={r && periodsWithData ? formatBRL(Math.round(r.total / periodsWithData)) : '—'} />
         <MiniStat label="Maior categoria" value={r && r.series[0] ? [...r.series].sort((a, b) => b.total - a.total)[0]!.name : '—'} />
         <MiniStat label="Períodos projetados" value={String(projected.length)} hint="Gerados por fixas, recorrentes e parcelas" />
@@ -144,7 +144,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
                       radius={i === series.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
                     />
                   ))}
-                  <Line type="monotone" dataKey="total" name="total" stroke="var(--app-fg)" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="0" />
+                  <Line type="linear" dataKey="total" name="total" stroke="var(--app-fg)" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             )}
@@ -166,7 +166,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="border-b border-border bg-surface-muted text-left text-[11px] font-semibold tracking-wide text-muted uppercase">
+                <tr className="border-b border-border text-left text-xs font-medium text-muted">
                   <th className="px-4 py-2.5">{drill ? 'Subcategoria' : 'Categoria'}</th>
                   <th className="px-4 py-2.5 text-right">Total</th>
                   <th className="px-4 py-2.5 text-right">Média</th>
@@ -195,7 +195,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
                         <td className="tabular px-4 py-3 text-right text-muted">{formatBRL(s.average)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <ProgressBar value={s.share} color={s.color} size="sm" />
+                            <ProgressBar value={s.share} color="var(--app-data)" size="sm" />
                             <span className="w-10 text-right text-xs text-muted">{formatPercent(s.share, 0)}</span>
                           </div>
                         </td>

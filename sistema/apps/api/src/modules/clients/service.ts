@@ -36,6 +36,8 @@ type InactivationInput = z.output<typeof clientInactivationSchema>;
 type FeeInput = z.output<typeof clientFeeInputSchema>;
 
 const TABLE = 'contacts';
+/** Due day of a client saved before migration 0010 set one (the column is filled for them). */
+const DEFAULT_FEE_DUE_DAY = 10;
 
 /** Personal data written by the client form, encrypted with the workspace key. */
 const CLIENT_INPUT_ENCRYPTED_FIELDS = [
@@ -52,6 +54,7 @@ function toFee(row: ClientFeeRow, contractStart: string): ClientFee {
     ...feePeriod(contractStart, row.periodIndex),
     amount: row.amount,
     employeeFee: row.employeeFee,
+    discountBps: row.discountBps,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -88,6 +91,7 @@ async function toClient(cipher: FieldCipher, row: ContactRow, feeRows: ClientFee
     taxRegime: plain.taxRegime!,
     simplesAnnex: plain.simplesAnnex,
     contractStartDate: contractStart,
+    feeDueDay: plain.feeDueDay ?? DEFAULT_FEE_DUE_DAY,
     zipCode: plain.zipCode,
     street: plain.street,
     number: plain.number,
@@ -395,7 +399,14 @@ export async function addFee(db: DbExecutor, workspaceId: string, clientId: stri
   }
   const [row] = await db
     .insert(clientFees)
-    .values({ workspaceId, clientId, periodIndex: period.index, amount: input.amount, employeeFee: input.employeeFee })
+    .values({
+      workspaceId,
+      clientId,
+      periodIndex: period.index,
+      amount: input.amount,
+      employeeFee: input.employeeFee,
+      discountBps: input.discountBps,
+    })
     .returning();
   return toFee(row!, start);
 }
@@ -411,7 +422,7 @@ export async function updateFee(
   await getFeeOrThrow(db, workspaceId, clientId, feeId);
   const [row] = await db
     .update(clientFees)
-    .set({ amount: input.amount, employeeFee: input.employeeFee })
+    .set({ amount: input.amount, employeeFee: input.employeeFee, discountBps: input.discountBps })
     .where(eq(clientFees.id, feeId))
     .returning();
   return toFee(row!, client.contractStartDate!);

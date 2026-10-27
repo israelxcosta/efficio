@@ -1,4 +1,4 @@
-import { and, inArray, sql } from 'drizzle-orm';
+import { and, inArray, or, sql } from 'drizzle-orm';
 import {
   getInvoiceDates,
   type RefAccount,
@@ -31,6 +31,8 @@ export interface RefMaps {
   notes: Map<string, string | null>;
   /** Interest and fine charged on each transaction settled late (by the original's id). */
   lateFees: Map<string, { interest: number; fine: number }>;
+  /** Discount granted on each receivable settled by its due date (by the receivable's id). */
+  discounts: Map<string, number>;
 }
 
 function collect(rows: TransactionRow[], pick: (r: TransactionRow) => (string | null)[]): string[] {
@@ -40,26 +42,40 @@ function collect(rows: TransactionRow[], pick: (r: TransactionRow) => (string | 
 }
 
 /**
- * Interest and fine charged on each of `ids` (originals settled late), summed in SQL. The list grows
- * with the rows mapped (a statement has no page size), so it goes in chunks.
+ * Interest, fine and discount settled with each of `ids` (their own rows, linked through late_fee_of
+ * and discount_of), summed in SQL. The list grows with the rows mapped (a statement has no page
+ * size), so it goes in chunks.
  */
-async function loadLateFees(db: DbExecutor, workspaceIds: string[], ids: string[]) {
+async function loadSettlementExtras(db: DbExecutor, workspaceIds: string[], ids: string[]) {
+  const of = sql<string>`coalesce(${transactions.lateFeeOf}, ${transactions.discountOf})`;
   const parts = await Promise.all(
     inChunks(ids).map((chunk) =>
       db
         .select({
-          of: transactions.lateFeeOf,
+          of,
+          lateFees: sumOf(sql`case when ${transactions.lateFeeOf} is not null then 1 else 0 end`),
           interest: sumOf(sql`case when ${transactions.lateFeeKind} = 'interest' then ${transactions.amount} else 0 end`),
           fine: sumOf(sql`case when ${transactions.lateFeeKind} = 'fine' then ${transactions.amount} else 0 end`),
+          discounts: sumOf(sql`case when ${transactions.discountOf} is not null then 1 else 0 end`),
+          discount: sumOf(sql`case when ${transactions.discountOf} is not null then ${transactions.amount} else 0 end`),
         })
         .from(transactions)
-        .where(and(inArray(transactions.workspaceId, workspaceIds), inArray(transactions.lateFeeOf, chunk)))
-        .groupBy(transactions.lateFeeOf),
+        .where(
+          and(
+            inArray(transactions.workspaceId, workspaceIds),
+            or(inArray(transactions.lateFeeOf, chunk), inArray(transactions.discountOf, chunk)),
+          ),
+        )
+        .groupBy(of),
     ),
   );
   const lateFees = new Map<string, { interest: number; fine: number }>();
-  for (const f of parts.flat()) if (f.of) lateFees.set(f.of, { interest: f.interest, fine: f.fine });
-  return lateFees;
+  const discounts = new Map<string, number>();
+  for (const f of parts.flat()) {
+    if (f.lateFees > 0) lateFees.set(f.of, { interest: f.interest, fine: f.fine });
+    if (f.discounts > 0) discounts.set(f.of, f.discount);
+  }
+  return { lateFees, discounts };
 }
 
 /** Loads only the referenced entities, inside the rows' workspace. */
@@ -70,10 +86,10 @@ export async function loadRefMaps(db: DbExecutor, rows: TransactionRow[]): Promi
   const accountIds = collect(rows, (r) => [r.accountId, r.toAccountId]);
   const cardIds = collect(rows, (r) => [r.creditCardId]);
   const contactIds = collect(rows, (r) => [r.contactId]);
-  // Only settled income/expense can carry late fees, and a late fee never has its own.
-  const paidIds = rows.filter((r) => r.paid && r.type !== 'transfer' && !r.lateFeeOf).map((r) => r.id);
+  // Only settled income/expense can carry late fees or a discount; those rows never have their own.
+  const paidIds = rows.filter((r) => r.paid && r.type !== 'transfer' && !r.lateFeeOf && !r.discountOf).map((r) => r.id);
 
-  const [cats, accs, cards, conts, notes, lateFees] = await Promise.all([
+  const [cats, accs, cards, conts, notes, extras] = await Promise.all([
     categoryIds.length
       ? db.select().from(categories).where(and(inArray(categories.workspaceId, workspaceIds), inArray(categories.id, categoryIds)))
       : [],
@@ -90,7 +106,7 @@ export async function loadRefMaps(db: DbExecutor, rows: TransactionRow[]): Promi
           .where(and(inArray(contacts.workspaceId, workspaceIds), inArray(contacts.id, contactIds)))
       : [],
     Promise.all(rows.map(async (r) => [r.id, await decryptNotes(r.workspaceId, r.notes)] as const)),
-    paidIds.length ? loadLateFees(db, workspaceIds, paidIds) : new Map<string, { interest: number; fine: number }>(),
+    paidIds.length ? loadSettlementExtras(db, workspaceIds, paidIds) : { lateFees: new Map(), discounts: new Map() },
   ]);
 
   return {
@@ -99,7 +115,8 @@ export async function loadRefMaps(db: DbExecutor, rows: TransactionRow[]): Promi
     cards: new Map(cards.map((c) => [c.id, c])),
     contacts: new Map(conts.map((c) => [c.id, c])),
     notes: new Map(notes),
-    lateFees,
+    lateFees: extras.lateFees,
+    discounts: extras.discounts,
   };
 }
 
@@ -168,6 +185,9 @@ export function toTransaction(row: TransactionRow, refs: RefMaps, now: string = 
     feeKind: row.feeKind,
     feeOf: row.feeOf,
     employees: row.employees,
+    feeDiscountBps: row.feeDiscountBps,
+    discountOf: row.discountOf,
+    discount: refs.discounts.get(row.id) ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     category: refCategory(get(refs.categories, row.categoryId)),

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type {
   Category,
   CategoryType,
@@ -127,4 +127,72 @@ export async function hasCategories(db: DbExecutor, workspaceId: string) {
     .where(and(eq(categories.workspaceId, workspaceId), isNull(categories.parentId)))
     .limit(1);
   return !!row;
+}
+
+const normalizeName = (name: string) => name.trim().toLocaleLowerCase('pt-BR');
+
+/**
+ * A category and some of its subcategories, found by name (any case; an active one first) and created
+ * when missing with the icon and color of the defaults. For flows that book into fixed categories
+ * ("Gerar honorários", discounts granted). Creating runs one request at a time per workspace
+ * (transaction-scoped advisory lock, re-read after it), so concurrent requests never duplicate them.
+ */
+export async function ensureCategoryPath<const S extends readonly string[]>(
+  db: DbExecutor,
+  workspaceId: string,
+  type: CategoryType,
+  name: string,
+  subcategories: S,
+): Promise<{ categoryId: string; subcategories: Record<S[number], string> }> {
+  const read = () =>
+    db
+      .select()
+      .from(categories)
+      .where(and(eq(categories.workspaceId, workspaceId), eq(categories.type, type)));
+  const find = (list: CategoryRow[], wanted: string) =>
+    list
+      .filter((r) => normalizeName(r.name) === normalizeName(wanted))
+      .sort((a, b) => Number(a.archived) - Number(b.archived))[0];
+  const resolve = (rows: CategoryRow[]) => {
+    const parent = find(
+      rows.filter((r) => !r.parentId),
+      name,
+    );
+    const children = parent ? rows.filter((r) => r.parentId === parent.id) : [];
+    return { parent, subs: subcategories.map((sub) => find(children, sub)) };
+  };
+  const result = (parent: CategoryRow, subs: (CategoryRow | undefined)[]) => ({
+    categoryId: parent.id,
+    subcategories: Object.fromEntries(subcategories.map((sub, i) => [sub, subs[i]!.id])) as Record<S[number], string>,
+  });
+
+  let found = resolve(await read());
+  if (found.parent && found.subs.every(Boolean)) return result(found.parent, found.subs);
+  await db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`categories:${workspaceId}`}, 0))`);
+  found = resolve(await read());
+
+  const defaults = [...BUSINESS_CATEGORIES, ...DEFAULT_CATEGORIES].find((c) => c.type === type && c.name === name);
+  let parent = found.parent;
+  if (!parent) {
+    [parent] = await db
+      .insert(categories)
+      .values({ workspaceId, name, type, icon: defaults?.icon ?? 'tag', color: defaults?.color ?? '#64748B' })
+      .returning();
+  }
+  const subs = [...found.subs];
+  for (const [i, sub] of subcategories.entries()) {
+    if (subs[i]) continue;
+    [subs[i]] = await db
+      .insert(categories)
+      .values({
+        workspaceId,
+        parentId: parent!.id,
+        name: sub,
+        type,
+        icon: defaults?.subcategories?.find((s) => s.name === sub)?.icon ?? parent!.icon,
+        color: parent!.color,
+      })
+      .returning();
+  }
+  return result(parent!, subs);
 }

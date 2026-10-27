@@ -242,7 +242,7 @@ export function ReviewStep({ preview, destination, choices, onChoices, onChangeF
             ) : null}
           </div>
 
-          <div className="hidden grid-cols-[18px_84px_minmax(0,1fr)_230px_124px] gap-x-3 border-b border-border bg-surface-muted px-4 py-2 text-[11px] font-semibold tracking-wide text-muted uppercase md:grid" aria-hidden>
+          <div className="hidden grid-cols-[18px_84px_minmax(0,1fr)_230px_124px] gap-x-3 border-b border-border px-4 py-2 text-xs font-medium text-muted md:grid" aria-hidden>
             <span />
             <span>Data</span>
             <span>Descrição</span>

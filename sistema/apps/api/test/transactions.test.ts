@@ -387,7 +387,7 @@ describe('paid toggle and balances', () => {
   });
 
   it('filters, searches, paginates and expands references', async () => {
-    const cat = await firstCategory(c, 'expense', 'Alimentação');
+    const cat = await firstCategory(c, 'expense', 'Administrativo');
     const contact = await c.post('/contacts', { name: 'Padaria do Zé' });
     for (let i = 1; i <= 5; i++) {
       await c.post('/transactions', {
@@ -406,7 +406,7 @@ describe('paid toggle and balances', () => {
     expect(page.body.items.map((t: any) => t.amount)).toEqual([3000, 2000]);
     expect(page.body.summary.expense).toBe(15000);
     expect(page.body.items[0]).toMatchObject({
-      category: { name: 'Alimentação' },
+      category: { name: 'Administrativo' },
       subcategory: { id: cat.subcategories[0]!.id },
       contact: { name: 'Padaria do Zé' },
       paymentMethod: 'pix',
@@ -418,10 +418,166 @@ describe('paid toggle and balances', () => {
   });
 });
 
+describe('discount for paying on time', () => {
+  async function receivable(overrides: Record<string, unknown> = {}) {
+    const client = await c.post('/contacts', { name: 'Padaria Pão Dourado' });
+    const res = await c.post('/transactions', {
+      type: 'income',
+      description: 'Honorários',
+      amount: 50000,
+      date: '2026-10-15',
+      accountId: account,
+      contactId: client.body.id,
+      paymentMethod: 'bank_slip',
+      ...overrides,
+    });
+    return { id: res.body[0].id as string, contactId: client.body.id as string };
+  }
+  const discountRows = async (id: string) =>
+    (await c.get('/transactions?type=expense&pageSize=50')).body.items.filter((t: any) => t.discountOf === id);
+
+  it('books the discount as a paid expense linked to the receivable, received by the due date', async () => {
+    const { id, contactId } = await receivable();
+    const paid = await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-15', discount: 2500 });
+    expect(paid.status).toBe(200);
+    expect(paid.body).toMatchObject({ paid: true, paidAt: '2026-10-15', discount: 2500, lateFees: null, discountOf: null });
+
+    const [row] = await discountRows(id);
+    expect(row).toMatchObject({
+      type: 'expense',
+      description: 'Desconto — Honorários',
+      amount: 2500,
+      date: '2026-10-15',
+      paid: true,
+      paidAt: '2026-10-15',
+      accountId: account,
+      contactId,
+      paymentMethod: 'bank_slip',
+      discountOf: id,
+      discount: null,
+      category: { name: 'Despesas financeiras' },
+      subcategory: { name: 'Descontos concedidos' },
+    });
+    // Net received: the full amount in, the discount out.
+    expect((await c.get(`/accounts/${account}`)).body.balance).toBe(1000000 + 50000 - 2500);
+    const overview = (await c.get('/reports/overview?from=2026-10-01&to=2026-10-31')).body;
+    expect(overview).toMatchObject({ income: 50000, expense: 2500, net: 47500 });
+
+    // Sending again replaces it; 0 removes it.
+    const replaced = await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-14', discount: 1000 });
+    expect(replaced.body.discount).toBe(1000);
+    expect((await discountRows(id)).map((t: any) => [t.amount, t.date])).toEqual([[1000, '2026-10-14']]);
+    const removed = await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-14', discount: 0 });
+    expect(removed.body.discount).toBeNull();
+    expect(await discountRows(id)).toEqual([]);
+    // The whole amount can be waived.
+    expect((await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-14', discount: 50000 })).body.discount).toBe(50000);
+    // The category was created once (business default), and reused.
+    const financial = (await c.get('/categories?type=expense')).body.filter((x: any) => x.name === 'Despesas financeiras');
+    expect(financial).toHaveLength(1);
+    expect(financial[0].subcategories.filter((x: any) => x.name === 'Descontos concedidos')).toHaveLength(1);
+  });
+
+  it('validates where and when a discount applies', async () => {
+    const { id } = await receivable();
+    const refuse = async (body: Record<string, unknown>, message: string, target = id) => {
+      const res = await c.patch(`/transactions/${target}/paid`, body);
+      expect(res.status, JSON.stringify(body)).toBe(422);
+      expect(res.body.message).toBe(message);
+    };
+    await refuse({ paid: false, discount: 100 }, 'O desconto só é lançado ao confirmar o recebimento');
+    await refuse({ paid: true, paidAt: '2026-10-16', discount: 100 }, 'O desconto só vale para recebimento até o vencimento');
+    await refuse({ paid: true, paidAt: '2026-10-15', discount: 50001 }, 'O desconto não pode ser maior que o valor do lançamento');
+    await refuse({ paid: true, paidAt: '2026-10-20', discount: 100, interest: 100 }, 'Desconto e juros/multa não podem ser lançados juntos');
+    expect((await c.patch(`/transactions/${id}/paid`, { paid: true, discount: -1 })).status).toBe(400);
+    expect((await c.patch(`/transactions/${id}/paid`, { paid: true, discount: 10.5 })).status).toBe(400);
+
+    // Bills and transfers have no discount for paying on time.
+    const bill = await c.post('/transactions', { type: 'expense', description: 'Aluguel', amount: 1000, date: '2026-10-15', accountId: account });
+    await refuse({ paid: true, paidAt: '2026-10-15', discount: 100 }, 'O desconto por pontualidade vale só para contas a receber', bill.body[0].id);
+    const other = await createAccount(c, { name: 'Reserva', initialBalance: 0 });
+    const transfer = await c.post('/transfers', { fromAccountId: account, toAccountId: other, amount: 1000, date: '2026-10-15', paid: false });
+    await refuse({ paid: true, paidAt: '2026-10-15', discount: 100 }, 'O desconto por pontualidade vale só para contas a receber', transfer.body.id);
+
+    // Nothing was booked by the refused attempts.
+    expect((await c.get('/transactions?type=expense&search=Desconto')).body.total).toBe(0);
+    expect((await c.get(`/transactions/${id}`)).body).toMatchObject({ paid: false, discount: null });
+  });
+
+  it('follows the payment: removed when reopened or no longer on time, else moved with it', async () => {
+    const { id } = await receivable();
+    const inter = await createAccount(c, { name: 'Inter', initialBalance: 0 });
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-10', discount: 2500 });
+
+    // Confirmed again with another date (no discount sent): it moves with the payment.
+    const moved = await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-12', accountId: inter });
+    expect(moved.body.discount).toBe(2500);
+    expect((await discountRows(id)).map((t: any) => [t.date, t.paidAt, t.accountId])).toEqual([['2026-10-12', '2026-10-12', inter]]);
+    // Edited to another account and contact: so is the discount.
+    const supplier = await c.post('/contacts', { name: 'Outro cliente' });
+    expect((await c.put(`/transactions/${id}?scope=one`, { accountId: account, contactId: supplier.body.id })).status).toBe(200);
+    expect((await discountRows(id)).map((t: any) => [t.accountId, t.contactId])).toEqual([[account, supplier.body.id]]);
+    expect((await c.get(`/accounts/${inter}`)).body.balance).toBe(0);
+    expect((await c.get(`/accounts/${account}`)).body.balance).toBe(1000000 + 50000 - 2500);
+    // Never above the receivable: lowering its amount caps the discount.
+    expect((await c.put(`/transactions/${id}?scope=one`, { amount: 2000 })).body.discount).toBe(2000);
+    expect((await c.put(`/transactions/${id}?scope=one`, { amount: 50000 })).body.discount).toBe(2000);
+
+    // The discount row is settled with its receivable: not reopened alone, nor charged extras.
+    const [row] = await discountRows(id);
+    for (const res of [
+      await c.patch(`/transactions/${row.id}/paid`, { paid: false }),
+      await c.put(`/transactions/${row.id}?scope=one`, { paid: false }),
+      await c.patch(`/transactions/${row.id}/paid`, { paid: true, paidAt: '2026-10-20', interest: 100 }),
+      await c.patch(`/transactions/${row.id}/paid`, { paid: true, paidAt: '2026-10-12', discount: 100 }),
+    ]) {
+      expect(res.status).toBe(422);
+    }
+    expect((await c.patch(`/transactions/${row.id}/paid`, { paid: false })).body.message).toContain('reabra o original');
+
+    // Payment re-dated after the due date: no longer on time, so no discount.
+    const late = await c.put(`/transactions/${id}?scope=one`, { paidAt: '2026-10-18' });
+    expect(late.body).toMatchObject({ paidAt: '2026-10-18', discount: null });
+    expect(await discountRows(id)).toEqual([]);
+
+    // Same when confirmed late again through PATCH /paid, and when reopened.
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-15', discount: 500 });
+    expect(await discountRows(id)).toHaveLength(1);
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-19' });
+    expect(await discountRows(id)).toEqual([]);
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-15', discount: 500 });
+    expect((await c.patch(`/transactions/${id}/paid`, { paid: false })).body).toMatchObject({ paid: false, discount: null });
+    expect(await discountRows(id)).toEqual([]);
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-15', discount: 500 });
+    await c.put(`/transactions/${id}?scope=one`, { paid: false });
+    expect(await discountRows(id)).toEqual([]);
+
+    // A later due date keeps an earlier payment on time; an earlier one drops the discount.
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-15', discount: 500 });
+    await c.put(`/transactions/${id}?scope=one`, { date: '2026-10-20' });
+    expect(await discountRows(id)).toHaveLength(1);
+    await c.put(`/transactions/${id}?scope=one`, { date: '2026-10-14' });
+    expect(await discountRows(id)).toEqual([]);
+  });
+
+  it('goes away with the receivable, and the discount row can be deleted alone', async () => {
+    const { id } = await receivable();
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-15', discount: 2500 });
+    const [row] = await discountRows(id);
+    expect((await c.del(`/transactions/${row.id}?scope=one`)).status).toBe(204);
+    expect((await c.get(`/transactions/${id}`)).body).toMatchObject({ paid: true, discount: null });
+
+    await c.patch(`/transactions/${id}/paid`, { paid: true, paidAt: '2026-10-15', discount: 2500 });
+    expect((await c.del(`/transactions/${id}?scope=one`)).status).toBe(204);
+    expect((await c.get('/transactions?type=expense&search=Desconto')).body.total).toBe(0);
+    expect((await c.get(`/accounts/${account}`)).body.balance).toBe(1000000);
+  });
+});
+
 describe('category split', () => {
   it('creates one linked transaction per category and keeps balances and reports right', async () => {
-    const food = await firstCategory(c, 'expense', 'Alimentação');
-    const home = await firstCategory(c, 'expense', 'Moradia');
+    const food = await firstCategory(c, 'expense', 'Administrativo');
+    const home = await firstCategory(c, 'expense', 'Ocupação');
     const res = await c.post('/transactions', {
       type: 'expense',
       description: 'Supermercado + casa',
@@ -440,8 +596,8 @@ describe('category split', () => {
     expect(a.splitGroupId).toBeTruthy();
     expect(b.splitGroupId).toBe(a.splitGroupId);
     expect(res.body.map((t: any) => [t.category.name, t.subcategory?.id ?? null, t.amount, t.paid, t.description])).toEqual([
-      ['Alimentação', food.subcategories[0]!.id, 6000, true, 'Supermercado + casa'],
-      ['Moradia', null, 4000, true, 'Supermercado + casa'],
+      ['Administrativo', food.subcategories[0]!.id, 6000, true, 'Supermercado + casa'],
+      ['Ocupação', null, 4000, true, 'Supermercado + casa'],
     ]);
 
     const acc = await c.get(`/accounts/${account}`);
@@ -449,12 +605,12 @@ describe('category split', () => {
 
     const report = await c.get('/reports/categories?from=2026-10-01&to=2026-10-31&type=expense');
     const byName = Object.fromEntries(report.body.series.map((s: any) => [s.name, s.total]));
-    expect(byName).toMatchObject({ Alimentação: 6000, Moradia: 4000 });
+    expect(byName).toMatchObject({ Administrativo: 6000, Ocupação: 4000 });
   });
 
   it('splits installments per part and rejects parts that do not add up', async () => {
-    const food = await firstCategory(c, 'expense', 'Alimentação');
-    const home = await firstCategory(c, 'expense', 'Moradia');
+    const food = await firstCategory(c, 'expense', 'Administrativo');
+    const home = await firstCategory(c, 'expense', 'Ocupação');
     const ok = await c.post('/transactions', {
       type: 'expense',
       description: 'Compra parcelada',
@@ -471,8 +627,8 @@ describe('category split', () => {
     expect(ok.status).toBe(201);
     expect(ok.body).toHaveLength(6);
     const byCategory = (name: string) => ok.body.filter((t: any) => t.category.name === name).map((t: any) => t.amount);
-    expect(byCategory('Alimentação')).toEqual([2000, 2000, 2000]);
-    expect(byCategory('Moradia')).toEqual([1000, 1000, 1000]);
+    expect(byCategory('Administrativo')).toEqual([2000, 2000, 2000]);
+    expect(byCategory('Ocupação')).toEqual([1000, 1000, 1000]);
     expect(new Set(ok.body.map((t: any) => t.splitGroupId)).size).toBe(1);
 
     const bad = await c.post('/transactions', {
@@ -490,7 +646,7 @@ describe('category split', () => {
   });
 
   it('rejects categories of the wrong type or from another user', async () => {
-    const food = await firstCategory(c, 'expense', 'Alimentação');
+    const food = await firstCategory(c, 'expense', 'Administrativo');
     const salary = await firstCategory(c, 'income');
     const wrongType = await c.post('/transactions', {
       type: 'expense',
@@ -505,7 +661,7 @@ describe('category split', () => {
     expect(wrongType.status).toBeGreaterThanOrEqual(400);
 
     const other = await registerUser(app, 'Outra pessoa');
-    const theirs = await firstCategory(other, 'expense', 'Moradia');
+    const theirs = await firstCategory(other, 'expense', 'Ocupação');
     const foreign = await c.post('/transactions', {
       type: 'expense',
       description: 'x',

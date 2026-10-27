@@ -49,7 +49,6 @@ export default function TransfersPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Movimentações"
         title="Transferências e investimentos"
         description="Mova dinheiro entre contas, aplique em investimentos e acompanhe o saldo investido à parte."
         actions={

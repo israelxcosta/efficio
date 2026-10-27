@@ -1,8 +1,8 @@
 // Runs the in-browser API (PGlite + real route plugins) in Node to guard the demo build.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { addMonths, monthKey, todayISO } from '@effinance/shared';
+import { addMonthKey, addMonths, daysInMonth, discountAmount, monthKey, todayISO } from '@effinance/shared';
 import { demoFetch } from './fetch';
-import { DEMO_EMAIL, DEMO_PARTNER_EMAIL, DEMO_PASSWORD, getDemoServer } from './server';
+import { DEMO_EMAIL, DEMO_PASSWORD, getDemoServer } from './server';
 
 async function call(method: string, path: string, body?: unknown) {
   const res = await demoFetch(`/api${path}`, { method, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -15,6 +15,23 @@ const month = monthKey(todayISO());
 const formatCompetence = (key: string) => `${key.slice(5)}/${key.slice(0, 4)}`;
 const from = `${month}-01`;
 const to = `${month}-28`;
+/** Due date of a competence's fee: `day` of the following month, clamped to its length. */
+function feeDue(competence: string, day: number) {
+  const next = addMonthKey(competence, 1);
+  const [year, monthNumber] = next.split('-').map(Number) as [number, number];
+  return `${next}-${String(Math.min(day, daysInMonth(year, monthNumber))).padStart(2, '0')}`;
+}
+/** The office's company (only workspace of the demo user) and a second one created by the suite. */
+const OFFICE = 'Efficio Contabilidade';
+const BRANCH = 'Filial Demo';
+
+async function switchTo(name: string) {
+  const me = (await call('GET', '/auth/me')).body;
+  const workspace = me.workspaces.find((w: { name: string }) => w.name === name);
+  const res = await call('POST', '/auth/switch-workspace', { workspaceId: workspace.id });
+  expect(res.status).toBe(200);
+  return res.body;
+}
 
 describe('demo api (PGlite)', () => {
   beforeAll(async () => {
@@ -29,10 +46,10 @@ describe('demo api (PGlite)', () => {
     expect(ok.status).toBe(200);
     const me = (await call('GET', '/auth/me')).body;
     expect(me.user.email).toBe(DEMO_EMAIL);
-    // The office (business workspace) opens first.
-    expect(me.workspace).toMatchObject({ name: 'Efficio Contabilidade', kind: 'business', role: 'owner' });
-    expect(me.workspace.subscription).toMatchObject({ status: 'active', canWrite: true });
-    expect(me.workspaces.map((w: { name: string }) => w.name)).toEqual(['Pessoal', 'Efficio Contabilidade', 'Família Costa']);
+    // Business only: the office, created with the account, is her only workspace.
+    expect(me.workspace).toMatchObject({ name: OFFICE, kind: 'business', role: 'owner' });
+    expect(me.workspace.subscription).toMatchObject({ status: 'active', canWrite: true, planCode: 'business_monthly' });
+    expect(me.workspaces.map((w: { name: string }) => w.name)).toEqual([OFFICE]);
   });
 
   it('has the office clients, fee periods, suppliers and receivables (migration 0007 applied)', async () => {
@@ -46,7 +63,10 @@ describe('demo api (PGlite)', () => {
     expect(pending.latestFee.endDate < todayISO()).toBe(true);
 
     const bakery = all.items.find((c: { tradeName: string }) => c.tradeName === 'Pão Quente');
-    expect(bakery.currentFee).toMatchObject({ amount: 78000, employeeFee: 3500 });
+    expect(bakery).toMatchObject({ feeDueDay: 5, currentFee: { amount: 78000, employeeFee: 3500, discountBps: 200 } });
+    // Due days vary per client (migration 0010).
+    const dueDays = new Set<number>(all.items.map((c: { feeDueDay: number }) => c.feeDueDay));
+    expect([...dueDays].sort((a, b) => a - b)).toEqual([5, 10, 15, 20]);
     const fees = (await call('GET', `/clients/${bakery.id}/fees`)).body;
     expect(fees.items[0].startDate <= todayISO() && todayISO() <= fees.items[0].endDate).toBe(true);
     expect(fees.items.at(-1).startDate).toBe(bakery.contractStartDate);
@@ -62,8 +82,37 @@ describe('demo api (PGlite)', () => {
     // This month's receivable is the fee of last month's competence ("Gerar honorários").
     const receivables = (await call('GET', `/transactions?type=income&contactId=${bakery.id}&from=${from}&to=${to}`)).body;
     const fee = receivables.items.find((t: { feeKind: string | null }) => t.feeKind === 'fee');
-    expect(fee).toMatchObject({ contactId: bakery.id, amount: 78000, feeCompetence: monthKey(addMonths(from, -1)), category: { name: 'Serviços Prestados' } });
+    expect(fee).toMatchObject({
+      contactId: bakery.id,
+      amount: 78000,
+      date: `${month}-05`,
+      feeCompetence: monthKey(addMonths(from, -1)),
+      feeDiscountBps: 200,
+      category: { name: 'Serviços Prestados' },
+    });
     expect(fee.description).toBe(`Honorários ref. ${formatCompetence(monthKey(addMonths(from, -1)))} - Pão Quente`);
+
+    // Punctuality discount: received by the due date → a linked "Descontos concedidos" expense.
+    const paidFees = async (clientId: string) =>
+      (await call('GET', `/transactions?type=income&status=paid&contactId=${clientId}&pageSize=100`)).body.items.filter(
+        (t: { feeKind: string | null }) => t.feeKind === 'fee',
+      );
+    const tecnova = all.items.find((c: { tradeName: string }) => c.tradeName === 'Tecnova');
+    expect(tecnova).toMatchObject({ feeDueDay: 10, currentFee: { discountBps: 500 } });
+    const tecnovaFees = await paidFees(tecnova.id);
+    expect(tecnovaFees.length).toBeGreaterThan(5);
+    for (const t of tecnovaFees) expect(t).toMatchObject({ feeDiscountBps: 500, discount: discountAmount(t.amount, 500) });
+    const bakeryFees = await paidFees(bakery.id);
+    const onTime = bakeryFees.filter((t: { paidAt: string; date: string }) => t.paidAt <= t.date);
+    const late = bakeryFees.filter((t: { paidAt: string; date: string }) => t.paidAt > t.date);
+    expect(onTime.length).toBeGreaterThan(0);
+    expect(late.length).toBeGreaterThan(0);
+    for (const t of onTime) expect(t.discount).toBe(discountAmount(t.amount, 200));
+    for (const t of late) expect(t.discount).toBeNull();
+    const discounts = (await call('GET', `/transactions?type=expense&contactId=${tecnova.id}&pageSize=100`)).body.items;
+    expect(discounts).toHaveLength(tecnovaFees.length);
+    expect(discounts[0]).toMatchObject({ paid: true, category: { name: 'Despesas financeiras' }, subcategory: { name: 'Descontos concedidos' } });
+    expect(discounts[0].description).toMatch(/^Desconto — Honorários ref\. /);
 
     // Payment history behind the delinquency report and the overdue widgets (migration 0008).
     const report = (await call('GET', '/reports/delinquency?months=12')).body;
@@ -93,8 +142,19 @@ describe('demo api (PGlite)', () => {
     expect(preview.created.every((x: { transactionId: string | null }) => x.transactionId === null)).toBe(true);
     const generated = await call('POST', '/fee-charges/generate', { competence: month });
     expect(generated.status).toBe(201);
-    expect(generated.body).toMatchObject({ competence: month, dueDate: `${monthKey(addMonths(from, 1))}-10` });
+    expect(generated.body).toMatchObject({ competence: month, dryRun: false });
     expect(generated.body.created).toHaveLength(7);
+    // Each fee is due on its client's day of next month and carries the period's discount.
+    const clientById = new Map(all.items.map((c: { id: string }) => [c.id, c]));
+    for (const item of generated.body.created) {
+      const client = clientById.get(item.clientId) as { feeDueDay: number; currentFee: { discountBps: number } };
+      expect(item.dueDate).toBe(feeDue(month, client.feeDueDay));
+      expect(item.discountBps).toBe(client.currentFee.discountBps);
+    }
+    expect(generated.body.created.find((x: { clientId: string }) => x.clientId === tecnova.id)).toMatchObject({
+      dueDate: feeDue(month, 10),
+      discountBps: 500,
+    });
     expect(generated.body.skipped.map((x: { reason: string }) => x.reason).sort()).toEqual(['inactive', 'inactive', 'no_current_fee']);
     const again = (await call('POST', '/fee-charges/generate', { competence: month, dryRun: true })).body;
     expect(again.created).toEqual([]);
@@ -102,12 +162,14 @@ describe('demo api (PGlite)', () => {
     const bakeryFee = generated.body.created.find((x: { clientId: string }) => x.clientId === bakery.id);
     const employees = await call('POST', `/fee-charges/${bakeryFee.transactionId}/employees`, { employees: 5 });
     expect(employees.body).toMatchObject({ employees: 5, rate: 3500, amount: 17500 });
-    expect(employees.body.transaction).toMatchObject({ feeKind: 'employees', feeOf: bakeryFee.transactionId, subcategory: { name: 'Folha de pagamento' } });
-
-    // The rest of the suite runs in Marina's personal workspace (cards, goals, integrations).
-    const me = (await call('GET', '/auth/me')).body;
-    const personal = me.workspaces.find((w: { kind: string }) => w.kind === 'personal');
-    expect((await call('POST', '/auth/switch-workspace', { workspaceId: personal.id })).status).toBe(200);
+    expect(employees.body.transaction).toMatchObject({
+      feeKind: 'employees',
+      feeOf: bakeryFee.transactionId,
+      date: bakeryFee.dueDate,
+      feeDiscountBps: null,
+      subcategory: { name: 'Folha de pagamento' },
+    });
+    // The rest of the suite runs in the office too.
   });
 
   it('serves dashboard, statement and every report', async () => {
@@ -186,30 +248,34 @@ describe('demo api (PGlite)', () => {
 
   it('keeps workspaces isolated with RLS and encrypts personal data in PGlite', async () => {
     const { client } = await getDemoServer();
-    const me = (await call('GET', '/auth/me')).body;
-    const family = me.workspaces.find((w: { kind: string }) => w.kind === 'family');
+    const officeAccounts = (await call('GET', '/accounts')).body.map((a: { name: string }) => a.name);
+    expect(officeAccounts).toEqual(expect.arrayContaining(['Caixa', 'Conta PJ Inter']));
 
-    const personalAccounts = (await call('GET', '/accounts')).body.map((a: { name: string }) => a.name);
-    const switched = await call('POST', '/auth/switch-workspace', { workspaceId: family.id });
-    expect(switched.body.workspace).toMatchObject({ name: 'Família Costa', role: 'owner', subscription: { status: 'active' } });
-    const familyAccounts = (await call('GET', '/accounts')).body.map((a: { name: string }) => a.name);
-    expect(familyAccounts).toContain('Conta conjunta');
-    expect(familyAccounts).not.toEqual(expect.arrayContaining(personalAccounts.filter((n: string) => n !== 'Carteira')));
+    // A second company: business by default, its own categories, nothing of the office.
+    const created = await call('POST', '/workspaces', { name: BRANCH });
+    expect(created).toMatchObject({ status: 201, body: { name: BRANCH, kind: 'business', role: 'owner', subscription: { status: 'trialing' } } });
+    const switched = await switchTo(BRANCH);
+    expect(switched.workspace).toMatchObject({ id: created.body.id, name: BRANCH });
+    expect((await call('GET', '/accounts')).body).toEqual([]);
+    expect((await call('GET', '/clients?status=all')).body.total).toBe(0);
+    expect((await call('GET', '/categories?type=income')).body.map((c: { name: string }) => c.name)).toContain('Serviços Prestados');
+    expect((await call('POST', '/accounts', { name: 'Conta da filial', type: 'checking' })).status).toBe(201);
+    expect((await call('GET', '/accounts')).body.map((a: { name: string }) => a.name)).toEqual(['Conta da filial']);
     const members = (await call('GET', '/workspaces/current/members')).body;
-    expect(members.map((m: { email: string }) => m.email)).toEqual([DEMO_EMAIL, DEMO_PARTNER_EMAIL]);
+    expect(members.map((m: { email: string }) => m.email)).toEqual([DEMO_EMAIL]);
 
     // The tenant role only sees the workspace pinned in the transaction.
     const visible = await client.transaction(async (tx) => {
-      await tx.query(`select set_config('role', 'effinance_app', true), set_config('app.workspace_id', $1, true)`, [family.id]);
-      return (await tx.query<{ n: number }>('select count(distinct workspace_id)::int as n from accounts')).rows[0]!.n;
+      await tx.query(`select set_config('role', 'effinance_app', true), set_config('app.workspace_id', $1, true)`, [created.body.id]);
+      return (await tx.query<{ n: number; names: string[] }>('select count(distinct workspace_id)::int as n, array_agg(name) as names from accounts')).rows[0]!;
     });
-    expect(visible).toBe(1);
+    expect(visible).toEqual({ n: 1, names: ['Conta da filial'] });
 
     const invite = await call('POST', '/workspaces/current/invites', { email: 'amiga@demo.app', role: 'viewer' });
     expect(invite.status).toBe(201);
     expect(invite.body.inviteUrl).toContain('/convite/');
 
-    await call('POST', '/auth/switch-workspace', { workspaceId: me.workspace.id });
+    await switchTo(OFFICE);
     const contacts = (await client.query<{ email: string | null }>('select email from contacts where email is not null')).rows;
     expect(contacts.length).toBeGreaterThan(0);
     expect(contacts.every((c) => c.email!.startsWith('v1.'))).toBe(true);
@@ -218,11 +284,24 @@ describe('demo api (PGlite)', () => {
   });
 
   it('runs the fake checkout and activates a plan', async () => {
-    const checkout = await call('POST', '/billing/checkout', { planCode: 'individual_monthly' });
-    expect(checkout.body.checkoutUrl).toContain('#/configuracoes?aba=assinatura&simular=individual_monthly');
-    const active = await call('POST', '/billing/dev/activate', { planCode: 'individual_monthly' });
-    expect(active.body).toMatchObject({ status: 'active', canWrite: true, plan: { code: 'individual_monthly' } });
+    // The office already subscribes to the Empresa plan; the new company is in trial.
+    expect((await call('POST', '/billing/checkout', { planCode: 'business_monthly' })).status).toBe(422);
+    await switchTo(BRANCH);
+    expect((await call('POST', '/billing/checkout', { planCode: 'individual_monthly' })).status).toBe(422);
+    const checkout = await call('POST', '/billing/checkout', { planCode: 'business_monthly' });
+    expect(checkout.body.checkoutUrl).toContain('#/configuracoes?aba=assinatura&simular=business_monthly');
+    const active = await call('POST', '/billing/dev/activate', { planCode: 'business_monthly' });
+    expect(active.body).toMatchObject({ status: 'active', canWrite: true, plan: { code: 'business_monthly' } });
     expect((await call('GET', '/billing/plans')).body).toHaveLength(4);
+
+    // Deleting the extra company is allowed; the last one is not.
+    expect((await call('DELETE', '/workspaces/current', { confirmName: BRANCH })).status).toBe(204);
+    const me = (await call('GET', '/auth/me')).body;
+    expect(me.workspace.name).toBe(OFFICE);
+    expect(me.workspaces).toHaveLength(1);
+    const last = await call('DELETE', '/workspaces/current', { confirmName: OFFICE });
+    expect(last.status).toBe(422);
+    expect(last.body.message).toContain('Mantenha ao menos uma empresa');
   });
 
   it('has the seeded integrations and imports/undoes a CSV statement', async () => {
@@ -271,7 +350,9 @@ describe('demo api (PGlite)', () => {
     const created = await call('POST', '/open-finance/connections', { itemId });
     expect(created.status).toBe(201);
     const connection = created.body;
-    const card = (await call('GET', '/credit-cards')).body[0];
+    // The office has no card yet: a corporate one receives the bank's card feed.
+    const card = (await call('POST', '/credit-cards', { name: 'Cartão PJ', bank: 'nubank', brand: 'mastercard', limit: 1000000, closingDay: 3, dueDay: 10 })).body;
+    expect(card.id).toBeTruthy();
     const linked = await call('PUT', `/open-finance/connections/${connection.id}/accounts`, {
       links: [
         { connectionAccountId: connection.accounts[0].id, target: { kind: 'new' } },
@@ -292,11 +373,22 @@ describe('demo api (PGlite)', () => {
     expect(ids.every((r) => r.id.startsWith('v1.') && !r.id.includes(itemId))).toBe(true);
   });
 
-  it('registers new users with default categories', async () => {
-    const reg = await call('POST', '/auth/register', { name: 'Teste', email: 'teste@demo.app', password: 'senha12345', acceptTerms: true });
+  it('registers new users with their company and business categories', async () => {
+    const reg = await call('POST', '/auth/register', {
+      name: 'Teste',
+      email: 'teste@demo.app',
+      password: 'senha12345',
+      companyName: 'Teste Contábil Ltda',
+      acceptTerms: true,
+    });
     expect(reg.status).toBe(201);
+    const me = (await call('GET', '/auth/me')).body;
+    expect(me.workspace).toMatchObject({ name: 'Teste Contábil Ltda', kind: 'business', role: 'owner', subscription: { status: 'trialing' } });
+    expect(me.workspaces).toHaveLength(1);
+    expect((await call('GET', '/accounts')).body.map((a: { name: string }) => a.name)).toEqual(['Caixa']);
     const cats = await call('GET', '/categories');
     expect(cats.body.length).toBeGreaterThan(5);
+    expect(cats.body.map((c: { name: string }) => c.name)).toEqual(expect.arrayContaining(['Serviços Prestados', 'Despesas financeiras']));
     const sessions = await call('GET', '/auth/sessions');
     expect(sessions.body).toEqual([expect.objectContaining({ current: true })]);
     expect((await call('POST', '/auth/logout')).status).toBe(204);

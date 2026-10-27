@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { ArrowUpRight, ChevronLeft, ChevronRight, Landmark, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Landmark } from 'lucide-react';
 import { ACCOUNT_TYPE_LABELS, formatBRL, type Account, type HealthScore, type Insight } from '@effinance/shared';
 import { Gauge } from '@/components/charts/gauge';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useElementSize } from '@/lib/use-element-size';
 import { cn, pluralize } from '@/lib/utils';
 import { HEALTH_INFO, HEALTH_TONE } from '../components/health-card';
-import { INSIGHT_ICONS, INSIGHT_LABELS } from '../components/insight-card';
+import { INSIGHT_LABELS } from '../components/insight-card';
 import type { WidgetProps } from '../layout/types';
 import { FitList, WidgetCard } from '../layout/widget-card';
 import { BodyEmpty, ListSkeleton } from './shared';
@@ -254,151 +254,83 @@ export function BalancesWidget({ d, loading, size, alert }: WidgetProps) {
 // Insights
 // ---------------------------------------------------------------------------
 
-/** Line height (px) of `text-caption`: the description shows as many lines as its box holds. */
-const CAPTION_LINE_PX = 16;
+const KIND_TONE: Record<Insight['kind'], string> = {
+  warning: 'text-danger',
+  opportunity: 'text-muted',
+  achievement: 'text-muted',
+  info: 'text-muted',
+};
 
-const heroButton =
-  'flex size-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-white [&_svg]:size-3.5';
-
-function KindChip({ insight }: { insight: Insight }) {
-  const Icon = INSIGHT_ICONS[insight.kind];
+/** One insight: its kind in words (red only for a warning), the finding, the detail and the link. */
+function InsightItem({ insight, clamp }: { insight: Insight; clamp: 1 | 2 | 3 }) {
   return (
-    <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full bg-white/15 px-2 text-micro font-medium text-white/90">
-      <Icon className="size-3" aria-hidden /> {INSIGHT_LABELS[insight.kind]}
-    </span>
-  );
-}
-
-/** One insight at a time with previous/next buttons; the description fills the remaining height. */
-function InsightCarousel({ insights, index, onStep, dots }: { insights: Insight[]; index: number; onStep: (step: number) => void; dots: boolean }) {
-  const desc = useElementSize<HTMLParagraphElement>();
-  const current = insights[index]!;
-  const lines = Math.max(1, Math.floor(desc.height / CAPTION_LINE_PX));
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-white/12 bg-white/8 px-3 py-2.5" aria-live="polite">
-        <div className="flex shrink-0 items-center gap-1.5">
-          <KindChip insight={current} />
-          {current.href ? (
-            <Link to={current.href} className="text-white/65 hover:text-white" aria-label="Abrir análise">
-              <ArrowUpRight className="size-3.5" />
-            </Link>
-          ) : null}
-          {insights.length > 1 ? (
-            <div className="ml-auto flex items-center gap-1">
-              <button type="button" onClick={() => onStep(-1)} className={heroButton} aria-label="Insight anterior">
-                <ChevronLeft />
-              </button>
-              <span className="min-w-7 text-center text-micro text-white/70 tabular">
-                {index + 1}/{insights.length}
-              </span>
-              <button type="button" onClick={() => onStep(1)} className={heroButton} aria-label="Próximo insight">
-                <ChevronRight />
-              </button>
-            </div>
-          ) : null}
-        </div>
-        <p className="mt-1.5 shrink-0 truncate text-body-sm font-semibold text-white" title={current.title}>
-          {current.title}
-        </p>
-        <p
-          ref={desc.ref}
-          className="mt-0.5 min-h-0 flex-1 overflow-hidden text-caption text-white/70"
-          style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: lines }}
-        >
-          {current.description}
-        </p>
-      </div>
-      {dots && insights.length > 1 ? (
-        <div className="mt-2 flex shrink-0 justify-center gap-1.5" aria-hidden>
-          {insights.map((_, i) => (
-            <span key={i} className={cn('h-1.5 rounded-full transition-all', i === index ? 'w-4 bg-white' : 'w-1.5 bg-white/30')} />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** Every insight as a row, cut to the card's height ("+ N" opens the "Dashboard inteligente" tab). */
-function InsightRows({ insights }: { insights: Insight[] }) {
-  return (
-    // FitList's "+ N" line is styled for light cards: repaint it for the navy gradient.
-    <div className="flex min-h-0 flex-1 flex-col [&>div>p]:text-white/70 [&>div>p_a]:text-white">
-      <FitList
-        items={insights}
-        getKey={(ins) => `${ins.kind}:${ins.title}`}
-        moreLabel="insight(s)"
-        moreHref="/?aba=insights"
-        className="flex flex-col gap-2"
-        renderItem={(ins) => {
-          const Icon = INSIGHT_ICONS[ins.kind];
-          return (
-            <div className="flex items-start gap-2.5 rounded-lg border border-white/12 bg-white/8 px-2.5 py-2">
-              <span className="mt-px flex size-6 shrink-0 items-center justify-center rounded-md bg-white/15 text-white" title={INSIGHT_LABELS[ins.kind]}>
-                <Icon className="size-3.5" aria-hidden />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-body-sm font-semibold text-white" title={ins.title}>
-                  <span className="sr-only">{INSIGHT_LABELS[ins.kind]}: </span>
-                  {ins.title}
-                </p>
-                <p className="line-clamp-2 text-caption text-white/70">{ins.description}</p>
-              </div>
-              {ins.href ? (
-                <Link to={ins.href} className="mt-0.5 shrink-0 text-white/60 hover:text-white" aria-label={`Abrir análise: ${ins.title}`}>
-                  <ArrowUpRight className="size-3.5" />
-                </Link>
-              ) : null}
-            </div>
-          );
-        }}
-      />
+    <div className="flex min-w-0 flex-col">
+      <p className={cn('text-caption font-medium', KIND_TONE[insight.kind])}>{INSIGHT_LABELS[insight.kind]}</p>
+      <p className="mt-0.5 line-clamp-2 text-body-sm font-semibold text-fg" title={insight.title}>
+        {insight.href ? (
+          <Link to={insight.href} className="hover:underline">
+            {insight.title}
+            <ArrowUpRight className="ml-0.5 inline size-3.5 text-subtle" aria-hidden />
+          </Link>
+        ) : (
+          insight.title
+        )}
+      </p>
+      <p className={cn('mt-0.5 text-caption text-muted', clamp === 1 ? 'line-clamp-1' : clamp === 2 ? 'line-clamp-2' : 'line-clamp-3')}>{insight.description}</p>
     </div>
   );
 }
 
 /**
- * "Insights" (navy card): a carousel on small cards (at 2 rows without subtitle and dots so it fits);
- * on tall or wide cards every insight is listed.
+ * "Insights": every insight of the month in plain text. Wide cards set them side by side, split by
+ * thin rules; narrow ones list them, cut to the height ("+ N" opens the "Dashboard inteligente" tab).
  */
-export function InsightsWidget({ d, loading, size, month, alert }: WidgetProps) {
+export function InsightsWidget({ d, loading, size, alert }: WidgetProps) {
   const insights = d?.insights ?? [];
-  const [pos, setPos] = useState({ month, index: 0 });
-  const index = pos.month === month ? Math.min(pos.index, Math.max(0, insights.length - 1)) : 0;
-  const compact = size.r <= 2;
-  const asList = !compact && (size.r >= 4 || size.c >= 2) && insights.length > 1;
+  const columns = Math.min(4, size.c >= 3 ? 4 : size.c >= 2 ? 2 : 1);
 
   let body;
   if (loading || !d) {
-    body = <Skeleton className="min-h-0 flex-1 rounded-lg bg-white/10" />;
+    body = <ListSkeleton />;
   } else if (insights.length === 0) {
+    body = <BodyEmpty title="Sem insights neste mês" description="Assim que houver movimentações, aparecem aqui as análises do mês." />;
+  } else if (columns > 1) {
+    const shown = insights.slice(0, columns);
     body = (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border border-dashed border-white/20 px-3 text-center">
-        <Sparkles className="size-4 shrink-0 text-white/60" aria-hidden />
-        <p className="text-body-sm font-semibold text-white">Sem insights neste mês</p>
-        {compact ? null : <p className="text-caption text-white/65">Assim que houver movimentações, trago análises e recomendações do mês.</p>}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ul className="grid min-h-0 flex-1 gap-x-5 gap-y-3" style={{ gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))` }}>
+          {shown.map((ins, i) => (
+            <li key={`${ins.kind}:${ins.title}`} className={cn('min-w-0', i > 0 && 'border-l border-border pl-5')}>
+              <InsightItem insight={ins} clamp={size.r >= 3 ? 3 : 2} />
+            </li>
+          ))}
+        </ul>
+        {insights.length > shown.length ? (
+          <Link to="/?aba=insights" className="mt-1.5 shrink-0 text-caption font-medium text-brand-text hover:underline">
+            + {pluralize(insights.length - shown.length, 'insight', 'insights')} no Dashboard inteligente
+          </Link>
+        ) : null}
       </div>
     );
-  } else if (asList) {
-    body = <InsightRows insights={insights} />;
   } else {
     body = (
-      <InsightCarousel
-        insights={insights}
-        index={index}
-        dots={!compact}
-        onStep={(step) => setPos({ month, index: (index + step + insights.length) % insights.length })}
+      <FitList
+        items={insights}
+        getKey={(ins) => `${ins.kind}:${ins.title}`}
+        moreLabel="insight(s)"
+        moreHref="/?aba=insights"
+        className="flex flex-col divide-y divide-border"
+        renderItem={(ins) => (
+          <div className="py-1.5 first:pt-0">
+            <InsightItem insight={ins} clamp={1} />
+          </div>
+        )}
       />
     );
   }
 
   return (
-    <WidgetCard
-      variant="hero"
-      alert={alert}
-      subtitle={compact ? undefined : insights.length ? `${pluralize(insights.length, 'análise', 'análises')} do mês` : 'Análises automáticas do mês'}
-    >
+    <WidgetCard alert={alert} subtitle={insights.length ? `${pluralize(insights.length, 'análise', 'análises')} do mês` : 'Análises automáticas do mês'}>
       {body}
     </WidgetCard>
   );

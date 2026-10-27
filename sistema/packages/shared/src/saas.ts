@@ -302,9 +302,10 @@ export const switchWorkspaceSchema = z.object({
 
 export const workspaceInputSchema = z.object({
   name: z.string().trim().min(1, { message: 'Informe o nome' }).max(60),
-  kind: z.enum(['family', 'business']),
+  /** Companies only in the interface; 'family' stays accepted for compatibility with older clients. */
+  kind: z.enum(['family', 'business']).default('business'),
 });
-export type WorkspaceInput = z.infer<typeof workspaceInputSchema>;
+export type WorkspaceInput = z.input<typeof workspaceInputSchema>;
 
 export const workspaceUpdateSchema = z.object({
   name: z.string().trim().min(1, { message: 'Informe o nome' }).max(60),

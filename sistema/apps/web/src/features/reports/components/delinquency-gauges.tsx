@@ -8,7 +8,7 @@ import { formatChance, PROBABILITY_ZONES, probabilityZone } from '../delinquency
 export const RISK_TONE: Record<DelinquencyRisk, { text: string; bg: string; soft: string; color: string }> = {
   baixo: { text: 'text-success', bg: 'bg-success', soft: 'bg-success-soft text-success', color: 'var(--app-success)' },
   moderado: { text: 'text-warning', bg: 'bg-warning', soft: 'bg-warning-soft text-warning', color: 'var(--app-warning)' },
-  alto: { text: 'text-aging-2', bg: 'bg-aging-2', soft: 'bg-aging-2/15 text-aging-2', color: 'var(--app-aging-2)' },
+  alto: { text: 'text-aging-3', bg: 'bg-aging-2', soft: 'bg-aging-2/15 text-aging-3', color: 'var(--app-aging-2)' },
   critico: { text: 'text-danger', bg: 'bg-danger', soft: 'bg-danger-soft text-danger', color: 'var(--app-danger)' },
 };
 
@@ -110,7 +110,8 @@ export function ScoreBar({ score, risk, className }: { score: number; risk: Deli
   const pct = Math.max(0, Math.min(1000, score)) / 10;
   return (
     <span className={cn('block h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle', className)} aria-hidden>
-      <span className={cn('block h-full min-w-1 rounded-full', RISK_TONE[risk].bg)} style={{ width: `${pct}%` }} />
+      {/* Grey for a good payer: colour only on the clients at risk. */}
+      <span className={cn('block h-full min-w-1 rounded-full', risk === 'baixo' ? 'bg-[var(--app-chart-neutral)]' : RISK_TONE[risk].bg)} style={{ width: `${pct}%` }} />
     </span>
   );
 }

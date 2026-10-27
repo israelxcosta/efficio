@@ -40,7 +40,6 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        overline="Conta"
         title="Configurações"
         description={
           workspace ? (

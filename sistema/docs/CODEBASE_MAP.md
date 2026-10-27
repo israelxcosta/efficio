@@ -62,7 +62,7 @@ sistema/
 │   └── utils/                  datas, dinheiro, documentos, fatura, recorrência, vigências,
 │                               juros/multa (late-fees) e score de inadimplência (delinquency)
 ├── apps/api/
-│   ├── drizzle/0000…0009*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
+│   ├── drizzle/0000…0010*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
 │   ├── src/app.ts, server.ts   montagem do Fastify, hooks globais, árvore de rotas
 │   ├── src/routes.ts           domainRoutes (tenantRoutes) e scopedRoutes (inTenant)
 │   ├── src/setup.ts, env.ts    providers (e-mail, cobrança, Open Finance, CNPJ) e env validado
@@ -171,7 +171,8 @@ sequenceDiagram
   Busca exata por índice cego (HMAC). Nomes e descrições ficam em claro.
 - **Migrações:** 0000 inicial · 0001 divisão · 0002 espaços · 0003 RLS · 0004 integridade de tenant ·
   0005 importação/Open Finance · 0006 tombstones · 0007 clientes e vigências · 0008 juros e multa ·
-  0009 geração de honorários. Escritas para rodar duas vezes e também no PGlite.
+  0009 geração de honorários · 0010 vencimento por cliente e desconto por pontualidade. Escritas
+  para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tokens, sessões e trials usam o relógio real.
 

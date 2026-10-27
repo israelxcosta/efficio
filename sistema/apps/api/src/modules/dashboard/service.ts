@@ -105,10 +105,10 @@ export function computeHealth(input: {
 
   const factors: HealthScore['factors'] = [
     {
-      label: 'Taxa de economia',
+      label: 'Margem',
       score: savings,
       max: 300,
-      hint: `Você poupou ${Math.round(rate * 100)}% da renda nos últimos 3 meses (meta: 20%).`,
+      hint: `Margem de ${Math.round(rate * 100)}% das receitas nos últimos 3 meses (referência: 20%).`,
     },
     {
       label: 'Reserva de emergência',

@@ -170,3 +170,27 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
   edição em Sheet.
 - **Relatórios**: abas por análise, seletor de período global, gráficos Recharts com tooltips
   formatados em R$, tabelas de apoio e frases de insight.
+
+## 5. Revisão "livro-razão" (out/2026)
+
+Aplicada a partir da análise com as skills `design-taste-frontend` (telas de app) e `frontend-design`.
+Prevalece sobre os itens acima quando houver conflito.
+
+- **Cor só nos dados.** Fundo `#f2f4f7` (papel de livro-razão), cartões brancos com borda `--app-border`, sem
+  sombra em repouso (sombra só em menus, diálogos e popovers). Um tom de dado, `--app-data` (`#2f5fbf`), na série
+  principal de cada gráfico; despesas e comparações em cinza. Verde/vermelho só como sinal (variação, atraso,
+  resultado negativo); valores em tinta, zero em cinza, sinal no texto (`+R$` para receitas).
+- **Sem degradês, vidro, arco-íris ou ícones em quadradinhos coloridos.** Categorias usam a rampa azul por
+  posição (`SERIES_PALETTE`); `CategoryIcon` é neutro nas listas (`tinted` só no editor/seletor de categorias).
+  Hachura só para o que está em aberto/previsto. Regimes tributários mantêm cores próprias (`REGIME_COLORS`).
+- **Tipografia** (densidade média): linhas e valores 14px, título de card 16px, meta 12–12,5px, eixos 11px;
+  nada abaixo de 11px. Rótulos em caixa normal (sem caixa alta espaçada; `eyebrow` virou rótulo comum).
+- **Grade do dashboard:** linhas de 96px (88px em 2 colunas), espaçamento 16px, cartões com 20px de padding.
+- **Títulos:** toda tela tem um `h1`; a linha abaixo fala dos dados (mês, regime de competência/caixa), não da
+  interface. O dashboard mostra o achado do mês (vencidos e quem concentra) ao lado do link para agir.
+- **Elemento próprio:** a "Régua da competência" (um quadro por cliente: pago, em aberto, atrasado, não gerado).
+- **Barras de rolagem** finas, com polegar arredondado e sem setas; `Modal` rola só o corpo, com cabeçalho e
+  rodapé fixos, para não cortar os cantos arredondados.
+- **Checagem:** `node ~/.claude/skills/design-taste-frontend/scripts/lint.mjs --app src/...` (0 FAIL) e
+  `inspect.mjs --app` nas telas. Falsos positivos conhecidos: o `<span>` de medição do Recharts encostado na
+  borda e o texto dentro do logo do banco.

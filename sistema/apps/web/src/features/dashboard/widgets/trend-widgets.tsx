@@ -348,7 +348,7 @@ export function CompositionWidget({ month, prefs, setPref, alert }: WidgetProps)
 
   const { series, rows, grouped } = useMemo(() => {
     const { items, grouped } = groupSeries(r?.series ?? [], 8);
-    const series = items.map((s, i) => ({ ...s, color: tone(s.color || SERIES_PALETTE[i % SERIES_PALETTE.length]!) }));
+    const series = items.map((s, i) => ({ ...s, color: tone(SERIES_PALETTE[i % SERIES_PALETTE.length]!) }));
     const rows = (r?.periods ?? []).map((p, i) => ({
       month: p.key,
       label: shortMonth(p.key),

@@ -33,8 +33,8 @@ describe('sizes', () => {
   });
 
   it('computes heights from rows', () => {
-    expect(heightForRows(3, 4)).toBe(3 * 86 + 2 * 12);
-    expect(heightForRows(3, 2)).toBe(3 * 80 + 2 * 12);
+    expect(heightForRows(3, 4)).toBe(3 * 96 + 2 * 16);
+    expect(heightForRows(3, 2)).toBe(3 * 88 + 2 * 16);
   });
 
   it('limits the displayed span to the grid columns and keeps the desktop width on narrow grids', () => {
@@ -92,14 +92,17 @@ describe('visibility', () => {
     expect(isVisible(layout, SPEC_BY_ID['carteira-clientes'], 'personal')).toBe(false);
     // Client widgets can still be turned on outside business workspaces.
     expect(isVisible({ ...layout, visible: { 'carteira-clientes': true } }, SPEC_BY_ID['carteira-clientes'], 'personal')).toBe(true);
-    expect(hiddenCount({ ...layout, visible: { saude: false, evolucao: false } }, WIDGET_SPECS, 'business')).toBe(1);
+    // Personal-finance widgets start hidden in an office (health score, card invoice, goals).
+    expect(isVisible(layout, SPEC_BY_ID.saude, 'business')).toBe(false);
+    expect(isVisible(layout, SPEC_BY_ID.competencia, 'business')).toBe(true);
+    expect(hiddenCount({ ...layout, visible: { 'saldo-contas': false, evolucao: false } }, WIDGET_SPECS, 'business')).toBe(1);
   });
 
   it('resolves a section in order with clamped sizes', () => {
-    const layout = { ...emptyLayout(), order: { 'visao-geral': ['projecao-caixa' as WidgetId] }, sizes: { saude: { c: 9, r: 9 } } };
+    const layout = { ...emptyLayout(), order: { 'visao-geral': ['projecao-caixa' as WidgetId] }, sizes: { 'saldo-contas': { c: 9, r: 9 } } };
     const resolved = resolveSection(layout, 'visao-geral', WIDGET_SPECS, 'business');
     expect(resolved[0]!.spec.id).toBe('projecao-caixa');
-    expect(resolved.find((x) => x.spec.id === 'saude')!.size).toEqual({ c: 2, r: 6 });
+    expect(resolved.find((x) => x.spec.id === 'saldo-contas')!.size).toEqual({ c: 2, r: 7 });
   });
 });
 

@@ -22,6 +22,8 @@ interface DonutChartProps {
   fill?: boolean;
   /** Makes slices and legend rows clickable (not called for the grouped "Outras" slice). */
   onSelect?: (item: CategoryAmount) => void;
+  /** Use each item's own colour (e.g. tax regimes); by default slices take the rank palette. */
+  itemColors?: boolean;
 }
 
 export const OTHERS_ID = 'others';
@@ -33,7 +35,7 @@ const FILL_ROW_PX = 26;
  * Category distribution donut. Hovering a slice or legend row highlights it and shows its name and
  * amount in the center (instead of a floating tooltip that would cover the total).
  */
-export function DonutChart({ data, total, centerLabel = 'Total', height = 200, maxItems = 6, showLegend = true, fill = false, onSelect }: DonutChartProps) {
+export function DonutChart({ data, total, centerLabel = 'Total', height = 200, maxItems = 6, showLegend = true, fill = false, onSelect, itemColors = false }: DonutChartProps) {
   const tone = useTone();
   const box = useElementSize();
   const [active, setActive] = useState<number | null>(null);
@@ -53,7 +55,11 @@ export function DonutChart({ data, total, centerLabel = 'Total', height = 200, m
         },
       ]
     : head;
-  const chartData = items.map((d, i) => ({ ...d, fill: tone(d.color || SERIES_PALETTE[i % SERIES_PALETTE.length]!) }));
+  const rank = (i: number) => SERIES_PALETTE[i % SERIES_PALETTE.length]!;
+  const chartData = items.map((d, i) => ({
+    ...d,
+    fill: tone(d.categoryId === OTHERS_ID ? '#C9CDD4' : itemColors && d.color ? d.color : rank(i)),
+  }));
   const focused = active === null ? null : chartData[active];
   const selectable = (d: CategoryAmount) => Boolean(onSelect) && d.categoryId !== OTHERS_ID;
 

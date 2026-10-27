@@ -21,9 +21,9 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <MiniStat label="Receitas" value={v(o?.income)} tone="success" />
-        <MiniStat label="Despesas" value={v(o?.expense)} tone="danger" />
-        <MiniStat label="Resultado" value={v(o?.net)} tone={o && o.net < 0 ? 'danger' : 'brand'} />
-        <MiniStat label="Taxa de economia" value={o ? formatPercent(o.savingsRate) : '—'} />
+        <MiniStat label="Despesas" value={v(o?.expense)} />
+        <MiniStat label="Resultado" value={v(o?.net)} tone={o && o.net < 0 ? 'danger' : undefined} />
+        <MiniStat label="Margem" value={o ? formatPercent(o.savingsRate ?? 0, 1) : '—'} />
         <MiniStat label="Gasto médio diário" value={v(o?.averageDailyExpense)} className="col-span-2 lg:col-span-1" />
       </div>
 

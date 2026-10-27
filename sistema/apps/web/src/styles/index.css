@@ -20,15 +20,17 @@
   --brand-900: #0f1f47;
   --brand-950: #0a1530;
 
-  --app-bg: #f6f6f4;
-  --app-bg-subtle: #efefec;
+  /* Ledger ground: a blue-grey page one step off white; cards stay white (achromatic ledger). */
+  --app-bg: #f2f4f7;
+  --app-bg-subtle: #e9ecf1;
   --app-surface: #ffffff;
-  --app-surface-muted: #f7f7f5;
-  --app-border: #e7e7e3;
-  --app-border-strong: #d6d6d1;
-  --app-fg: #16181d;
-  --app-muted: #6b6f76;
-  --app-subtle: #9a9ea5;
+  --app-surface-muted: #f6f7f9;
+  --app-border: #e4e7ec;
+  --app-border-strong: #d0d5dd;
+  --app-fg: #14171f;
+  /* Both greys that carry words hold 4.5:1 on white and on the ground. */
+  --app-muted: #5b616b;
+  --app-subtle: #6b7079;
 
   --app-primary: var(--brand-800);
   --app-primary-hover: var(--brand-700);
@@ -38,35 +40,45 @@
   --app-ring: var(--brand-500);
   --app-brand-text: var(--brand-700);
 
-  --app-success: #12a150;
-  --app-success-soft: #e7f6ed;
-  --app-danger: #e5484d;
-  --app-danger-soft: #fdecec;
-  --app-warning: #b7791f;
-  --app-warning-soft: #fef6da;
+  /* Status colours are signals (a change, an overdue fact), dark enough to be read as text. */
+  --app-success: #18794a;
+  --app-success-soft: #e6f4ec;
+  --app-danger: #c4242a;
+  --app-danger-soft: #fdeceb;
+  --app-warning: #95600f;
+  --app-warning-soft: #fdf3dc;
 
-  --app-chart-income: var(--brand-300);
-  --app-chart-income-strong: var(--brand-700);
-  --app-chart-expense: #f2a3a5;
-  --app-chart-expense-strong: #e5484d;
+  /*
+   * Charts: one data hue (the screen's main series or the current period) and greys for the rest.
+   * Income is the data hue; expenses and comparisons are neutral.
+   */
+  --app-data: #2f5fbf;
+  --app-data-soft: #dbe5f7;
+  --app-chart-income: #2f5fbf;
+  --app-chart-income-strong: #1e3f8a;
+  --app-chart-expense: #c3c8d1;
+  --app-chart-expense-strong: #7a818c;
   /* Neutral series (e.g. the earlier period in comparisons). */
-  --app-chart-neutral: #d4d4d8;
-  --app-chart-grid: #e7e7e3;
-  /* Ordered data series (e.g. fixed / installments / variable) and single-series accents. */
-  --app-chart-1: var(--brand-800);
-  --app-chart-2: var(--brand-500);
-  --app-chart-3: var(--brand-300);
-  --app-chart-accent: var(--brand-500);
+  --app-chart-neutral: #d0d5dd;
+  --app-chart-grid: #e9ecf1;
+  /* Ordered data series (e.g. fixed / installments / variable): one blue ramp. */
+  --app-chart-1: #1e3f8a;
+  --app-chart-2: #2f5fbf;
+  --app-chart-3: #8fa9dd;
+  --app-chart-accent: #2f5fbf;
   /* Overdue age bands (até 30 / 31–60 / mais de 60 dias), light → dark red. */
   --app-aging-1: #f3c88e;
   --app-aging-2: #c9612f;
   --app-aging-3: #8e2f1b;
 
-  /* Gradient "hero" cards (insights, highlights) with white text. */
-  --app-hero-from: var(--brand-700);
+  /* Former gradient "hero" cards now use a flat brand surface. */
+  --app-hero-from: var(--brand-800);
   --app-hero-via: var(--brand-800);
-  --app-hero-to: var(--brand-950);
+  --app-hero-to: var(--brand-800);
   --app-hero-accent: var(--brand-200);
+
+  --app-scrollbar: rgb(20 23 31 / 0.2);
+  --app-scrollbar-hover: rgb(20 23 31 / 0.36);
 
   --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.04);
   --shadow-sm: 0 1px 3px rgb(16 24 40 / 0.06), 0 1px 2px rgb(16 24 40 / 0.03);
@@ -119,24 +131,29 @@
   --app-warning: #e2b257;
   --app-warning-soft: #3d3422;
 
-  --app-chart-income: #e3e2dd;
-  --app-chart-income-strong: #f4f3ef;
-  --app-chart-expense: #c4595d;
-  --app-chart-expense-strong: #f27a7d;
+  --app-data: #8fb0ee;
+  --app-data-soft: #2c3546;
+  --app-chart-income: #8fb0ee;
+  --app-chart-income-strong: #c3d4f6;
+  --app-chart-expense: #5d5d5b;
+  --app-chart-expense-strong: #96958f;
   --app-chart-neutral: #5d5d5b;
   --app-chart-grid: #3b3b3b;
-  --app-chart-1: #f4f3ef;
-  --app-chart-2: #b5b4ae;
-  --app-chart-3: #73726f;
-  --app-chart-accent: #d1d0ca;
+  --app-chart-1: #c3d4f6;
+  --app-chart-2: #8fb0ee;
+  --app-chart-3: #4f6ea8;
+  --app-chart-accent: #8fb0ee;
   --app-aging-1: #7a5a32;
   --app-aging-2: #d97b45;
   --app-aging-3: #e8916f;
 
-  --app-hero-from: #4a4a49;
-  --app-hero-via: #3b3b3b;
-  --app-hero-to: #2b2b2b;
+  --app-hero-from: #323232;
+  --app-hero-via: #323232;
+  --app-hero-to: #323232;
   --app-hero-accent: #f4f3ef;
+
+  --app-scrollbar: rgb(244 243 239 / 0.2);
+  --app-scrollbar-hover: rgb(244 243 239 / 0.34);
 
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.25);
   --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.3);
@@ -146,23 +163,24 @@
 }
 
 /*
- * Compact type scale of dashboard widgets (Effy): the chart grows with the card, the text does not.
- * micro: Y-axis ticks and footnotes · mini: X labels, list meta, counts · caption: legends,
+ * Type scale of dashboard widgets, at the "medium density" of app screens (design-taste-frontend):
+ * rows and values in 14px, card titles 16px, meta 12px, axis 11px; the chart grows with the card,
+ * the text does not. micro: axis ticks and footnotes · mini: list meta, counts · caption: legends,
  * subtitles, "+ N" · body-sm: list rows and values · title-sm: card title · kpi: hero numbers.
  */
 @theme {
-  --text-micro: 10px;
+  --text-micro: 11px;
   --text-micro--line-height: 14px;
-  --text-mini: 10.5px;
-  --text-mini--line-height: 14px;
-  --text-caption: 11.5px;
-  --text-caption--line-height: 16px;
-  --text-body-sm: 12.5px;
-  --text-body-sm--line-height: 18px;
-  --text-title-sm: 14px;
-  --text-title-sm--line-height: 20px;
-  --text-kpi: 22px;
-  --text-kpi--line-height: 28px;
+  --text-mini: 12px;
+  --text-mini--line-height: 16px;
+  --text-caption: 12.5px;
+  --text-caption--line-height: 18px;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 20px;
+  --text-title-sm: 16px;
+  --text-title-sm--line-height: 22px;
+  --text-kpi: 24px;
+  --text-kpi--line-height: 30px;
 }
 
 @theme inline {
@@ -210,6 +228,8 @@
   --color-hero-to: var(--app-hero-to);
   --color-hero-accent: var(--app-hero-accent);
 
+  --color-data: var(--app-data);
+  --color-data-soft: var(--app-data-soft);
   --color-chart-income: var(--app-chart-income);
   --color-chart-expense: var(--app-chart-expense);
   --color-aging-1: var(--app-aging-1);
@@ -315,16 +335,39 @@ html:root > body {
   }
 }
 
-@layer components {
-
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: var(--app-border-strong) transparent;
+/*
+ * Scrollbars: thin, a rounded thumb inset in a transparent track and no arrow buttons, so rounded
+ * dialogs, sheets and lists keep their corners. WebKit/Blink use the pseudo-elements (they are
+ * ignored if scrollbar-width/scrollbar-color are set); Firefox gets the standard properties.
+ */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
   }
-
-  .dot-grid {
-    background-image: radial-gradient(var(--app-border-strong) 1px, transparent 1px);
-    background-size: 16px 16px;
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--app-scrollbar);
+    background-clip: padding-box;
+    border: 3px solid transparent;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--app-scrollbar-hover);
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--app-scrollbar) transparent;
+    }
   }
 }
 
@@ -333,11 +376,12 @@ html:root > body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Small group label, in sentence case (no tracked capitals). */
 @utility eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

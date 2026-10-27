@@ -134,7 +134,7 @@ export function CategoryPicker({
         >
           {selected ? (
             <>
-              <CategoryIcon icon={selected.icon} color={selected.parent.color} className="!size-6 !rounded-md [&_svg]:!size-3.5" />
+              <CategoryIcon tinted icon={selected.icon} color={selected.parent.color} className="!size-6 !rounded-md [&_svg]:!size-3.5" />
               <span className="min-w-0 flex-1 truncate">
                 {selected.label}
                 {selected.parentLabel ? <span className="text-subtle"> · {selected.parentLabel}</span> : null}

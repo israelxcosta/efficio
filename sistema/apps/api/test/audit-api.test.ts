@@ -29,7 +29,17 @@ import { ImportParseError, parseImportFile } from '../src/modules/imports/parse'
 import { FakeOpenFinanceProvider } from '../src/modules/open-finance/providers/fake';
 import type { OpenFinanceSetup, ProviderTransaction } from '../src/modules/open-finance/providers/types';
 import { settleOpenFinanceJobs } from '../src/modules/open-finance/webhooks';
-import { TEST_PASSWORD, admin, createAccount, createTestApp, firstCategory, registerUser, resetDb, type Client } from './helpers';
+import {
+  TEST_PASSWORD,
+  admin,
+  createAccount,
+  createTestApp,
+  firstCategory,
+  legacyPersonalWorkspace,
+  registerUser,
+  resetDb,
+  type Client,
+} from './helpers';
 
 const DAY = 86_400_000;
 const FAKE_ID = '00000000-0000-4000-8000-000000000000';
@@ -443,6 +453,8 @@ describe('finding: billing', () => {
 
   it('grants the plan that was actually paid, not the last one picked at checkout (CWE-840)', async () => {
     const owner = await registerUser(app, 'Plano Barato');
+    // Two plans for the same workspace: a legacy personal one (Individual and Família).
+    await legacyPersonalWorkspace(app, owner);
     expect((await owner.post('/billing/checkout', { planCode: 'individual_monthly' })).status).toBe(200); // pre_1, R$ 19,90
     expect((await owner.post('/billing/checkout', { planCode: 'family_monthly' })).status).toBe(200); // pre_2, R$ 34,90
     // The owner pays the cheap one…
@@ -457,6 +469,7 @@ describe('finding: billing', () => {
 
   it('ignores notifications of a non-current preapproval unless it was authorized (CWE-345)', async () => {
     const owner = await registerUser(app, 'Plano Ativo');
+    await legacyPersonalWorkspace(app, owner);
     await owner.post('/billing/checkout', { planCode: 'individual_monthly' });
     mp.preapprovals.get('pre_1')!.status = 'authorized';
     await webhook('pre_1');
@@ -486,18 +499,18 @@ describe('finding: billing', () => {
   it('only sends the browser to Mercado Pago checkout URLs (open redirect, CWE-601)', async () => {
     const owner = await registerUser(app, 'Checkout Desviado');
     mp.answerCheckoutFrom('https://mercadopago.com.br.evil.example');
-    expect((await owner.post('/billing/checkout', { planCode: 'individual_monthly' })).status).toBe(500);
+    expect((await owner.post('/billing/checkout', { planCode: 'business_monthly' })).status).toBe(500);
     mp.answerCheckoutFrom('http://www.mercadopago.com.br');
-    expect((await owner.post('/billing/checkout', { planCode: 'individual_monthly' })).status).toBe(500);
+    expect((await owner.post('/billing/checkout', { planCode: 'business_monthly' })).status).toBe(500);
     mp.answerCheckoutFrom('https://www.mercadopago.com');
-    const ok = await owner.post('/billing/checkout', { planCode: 'individual_monthly' });
+    const ok = await owner.post('/billing/checkout', { planCode: 'business_monthly' });
     expect(ok.status).toBe(200);
     expect(ok.body.checkoutUrl).toMatch(/^https:\/\/www\.mercadopago\.com\//);
   });
 
   it('processes a notification again when the first attempt failed (lost payment, CWE-754)', async () => {
     const owner = await registerUser(app, 'Webhook Instável');
-    await owner.post('/billing/checkout', { planCode: 'individual_monthly' });
+    await owner.post('/billing/checkout', { planCode: 'business_monthly' });
     mp.preapprovals.get('pre_1')!.status = 'authorized';
     mp.failNextGets(1);
     expect((await webhook('pre_1', 'evt-retry')).statusCode).toBe(500);

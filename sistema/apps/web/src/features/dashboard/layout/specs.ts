@@ -1,26 +1,30 @@
 // Catalog of dashboard sections and widgets: default sizes, limits and the presets offered in
 // "Personalizar". Default sizes pack every section with no holes at 4 columns (checked in tests).
+//
+// Default order follows the office's month: first the fees to receive (who paid the competence, who
+// is late, what falls due), then cash, clients, the month's analyses and recurring entries. Widgets
+// of personal finance (health score, card invoice, goals) start hidden; "Personalizar" turns them on.
 
 import type { SectionSpec, WidgetSize, WidgetSpec } from './types';
 
 const s = (c: number, r: number): WidgetSize => ({ c, r });
 
 export const SECTIONS: SectionSpec[] = [
-  { id: 'visao-geral', title: 'Visão geral' },
-  { id: 'receber-pagar', title: 'Receber e pagar' },
+  { id: 'receber-pagar', title: 'Honorários e cobrança' },
+  { id: 'visao-geral', title: 'Caixa' },
+  { id: 'clientes', title: 'Clientes' },
   { id: 'analises', title: 'Análises do mês' },
-  { id: 'clientes', title: 'Clientes e honorários' },
-  { id: 'planejamento', title: 'Metas e recorrentes' },
+  { id: 'planejamento', title: 'Recorrentes e metas' },
 ];
 
 export const WIDGET_SPECS: WidgetSpec[] = [
-  // Visão geral: fluxo (2×5) | saúde (1×3) over insights (1×2) | saldo (1×5), then projeção (4×4).
+  // Caixa: fluxo (2×4) | saldo (2×4), then projeção (4×4) and insights (4×2). Saúde starts hidden.
   {
     id: 'fluxo-caixa',
     section: 'visao-geral',
     title: 'Fluxo de caixa',
     description: 'Receitas e despesas por dia, semana, mês ou ano.',
-    defaultSize: s(2, 5),
+    defaultSize: s(2, 4),
     min: s(2, 3),
     max: s(4, 7),
     presets: [s(2, 4), s(2, 5), s(4, 5), s(4, 6)],
@@ -34,26 +38,17 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     min: s(1, 3),
     max: s(2, 6),
     presets: [s(1, 3), s(1, 4), s(2, 5)],
+    defaultHidden: true,
   },
   {
     id: 'saldo-contas',
     section: 'visao-geral',
     title: 'Saldo em contas',
     description: 'Saldo de cada conta, total investido e patrimônio.',
-    defaultSize: s(1, 5),
+    defaultSize: s(2, 4),
     min: s(1, 3),
     max: s(2, 7),
-    presets: [s(1, 4), s(1, 5), s(2, 5)],
-  },
-  {
-    id: 'insights',
-    section: 'visao-geral',
-    title: 'Insights',
-    description: 'Análises automáticas do mês.',
-    defaultSize: s(1, 2),
-    min: s(1, 2),
-    max: s(2, 4),
-    presets: [s(1, 2), s(1, 3), s(2, 2)],
+    presets: [s(1, 4), s(2, 4), s(2, 5)],
   },
   {
     id: 'projecao-caixa',
@@ -66,7 +61,29 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     presets: [s(2, 4), s(4, 4), s(4, 5)],
   },
 
-  // Receber e pagar
+  {
+    id: 'insights',
+    section: 'visao-geral',
+    title: 'Insights',
+    description: 'Análises automáticas do mês.',
+    defaultSize: s(4, 2),
+    min: s(1, 2),
+    max: s(4, 4),
+    presets: [s(1, 2), s(2, 2), s(4, 2)],
+  },
+
+  // Honorários e cobrança: régua (4×3), inadimplência | devedores (2×3), vencimentos (4×3).
+  {
+    id: 'competencia',
+    section: 'receber-pagar',
+    title: 'Régua da competência',
+    description: 'Um quadro por cliente: honorário pago, em aberto, atrasado ou não gerado.',
+    defaultSize: s(4, 3),
+    min: s(2, 2),
+    max: s(4, 5),
+    presets: [s(4, 2), s(4, 3), s(4, 4)],
+    defaultFor: 'business',
+  },
   {
     id: 'inadimplencia',
     section: 'receber-pagar',
@@ -92,10 +109,10 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     section: 'receber-pagar',
     title: 'Próximos vencimentos',
     description: 'Contas vencidas e dos próximos 15 dias.',
-    defaultSize: s(2, 4),
+    defaultSize: s(4, 3),
     min: s(2, 3),
     max: s(4, 7),
-    presets: [s(2, 4), s(2, 5)],
+    presets: [s(2, 4), s(4, 3), s(4, 4)],
   },
   {
     id: 'fatura-cartao',
@@ -106,6 +123,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     min: s(1, 3),
     max: s(4, 5),
     presets: [s(2, 3), s(2, 4)],
+    defaultHidden: true,
   },
 
   // Análises do mês
@@ -134,10 +152,10 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     section: 'analises',
     title: 'Resultado mês a mês',
     description: 'Saldo (receitas − despesas) dos últimos 6 meses.',
-    defaultSize: s(2, 4),
+    defaultSize: s(4, 3),
     min: s(1, 3),
     max: s(4, 6),
-    presets: [s(2, 4), s(4, 4)],
+    presets: [s(2, 4), s(4, 3), s(4, 4)],
   },
   {
     id: 'receitas-categoria',
@@ -148,6 +166,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     min: s(2, 3),
     max: s(4, 7),
     presets: [s(2, 4), s(2, 5), s(4, 5)],
+    defaultHidden: true,
   },
   {
     id: 'evolucao',
@@ -172,7 +191,18 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultHidden: true,
   },
 
-  // Clientes e honorários (visible by default in business workspaces)
+  // Clientes: honorários do mês (4×3), carteira | vigências (2×4). Visible by default in business workspaces.
+  {
+    id: 'honorarios-mes',
+    section: 'clientes',
+    title: 'Honorários do mês',
+    description: 'Previsto pelas vigências × faturado × recebido no mês.',
+    defaultSize: s(4, 3),
+    min: s(2, 3),
+    max: s(4, 5),
+    presets: [s(2, 3), s(4, 3)],
+    defaultFor: 'business',
+  },
   {
     id: 'carteira-clientes',
     section: 'clientes',
@@ -196,17 +226,6 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultFor: 'business',
   },
   {
-    id: 'honorarios-mes',
-    section: 'clientes',
-    title: 'Honorários do mês',
-    description: 'Previsto pelas vigências × faturado × recebido no mês.',
-    defaultSize: s(4, 3),
-    min: s(2, 3),
-    max: s(4, 5),
-    presets: [s(2, 3), s(4, 3)],
-    defaultFor: 'business',
-  },
-  {
     id: 'cadastro-incompleto',
     section: 'clientes',
     title: 'Cadastro incompleto',
@@ -219,7 +238,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultFor: 'business',
   },
 
-  // Metas e recorrentes
+  // Recorrentes e metas: gastos | receitas fixas (2×4). Metas start hidden.
   {
     id: 'gastos-fixos',
     section: 'planejamento',
@@ -249,6 +268,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     min: s(2, 3),
     max: s(4, 6),
     presets: [s(2, 4), s(4, 3)],
+    defaultHidden: true,
   },
 ];
 

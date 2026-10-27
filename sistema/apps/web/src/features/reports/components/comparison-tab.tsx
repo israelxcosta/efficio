@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { axisProps, CHART_COLORS, LegendDot, moneyAxisFormatter, MoneyTooltip, StripeDefs } from '@/components/charts/chart-utils';
+import { axisProps, CHART_COLORS, LegendDot, moneyAxisFormatter, MoneyTooltip } from '@/components/charts/chart-utils';
 import { useActiveMonth } from '@/lib/active-month';
 import { cn } from '@/lib/utils';
 import { useComparisonReport } from '../api';
@@ -111,8 +111,8 @@ export function ComparisonTab() {
           <Card className="p-5">
             <CardHeader title="Por categoria" subtitle="Período A × Período B" icon={<GitCompareArrows />} />
             <div className="mt-3 flex gap-4">
-              <LegendDot color={CHART_COLORS.neutral} label="Período A" striped />
-              <LegendDot color={CHART_COLORS.incomeStrong} label="Período B" />
+              <LegendDot color={CHART_COLORS.neutral} label="Período A" />
+              <LegendDot color={CHART_COLORS.income} label="Período B" />
             </div>
             <div className="mt-2 h-72">
               {report.isPending ? (
@@ -122,13 +122,12 @@ export function ComparisonTab() {
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ left: -4, right: 8, top: 8 }} barGap={4}>
-                    <StripeDefs />
                     <CartesianGrid vertical={false} stroke="var(--app-chart-grid)" strokeDasharray="4 4" />
                     <XAxis dataKey="name" {...axisProps} interval={0} angle={chartData.length > 6 ? -20 : 0} textAnchor={chartData.length > 6 ? 'end' : 'middle'} height={chartData.length > 6 ? 56 : 30} />
                     <YAxis {...axisProps} tickFormatter={moneyAxisFormatter} width={56} />
                     <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ a: 'Período A', b: 'Período B' }} />} />
-                    <Bar dataKey="a" name="a" fill="url(#stripe-neutral)" radius={[6, 6, 6, 6]} maxBarSize={26} />
-                    <Bar dataKey="b" name="b" fill={CHART_COLORS.incomeStrong} radius={[6, 6, 6, 6]} maxBarSize={26} />
+                    <Bar dataKey="a" name="a" fill={CHART_COLORS.neutral} radius={[3, 3, 0, 0]} maxBarSize={26} />
+                    <Bar dataKey="b" name="b" fill={CHART_COLORS.income} radius={[3, 3, 0, 0]} maxBarSize={26} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -140,7 +139,7 @@ export function ComparisonTab() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-surface-muted text-left text-[11px] font-semibold tracking-wide text-muted uppercase">
+                    <tr className="border-b border-border text-left text-xs font-medium text-muted">
                       <th className="px-4 py-2.5">Categoria</th>
                       <th className="px-4 py-2.5 text-right">Período A</th>
                       <th className="px-4 py-2.5 text-right">Período B</th>

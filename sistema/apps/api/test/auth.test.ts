@@ -31,9 +31,10 @@ describe('auth', () => {
     const me = await app.inject({ method: 'GET', url: '/api/auth/me', cookies: { effinance_token: cookie!.value } });
     expect(me.statusCode).toBe(200);
     expect(me.json().user).toMatchObject({ email: 'ana@exemplo.com', mfaEnabled: false });
+    // The account comes with its company (business workspace, in trial): "Minha empresa" when unnamed.
     expect(me.json().workspace).toMatchObject({
-      name: 'Pessoal',
-      kind: 'personal',
+      name: 'Minha empresa',
+      kind: 'business',
       role: 'owner',
       subscription: { status: 'trialing', canWrite: true, planCode: null },
     });
@@ -45,12 +46,34 @@ describe('auth', () => {
       headers: { authorization: `Bearer ${body.token}` },
     });
     expect(cats.json().length).toBeGreaterThan(10);
+    // Business categories: fees, payroll, taxes, occupancy…
+    expect(cats.json().map((c: { name: string }) => c.name)).toEqual(
+      expect.arrayContaining(['Serviços Prestados', 'Pessoal', 'Impostos e taxas', 'Ocupação', 'Despesas financeiras']),
+    );
+    expect(cats.json().map((c: { name: string }) => c.name)).not.toContain('Alimentação');
     const accounts = await app.inject({
       method: 'GET',
       url: '/api/accounts',
       headers: { authorization: `Bearer ${body.token}` },
     });
-    expect(accounts.json()).toEqual([expect.objectContaining({ name: 'Carteira', type: 'wallet', balance: 0 })]);
+    expect(accounts.json()).toEqual([expect.objectContaining({ name: 'Caixa', type: 'wallet', balance: 0 })]);
+  });
+
+  it('names the company created with the account', async () => {
+    const register = (payload: Record<string, unknown>) =>
+      app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'Caio', password: 'senha-forte-123', acceptTerms: true, ...payload } });
+    const workspaceOf = async (res: Awaited<ReturnType<typeof register>>) =>
+      (await app.inject({ method: 'GET', url: '/api/auth/me', headers: { authorization: `Bearer ${res.json().token}` } })).json().workspace;
+
+    const named = await register({ email: 'caio@exemplo.com', companyName: '  Caio Contabilidade Ltda  ' });
+    expect(named.statusCode).toBe(201);
+    expect(await workspaceOf(named)).toMatchObject({ name: 'Caio Contabilidade Ltda', kind: 'business', role: 'owner' });
+
+    const blank = await register({ email: 'dora@exemplo.com', companyName: '   ' });
+    expect(await workspaceOf(blank)).toMatchObject({ name: 'Minha empresa', kind: 'business' });
+
+    const tooLong = await register({ email: 'eva@exemplo.com', companyName: 'x'.repeat(61) });
+    expect(tooLong.statusCode).toBe(400);
   });
 
   it('rejects duplicates, wrong passwords and missing auth', async () => {
@@ -134,7 +157,7 @@ describe('auth', () => {
     const list = await bob.get('/transactions');
     expect(list.body.total).toBe(0);
     const accounts = await bob.get('/accounts');
-    expect(accounts.body.map((a: any) => a.name)).toEqual(['Carteira']);
+    expect(accounts.body.map((a: any) => a.name)).toEqual(['Caixa']);
     const search = await bob.get('/search?q=Mercado');
     expect(search.body.transactions).toEqual([]);
   });

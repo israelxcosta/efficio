@@ -71,6 +71,13 @@
       "when": 1792703872216,
       "tag": "0009_fee_charges",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793119251986,
+      "tag": "0010_fee_due_day_discounts",
+      "breakpoints": true
     }
   ]
 }

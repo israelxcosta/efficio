@@ -1,4 +1,4 @@
-import { FEE_CATEGORY, type CategoryType, type IconName } from '@effinance/shared';
+import { DISCOUNT_CATEGORY, FEE_CATEGORY, type CategoryType, type IconName } from '@effinance/shared';
 
 export interface DefaultCategory {
   name: string;
@@ -285,13 +285,16 @@ export const BUSINESS_CATEGORIES: DefaultCategory[] = [
     ],
   },
   {
-    name: 'Despesas financeiras',
+    // DISCOUNT_CATEGORY: discounts granted for paying by the due date are booked into "Descontos
+    // concedidos" (created in a workspace that renamed or removed it).
+    name: DISCOUNT_CATEGORY.name,
     type: 'expense',
     icon: 'landmark',
     color: '#E5484D',
     subcategories: [
       { name: 'Juros e multas', icon: 'receipt' },
       { name: 'Empréstimos', icon: 'landmark' },
+      { name: DISCOUNT_CATEGORY.discount, icon: 'tag' },
     ],
   },
   { name: 'Outras despesas', type: 'expense', icon: 'tag', color: '#78716C' },

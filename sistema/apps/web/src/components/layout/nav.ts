@@ -19,22 +19,24 @@ export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
-  /** Shown in the mobile bottom bar. */
+  /** Shown in the mobile bottom bar (the first three). */
   mobile?: boolean;
+  /** One-word label of the mobile bottom bar; the first word of `label` when omitted. */
+  short?: string;
   keywords?: string;
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutGrid, mobile: true, keywords: 'inicio resumo visao geral' },
-  { to: '/extrato', label: 'Extrato', icon: ScrollText, mobile: true, keywords: 'lancamentos movimentacoes saldo' },
-  { to: '/contas-a-pagar', label: 'Contas a pagar', icon: Receipt, mobile: true, keywords: 'despesas boletos vencimentos' },
-  { to: '/contas-a-receber', label: 'Contas a receber', icon: HandCoins, keywords: 'receitas entradas salario' },
+  { to: '/', label: 'Dashboard', short: 'Painel', icon: LayoutGrid, mobile: true, keywords: 'inicio resumo visao geral' },
+  { to: '/extrato', label: 'Extrato', icon: ScrollText, keywords: 'lancamentos movimentacoes saldo' },
+  { to: '/contas-a-pagar', label: 'Contas a pagar', icon: Receipt, keywords: 'despesas boletos vencimentos' },
+  { to: '/contas-a-receber', label: 'Contas a receber', short: 'Receber', icon: HandCoins, mobile: true, keywords: 'receitas entradas honorarios' },
   { to: '/transferencias', label: 'Transferências e investimentos', icon: ArrowLeftRight, keywords: 'investir aplicar resgatar mover' },
   { to: '/contas', label: 'Contas e carteiras', icon: Landmark, keywords: 'bancos carteira poupanca' },
   { to: '/cartoes', label: 'Cartões de crédito', icon: CreditCard, keywords: 'fatura limite' },
   { to: '/metas', label: 'Metas', icon: Target, keywords: 'objetivos reserva' },
   { to: '/categorias', label: 'Categorias', icon: Tags, keywords: 'subcategorias' },
-  { to: '/clientes', label: 'Clientes', icon: Building2, keywords: 'empresas cnpj honorarios contrato regime simples inativar receita federal' },
+  { to: '/clientes', label: 'Clientes', icon: Building2, mobile: true, keywords: 'empresas cnpj honorarios contrato regime simples inativar receita federal' },
   { to: '/fornecedores', label: 'Fornecedores', icon: Truck, keywords: 'contatos pessoas cpf cnpj prestadores' },
   { to: '/relatorios', label: 'Relatórios', icon: ChartLine, mobile: true, keywords: 'analises fluxo de caixa comparacao insights' },
 ];

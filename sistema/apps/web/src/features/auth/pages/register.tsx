@@ -27,7 +27,7 @@ export default function RegisterPage() {
   const [show, setShow] = useState(false);
   const form = useForm<RegisterForm, unknown, z.output<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: '', email: typeof state?.email === 'string' ? state.email : '', password: '', acceptTerms: false as unknown as true },
+    defaultValues: { name: '', companyName: '', email: typeof state?.email === 'string' ? state.email : '', password: '', acceptTerms: false as unknown as true },
   });
 
   if (loading) return <FullPageLoader />;
@@ -36,7 +36,7 @@ export default function RegisterPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     try {
       await signUp(values);
-      toast.success(`Conta criada! Você tem ${TRIAL_DAYS} dias grátis, com categorias e uma carteira prontas.`);
+      toast.success(`Conta criada! Você tem ${TRIAL_DAYS} dias grátis, com o plano de contas da empresa e um caixa prontos.`);
       navigate(from, { replace: true });
     } catch (error) {
       toast.error(errorMessage(error));
@@ -46,7 +46,7 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       title="Crie sua conta"
-      subtitle="Comece a organizar suas finanças em minutos."
+      subtitle="Organize o financeiro da sua empresa em minutos."
       footer={
         <>
           Já tem conta?{' '}
@@ -59,6 +59,9 @@ export default function RegisterPage() {
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <Field label="Nome" error={form.formState.errors.name?.message}>
           <Input autoComplete="name" placeholder="Seu nome" autoFocus {...form.register('name')} />
+        </Field>
+        <Field label="Nome da empresa" hint="Você pode alterar depois em Configurações" error={form.formState.errors.companyName?.message}>
+          <Input autoComplete="organization" placeholder="Ex.: Costa Contabilidade Ltda." {...form.register('companyName')} />
         </Field>
         <Field label="E-mail" error={form.formState.errors.email?.message}>
           <Input type="email" autoComplete="email" placeholder="voce@email.com" {...form.register('email')} />

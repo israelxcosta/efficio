@@ -47,7 +47,7 @@ export function CompactTransactionRow({ tx, today }: { tx: Transaction; today: s
   const due = dueText(tx, today);
   const detail = [tx.contact?.name, tx.category?.name].filter(Boolean).join(' · ');
   return (
-    <div className="group flex items-center gap-2.5 rounded-lg px-1.5 py-1 transition-colors hover:bg-surface-muted">
+    <div className="group flex items-center gap-3 rounded-lg px-1.5 py-2 transition-colors hover:bg-surface-muted">
       <PaidToggle
         size="sm"
         paid={tx.paid}
@@ -62,7 +62,7 @@ export function CompactTransactionRow({ tx, today }: { tx: Transaction; today: s
         className="min-w-0 flex-1 text-left"
       >
         <span className="block truncate text-body-sm font-semibold text-fg">{tx.description}</span>
-        <span className="mt-px flex min-w-0 items-center gap-1 text-mini">
+        <span className="mt-0.5 flex min-w-0 items-center gap-1 text-mini">
           <span className={cn('shrink-0 @xl:hidden', due.tone)}>{due.text}</span>
           {detail ? (
             <span className="truncate text-muted">
@@ -76,8 +76,9 @@ export function CompactTransactionRow({ tx, today }: { tx: Transaction; today: s
         <span className="block text-caption font-medium text-fg tabular">{formatDateBR(tx.date)}</span>
         <span className={cn('block text-mini', due.tone)}>{due.text}</span>
       </span>
-      <span className="shrink-0 text-right text-body-sm @md:w-24">
-        <Money value={tx.type === 'expense' ? -tx.amount : tx.amount} signed />
+      {/* The sign carries the direction: income green with "+", expenses in ink. */}
+      <span className="shrink-0 text-right text-body-sm @md:w-28">
+        <Money value={tx.type === 'expense' ? -tx.amount : tx.amount} tone={tx.type === 'income' ? 'income' : 'neutral'} showPlus />
       </span>
       <RowMenu tx={tx} />
     </div>

@@ -57,7 +57,20 @@ describe('client schemas', () => {
   });
 
   it('accepts a zero employee fee but not a zero monthly fee', () => {
-    expect(clientFeeInputSchema.parse({ amount: 85000 })).toEqual({ amount: 85000, employeeFee: 0 });
+    expect(clientFeeInputSchema.parse({ amount: 85000 })).toEqual({ amount: 85000, employeeFee: 0, discountBps: 0 });
     expect(clientFeeInputSchema.safeParse({ amount: 0, employeeFee: 3500 }).success).toBe(false);
+  });
+
+  it('takes the discount for paying on time in basis points, below 100%', () => {
+    expect(clientFeeInputSchema.parse({ amount: 85000, discountBps: 500 }).discountBps).toBe(500);
+    for (const discountBps of [-1, 10000, 2.5]) {
+      expect(clientFeeInputSchema.safeParse({ amount: 85000, discountBps }).success, String(discountBps)).toBe(false);
+    }
+  });
+
+  it('defaults the fee due day to 10 and keeps it within the month', () => {
+    expect(clientInputSchema.parse(base).feeDueDay).toBe(10);
+    expect(clientInputSchema.parse({ ...base, feeDueDay: 31 }).feeDueDay).toBe(31);
+    for (const feeDueDay of [0, 32, 1.5]) expect(clientInputSchema.safeParse({ ...base, feeDueDay }).success).toBe(false);
   });
 });

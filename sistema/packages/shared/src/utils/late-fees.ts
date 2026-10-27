@@ -19,3 +19,18 @@ export function suggestLateFees(amount: number, dueDate: ISODate, paidAt: ISODat
     days,
   };
 }
+
+/** Discount in cents of `bps` basis points (500 = 5%) on `amount` cents. */
+export function discountAmount(amount: number, bps: number | null | undefined): number {
+  return bps ? Math.round((amount * bps) / 10_000) : 0;
+}
+
+/** Whether a payment on `paidAt` still earns the discount for paying by `dueDate`. */
+export function earnsDiscount(dueDate: ISODate, paidAt: ISODate): boolean {
+  return paidAt <= dueDate;
+}
+
+/** "5%", "2,5%" for basis points. */
+export function formatBps(bps: number): string {
+  return `${(bps / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
+}

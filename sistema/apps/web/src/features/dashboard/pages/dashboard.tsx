@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
-import { ChevronLeft, ChevronRight, Gauge as GaugeIcon, Percent, SlidersHorizontal, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
-import { MONTH_NAMES, addMonthKey, formatBRL, formatPercent, percentChange, type DashboardResponse, type WorkspaceKind } from '@effinance/shared';
+import { Link, useSearchParams } from 'react-router';
+import { ChevronLeft, ChevronRight, LayoutGrid, Percent, SlidersHorizontal, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import {
+  MONTH_NAMES,
+  addMonthKey,
+  formatBRL,
+  formatMonthKey,
+  formatPercent,
+  percentChange,
+  type DashboardResponse,
+  type MonthKey,
+  type WorkspaceKind,
+} from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { ErrorState } from '@/components/ui/misc';
@@ -12,6 +22,8 @@ import { useActiveMonth } from '@/lib/active-month';
 import { useAuth } from '@/features/auth/auth-context';
 import { useDashboard } from '../api';
 import { InsightsTab } from '../components/insights-tab';
+import { overdueFinding } from '../layout/finding';
+import { useOverdueReceivables } from '../widgets/data';
 import { useDashboardAlerts } from '../layout/alerts';
 import { WIDGET_COMPONENTS } from '../layout/catalog';
 import { CustomizeSheet } from '../layout/customize-sheet';
@@ -66,19 +78,22 @@ export default function DashboardPage() {
   const setMonth = (y: number, m: number) => setActiveMonth(`${y}-${String(m).padStart(2, '0')}`);
 
   return (
-    <div className="@container flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SegmentedControl
-          variant="solid"
-          ariaLabel="Visão"
-          value={tab}
-          onChange={(t) => update({ aba: t === 'dashboard' ? null : t })}
-          options={[
-            { value: 'dashboard', label: 'Dashboard', icon: <GaugeIcon /> },
-            { value: 'insights', label: 'Dashboard inteligente', icon: <Sparkles /> },
-          ]}
-        />
+    <div className="@container flex flex-col gap-6">
+      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-fg">Painel financeiro</h1>
+          <FindingLine month={month} />
+        </div>
         <div className="flex flex-wrap items-center gap-2">
+          <SegmentedControl
+            ariaLabel="Visão"
+            value={tab}
+            onChange={(t) => update({ aba: t === 'dashboard' ? null : t })}
+            options={[
+              { value: 'dashboard', label: 'Visão geral', icon: <LayoutGrid /> },
+              { value: 'insights', label: 'Dashboard inteligente', icon: <Sparkles /> },
+            ]}
+          />
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon-sm" aria-label="Mês anterior" onClick={() => setActiveMonth(addMonthKey(month, -1))}>
               <ChevronLeft />
@@ -112,7 +127,7 @@ export default function DashboardPage() {
             </Button>
           ) : null}
         </div>
-      </div>
+      </header>
 
       {dashboard.isError ? (
         <ErrorState error={dashboard.error} onRetry={() => dashboard.refetch()} />
@@ -137,28 +152,56 @@ function Overview({ d, loading, month, kind }: { d: DashboardResponse | undefine
   );
 }
 
-/** Fixed strip above the grid: income, expenses, efficiency and net worth (same breakpoints as the grid). */
+/**
+ * The line under the title: the month and the fact that most needs attention (overdue receivables
+ * and who holds most of them), with the way to act on it.
+ */
+function FindingLine({ month }: { month: MonthKey }) {
+  const overdue = useOverdueReceivables();
+  const finding = overdue.data ? overdueFinding(overdue.data.items) : null;
+  return (
+    <p className="mt-1 text-sm text-muted" aria-live="polite">
+      {formatMonthKey(month)}
+      {overdue.data ? (
+        finding ? (
+          <>
+            {' · '}
+            <span className="font-medium text-danger">{finding.text}</span>
+            {' · '}
+            <Link to="/relatorios?aba=inadimplencia" className="font-medium text-brand-text hover:underline">
+              Ver inadimplência
+            </Link>
+          </>
+        ) : (
+          ' · nenhum recebimento vencido em aberto'
+        )
+      ) : null}
+    </p>
+  );
+}
+
+/** Fixed strip above the grid: income, expenses, margin and net worth (same breakpoints as the grid). */
 function DashboardKpis({ d, loading }: { d: DashboardResponse | undefined; loading: boolean }) {
   const s = d?.summary;
   const p = d?.previous;
   const money = (v: number | undefined) => (loading || v === undefined ? <Skeleton className="ml-auto h-7 w-32" /> : formatBRL(v));
 
   return (
-    <div className="grid grid-cols-1 gap-3 @[420px]:grid-cols-2 @[1000px]:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 @[1000px]:grid-cols-4">
       <KpiCard
         compact
-        icon={<TrendingUp className="text-success" />}
+        icon={<TrendingUp />}
         label="Receitas"
-        info="Receitas do mês (recebidas + a receber)"
+        info="Receitas do mês pela competência (recebidas + a receber)"
         value={money(s?.income)}
         change={s && p ? percentChange(s.income, p.income) : undefined}
         href="/contas-a-receber"
       />
       <KpiCard
         compact
-        icon={<TrendingDown className="text-danger" />}
+        icon={<TrendingDown />}
         label="Despesas"
-        info="Despesas do mês, incluindo compras no cartão"
+        info="Despesas do mês pela competência, incluindo compras no cartão"
         value={money(s?.expense)}
         change={s && p ? percentChange(s.expense, p.expense) : undefined}
         invert
@@ -166,23 +209,24 @@ function DashboardKpis({ d, loading }: { d: DashboardResponse | undefined; loadi
       />
       <KpiCard
         compact
-        icon={<Percent className="text-brand-text" />}
-        label="Eficiência"
-        info="Taxa de economia: quanto da receita sobrou no mês"
-        value={s ? formatPercent(s.savingsRate ?? 0, 0) : <Skeleton className="ml-auto h-7 w-20" />}
+        icon={<Percent />}
+        label="Margem"
+        info="Resultado do mês (receitas − despesas) sobre as receitas. A variação é em pontos percentuais."
+        value={s ? formatPercent(s.savingsRate ?? 0, 1) : <Skeleton className="ml-auto h-7 w-20" />}
         change={s && p && s.savingsRate !== null && p.savingsRate !== null ? s.savingsRate - p.savingsRate : undefined}
+        changeUnit="pp"
         href="/relatorios"
       />
       <KpiCard
         compact
-        icon={<Wallet className="text-brand-text" />}
+        icon={<Wallet />}
         label="Patrimônio"
         info="Saldo em contas + investimentos − dívida de cartão"
         value={money(d?.balances.netWorth)}
         footerContent={
           d ? (
             <span>
-              Investido: <span className="font-semibold text-brand-text">{formatBRL(d.balances.investments)}</span>
+              Investido: <span className="tabular font-semibold text-fg">{formatBRL(d.balances.investments)}</span>
             </span>
           ) : undefined
         }

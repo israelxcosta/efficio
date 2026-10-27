@@ -86,7 +86,7 @@ export function DelinquencyChart({ monthly }: { monthly: DelinquencyMonth[] }) {
                 yAxisId="rate"
                 dataKey="rate"
                 name="Taxa de atraso"
-                type="monotone"
+                type="linear"
                 stroke={RATE_COLOR}
                 strokeWidth={2}
                 dot={{ r: 2.5, fill: RATE_COLOR, strokeWidth: 0 }}

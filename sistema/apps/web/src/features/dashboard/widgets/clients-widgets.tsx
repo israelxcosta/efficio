@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Building2, CalendarCheck, ClipboardCheck } from 'lucide-react';
@@ -10,6 +10,7 @@ import {
   todayISO,
   type CategoryAmount,
   type Client,
+  type ISODate,
   type MonthKey,
   type Transaction,
   type TransactionListResponse,
@@ -26,12 +27,15 @@ import { useTone } from '@/lib/theme';
 import { useElementSize } from '@/lib/use-element-size';
 import { cn, pluralize } from '@/lib/utils';
 import { REGIME_COLORS } from '@/features/clients/clients-summary';
+import { GenerateFeesDialog } from '@/features/fee-charges/generate-fees-dialog';
+import { usePermissions } from '@/features/auth/permissions';
 import { useContactReport } from '@/features/reports/api';
 import type { WidgetProps } from '../layout/types';
 import { FitList, WidgetCard } from '../layout/widget-card';
 import {
   billableClients,
   clientIncome,
+  competenceRuler,
   feeCompetence,
   feePeriodAlerts,
   FEE_ENDING_DAYS,
@@ -41,6 +45,8 @@ import {
   regimeChartLayout,
   regimeStats,
   type FeePeriodAlert,
+  type RulerEntry,
+  type RulerStatus,
 } from './clients-math';
 import { useOfficeClients } from './data';
 import { BodyEmpty, ListSkeleton } from './shared';
@@ -237,7 +243,7 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
               {feesTotal === 0 ? (
                 <p className="flex flex-1 items-center justify-center text-center text-caption text-muted">Nenhum honorário vigente nos clientes ativos.</p>
               ) : chartBox.height === 0 ? null : chart.donut ? (
-                <DonutChart fill data={slices} total={feesTotal} centerLabel="por mês" maxItems={chart.maxItems} />
+                <DonutChart fill itemColors data={slices} total={feesTotal} centerLabel="por mês" maxItems={chart.maxItems} />
               ) : (
                 <RegimeShares slices={slices} total={feesTotal} />
               )}
@@ -316,11 +322,23 @@ function alertMeta(a: FeePeriodAlert): ReactNode {
 }
 
 /** Clients without a current fee period, then the periods that end in the next 60 days. */
+type FeeRow = FeePeriodAlert | { kind: 'renewal'; client: Client; date: ISODate; first: boolean };
+
 export function FeePeriodsWidget({ alert }: WidgetProps) {
   const clients = useOfficeClients();
   const today = todayISO();
   const data = clients.data;
   const alerts = useMemo(() => (data ? feePeriodAlerts(data.items, today) : []), [data, today]);
+  // Below the alerts, the next renewals as reference, so the card shows the whole calendar of periods.
+  const rows = useMemo<FeeRow[]>(() => {
+    if (!data) return [];
+    const flagged = new Set(alerts.map((a) => a.client.id));
+    const renewals = data.items
+      .filter((c) => c.status === 'active' && c.currentFee && !flagged.has(c.id))
+      .sort((a, b) => a.currentFee!.endDate.localeCompare(b.currentFee!.endDate))
+      .map((client, i): FeeRow => ({ kind: 'renewal', client, date: client.currentFee!.endDate, first: i === 0 }));
+    return [...alerts, ...renewals];
+  }, [data, alerts]);
   const missing = alerts.filter((a) => a.kind === 'missing').length;
   const ending = alerts.length - missing;
 
@@ -331,7 +349,7 @@ export function FeePeriodsWidget({ alert }: WidgetProps) {
     body = <ErrorState error={clients.error} onRetry={() => clients.refetch()} className="p-3" />;
   } else if (!data || data.items.length === 0) {
     body = <NoClients />;
-  } else if (alerts.length === 0) {
+  } else if (rows.length === 0) {
     body = (
       <BodyEmpty
         icon={<CalendarCheck />}
@@ -342,24 +360,44 @@ export function FeePeriodsWidget({ alert }: WidgetProps) {
   } else {
     body = (
       <FitList
-        items={alerts}
+        items={rows}
         getKey={(a) => a.client.id}
         moreLabel="cliente(s)"
         moreHref="/clientes"
         className="flex flex-col gap-0.5"
         renderItem={(a) => {
           const name = a.client.name;
+          if (a.kind === 'renewal') {
+            return (
+              <div>
+                {a.first ? <p className="mt-2 mb-1 px-1.5 text-caption font-medium text-muted">{alerts.length ? 'Próximas renovações' : 'Todas em dia · próximas renovações'}</p> : null}
+                <Link
+                  to={clientHref(a.client.id)}
+                  className="flex items-center gap-3 rounded-md px-1.5 py-1.5 transition-colors hover:bg-surface-muted"
+                  aria-label={`${name}: vigência até ${formatDateBR(a.date)}`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-body-sm font-medium text-fg" title={name}>
+                      {name}
+                    </span>
+                    <span className="mt-0.5 block truncate text-mini text-muted">vigência até {formatDateBR(a.date)}</span>
+                  </span>
+                  <span className="shrink-0 text-right text-caption text-muted tabular">{formatBRL(a.client.currentFee?.amount ?? 0)}/mês</span>
+                </Link>
+              </div>
+            );
+          }
           return (
             <Link
               to={clientHref(a.client.id)}
-              className="flex items-center gap-3 rounded-md px-1.5 py-1 transition-colors hover:bg-surface-muted"
+              className="flex items-center gap-3 rounded-md px-1.5 py-1.5 transition-colors hover:bg-surface-muted"
               aria-label={`${name}: ${a.kind === 'missing' ? 'sem vigência' : `vigência vence em ${formatDateBR(a.date)}`}`}
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] font-semibold text-fg" title={name}>
+                <span className="block truncate text-body-sm font-semibold text-fg" title={name}>
                   {name}
                 </span>
-                <span className="mt-px block truncate text-micro text-muted">{alertMeta(a)}</span>
+                <span className="mt-0.5 block truncate text-mini text-muted">{alertMeta(a)}</span>
               </span>
               <span className="hidden w-28 shrink-0 truncate text-caption text-muted @2xl:block">{TAX_REGIME_LABELS[a.client.taxRegime]}</span>
               <span
@@ -558,14 +596,14 @@ export function FeesMonthWidget({ month, d, loading, size, alert }: WidgetProps)
           summary.monthlyFees > 0
             ? `${pct(view.billed, summary.monthlyFees)} do previsto${feeAware ? ` · ${pluralize(view.count, 'lançamento', 'lançamentos')}` : ''}`
             : undefined,
-        fill: 'bg-primary',
+        fill: 'bg-[var(--app-chart-3)]',
       },
       {
         key: 'received',
         label: 'Recebido',
         value: view.received,
         hint: view.billed > 0 ? `${pct(view.received, view.billed)} do ${billedLabel.toLowerCase()}` : undefined,
-        fill: 'bg-success',
+        fill: 'bg-data',
       },
     ];
     const missing = view.missing.length;
@@ -640,6 +678,173 @@ export function FeesMonthWidget({ month, d, loading, size, alert }: WidgetProps)
             {!feeAware && zero ? ' Lançamentos sem cliente vinculado não entram nesta conta.' : ''}
             {income.data?.truncated ? ` Calculado sobre os ${MONTH_ROWS_LIMIT.toLocaleString('pt-BR')} primeiros lançamentos do mês.` : ''}
           </p>
+        ) : undefined
+      }
+    >
+      {body}
+    </WidgetCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Régua da competência
+// ---------------------------------------------------------------------------
+
+const RULER_LABELS: Record<RulerStatus, { one: string; many: string }> = {
+  atrasado: { one: 'atrasado', many: 'atrasados' },
+  aberto: { one: 'em aberto', many: 'em aberto' },
+  sem: { one: 'sem honorário', many: 'sem honorário' },
+  pago: { one: 'pago', many: 'pagos' },
+};
+
+/** Cell look per status: colour only where it means something (paid = the data hue, late = red). */
+const RULER_CELL: Record<RulerStatus, string> = {
+  pago: 'border-transparent bg-data-soft',
+  aberto: 'border-border bg-surface',
+  atrasado: 'border-transparent bg-danger-soft',
+  sem: 'border-dashed border-border-strong bg-transparent',
+};
+
+const RULER_SWATCH: Record<RulerStatus, string> = {
+  pago: 'bg-data',
+  aberto: 'border border-border-strong bg-surface',
+  atrasado: 'bg-danger',
+  sem: 'border border-dashed border-border-strong',
+};
+
+function rulerDetail(e: RulerEntry): string {
+  if (e.status === 'sem') return 'não gerado';
+  if (e.status === 'pago') return 'pago';
+  const due = e.dueDate ? `${e.dueDate.slice(8, 10)}/${e.dueDate.slice(5, 7)}` : '';
+  return e.status === 'atrasado' ? `${e.daysLate} ${e.daysLate === 1 ? 'dia' : 'dias'} de atraso` : `vence ${due}`;
+}
+
+/**
+ * The office's month at a glance: one cell per client for the competence due this month (paid,
+ * open, late or not generated), what needs doing first. Narrow cards switch to small squares.
+ */
+export function CompetenceRulerWidget({ month, alert }: WidgetProps) {
+  const today = todayISO();
+  const clients = useOfficeClients();
+  const income = useMonthIncome(month);
+  const { canWrite } = usePermissions();
+  const [generating, setGenerating] = useState(false);
+  const grid = useElementSize<HTMLDivElement>();
+  const competence = feeCompetence(month);
+  const compLabel = `${competence.slice(5)}/${competence.slice(0, 4)}`;
+
+  const entries = useMemo(
+    () => (clients.data && income.data ? competenceRuler(clients.data.items, income.data.items, competence, today) : null),
+    [clients.data, income.data, competence, today],
+  );
+  const counts = useMemo(() => {
+    const out: Record<RulerStatus, number> = { atrasado: 0, aberto: 0, sem: 0, pago: 0 };
+    for (const e of entries ?? []) out[e.status]++;
+    return out;
+  }, [entries]);
+
+  // Three densities, the richest that fits: name + status + amount (11rem × 3.75rem), name only
+  // (8rem × 2.25rem), then a 1rem square per client with its tooltip.
+  const fits = (cellW: number, cellH: number, gap: number) =>
+    Math.max(1, Math.floor((grid.width + gap) / (cellW + gap))) * Math.max(1, Math.floor((grid.height + gap) / (cellH + gap)));
+  const count = entries?.length ?? 0;
+  const mode: 'full' | 'name' | 'dots' = count <= fits(176, 60, 10) ? 'full' : count <= fits(128, 36, 8) ? 'name' : 'dots';
+  const compact = mode === 'dots';
+
+  const failed = [clients, income].find((q) => q.isError);
+  let body;
+  if (failed) {
+    body = <ErrorState error={failed.error} onRetry={() => failed.refetch()} className="p-3" />;
+  } else if (!entries) {
+    body = (
+      <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2.5" aria-busy="true" aria-label="Carregando">
+        {Array.from({ length: 8 }, (_, i) => (
+          <Skeleton key={i} className="h-15" />
+        ))}
+      </div>
+    );
+  } else if (entries.length === 0) {
+    body = <NoClients />;
+  } else {
+    body = (
+      <div ref={grid.ref} className="min-h-0 flex-1 overflow-hidden">
+        <ul
+          className={cn(
+            'grid',
+            mode === 'dots' ? 'grid-cols-[repeat(auto-fill,1rem)] gap-1.5' : mode === 'name' ? 'grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2.5',
+          )}
+          aria-label={`Honorários da competência ${compLabel} por cliente`}
+        >
+          {entries.map((e) =>
+            compact ? (
+              <li key={e.clientId} title={`${e.name}: ${rulerDetail(e)}`} className={cn('size-4 rounded-[4px] border', RULER_CELL[e.status])}>
+                <span className="sr-only">
+                  {e.name}: {rulerDetail(e)}
+                </span>
+              </li>
+            ) : mode === 'name' ? (
+              <li key={e.clientId}>
+                <Link
+                  to={clientHref(e.clientId)}
+                  title={`${e.name}: ${rulerDetail(e)}`}
+                  className={cn('flex h-9 items-center rounded-md border px-2.5 transition-colors hover:border-border-strong', RULER_CELL[e.status])}
+                >
+                  <span className={cn('truncate text-caption font-medium', e.status === 'atrasado' ? 'text-danger' : 'text-fg')}>{e.name}</span>
+                  <span className="sr-only">: {rulerDetail(e)}</span>
+                </Link>
+              </li>
+            ) : (
+              <li key={e.clientId}>
+                <Link
+                  to={clientHref(e.clientId)}
+                  title={e.name}
+                  className={cn('flex h-15 flex-col justify-center gap-0.5 rounded-lg border px-3 transition-colors hover:border-border-strong', RULER_CELL[e.status])}
+                >
+                  <span className="truncate text-body-sm font-semibold text-fg">{e.name}</span>
+                  <span className="flex items-baseline justify-between gap-2 text-caption">
+                    <span className={cn('truncate', e.status === 'atrasado' ? 'font-medium text-danger' : 'text-muted')}>{rulerDetail(e)}</span>
+                    {e.amount > 0 ? <span className="tabular shrink-0 text-muted">{formatBRL(e.amount)}</span> : null}
+                  </span>
+                </Link>
+              </li>
+            ),
+          )}
+        </ul>
+      </div>
+    );
+  }
+
+  const order: RulerStatus[] = ['pago', 'aberto', 'atrasado', 'sem'];
+  return (
+    <WidgetCard
+      subtitle={`Competência ${compLabel} · vence neste mês`}
+      info="Cada quadro é um cliente com honorário na competência (mês do serviço), que vence no mês seguinte conforme o dia cadastrado no cliente. Atrasados primeiro."
+      alert={alert}
+      action={
+        entries && entries.length > 0 ? (
+          <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted" aria-label="Legenda">
+            {order
+              .filter((st) => counts[st] > 0)
+              .map((st) => (
+                <li key={st} className="flex items-center gap-1.5">
+                  <span className={cn('size-2.5 rounded-[3px]', RULER_SWATCH[st])} aria-hidden />
+                  <span className="tabular font-semibold text-fg">{counts[st]}</span> {counts[st] === 1 ? RULER_LABELS[st].one : RULER_LABELS[st].many}
+                </li>
+              ))}
+          </ul>
+        ) : undefined
+      }
+      footer={
+        counts.sem > 0 && canWrite ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-caption text-muted">
+              {counts.sem === 1 ? '1 cliente com vigência' : `${counts.sem} clientes com vigência`} sem honorário de {compLabel}.
+            </p>
+            <Button size="sm" variant="outline" onClick={() => setGenerating(true)}>
+              Gerar honorários
+            </Button>
+            <GenerateFeesDialog open={generating} onOpenChange={setGenerating} competence={competence} />
+          </div>
         ) : undefined
       }
     >

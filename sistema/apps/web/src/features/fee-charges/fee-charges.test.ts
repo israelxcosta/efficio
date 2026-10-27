@@ -5,43 +5,17 @@ import {
   competenceLongLabel,
   employeesAction,
   employeesFormula,
-  feeDueDate,
   findEmployeesCharge,
   isMonthKey,
   lateFeesSplit,
   lateFeesTotal,
-  parseDueDay,
+  dueDatesLabel,
   parseEmployees,
   plural,
   transactionsInCacheData,
 } from './fee-charges';
 
 const tx = (patch: Partial<Transaction>): Transaction => ({ id: 'x', feeKind: null, feeOf: null, ...patch }) as Transaction;
-
-describe('feeDueDate', () => {
-  it('falls on the due day of the month after the competence', () => {
-    expect(feeDueDate('2026-10', 10)).toBe('2026-11-10');
-    expect(feeDueDate('2026-10', 1)).toBe('2026-11-01');
-  });
-
-  it('crosses the year after December', () => {
-    expect(feeDueDate('2026-12', 10)).toBe('2027-01-10');
-  });
-
-  it('clamps the day to the length of the due month', () => {
-    expect(feeDueDate('2026-10', 31)).toBe('2026-11-30');
-    expect(feeDueDate('2027-01', 31)).toBe('2027-02-28');
-    expect(feeDueDate('2027-01', 29)).toBe('2027-02-28');
-    // 2028 is a leap year.
-    expect(feeDueDate('2028-01', 31)).toBe('2028-02-29');
-    expect(feeDueDate('2026-11', 31)).toBe('2026-12-31');
-  });
-
-  it('keeps out-of-range days inside the month', () => {
-    expect(feeDueDate('2026-10', 0)).toBe('2026-11-01');
-    expect(feeDueDate('2026-10', 45)).toBe('2026-11-30');
-  });
-});
 
 describe('competence labels', () => {
   it('formats MM/AAAA and the long month name', () => {
@@ -59,15 +33,16 @@ describe('competence labels', () => {
   });
 });
 
-describe('parseDueDay', () => {
-  it('accepts integers from 1 to 31', () => {
-    expect(parseDueDay('10')).toBe(10);
-    expect(parseDueDay(' 5 ')).toBe(5);
-    expect(parseDueDay('31')).toBe(31);
+describe('dueDatesLabel', () => {
+  it('shows one date when every client falls due on the same day', () => {
+    expect(dueDatesLabel(['2026-11-10', '2026-11-10'])).toBe('10/11/2026');
   });
-
-  it('rejects empty, zero, out of range and decimals', () => {
-    for (const v of ['', '0', '32', '1.5', '-3', 'abc', '100']) expect(parseDueDay(v)).toBeNull();
+  it('shows the range when the clients have different due days', () => {
+    expect(dueDatesLabel(['2026-11-20', '2026-11-05', '2026-11-10'])).toBe('05/11 a 20/11/2026');
+    expect(dueDatesLabel(['2027-01-05', '2026-12-30'])).toBe('30/12/2026 a 05/01/2027');
+  });
+  it('is null without fees', () => {
+    expect(dueDatesLabel([])).toBeNull();
   });
 });
 
