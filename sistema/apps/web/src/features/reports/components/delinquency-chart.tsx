@@ -67,10 +67,8 @@ export function DelinquencyChart({ monthly }: { monthly: DelinquencyMonth[] }) {
                 {...axisProps}
                 allowDecimals={false}
                 tickFormatter={daysTick}
-                width={yAxisWidth(
-                  data.map((d) => d.days ?? 0),
-                  daysTick,
-                )}
+                // Ticks round up past the data (91 → 100d): size the gutter for that label.
+                width={yAxisWidth([Math.max(0, ...data.map((d) => d.days ?? 0)) * 1.25], daysTick)}
               />
               <YAxis yAxisId="rate" orientation="right" {...axisProps} domain={[0, rateMax]} tickFormatter={rateTick} width={yAxisWidth([rateMax], rateTick)} />
               <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<DelinquencyTooltip />} />

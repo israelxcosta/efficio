@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { ChevronLeft, ChevronRight, Plus, Receipt, Search, HandCoins, X } from 'lucide-react';
 import { formatBRL, todayISO, TRANSACTION_ORIGIN_LABELS, TRANSACTION_ORIGINS, type TransactionStatus } from '@effinance/shared';
@@ -35,7 +35,13 @@ function useDebounced<T>(value: T, ms = 300): T {
   return v;
 }
 
-export function TransactionListPage({ type }: { type: 'expense' | 'income' }) {
+interface TransactionListPageProps {
+  type: 'expense' | 'income';
+  /** Extra header actions, shown before "Nova despesa/receita" (e.g. "Gerar honorários"). */
+  actions?: ReactNode;
+}
+
+export function TransactionListPage({ type, actions: extraActions }: TransactionListPageProps) {
   const [params, setParams] = useSearchParams();
   const actions = useTransactionActions();
   const isExpense = type === 'expense';
@@ -113,11 +119,14 @@ export function TransactionListPage({ type }: { type: 'expense' | 'income' }) {
             : 'Acompanhe recebimentos previstos, parcelas e receitas fixas. Marque 👍 quando receber.'
         }
         actions={
-          <WriteGate>
-            <Button onClick={() => actions.openTransaction({ type })}>
-              <Plus /> {labels.new}
-            </Button>
-          </WriteGate>
+          <>
+            {extraActions}
+            <WriteGate>
+              <Button onClick={() => actions.openTransaction({ type })}>
+                <Plus /> {labels.new}
+              </Button>
+            </WriteGate>
+          </>
         }
       />
 

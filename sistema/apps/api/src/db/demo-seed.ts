@@ -3,7 +3,7 @@
 // personal workspace (in trial) with ~8 months of history, and "Família Costa" (Família plan) shared
 // with Rafael. Keep this module free of Node-only imports: it also runs in the browser (PGlite).
 
-import { and, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import {
   addDays,
   addMonthKey,
@@ -11,10 +11,12 @@ import {
   clientInputSchema,
   contactInputSchema,
   daysInMonth,
+  FEE_CATEGORY,
   feePeriodIndexAt,
   getInvoiceDates,
   monthKey,
   parseISODate,
+  suggestLateFees,
   todayISO,
   transactionInputSchema,
   type ClientInput,
@@ -33,7 +35,8 @@ import { createCreditCard, payInvoice } from '../modules/credit-cards/service';
 import { createContact } from '../modules/contacts/service';
 import { addFee, createClient, inactivateClient } from '../modules/clients/service';
 import { addContribution, createGoal } from '../modules/goals/service';
-import { createTransaction } from '../modules/transactions/service';
+import { createTransaction, setPaid } from '../modules/transactions/service';
+import { generateFees, setFeeEmployees } from '../modules/fee-charges/service';
 import { createTransfer } from '../modules/transfers/service';
 import { commitImport, previewImport } from '../modules/imports/service';
 import { FakeOpenFinanceProvider } from '../modules/open-finance/providers/fake';
@@ -866,10 +869,30 @@ const DEMO_CLIENTS: DemoClient[] = [
   },
 ];
 
+type Payment = 'open' | { daysLate: number; charged?: boolean };
+
+/**
+ * How each client pays its fees, by the position of the fee among those already due (0 = the most
+ * recent). Deterministic, relative to today: two always on time, some a few days late (a few of those
+ * charged juros e multa), Rota Sul owing the latest one and Ju Prado Design six months in a row.
+ */
+const PAYMENT_HABITS: Record<string, (k: number) => Payment> = {
+  Tecnova: () => ({ daysLate: 0 }),
+  'Sorriso Pleno': (k) => ({ daysLate: k % 2 ? -3 : 0 }), // pays the bank slip early now and then
+  'Vida Saudável': () => ({ daysLate: 0 }),
+  'Bom Preço': () => ({ daysLate: 0 }),
+  'Arte & Forma': () => ({ daysLate: 0 }),
+  'Pão Quente': (k) => ({ daysLate: k % 3 === 1 ? 4 : k % 4 === 3 ? 6 : 0 }),
+  'Instituto Aprender': (k) => ({ daysLate: k === 1 || k === 4 ? 2 : 0 }),
+  Alicerce: (k) => (k === 2 ? { daysLate: 18, charged: true } : { daysLate: 0 }),
+  'Rota Sul': (k) => (k === 0 ? 'open' : k % 2 ? { daysLate: 12 + k, charged: true } : { daysLate: 5 }),
+  'Ju Prado Design': (k) => (k < 6 ? 'open' : { daysLate: 20 + 3 * k, charged: true }),
+};
+
 /**
  * The accounting office (business plan): clients with yearly fee periods (one awaiting its
- * readjustment, two inactive), suppliers, monthly fees receivable linked to each client and the
- * office's fixed costs. Past occurrences are paid, except one overdue fee.
+ * readjustment, two inactive), suppliers, fees receivable generated per competence month (some with
+ * the employee charge) and the office's fixed costs. Fees follow each client's payment habit.
  */
 async function seedCompany(db: DbExecutor, ownerId: string): Promise<string> {
   const workspaceId = await db.transaction((tx) =>
@@ -964,12 +987,12 @@ async function seedCompany(db: DbExecutor, ownerId: string): Promise<string> {
         frequency: 'monthly',
       });
 
-    // --- clients, fee periods and the monthly fees receivable --------------------------------------
-    const fees = find('Honorários', 'Honorários mensais');
-    let overdue: string | null = null;
+    // --- clients and fee periods ----------------------------------------------------------------------
+    const clientIds = new Map<string, string>();
     for (const demo of DEMO_CLIENTS) {
       const contractStartDate = `${addMonthKey(month, -demo.startedMonthsAgo)}-01`;
       const client = await createClient(tx, workspaceId, clientInputSchema.parse({ ...demo.input, contractStartDate }));
+      clientIds.set(demo.input.tradeName ?? demo.input.name, client.id);
       const until = demo.inactive ? `${addMonthKey(month, -demo.inactive.monthsAgo)}-01` : today;
       const last = feePeriodIndexAt(contractStartDate, until) - (demo.renewalPending ? 1 : 0);
       for (let i = 0; i <= last; i++) {
@@ -979,43 +1002,52 @@ async function seedCompany(db: DbExecutor, ownerId: string): Promise<string> {
           employeeFee: Math.round(demo.employeeFee / factor / 100) * 100,
         });
       }
-      const name = demo.input.tradeName ?? demo.input.name;
-      const startMonth = monthKey(contractStartDate) > firstMonth ? monthKey(addMonths(contractStartDate, 1)) : firstMonth;
       if (demo.inactive) {
-        // Former client: the last fees before the transfer stay as history (and block deletion).
-        if (demo.inactive.reason === 'accounting_transfer') {
-          for (let m = 4; m >= 1; m--) {
-            await add({
-              ...fees,
-              type: 'income',
-              description: `Honorários — ${name}`,
-              amount: demo.fee,
-              date: `${addMonthKey(month, -demo.inactive.monthsAgo - m)}-10`,
-              paid: true,
-              contactId: client.id,
-              paymentMethod: 'bank_slip',
-            });
-          }
-        }
         await inactivateClient(tx, workspaceId, client.id, {
           date: until,
           reason: demo.inactive.reason,
           notes: demo.inactive.notes ?? null,
         });
-        continue;
       }
-      const rows = await fixed('income', `Honorários — ${name}`, demo.fee, startMonth, 10, fees, client.id, 'bank_slip');
-      if (demo.input.tradeName === 'Rota Sul') overdue = rows.find((r) => r.date.startsWith(addMonthKey(month, -1)))?.id ?? null;
     }
     await add({
-      ...find('Honorários', 'Serviços avulsos'),
+      ...find(FEE_CATEGORY.name, 'Serviços avulsos'),
       type: 'income',
       description: 'Abertura de filial — Vida Saudável',
       amount: 150000,
       date: addDays(today, -12),
       paid: true,
-      contactId: null,
+      contactId: clientIds.get('Vida Saudável') ?? null,
     });
+
+    // --- fees receivable: "Gerar honorários" for the 10 competence months before the current one ------
+    // Competence M is due on the 10th of M+1. The current competence is left for the user to generate
+    // (that is what the button is tried with). Former clients are billed until their inactivation;
+    // Alicerce has no fee for the current period (renewal pending).
+    for (let k = 10; k >= 1; k--) {
+      await generateFees(tx, workspaceId, { competence: addMonthKey(month, -k), dueDay: 10, dryRun: false });
+    }
+    const feeRows = await tx
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.feeKind, 'fee')))
+      .orderBy(asc(transactions.date));
+    const feesOf = (name: string) => feeRows.filter((r) => r.contactId === clientIds.get(name));
+
+    // "+ Empregados" on the latest competences of the clients with staff on payroll.
+    const headcounts: [string, number[]][] = [
+      ['Pão Quente', [6, 6, 7]],
+      ['Rota Sul', [12, 12, 13, 14]],
+      ['Sorriso Pleno', [4, 4]],
+    ];
+    const employeeCharges = new Map<string, string>();
+    for (const [name, counts] of headcounts) {
+      const latest = feesOf(name).slice(-counts.length);
+      for (const [i, fee] of latest.entries()) {
+        const res = await setFeeEmployees(tx, workspaceId, fee.id, { employees: counts[i]!, dryRun: false });
+        if (res.transaction) employeeCharges.set(fee.id, res.transaction.id);
+      }
+    }
 
     // --- fixed costs of the office --------------------------------------------------------------------
     await fixed('expense', 'Aluguel do escritório', 180000, firstMonth, 5, find('Ocupação', 'Aluguel'), landlord.id, 'bank_slip');
@@ -1038,12 +1070,26 @@ async function seedCompany(db: DbExecutor, ownerId: string): Promise<string> {
       installments: 3,
     });
 
-    // Everything due until today was paid or received, except one client's last fee.
+    // Bills due until today were paid on their due date; the fees follow each client's habit.
     await tx
       .update(transactions)
       .set({ paid: true, paidAt: sql`${transactions.date}` })
-      .where(and(eq(transactions.workspaceId, workspaceId), lte(transactions.date, today)));
-    if (overdue) await tx.update(transactions).set({ paid: false, paidAt: null }).where(eq(transactions.id, overdue));
+      .where(and(eq(transactions.workspaceId, workspaceId), lte(transactions.date, today), isNull(transactions.feeKind)));
+    for (const [name, habit] of Object.entries(PAYMENT_HABITS)) {
+      // k = 0 is the most recent fee already due.
+      const due = feesOf(name).filter((f) => f.date < today).reverse();
+      for (const [k, fee] of due.entries()) {
+        const payment = habit(k);
+        if (payment === 'open') continue;
+        const paidAt = addDays(fee.date, payment.daysLate);
+        if (paidAt > today) continue; // still late today
+        const charge = employeeCharges.get(fee.id);
+        // Settled late with juros e multa: the same path as confirming in the app (linked rows).
+        const extra = payment.charged ? suggestLateFees(fee.amount, fee.date, paidAt) : null;
+        await setPaid(tx, workspaceId, fee.id, { paid: true, paidAt, accountId: bank.id, interest: extra?.interest, fine: extra?.fine });
+        if (charge) await setPaid(tx, workspaceId, charge, { paid: true, paidAt, accountId: bank.id });
+      }
+    }
   });
   return workspaceId;
 }

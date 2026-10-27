@@ -3,7 +3,7 @@
 // items used by the collection message. Receivables = income linked to a client, without the
 // interest/fine rows themselves.
 
-import { and, eq, gte, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import {
   addMonthKey,
@@ -90,7 +90,9 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
           and(eq(transactions.paid, false), lt(transactions.date, now)),
         ),
       ),
-    );
+    )
+    // Overdue lists read oldest first; a fee before the employee charge made after it.
+    .orderBy(asc(transactions.date), asc(transactions.createdAt));
 
   const feesOf = (r: Receivable) => (r.interest > 0 || r.fine > 0 ? { interest: r.interest, fine: r.fine } : undefined);
 

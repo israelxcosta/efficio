@@ -154,12 +154,15 @@ function PortfolioCard({ r, months, className }: { r: DelinquencyReportResponse;
   return (
     <Card className={cn('flex flex-col p-4 sm:p-5', className)}>
       <CardHeader title="Termômetro de inadimplência" subtitle={`Carteira · vencimentos de ${formatDateBR(r.from)} a ${formatDateBR(r.to)}`} info={THERMOMETER_HELP} />
-      <div className="mt-4 flex flex-1 items-center gap-4 sm:gap-6">
-        <Thermometer probability={s.probability} />
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div>
+      {/* Phones: thermometer + headline, stats below. Side card: stats under the headline. Full width: three columns. */}
+      <div className="@container mt-4 flex flex-1 flex-col justify-center">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5 gap-y-4 @[720px]:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] @[720px]:gap-x-10">
+          <div className="@[400px]:row-span-2 @[720px]:row-span-1">
+            <Thermometer probability={s.probability} />
+          </div>
+          <div className="min-w-0">
             <div className="flex items-start justify-between gap-3">
-              <span className="text-caption leading-snug font-medium text-muted">Chance média de atrasar a próxima mensalidade</span>
+              <span className="text-caption leading-snug font-medium text-muted">Chance média de atraso</span>
               <span className={cn('tabular text-kpi leading-none font-semibold tracking-tight', RISK_TONE[zone].text)}>{formatChance(s.probability)}</span>
             </div>
             <div className="mt-1.5 flex justify-end">
@@ -173,37 +176,39 @@ function PortfolioCard({ r, months, className }: { r: DelinquencyReportResponse;
                   : `Pelo histórico, cerca de 1 em cada ${oneIn} mensalidades tende a atrasar.`}
             </p>
           </div>
-          <dl className="flex flex-col gap-1.5 border-t border-border pt-3 text-body-sm">
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted">Taxa de atraso real ({months} meses)</dt>
-              <dd className="tabular font-semibold text-fg">{formatPercent(s.lateRate)}</dd>
+          <div className="col-span-2 flex min-w-0 flex-col gap-3 @[400px]:col-span-1 @[400px]:col-start-2 @[720px]:col-start-3 @[720px]:row-start-1">
+            <dl className="flex flex-col gap-1.5 border-t border-border pt-3 text-body-sm @[720px]:border-t-0 @[720px]:pt-0">
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted">Taxa de atraso real ({months} meses)</dt>
+                <dd className="tabular font-semibold text-fg">{formatPercent(s.lateRate)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted">Clientes em risco alto ou crítico</dt>
+                <dd className={cn('tabular font-semibold whitespace-nowrap', s.clientsAtRisk > 0 ? 'text-danger' : 'text-fg')}>
+                  {s.clientsAtRisk} de {total}
+                </dd>
+              </div>
+            </dl>
+            <div>
+              <div
+                role="img"
+                aria-label={`Clientes por faixa: ${DELINQUENCY_RISKS.map((k) => `${DELINQUENCY_RISK_LABELS[k]} ${byRisk[k]}`).join(', ')}`}
+                className="flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-bg-subtle"
+              >
+                {DELINQUENCY_RISKS.filter((k) => byRisk[k] > 0).map((k) => (
+                  <span key={k} className={cn('h-full min-w-1', RISK_TONE[k].bg)} style={{ width: `${(byRisk[k] / Math.max(1, total)) * 100}%` }} />
+                ))}
+              </div>
+              <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                {DELINQUENCY_RISKS.map((k) => (
+                  <li key={k} className={cn('flex items-center gap-1.5 text-caption whitespace-nowrap', byRisk[k] === 0 ? 'text-subtle' : 'text-muted')}>
+                    <span className={cn('size-2 shrink-0 rounded-[3px]', RISK_TONE[k].bg, byRisk[k] === 0 && 'opacity-40')} aria-hidden />
+                    {DELINQUENCY_RISK_LABELS[k]}
+                    <span className="tabular font-semibold text-fg">{byRisk[k]}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted">Clientes em risco alto ou crítico</dt>
-              <dd className={cn('tabular font-semibold', s.clientsAtRisk > 0 ? 'text-danger' : 'text-fg')}>
-                {s.clientsAtRisk} de {total}
-              </dd>
-            </div>
-          </dl>
-          <div>
-            <div
-              role="img"
-              aria-label={`Clientes por faixa: ${DELINQUENCY_RISKS.map((k) => `${DELINQUENCY_RISK_LABELS[k]} ${byRisk[k]}`).join(', ')}`}
-              className="flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-bg-subtle"
-            >
-              {DELINQUENCY_RISKS.filter((k) => byRisk[k] > 0).map((k) => (
-                <span key={k} className={cn('h-full min-w-1', RISK_TONE[k].bg)} style={{ width: `${(byRisk[k] / Math.max(1, total)) * 100}%` }} />
-              ))}
-            </div>
-            <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-              {DELINQUENCY_RISKS.map((k) => (
-                <li key={k} className={cn('flex items-center gap-1.5 text-caption', byRisk[k] === 0 ? 'text-subtle' : 'text-muted')}>
-                  <span className={cn('size-2 shrink-0 rounded-[3px]', RISK_TONE[k].bg, byRisk[k] === 0 && 'opacity-40')} aria-hidden />
-                  {DELINQUENCY_RISK_LABELS[k]}
-                  <span className="tabular font-semibold text-fg">{byRisk[k]}</span>
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       </div>

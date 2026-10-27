@@ -5,15 +5,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Gauge } from '@/components/charts/gauge';
 import { ProgressBar } from '@/components/ui/progress-bar';
 
-const TONE = { Crítica: 'danger', Atenção: 'warning', Saudável: 'success', Excelente: 'success' } as const;
+/** Badge tone of each health label. */
+export const HEALTH_TONE = { Crítica: 'danger', Atenção: 'warning', Saudável: 'success', Excelente: 'success' } as const;
+
+/** What the score adds up (computeHealth in apps/api/src/modules/dashboard/service.ts). */
+export const HEALTH_INFO =
+  'Pontuação de 0 a 1000 que soma cinco fatores: taxa de economia dos últimos 3 meses, reserva de emergência, contas em dia, uso do limite dos cartões e progresso das metas.';
 
 export function HealthCard({ health, loading }: { health: HealthScore | undefined; loading: boolean }) {
   return (
     <Card className="flex flex-col p-5">
       <CardHeader
         title="Saúde financeira"
-        info="Pontuação de 0 a 1000 calculada a partir da taxa de economia, contas em atraso, uso do cartão, reserva e metas."
-        action={health ? <Badge tone={TONE[health.label]}>{health.label}</Badge> : null}
+        info={HEALTH_INFO}
+        action={health ? <Badge tone={HEALTH_TONE[health.label]}>{health.label}</Badge> : null}
       />
       {loading || !health ? (
         <Skeleton className="mx-auto mt-4 h-28 w-48" />

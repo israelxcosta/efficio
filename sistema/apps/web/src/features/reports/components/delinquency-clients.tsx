@@ -127,12 +127,12 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
             <table className="w-full table-fixed text-sm">
               <colgroup>
                 <col />
-                <col className="w-[104px]" />
-                <col className="w-[128px]" />
-                <col className="w-[96px]" />
-                <col className="w-[128px]" />
-                <col className="w-[176px]" />
-                <col className="w-[112px] xl:w-[188px]" />
+                <col className="w-[92px] xl:w-[104px]" />
+                <col className="w-[112px] xl:w-[128px]" />
+                <col className="w-[88px] xl:w-[100px]" />
+                <col className="w-[112px] xl:w-[128px]" />
+                <col className="w-[156px] xl:w-[176px]" />
+                <col className="w-[100px] xl:w-[196px]" />
               </colgroup>
               <thead>
                 <tr className="border-b border-border bg-surface-muted text-left text-[11px] font-semibold tracking-wide text-muted uppercase">
@@ -246,7 +246,7 @@ function Stat({ label, children }: { label: string; children: ReactNode }) {
 function ClientName({ client: c, expanded, onToggle }: { client: DelinquencyClient; expanded: boolean; onToggle: () => void }) {
   const title = collectionName(c);
   return (
-    <button type="button" onClick={onToggle} aria-expanded={expanded} className="group flex min-w-0 flex-1 items-start gap-3 text-left">
+    <button type="button" onClick={onToggle} aria-expanded={expanded} className="group flex w-full min-w-0 flex-1 items-start gap-3 text-left">
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg">{initials(title)}</span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1">
@@ -304,7 +304,7 @@ function DaysCell({ client: c }: { client: DelinquencyClient }) {
 }
 
 function OpenCell({ client: c, align = 'left' }: { client: DelinquencyClient; align?: 'left' | 'right' }) {
-  if (c.openCount === 0) return <span className="text-body-sm text-subtle">nada em aberto</span>;
+  if (c.openCount === 0) return <span className={cn('block text-body-sm whitespace-nowrap text-subtle', align === 'right' && 'text-right')}>em dia</span>;
   return (
     <span className={cn('block leading-tight', align === 'right' && 'text-right')}>
       <span className="tabular text-body-sm font-semibold text-danger">{formatBRL(c.openAmount)}</span>
@@ -371,11 +371,22 @@ function OpenItems({ client: c }: { client: DelinquencyClient }) {
           <p className="mb-1.5 text-micro font-semibold tracking-wide text-subtle uppercase">Vencidos em aberto</p>
           <ul className="divide-y divide-border">
             {c.overdue.map((item) => (
-              <li key={item.id} className="flex items-center gap-3 py-1.5 text-body-sm">
-                <span className="min-w-0 flex-1 truncate text-fg">{item.description}</span>
-                <span className="tabular shrink-0 text-muted">Venc. {formatDateBR(item.date)}</span>
-                <span className="tabular hidden w-24 shrink-0 text-right text-danger sm:block">há {formatDays(item.daysLate)}</span>
-                <span className="tabular w-24 shrink-0 text-right font-semibold text-fg">{formatBRL(item.amount)}</span>
+              // Phones: description and amount, then the due date below. Wider: one line.
+              <li
+                key={item.id}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 py-1.5 text-body-sm sm:grid-cols-[minmax(0,1fr)_auto_6.5rem_6.5rem]"
+              >
+                <span className="truncate text-fg" title={item.description}>
+                  {item.description}
+                </span>
+                <span className="tabular row-start-2 text-micro text-muted sm:row-start-auto sm:text-body-sm">
+                  Venc. {formatDateBR(item.date)}
+                  <span className="text-danger sm:hidden"> · há {formatDays(item.daysLate)}</span>
+                </span>
+                <span className="tabular hidden text-right text-danger sm:block">há {formatDays(item.daysLate)}</span>
+                <span className="tabular col-start-2 row-start-1 text-right font-semibold text-fg sm:col-start-auto sm:row-start-auto">
+                  {formatBRL(item.amount)}
+                </span>
               </li>
             ))}
           </ul>

@@ -67,6 +67,12 @@ do sistema: as mesmas rotas e regras da API rodam no navegador sobre o PGlite (P
 WebAssembly). Cada navegador ganha sua própria base, salva no IndexedDB e já preenchida com os dados
 de demonstração; o login vem preenchido com a conta demo e um aviso permite restaurar os dados.
 
+O escritório "Efficio Contabilidade" do demo traz honorários gerados para os 10 meses anteriores
+(com "+ Empregados" em alguns clientes), clientes que pagam em dia, clientes que atrasam (alguns
+pagos com juros e multa) e um cliente com 6 meses em aberto. A competência atual fica livre para
+testar **Contas a receber → Gerar honorários**. Ao mudar esses dados, aumente `SEED_VERSION` em
+`apps/web/src/demo/server.ts` para que navegadores com dados antigos recriem a base.
+
 A pasta pode ser publicada em qualquer hospedagem estática (Netlify, Vercel, GitHub Pages, S3).
 Para testar localmente: `pnpm --filter @effinance/web dev:demo`.
 

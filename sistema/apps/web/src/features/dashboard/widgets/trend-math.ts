@@ -235,3 +235,20 @@ export function resultStats(months: readonly { month: MonthKey; net: number }[])
     worst,
   };
 }
+
+/** Height of a donut legend row in fill mode (DonutChart's FILL_ROW_PX). */
+const DONUT_ROW_PX = 26;
+/** Room kept for the donut itself when the legend sits below it. */
+const DONUT_BELOW_PX = 132;
+
+/**
+ * Slices a category donut shows before grouping the rest into "Outras (N)": about 4 up to 4 rows,
+ * 6 from 5 rows and 8 at 4 columns, never more legend rows than the body fits (legend beside the
+ * donut from 448px of width, below it otherwise). Nothing is grouped when everything fits.
+ */
+export function donutMaxItems(count: number, size: { c: number; r: number }, width: number, height: number): number {
+  const wanted = size.c >= 4 ? 8 : size.r >= 5 ? 6 : 4;
+  const room = height > 0 ? Math.floor((width >= 448 ? height : height - DONUT_BELOW_PX) / DONUT_ROW_PX) : wanted + 1;
+  const rows = Math.max(2, Math.min(wanted + 1, room));
+  return count <= rows ? count : rows - 1;
+}

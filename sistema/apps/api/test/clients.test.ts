@@ -357,7 +357,11 @@ describe('business workspace', () => {
     expect((await c.post('/auth/switch-workspace', { workspaceId: created.body.id })).status).toBe(200);
     const income = (await c.get('/categories?type=income')).body.map((x: { name: string }) => x.name);
     const expense = (await c.get('/categories?type=expense')).body.map((x: { name: string }) => x.name);
-    expect(income).toContain('Honorários');
+    expect(income).toContain('Serviços Prestados');
+    const services = (await c.get('/categories?type=income')).body.find((x: { name: string }) => x.name === 'Serviços Prestados');
+    expect(services.subcategories.map((s: { name: string }) => s.name)).toEqual(
+      expect.arrayContaining(['Honorários contábeis', 'Folha de pagamento', '13º honorário', 'Serviços avulsos']),
+    );
     expect(expense).toEqual(expect.arrayContaining(['Pessoal', 'Impostos e taxas', 'Ocupação']));
     expect(expense).not.toContain('Lazer');
   });

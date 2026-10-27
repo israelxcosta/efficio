@@ -93,7 +93,7 @@ export function CollectionMessageDialog({ client, onClose }: { client: Delinquen
         shown ? (
           <>
             <span className="font-semibold text-fg">{collectionName(shown)}</span> · {pluralize(shown.overdue.length, 'mensalidade vencida', 'mensalidades vencidas')} ·{' '}
-            {formatBRL(shown.openAmount)}
+            <span className="tabular whitespace-nowrap">{formatBRL(shown.openAmount)}</span>
           </>
         ) : null
       }
@@ -101,13 +101,13 @@ export function CollectionMessageDialog({ client, onClose }: { client: Delinquen
       footer={
         <div className="flex w-full flex-wrap items-center justify-end gap-2">
           {href ? (
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="flex-1 sm:flex-none">
               <a href={href} target="_blank" rel="noopener noreferrer">
                 <MessageCircle /> Abrir no WhatsApp
               </a>
             </Button>
           ) : null}
-          <Button onClick={copy}>
+          <Button onClick={copy} className="flex-1 sm:flex-none">
             <Copy /> Copiar mensagem
           </Button>
         </div>

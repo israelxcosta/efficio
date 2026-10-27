@@ -1,6 +1,6 @@
 // Runs the in-browser API (PGlite + real route plugins) in Node to guard the demo build.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { monthKey, todayISO } from '@effinance/shared';
+import { addMonths, monthKey, todayISO } from '@effinance/shared';
 import { demoFetch } from './fetch';
 import { DEMO_EMAIL, DEMO_PARTNER_EMAIL, DEMO_PASSWORD, getDemoServer } from './server';
 
@@ -11,6 +11,8 @@ async function call(method: string, path: string, body?: unknown) {
 }
 
 const month = monthKey(todayISO());
+/** 'YYYY-MM' → 'MM/AAAA'. */
+const formatCompetence = (key: string) => `${key.slice(5)}/${key.slice(0, 4)}`;
 const from = `${month}-01`;
 const to = `${month}-28`;
 
@@ -53,11 +55,54 @@ describe('demo api (PGlite)', () => {
 
     const transferred = all.items.find((c: { tradeName: string }) => c.tradeName === 'Bom Preço');
     expect(transferred).toMatchObject({ status: 'inactive', inactivation: { reason: 'accounting_transfer' } });
-    expect(transferred.transactionCount).toBe(4);
+    // Fees generated for the competences until the inactivation (10 months before the current one, migration 0009).
+    expect(transferred.transactionCount).toBe(9);
 
     expect((await call('GET', '/contacts?kind=supplier')).body.total).toBe(5);
+    // This month's receivable is the fee of last month's competence ("Gerar honorários").
     const receivables = (await call('GET', `/transactions?type=income&contactId=${bakery.id}&from=${from}&to=${to}`)).body;
-    expect(receivables.items[0]).toMatchObject({ contactId: bakery.id, amount: 78000 });
+    const fee = receivables.items.find((t: { feeKind: string | null }) => t.feeKind === 'fee');
+    expect(fee).toMatchObject({ contactId: bakery.id, amount: 78000, feeCompetence: monthKey(addMonths(from, -1)), category: { name: 'Serviços Prestados' } });
+    expect(fee.description).toBe(`Honorários ref. ${formatCompetence(monthKey(addMonths(from, -1)))} - Pão Quente`);
+
+    // Payment history behind the delinquency report and the overdue widgets (migration 0008).
+    const report = (await call('GET', '/reports/delinquency?months=12')).body;
+    const byName = (name: string) => report.clients.find((x: { tradeName: string | null }) => x.tradeName === name);
+    const chronic = byName('Ju Prado Design');
+    expect(chronic).toMatchObject({ openCount: 6, risk: 'critico' });
+    expect(chronic.overdue).toHaveLength(6);
+    expect(chronic.overdue.every((o: { competence: string | null; daysLate: number }) => o.competence && o.daysLate > 0)).toBe(true);
+    expect(chronic.fineCount).toBeGreaterThan(0);
+    expect(byName('Rota Sul')).toMatchObject({ openCount: 2 }); // the latest fee and its employee charge
+    expect(byName('Rota Sul').interestCount).toBeGreaterThan(0);
+    expect(byName('Tecnova')).toMatchObject({ lateCount: 0, openCount: 0, risk: 'baixo' });
+    expect(byName('Sorriso Pleno')).toMatchObject({ lateCount: 0, openCount: 0 });
+    expect(byName('Pão Quente').lateCount).toBeGreaterThan(0);
+    // Most open amount first: Rota Sul's big fee, then the chronic small one.
+    expect(report.clients.slice(0, 2).map((x: { tradeName: string }) => x.tradeName)).toEqual(['Rota Sul', 'Ju Prado Design']);
+    expect(report.summary).toMatchObject({ openClients: 2, openCount: 8 });
+    expect(report.summary.paidWithFeesCount).toBeGreaterThan(2);
+    expect(report.summary.interestTotal + report.summary.fineTotal).toBeGreaterThan(0);
+    expect(report.summary.clientsAtRisk).toBeGreaterThanOrEqual(1);
+    const overdue = (await call('GET', '/transactions?type=income&status=overdue&pageSize=200')).body;
+    expect(overdue.total).toBe(8);
+
+    // "Gerar honorários": the seed stops at last month's competence, so the current one is left to generate.
+    const preview = (await call('POST', '/fee-charges/generate', { competence: month, dryRun: true })).body;
+    expect(preview.created).toHaveLength(7);
+    expect(preview.created.every((x: { transactionId: string | null }) => x.transactionId === null)).toBe(true);
+    const generated = await call('POST', '/fee-charges/generate', { competence: month });
+    expect(generated.status).toBe(201);
+    expect(generated.body).toMatchObject({ competence: month, dueDate: `${monthKey(addMonths(from, 1))}-10` });
+    expect(generated.body.created).toHaveLength(7);
+    expect(generated.body.skipped.map((x: { reason: string }) => x.reason).sort()).toEqual(['inactive', 'inactive', 'no_current_fee']);
+    const again = (await call('POST', '/fee-charges/generate', { competence: month, dryRun: true })).body;
+    expect(again.created).toEqual([]);
+    expect(again.skipped.filter((x: { reason: string }) => x.reason === 'already_generated')).toHaveLength(7);
+    const bakeryFee = generated.body.created.find((x: { clientId: string }) => x.clientId === bakery.id);
+    const employees = await call('POST', `/fee-charges/${bakeryFee.transactionId}/employees`, { employees: 5 });
+    expect(employees.body).toMatchObject({ employees: 5, rate: 3500, amount: 17500 });
+    expect(employees.body.transaction).toMatchObject({ feeKind: 'employees', feeOf: bakeryFee.transactionId, subcategory: { name: 'Folha de pagamento' } });
 
     // The rest of the suite runs in Marina's personal workspace (cards, goals, integrations).
     const me = (await call('GET', '/auth/me')).body;

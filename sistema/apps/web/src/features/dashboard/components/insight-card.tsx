@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { ArrowUpRight, ChevronLeft, ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, ChevronRight, CircleAlert, Lightbulb, Sparkles, TrendingUp, Trophy, type LucideIcon } from 'lucide-react';
 import type { Insight, InsightKind } from '@effinance/shared';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,6 +10,14 @@ export const INSIGHT_LABELS: Record<InsightKind, string> = {
   warning: 'Atenção',
   achievement: 'Conquista',
   info: 'Dica',
+};
+
+/** Icon of each insight kind (same as the "Dashboard inteligente" list). */
+export const INSIGHT_ICONS: Record<InsightKind, LucideIcon> = {
+  opportunity: TrendingUp,
+  warning: CircleAlert,
+  achievement: Trophy,
+  info: Lightbulb,
 };
 
 /** Navy gradient card with a glass inner card (Graniq "NIQ IA — Insights"). */

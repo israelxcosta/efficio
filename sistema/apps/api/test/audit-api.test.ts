@@ -744,6 +744,8 @@ describe('guards: access control', () => {
     ['PATCH', `/transactions/${FAKE_ID}/paid`],
     ['POST', `/transactions/${FAKE_ID}/anticipate`],
     ['DELETE', `/transactions/${FAKE_ID}`],
+    ['POST', '/fee-charges/generate'],
+    ['POST', `/fee-charges/${FAKE_ID}/employees`],
     ['POST', '/transfers'],
     ['PUT', `/transfers/${FAKE_ID}`],
     ['DELETE', `/transfers/${FAKE_ID}`],

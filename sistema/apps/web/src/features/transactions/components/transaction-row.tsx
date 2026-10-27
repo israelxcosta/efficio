@@ -1,9 +1,11 @@
-import { Copy, CreditCard, Ellipsis, FastForward, FileDown, Landmark, Pencil, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
+import { Copy, CreditCard, Ellipsis, FastForward, FileDown, Landmark, Pencil, Plus, ThumbsDown, ThumbsUp, Trash2, UsersRound } from 'lucide-react';
 import {
   FREQUENCY_LABELS,
+  LATE_FEE_KIND_LABELS,
   TRANSACTION_ORIGIN_LABELS,
   TRANSFER_KIND_LABELS,
   diffInDays,
+  formatBRL,
   formatDateBR,
   formatMonthKey,
   todayISO,
@@ -11,9 +13,14 @@ import {
 } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { BankLogo } from '@/components/ui/bank-logo';
+import { Button } from '@/components/ui/button';
 import { CategoryIcon } from '@/components/ui/category-icon';
 import { Money } from '@/components/ui/misc';
 import { PaidToggle } from '@/components/ui/paid-toggle';
+import { Tooltip } from '@/components/ui/tooltip';
+import { WriteGate } from '@/features/auth/permissions';
+import { useEmployeesDialog } from '@/features/fee-charges/employees-dialog';
+import { competenceLabel, isMonthKey, lateFeesSplit, lateFeesTotal, plural } from '@/features/fee-charges/fee-charges';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +60,64 @@ export function OriginBadge({ tx }: { tx: Transaction }) {
       {/* Icon only in narrow rows (mobile); the label stays for screen readers. */}
       <span className="sr-only @md:not-sr-only">{TRANSACTION_ORIGIN_LABELS[origin]}</span>
     </Badge>
+  );
+}
+
+/**
+ * Rows made by "Gerar honorários" ("Ref. 10/2026", "Folha · 5 empregados") and interest/fine rows of a
+ * late payment ("Juros", "Multa"). Tolerates APIs that don't send these fields yet.
+ */
+export function FeeBadges({ tx }: { tx: Transaction }) {
+  return (
+    <>
+      {tx.feeKind === 'fee' && isMonthKey(tx.feeCompetence) ? (
+        // The description already says "ref. MM/AAAA": narrow rows keep the room for it.
+        <Badge tone="neutral" title={`Honorário da competência ${competenceLabel(tx.feeCompetence)}`} className="hidden shrink-0 @md:inline-flex">
+          Ref. {competenceLabel(tx.feeCompetence)}
+        </Badge>
+      ) : null}
+      {tx.feeKind === 'employees' ? (
+        <Badge tone="brand" className="shrink-0" title="Cobrança de empregados (folha de pagamento)">
+          <UsersRound aria-hidden />
+          {tx.employees != null ? (
+            <>
+              {/* Narrow rows: icon + count; the full label stays for screen readers. */}
+              <span className="@md:hidden" aria-hidden>
+                {tx.employees.toLocaleString('pt-BR')}
+              </span>
+              <span className="sr-only @md:not-sr-only">Folha · {plural(tx.employees, 'empregado', 'empregados')}</span>
+            </>
+          ) : (
+            'Folha'
+          )}
+        </Badge>
+      ) : null}
+      {tx.lateFeeKind ? (
+        <Badge tone="warning" className="shrink-0" title="Cobrado por pagamento em atraso">
+          {LATE_FEE_KIND_LABELS[tx.lateFeeKind]}
+        </Badge>
+      ) : null}
+    </>
+  );
+}
+
+/** "+ juros/multa R$ X" on a row settled late; the tooltip (and screen readers) get the split. */
+export function LateFeesBadge({ tx }: { tx: Transaction }) {
+  if (!tx.lateFees) return null;
+  const total = lateFeesTotal(tx.lateFees);
+  if (total <= 0) return null;
+  const split = lateFeesSplit(tx.lateFees);
+  return (
+    <Tooltip content={split}>
+      <Badge tone="warning" className="shrink-0">
+        {/* Narrow rows: just the amount, so the description keeps its room. */}
+        <span className="@md:hidden" aria-hidden>
+          + {formatBRL(total)}
+        </span>
+        <span className="sr-only @md:not-sr-only">+ juros/multa {formatBRL(total)}</span>
+        <span className="sr-only"> ({split})</span>
+      </Badge>
+    </Tooltip>
   );
 }
 
@@ -127,6 +192,9 @@ export function TransactionRow({ tx, amount, trailing, showDue = true, muted }: 
   // Read-only workspaces (viewer / inactive subscription): the row is informational only.
   const readOnly = Boolean(actions.readOnlyReason);
   const Main = readOnly ? 'div' : 'button';
+  // Generated fees: "+ Empregados" (chip on wide rows, item in the menu) opens one dialog per row.
+  const employees = useEmployeesDialog(tx);
+  const isFee = tx.feeKind === 'fee';
   return (
     <div className="@container">
     <div
@@ -164,6 +232,8 @@ export function TransactionRow({ tx, amount, trailing, showDue = true, muted }: 
             <SeriesBadge tx={tx} />
             {tx.splitGroupId ? <Badge tone="neutral" title="Valor dividido entre categorias">Dividido</Badge> : null}
             {tx.type === 'transfer' && tx.transferKind ? <Badge tone="brand">{TRANSFER_KIND_LABELS[tx.transferKind]}</Badge> : null}
+            <FeeBadges tx={tx} />
+            <LateFeesBadge tx={tx} />
             <OriginBadge tx={tx} />
           </span>
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
@@ -182,6 +252,22 @@ export function TransactionRow({ tx, amount, trailing, showDue = true, muted }: 
           </span>
         </span>
       </Main>
+      {isFee ? (
+        // Right after the flexible column, so the fixed columns (account, due date, amount) stay aligned.
+        <div className="hidden shrink-0 @xl:block">
+          <WriteGate>
+            <Button
+              variant="outline"
+              size="xs"
+              className="rounded-full px-2.5 [&_svg]:size-3.5"
+              onClick={employees.show}
+              aria-label={`+ Empregados · ${tx.contact?.name ?? tx.description}`}
+            >
+              <Plus aria-hidden /> Empregados
+            </Button>
+          </WriteGate>
+        </div>
+      ) : null}
       <div className="hidden w-44 min-w-0 @3xl:block">
         <SourceLabel tx={tx} />
       </div>
@@ -195,65 +281,81 @@ export function TransactionRow({ tx, amount, trailing, showDue = true, muted }: 
         <Money value={signed} tone={tx.type === 'transfer' && amount === undefined ? 'neutral' : undefined} signed className="text-[15px]" />
         {trailing}
       </div>
-      <RowMenu tx={tx} />
+      <RowMenu tx={tx} onAddEmployees={isFee ? employees.show : undefined} />
     </div>
+    {employees.element}
     </div>
   );
 }
 
-export function RowMenu({ tx }: { tx: Transaction }) {
+interface RowMenuProps {
+  tx: Transaction;
+  /** Opens the row's "+ Empregados" dialog; without it (compact rows) the menu opens its own. */
+  onAddEmployees?: () => void;
+}
+
+export function RowMenu({ tx, onAddEmployees }: RowMenuProps) {
   const actions = useTransactionActions();
+  const ownEmployees = useEmployeesDialog(tx);
   const isCardPurchase = Boolean(tx.creditCardId) && tx.type !== 'transfer';
   // Every item changes data; keep the column width so rows stay aligned.
   if (actions.readOnlyReason) return <span className="size-8 shrink-0" aria-hidden />;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100"
-          aria-label={`Ações de ${tx.description}`}
-        >
-          <Ellipsis className="size-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuItem icon={<Pencil />} onSelect={() => actions.edit(tx)}>
-          Editar
-        </DropdownMenuItem>
-        {tx.type !== 'transfer' ? (
-          <DropdownMenuItem icon={<Copy />} onSelect={() => actions.duplicate(tx)}>
-            Duplicar
-          </DropdownMenuItem>
-        ) : null}
-        {tx.type !== 'transfer' && !isCardPurchase ? (
-          <DropdownMenuItem
-            icon={tx.paid ? <ThumbsDown /> : <ThumbsUp />}
-            onSelect={() => actions.togglePaid(tx, !tx.paid)}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100"
+            aria-label={`Ações de ${tx.description}`}
           >
-            {tx.paid
-              ? tx.type === 'income'
-                ? 'Marcar como a receber'
-                : 'Marcar como pendente'
-              : tx.type === 'income'
-                ? 'Marcar como recebido'
-                : 'Marcar como pago'}
+            <Ellipsis className="size-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem icon={<Pencil />} onSelect={() => actions.edit(tx)}>
+            Editar
           </DropdownMenuItem>
-        ) : null}
-        {tx.recurrenceKind === 'installment' && (tx.installmentNumber ?? 0) < (tx.installmentTotal ?? 0) ? (
-          <DropdownMenuItem icon={<FastForward />} onSelect={() => actions.anticipate(tx)}>
-            Antecipar parcelas
-          </DropdownMenuItem>
-        ) : null}
-        {tx.transferKind !== 'card_payment' ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => actions.remove(tx)}>
-              Excluir
+          {tx.feeKind === 'fee' ? (
+            <DropdownMenuItem icon={<UsersRound />} onSelect={onAddEmployees ?? ownEmployees.show}>
+              + Empregados
             </DropdownMenuItem>
-          </>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          ) : null}
+          {tx.type !== 'transfer' ? (
+            <DropdownMenuItem icon={<Copy />} onSelect={() => actions.duplicate(tx)}>
+              Duplicar
+            </DropdownMenuItem>
+          ) : null}
+          {tx.type !== 'transfer' && !isCardPurchase ? (
+            <DropdownMenuItem
+              icon={tx.paid ? <ThumbsDown /> : <ThumbsUp />}
+              onSelect={() => actions.togglePaid(tx, !tx.paid)}
+            >
+              {tx.paid
+                ? tx.type === 'income'
+                  ? 'Marcar como a receber'
+                  : 'Marcar como pendente'
+                : tx.type === 'income'
+                  ? 'Marcar como recebido'
+                  : 'Marcar como pago'}
+            </DropdownMenuItem>
+          ) : null}
+          {tx.recurrenceKind === 'installment' && (tx.installmentNumber ?? 0) < (tx.installmentTotal ?? 0) ? (
+            <DropdownMenuItem icon={<FastForward />} onSelect={() => actions.anticipate(tx)}>
+              Antecipar parcelas
+            </DropdownMenuItem>
+          ) : null}
+          {tx.transferKind !== 'card_payment' ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => actions.remove(tx)}>
+                Excluir
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {onAddEmployees ? null : ownEmployees.element}
+    </>
   );
 }

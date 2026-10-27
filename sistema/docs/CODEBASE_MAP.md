@@ -152,7 +152,7 @@ sequenceDiagram
 | `statement` | `/statement` | extrato por data efetiva com saldo corrente |
 | `dashboard` | `/dashboard` | payload único: resumo, 6 meses, categorias, vencimentos (50 + totais), faturas a pagar, saúde, insights |
 | `reports` | `/reports/*` | overview, categories, contacts, comparison, cashflow, delinquency |
-| `fee-charges` | `/fee-charges/*` | (em andamento) gerar honorários da competência e "+ Empregados" |
+| `fee-charges` | `/fee-charges/*` | gerar honorários da competência (vigência do fim do mês, `ON CONFLICT`) e "+ Empregados" |
 | `search` | `/search` | lançamentos, contas, categorias, contatos; ordena pela distância de hoje |
 | `imports` | `/imports` | OFX/CSV: prévia, duplicados, sugestão de categoria, lote com desfazer |
 | `open-finance` | `/open-finance/*` | Pluggy ou provedor simulado, vínculo de contas, sync incremental, webhooks |
@@ -171,7 +171,7 @@ sequenceDiagram
   Busca exata por índice cego (HMAC). Nomes e descrições ficam em claro.
 - **Migrações:** 0000 inicial · 0001 divisão · 0002 espaços · 0003 RLS · 0004 integridade de tenant ·
   0005 importação/Open Finance · 0006 tombstones · 0007 clientes e vigências · 0008 juros e multa ·
-  0009 geração de honorários (em andamento). Escritas para rodar duas vezes e também no PGlite.
+  0009 geração de honorários. Escritas para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tokens, sessões e trials usam o relógio real.
 

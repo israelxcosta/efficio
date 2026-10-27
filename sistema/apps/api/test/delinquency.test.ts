@@ -126,8 +126,9 @@ describe('delinquency report', () => {
       lowHistory: false,
     });
     expect(clientA.overdue).toEqual([
-      { id: ids.september, description: 'Honorários 2026-09', date: '2026-09-10', amount: 35000, daysLate: 40 },
-      { id: ids.october, description: 'Honorários 2026-10', date: '2026-10-10', amount: 35000, daysLate: 10 },
+      // Typed receivables have no competence (generated fees do: see fee-charges.test.ts).
+      { id: ids.september, description: 'Honorários 2026-09', date: '2026-09-10', amount: 35000, daysLate: 40, competence: null },
+      { id: ids.october, description: 'Honorários 2026-10', date: '2026-10-10', amount: 35000, daysLate: 10, competence: null },
     ]);
     expect(clientB).toMatchObject({
       phone: '19987654321', // no responsible person: the company's number

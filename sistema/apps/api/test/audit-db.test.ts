@@ -13,8 +13,10 @@ import {
   BANK_CONNECTION_STATUSES,
   CARD_BRANDS,
   CATEGORY_TYPES,
+  FEE_ENTRY_KINDS,
   FREQUENCIES,
   IMPORT_FORMATS,
+  LATE_FEE_KINDS,
   MEMBER_ROLES,
   OPEN_FINANCE_PROVIDERS,
   PAYMENT_METHODS,
@@ -363,6 +365,34 @@ describe('catalog: row level security and privileges', () => {
     expect(values('bank_connections_status_chk')).toEqual(sorted(BANK_CONNECTION_STATUSES));
     expect(values('bank_connection_accounts_kind_chk')).toEqual(sorted(BANK_ACCOUNT_KINDS));
     expect(values('bank_connection_accounts_card_brand_chk')).toEqual(sorted(CARD_BRANDS));
+    // Migrations 0008 and 0009.
+    expect(values('transactions_late_fee_kind_chk')).toEqual(sorted(LATE_FEE_KINDS));
+    expect(values('transactions_fee_kind_chk')).toEqual(sorted(FEE_ENTRY_KINDS));
+  });
+
+  it('late fees and generated fee rows keep their shape (CHECKs of 0008/0009)', async () => {
+    const a = await seedTenant('A');
+    const base = { workspaceId: a.ws, type: 'income' as const, description: 'x', amount: 100, date: '2026-10-01' };
+    const fee = { ...base, feeKind: 'fee' as const, feeCompetence: '2026-09' };
+    const broken: [string, Record<string, unknown>][] = [
+      ['late fee without kind', { ...base, lateFeeOf: a.tx }],
+      ['kind without competence', { ...base, feeKind: 'fee' }],
+      ['competence without kind', { ...base, feeCompetence: '2026-09' }],
+      ['bad competence', { ...fee, feeCompetence: '2026-13' }],
+      ['generated expense', { ...fee, type: 'expense' }],
+      ['fee pointing to a fee', { ...fee, feeOf: a.tx }],
+      ['fee with headcount', { ...fee, employees: 3 }],
+      ['employee charge without fee', { ...fee, feeKind: 'employees', employees: 3 }],
+      ['employee charge without headcount', { ...fee, feeKind: 'employees', feeOf: a.tx }],
+      ['zero employees', { ...fee, feeKind: 'employees', feeOf: a.tx, employees: 0 }],
+    ];
+    for (const [label, values] of broken) {
+      const failure = await pgFailure(admin().insert(transactions).values(values as typeof transactions.$inferInsert));
+      expect(failure?.code, label).toBe('23514');
+    }
+    // A client is billed once per competence.
+    await admin().insert(transactions).values({ ...fee, contactId: a.client });
+    expect((await pgFailure(admin().insert(transactions).values({ ...fee, contactId: a.client })))?.code).toBe('23505');
   });
 });
 
@@ -511,6 +541,18 @@ describe('foreign keys never cross workspaces', () => {
         'bank_connection_accounts.linked_credit_card_id',
         (tx, id) => tx.update(bankConnectionAccounts).set({ linkedCreditCardId: id }).where(eq(bankConnectionAccounts.id, b.cardFeed)),
         a.card,
+      ],
+      // Migrations 0008 and 0009: self references (late fee, employee charge).
+      [
+        'transactions.late_fee_of',
+        (tx, id) => tx.insert(transactions).values({ ...base, type: 'income', lateFeeOf: id, lateFeeKind: 'interest' }),
+        a.tx,
+      ],
+      [
+        'transactions.fee_of',
+        (tx, id) =>
+          tx.insert(transactions).values({ ...base, type: 'income', feeKind: 'employees', feeCompetence: '2026-09', feeOf: id, employees: 2 }),
+        a.tx,
       ],
       // Re-pointing an existing row is blocked as well.
       ['transactions.account_id (update)', (tx, id) => tx.update(transactions).set({ accountId: id }).where(eq(transactions.id, b.tx)), a.account],

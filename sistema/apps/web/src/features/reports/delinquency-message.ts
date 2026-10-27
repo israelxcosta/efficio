@@ -67,9 +67,23 @@ export function collectionLine(item: CollectionItem, mode: CompetenceMode = 'pre
   return `• ${competenceOf(item, mode)} | ${formatBRL(item.amount)} | Venc ${formatDateBR(item.date)}`;
 }
 
-/** The standard message of the office, with one line per open receivable (oldest first). */
+/**
+ * One line per competence month and due date (oldest first): the fee and its "+ Empregados" charge
+ * of the same month are summed into one line, as in the office's model.
+ */
+export function groupByMonth(items: readonly CollectionItem[], mode: CompetenceMode = 'previous'): CollectionItem[] {
+  const groups = new Map<string, CollectionItem>();
+  for (const item of items) {
+    const key = `${competenceOf(item, mode)}|${item.date}`;
+    const current = groups.get(key);
+    groups.set(key, current ? { ...current, amount: current.amount + item.amount } : { ...item });
+  }
+  return [...groups.values()].sort((a, b) => a.date.localeCompare(b.date) || competenceOf(a, mode).localeCompare(competenceOf(b, mode)));
+}
+
+/** The standard message of the office, with one line per open month (oldest first). */
 export function buildCollectionMessage({ clientName, items, signature, now, competence = 'previous' }: CollectionMessageInput): string {
-  const lines = [...items].sort((a, b) => a.date.localeCompare(b.date)).map((item) => collectionLine(item, competence));
+  const lines = groupByMonth(items, competence).map((item) => collectionLine(item, competence));
   const closing = signature.trim() ? `Atenciosamente,\n${signature.trim()}` : 'Atenciosamente,';
   return [
     `${greeting(now)}, ${clientName.trim()}`,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCollectionMessage,
+  groupByMonth,
   collectionLine,
   collectionName,
   competenceOf,
@@ -154,5 +155,23 @@ describe('whatsappNumber / whatsappHref', () => {
     expect(href).toBe('https://wa.me/5511987654321?text=Bom%20dia%2C%20A%26B%0A%E2%80%A2%2012%2F2025%20%7C%20R%24%20350%2C00');
     expect(whatsappHref('javascript:alert(1)', 'x')).toBeNull();
     expect(whatsappHref('11987654321?text=evil', 'x')).toBe('https://wa.me/5511987654321?text=x');
+  });
+});
+
+describe('groupByMonth', () => {
+  it('sums the fee and its employee charge of the same month into one line', () => {
+    const items = [
+      { date: '2026-10-10', amount: 480000, competence: '2026-09' },
+      { date: '2026-10-10', amount: 65000, competence: '2026-09' },
+      { date: '2026-09-10', amount: 480000, competence: '2026-08' },
+    ];
+    expect(groupByMonth(items).map((i) => collectionLine(i))).toEqual([
+      '• 08/2026 | R$ 4.800,00 | Venc 10/09/2026',
+      '• 09/2026 | R$ 5.450,00 | Venc 10/10/2026',
+    ]);
+  });
+
+  it('keeps different due dates apart', () => {
+    expect(groupByMonth([{ date: '2026-01-15', amount: 100 }, { date: '2026-01-20', amount: 200 }])).toHaveLength(2);
   });
 });

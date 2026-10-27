@@ -65,9 +65,11 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/transactions/:id` | — | `Transaction` |
 | POST | `/api/transactions` | `transactionInputSchema` | `Transaction[]` (201) — todas as ocorrências criadas (e todas as partes, se dividido) |
 | PUT | `/api/transactions/:id?scope=one\|future\|all` | `transactionUpdateSchema` | `Transaction` |
-| PATCH | `/api/transactions/:id/paid` | `setPaidSchema` | `Transaction` |
+| PATCH | `/api/transactions/:id/paid` | `setPaidSchema` (`paid`, `paidAt`, `accountId`, `interest`, `fine`) | `Transaction` — juros e multa viram lançamentos vinculados (veja "Juros e multa") |
 | DELETE | `/api/transactions/:id?scope=one\|future\|all` | — | 204 |
 | POST | `/api/transactions/:id/anticipate` | `anticipateInstallmentsSchema` | `Transaction[]` — parcelas antecipadas |
+| POST | `/api/fee-charges/generate` | `generateFeesSchema` (`competence`, `dueDay` = 10, `dryRun`) | `GenerateFeesResponse` (201 se criou algo; 200 na simulação ou sem novidades) |
+| POST | `/api/fee-charges/:id/employees` | `feeEmployeesSchema` (`employees`, `dryRun`) | `FeeEmployeesResponse`; 422 se não for honorário gerado, sem taxa por empregado ou já recebido |
 | GET | `/api/transfers` | `transferQuerySchema` | `Paginated<Transaction>` |
 | POST | `/api/transfers` | `transferInputSchema` | `Transaction` (201) — `transferKind` derivado (aplicação/resgate) |
 | PUT | `/api/transfers/:id` | `transferInputSchema` | `Transaction` |
@@ -79,6 +81,7 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/reports/contacts` | `contactReportQuerySchema` | `ContactReportResponse` |
 | GET | `/api/reports/comparison` | `comparisonReportQuerySchema` | `ComparisonReportResponse` |
 | GET | `/api/reports/cashflow` | `cashflowReportQuerySchema` | `CashflowReportResponse` |
+| GET | `/api/reports/delinquency?months=3..24` | `delinquencyReportQuerySchema` (padrão 12) | `DelinquencyReportResponse` — veja "Relatório de inadimplência" |
 | GET | `/api/search?q=` | `searchQuerySchema` | `SearchResponse` — descrição, nomes e CPF/CNPJ exato |
 
 ## Regras de negócio
@@ -121,6 +124,85 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
   incluem compras no cartão; **fluxo de caixa** usa a data efetiva e só movimentos de contas, com
   faturas pendentes projetadas no vencimento.
 
+## Juros e multa
+
+- Confirmar um lançamento depois do vencimento (`PATCH /transactions/:id/paid` com `paid: true` e
+  `paidAt > date`) aceita `interest` (juros) e `fine` (multa) em centavos. Cada valor > 0 vira um
+  lançamento **pago** próprio, do mesmo tipo, conta (a do pagamento), contato e categoria, datado no
+  pagamento, com `lateFeeOf` = o original e `lateFeeKind` = `interest` | `fine`, descrição
+  "Juros — …" / "Multa — …". Saldos, extratos e relatórios não precisam de regra nova: são receitas
+  (ou despesas) comuns. O original expõe a soma em `lateFees: { interest, fine }` (`null` sem nenhum).
+  Sugestão da interface (`suggestLateFees` no contrato): multa de 2% + juros de 1% a.m. pro rata.
+- Enviar `interest` ou `fine` de novo **substitui** o par (o ausente vale 0; os dois 0 removem).
+  Confirmar de novo **sem** enviar move os vinculados para a nova data/conta; se a nova data não é
+  depois do vencimento, eles são removidos. O mesmo vale para a edição (`PUT`): reabrir, pagar em dia
+  ou mover para o cartão remove; mudar data de pagamento, conta, contato ou categoria acompanha.
+- 422: juros/multa com `paid: false`, pagamento até o vencimento, transferência, compra no cartão ou
+  lançamento que já é de juros/multa. Um lançamento de juros/multa não é reaberto sozinho (422 —
+  reabra o original ou exclua-o). Excluir o original (qualquer escopo de série) leva os vinculados
+  (FK em cascata).
+
+## Relatório de inadimplência
+
+`GET /reports/delinquency?months=N` (3–24, padrão 12): período = do dia 1 do mês `hoje − (N−1)`
+até hoje (`from`, `to`). **Recebíveis** = receitas vinculadas a um cliente (`contacts.kind =
+'client'`), fora do cartão, sem os lançamentos de juros/multa. Entram no período os recebíveis com
+vencimento no período que estão pagos ou já venceram (vencendo hoje ainda não é atraso); os
+**em aberto vencidos** entram sempre, mesmo antes do período.
+
+- **Dias de atraso**: pago → `paidAt − date`; em aberto → `hoje − date` (nunca negativo).
+  **Atrasado** = dias > 0.
+- Por cliente (`clients`, mais valor em aberto primeiro, depois pior score e nome): `dueCount`,
+  `onTimeCount`, `lateCount` (do período), `openCount`/`openAmount` (em aberto vencidos, qualquer
+  data), `avgDaysLate` (média dos atrasados, 1 casa; `null` sem atraso), `maxDaysLate`,
+  `interestCount`/`fineCount` e `interestTotal`/`fineTotal` (pagamentos do período com juros/multa),
+  `overdue` (em aberto vencidos, mais antigo primeiro: `id`, `description`, `date`, `amount`,
+  `daysLate`, `competence` dos honorários gerados) e dados para a cobrança (`name`, `tradeName`,
+  `document`, `responsibleName`, `phone` = do responsável, senão da empresa, `status`).
+- `monthly`: por mês de vencimento, `dueCount`, `lateCount`, `lateRate`, `avgDaysLate`,
+  `dueAmount`, `lateAmount`. `summary`: os mesmos totais do período, `openCount`/`openAmount`/
+  `openClients`, `interestTotal`/`fineTotal`, `paidWithFeesCount`, `probability` (média das
+  probabilidades ponderada por `dueCount`) e `clientsAtRisk` (risco `alto` ou `critico`).
+- **Score** (`delinquencyScore` em `packages/shared/src/utils/delinquency.ts`, testado no contrato):
+  cada recebível do período pesa `0,5^(meses atrás / 6)` (meia-vida de 6 meses).
+  `probability = (atrasados ponderados + 1) / (total ponderado + 5)` (sem histórico = 20%).
+  `score = 1000 × (1 − probability) − 150 × min(1, atraso médio ponderado / 60) − 60 × em aberto`,
+  limitado a 0..1000. Faixas (`riskOf`): ≥ 800 `baixo` (bom pagador), ≥ 600 `moderado`, ≥ 400
+  `alto`, abaixo `critico`. `lowHistory` = menos de 3 recebíveis no período.
+- Consultas: um SELECT com junção em `contacts` e a soma dos juros/multa de cada linha por
+  subconsulta correlacionada (índice parcial em `late_fee_of`) — sem listas de ids, que estourariam
+  o limite de parâmetros num escritório grande; os dados de contato vêm decifrados em lotes.
+
+## Gerar honorários e "+ Empregados"
+
+- **Competência** `M` (`YYYY-MM`): o honorário de `M` vence no dia `dueDay` (padrão 10, limitado ao
+  fim do mês) de `M+1` — o que vence em 10/11 é de 10/2026. `POST /fee-charges/generate` percorre os
+  clientes por nome de exibição (fantasia, senão razão social) e cria, para cada um, uma receita a
+  receber: valor = `amount` da vigência que contém o **último dia de `M`**; sem conta, boleto,
+  "Honorários ref. MM/AAAA - <cliente>", categoria **Serviços Prestados / Honorários contábeis**,
+  `feeKind: 'fee'`, `feeCompetence: M`.
+- Fica de fora, com motivo (`skipped`): `already_generated` (já existe o honorário do cliente em
+  `M`), `not_started` (contrato começa depois do fim de `M`), `inactive` (inativado antes do dia 1º
+  de `M`; inativado durante `M` ainda é cobrado), `no_current_fee` (sem vigência cadastrada para
+  `M`, ex.: reajuste pendente). `dryRun: true` calcula sem gravar nada (nem categorias;
+  `transactionId: null`).
+- Concorrência: as escritas de honorários do espaço são serializadas por um advisory lock da
+  transação e o insert usa `ON CONFLICT DO NOTHING` no índice único `(workspace_id, contact_id,
+  fee_competence) WHERE fee_kind = 'fee'` — quem perde a corrida volta como `already_generated`.
+  Editar um honorário para outro cliente que já tem o da competência dá 409.
+- **Categorias**: "Serviços Prestados" (receita) e as subcategorias "Honorários contábeis" e "Folha
+  de pagamento" são procuradas pelo nome sem diferenciar maiúsculas (uma ativa primeiro) e criadas
+  quando faltam. Espaços empresariais já nascem com elas (+ "13º honorário" e "Serviços avulsos").
+- **+ Empregados** (`POST /fee-charges/:id/employees`, `:id` = honorário gerado): `amount =
+  employees × employeeFee` da mesma vigência usada na competência; cria (ou substitui) uma receita
+  "Folha de pagamento ref. MM/AAAA - <cliente> (N empregados)" com o vencimento, cliente e
+  competência do honorário, categoria **Serviços Prestados / Folha de pagamento**, `feeKind:
+  'employees'`, `feeOf` = o honorário, `employees` = N. `employees: 0` remove. 422: `:id` não é
+  honorário gerado, taxa por empregado 0 ("Cadastre a taxa por empregado no honorário do cliente"),
+  sem vigência na competência, ou cobrança já recebida (alterar/remover; reenviar o mesmo N é aceito).
+  `dryRun` devolve só `rate` e `amount`. Mudar o vencimento ou o cliente do honorário leva junto a
+  cobrança de empregados em aberto; excluir o honorário a exclui (cascata).
+
 ## Clientes, honorários e fornecedores
 
 - **Contatos** têm `kind`: `supplier` (fornecedor, `/contacts`) ou `client` (empresa atendida,
@@ -151,6 +233,10 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
   cria sempre a próxima vigência; só a mais recente pode ser excluída. **Vigente** = a vigência que
   contém hoje; sem ela (nova ou vencida) o cliente entra em `summary.withoutCurrentFee`
   ("reajuste pendente" na tela).
+- **Resumo da lista** (`GET /clients` → `summary`, sempre do espaço inteiro, independente dos
+  filtros): `active`, `inactive`, `monthlyFees` (soma dos honorários vigentes), `withoutCurrentFee`,
+  `byRegime` (clientes **ativos** por regime tributário, todos os regimes presentes, zero quando não
+  há) e `averageFee` (= `monthlyFees` ÷ ativos **com** honorário vigente, arredondado; 0 sem nenhum).
 
 ---
 
@@ -484,3 +570,20 @@ provider_unavailable` (agregador não respondeu; detalhes só no log do servidor
 - `client_fees` (tenant, RLS `ENABLE`+`FORCE`, `UNIQUE (workspace_id, id)`, FK composta para o
   cliente com `ON DELETE CASCADE`, único `(client_id, period_index)`, CHECKs de valor e índice).
 - A exportação LGPD inclui os campos de cliente decifrados e `clientFees`.
+
+## Banco (migrações 0008 e 0009)
+
+- 0008 (juros e multa): `transactions.late_fee_of` (FK composta `(workspace_id, late_fee_of) →
+  transactions(workspace_id, id)` `ON DELETE CASCADE`, índice parcial) e `late_fee_kind` (CHECK
+  `interest` | `fine`; os dois juntos ou nenhum). Ganha também `UNIQUE (workspace_id, id)` em
+  `transactions`, alvo das referências a si mesma — criado só se faltar (um re-run não o derruba,
+  pois 0009 depende dele).
+- 0009 (honorários gerados): `fee_competence` (CHECK `YYYY-MM`), `fee_kind` (CHECK `fee` |
+  `employees`), `fee_of` (FK composta para o honorário, `ON DELETE CASCADE`) e `employees` (> 0).
+  CHECK de consistência: tipo ⇔ competência; gerado é sempre receita; `fee_of` só (e sempre) na
+  cobrança de empregados, junto com `employees`. Únicos parciais: `transactions_fee_competence_uq`
+  `(workspace_id, contact_id, fee_competence) WHERE fee_kind = 'fee'` e `transactions_fee_of_uq`
+  `(fee_of) WHERE fee_of IS NOT NULL` (equivale a `fee_kind = 'employees'` pelo CHECK e serve de
+  índice da FK). Conflitos viram 409 com mensagem própria (`lib/errors.ts`).
+- As duas são re-executáveis (`IF NOT EXISTS`, `DROP … IF EXISTS` antes de cada constraint) e rodam
+  também no demo (PGlite).
