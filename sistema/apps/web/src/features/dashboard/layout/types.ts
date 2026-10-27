@@ -8,7 +8,6 @@ export type WidgetId =
   | 'saldo-contas'
   | 'insights'
   | 'projecao-caixa'
-  | 'competencia'
   | 'inadimplencia'
   | 'clientes-devedores'
   | 'proximos-vencimentos'

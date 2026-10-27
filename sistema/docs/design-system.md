@@ -188,7 +188,6 @@ Prevalece sobre os itens acima quando houver conflito.
 - **Grade do dashboard:** linhas de 96px (88px em 2 colunas), espaçamento 16px, cartões com 20px de padding.
 - **Títulos:** toda tela tem um `h1`; a linha abaixo fala dos dados (mês, regime de competência/caixa), não da
   interface. O dashboard mostra o achado do mês (vencidos e quem concentra) ao lado do link para agir.
-- **Elemento próprio:** a "Régua da competência" (um quadro por cliente: pago, em aberto, atrasado, não gerado).
 - **Barras de rolagem** finas, com polegar arredondado e sem setas; `Modal` rola só o corpo, com cabeçalho e
   rodapé fixos, para não cortar os cantos arredondados.
 - **Checagem:** `node ~/.claude/skills/design-taste-frontend/scripts/lint.mjs --app src/...` (0 FAIL) e

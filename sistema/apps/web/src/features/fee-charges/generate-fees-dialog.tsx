@@ -30,15 +30,13 @@ import { useDebounced } from './use-debounced';
 interface GenerateFeesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Competence to start on; the month active on the dashboard when omitted. */
-  competence?: MonthKey;
 }
 
 /**
  * "Gerar honorários": one receivable per client for a competence month, previewed with a dry run
  * before anything is created. Opens on the month active on the dashboard.
  */
-export function GenerateFeesDialog({ open, onOpenChange, competence }: GenerateFeesDialogProps) {
+export function GenerateFeesDialog({ open, onOpenChange }: GenerateFeesDialogProps) {
   return (
     <Modal
       open={open}
@@ -48,15 +46,15 @@ export function GenerateFeesDialog({ open, onOpenChange, competence }: GenerateF
       className="max-w-lg"
     >
       {/* Mounted per opening, so it starts again from the active month and a fresh preview. */}
-      {open ? <GenerateFeesForm initialCompetence={competence} onClose={() => onOpenChange(false)} /> : null}
+      {open ? <GenerateFeesForm onClose={() => onOpenChange(false)} /> : null}
     </Modal>
   );
 }
 
-function GenerateFeesForm({ initialCompetence, onClose }: { initialCompetence?: MonthKey; onClose: () => void }) {
+function GenerateFeesForm({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const [activeMonth] = useActiveMonth();
-  const [competence, setCompetence] = useState<MonthKey>(initialCompetence ?? activeMonth);
+  const [competence, setCompetence] = useState<MonthKey>(activeMonth);
 
   const params = useMemo<GenerateFeesParams>(() => ({ competence }), [competence]);
   const debounced = useDebounced(params, 350);

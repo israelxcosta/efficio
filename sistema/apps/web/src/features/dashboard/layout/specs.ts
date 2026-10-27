@@ -72,18 +72,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     presets: [s(1, 2), s(2, 2), s(4, 2)],
   },
 
-  // Honorários e cobrança: régua (4×3), inadimplência | devedores (2×3), vencimentos (4×3).
-  {
-    id: 'competencia',
-    section: 'receber-pagar',
-    title: 'Régua da competência',
-    description: 'Um quadro por cliente: honorário pago, em aberto, atrasado ou não gerado.',
-    defaultSize: s(4, 3),
-    min: s(2, 2),
-    max: s(4, 5),
-    presets: [s(4, 2), s(4, 3), s(4, 4)],
-    defaultFor: 'business',
-  },
+  // Honorários e cobrança: inadimplência | devedores (2×3), vencimentos (4×3).
   {
     id: 'inadimplencia',
     section: 'receber-pagar',

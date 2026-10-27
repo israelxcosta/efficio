@@ -94,7 +94,7 @@ describe('visibility', () => {
     expect(isVisible({ ...layout, visible: { 'carteira-clientes': true } }, SPEC_BY_ID['carteira-clientes'], 'personal')).toBe(true);
     // Personal-finance widgets start hidden in an office (health score, card invoice, goals).
     expect(isVisible(layout, SPEC_BY_ID.saude, 'business')).toBe(false);
-    expect(isVisible(layout, SPEC_BY_ID.competencia, 'business')).toBe(true);
+    expect(isVisible(layout, SPEC_BY_ID.inadimplencia, 'business')).toBe(true);
     expect(hiddenCount({ ...layout, visible: { 'saldo-contas': false, evolucao: false } }, WIDGET_SPECS, 'business')).toBe(1);
   });
 

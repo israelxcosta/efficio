@@ -110,7 +110,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
                   </Stat>
                 </dl>
                 <div className="flex flex-wrap items-center gap-2">
-                  <MessageButton client={c} onMessage={onMessage} label="Gerar mensagem" />
+                  <MessageButton client={c} onMessage={onMessage} />
                   <Button asChild variant="ghost" size="sm">
                     <Link to={receivablesHref(c.contactId)}>
                       Contas a receber <ArrowUpRight />
@@ -184,7 +184,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
-                            <MessageButton client={c} onMessage={onMessage} label={<span className="hidden xl:inline">Gerar mensagem</span>} />
+                            <MessageButton client={c} onMessage={onMessage} />
                             <Tooltip content="Ver vencidos em contas a receber">
                               <Link
                                 to={receivablesHref(c.contactId)}
@@ -336,13 +336,19 @@ function ScoreCell({ client: c, compact }: { client: DelinquencyClient; compact?
 }
 
 /** Only for clients with something overdue: the others have nothing to collect, so no button at all. */
-function MessageButton({ client: c, onMessage, label }: { client: DelinquencyClient; onMessage: (c: DelinquencyClient) => void; label: ReactNode }) {
+/** The speech-balloon icon (same size as the row's other icon actions); "Enviar mensagem" on hover. */
+function MessageButton({ client: c, onMessage }: { client: DelinquencyClient; onMessage: (c: DelinquencyClient) => void }) {
   if (c.overdue.length === 0) return null;
   return (
-    <Tooltip content="Mensagem com os meses vencidos para copiar ou enviar pelo WhatsApp">
-      <Button variant="outline" size="sm" onClick={() => onMessage(c)} aria-label={`Gerar mensagem de cobrança para ${collectionName(c)}`}>
-        <MessageCircle /> {label}
-      </Button>
+    <Tooltip content="Enviar mensagem">
+      <button
+        type="button"
+        onClick={() => onMessage(c)}
+        aria-label={`Enviar mensagem de cobrança para ${collectionName(c)}`}
+        className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-muted transition-colors outline-none hover:bg-bg-subtle hover:text-fg focus-visible:ring-[3px] focus-visible:ring-brand-500/25 [&_svg]:size-4"
+      >
+        <MessageCircle />
+      </button>
     </Tooltip>
   );
 }

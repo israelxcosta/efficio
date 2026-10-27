@@ -1,7 +1,7 @@
 import { CashflowWidget } from '../components/cashflow-card';
 import { EvolutionWidget, CompositionWidget } from '../widgets/trend-widgets';
 import { ExpenseCategoryWidget, IncomeCategoryWidget, MonthlyResultWidget, SummaryWidget } from '../widgets/analysis-widgets';
-import { ClientsPortfolioWidget, CompetenceRulerWidget, FeePeriodsWidget, FeesMonthWidget, IncompleteClientsWidget } from '../widgets/clients-widgets';
+import { ClientsPortfolioWidget, FeePeriodsWidget, FeesMonthWidget, IncompleteClientsWidget } from '../widgets/clients-widgets';
 import { BalancesWidget, HealthWidget, InsightsWidget } from '../widgets/overview-widgets';
 import { FixedExpensesWidget, FixedIncomeWidget, GoalsWidget } from '../widgets/planning-widgets';
 import { ProjectionWidget } from '../widgets/projection-widget';
@@ -15,7 +15,6 @@ export const WIDGET_COMPONENTS: WidgetComponents = {
   'saldo-contas': BalancesWidget,
   insights: InsightsWidget,
   'projecao-caixa': ProjectionWidget,
-  competencia: CompetenceRulerWidget,
   inadimplencia: OverdueWidget,
   'clientes-devedores': DebtorsWidget,
   'proximos-vencimentos': UpcomingWidget,
