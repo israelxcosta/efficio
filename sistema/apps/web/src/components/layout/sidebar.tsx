@@ -30,7 +30,7 @@ export function Sidebar() {
   const { visible, hidden } = splitRail(NAV_ITEMS, rail.height);
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col items-center border-r border-border bg-bg-subtle py-5 lg:flex">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col items-center border-r border-border bg-bg-subtle py-5 lg:flex print:hidden">
       <NavLink to="/" className="mb-6 text-[13px] font-extrabold tracking-tight text-fg" aria-label="Efficio — início">
         efficio
       </NavLink>

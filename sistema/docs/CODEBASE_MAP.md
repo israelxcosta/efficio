@@ -198,7 +198,7 @@ sequenceDiagram
 | `statement` | `/extrato` | extrato diário com saldo; links vindos do fluxo de caixa |
 | `accounts`, `cards`, `goals` | `/contas`, `/cartoes`, `/metas` | cadastros, faturas, aportes |
 | `clients`, `contacts` | `/clientes`, `/fornecedores` | clientes (CNPJ, regime, vigências, inativação) e fornecedores |
-| `reports` | `/relatorios?aba=` | overview, categorias, contatos, comparação, fluxo de caixa, inadimplência |
+| `reports` | `/relatorios?aba=`, `/relatorios/cliente/:id` | overview, categorias, contatos, comparação, fluxo de caixa, inadimplência; relatório financeiro de um cliente (`client-report/`) |
 | `imports`, `open-finance` | (sheets) | importação OFX/CSV e conexões bancárias |
 | `settings`, `auth`, `workspaces`, `billing`, `legal` | `/configuracoes`, `/login`… | perfil, segurança/MFA, membros, assinatura, privacidade |
 | `fee-charges` | (em Contas a receber) | (em andamento) gerar honorários e "+ Empregados" |

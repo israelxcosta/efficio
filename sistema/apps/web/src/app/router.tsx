@@ -24,6 +24,7 @@ const GoalsPage = lazy(() => import('@/features/goals/pages/goals'));
 const ContactsPage = lazy(() => import('@/features/contacts/pages/contacts'));
 const ClientsPage = lazy(() => import('@/features/clients/pages/clients'));
 const ReportsPage = lazy(() => import('@/features/reports/pages/reports'));
+const ClientReportPage = lazy(() => import('@/features/reports/pages/client-report'));
 const SettingsPage = lazy(() => import('@/features/settings/pages/settings'));
 
 function NotFound() {
@@ -75,6 +76,7 @@ export const router = (IS_DEMO ? createHashRouter : createBrowserRouter)([
       // Old address of the suppliers page (bookmarks, links in e-mails).
       { path: 'contatos', element: <LegacyContactsRedirect /> },
       { path: 'relatorios', element: <ReportsPage /> },
+      { path: 'relatorios/cliente/:id', element: <ClientReportPage /> },
       { path: 'configuracoes', element: <SettingsPage /> },
       { path: '*', element: <NotFound /> },
     ],

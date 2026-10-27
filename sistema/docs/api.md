@@ -194,6 +194,11 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
   `score = 1000 × (1 − probability) − 150 × min(1, atraso médio ponderado / 60) − 60 × em aberto`,
   limitado a 0..1000. Faixas (`riskOf`): ≥ 800 `baixo` (bom pagador), ≥ 600 `moderado`, ≥ 400
   `alto`, abaixo `critico`. `lowHistory` = menos de 3 recebíveis no período.
+- **Relatório do cliente** (web, `/relatorios/cliente/:id?meses=`, botão em cada linha): lê todos
+  os lançamentos de receita do cliente em `GET /transactions?contactId=&type=income` (páginas de
+  200) e calcula no navegador (`features/reports/client-report/client-report.ts`, testado) o
+  histórico, pontualidade, faixas de atraso, mapa de pagamentos, ano a ano e o mesmo score da linha
+  (`periodScore`, mesma janela e regras deste relatório).
 - Consultas: um SELECT com junção em `contacts` e a soma dos juros/multa de cada linha por
   subconsulta correlacionada (índice parcial em `late_fee_of`) — sem listas de ids, que estourariam
   o limite de parâmetros num escritório grande; os dados de contato vêm decifrados em lotes.

@@ -392,3 +392,23 @@ html:root > body {
     transition-duration: 1ms !important;
   }
 }
+
+/* Printing (the client report's "Imprimir ou salvar PDF"): white page, the shell's chrome hidden
+   with print:hidden, and the status colours kept (badges, the payment map). */
+@media print {
+  @page {
+    margin: 14mm 12mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  /* A4 is ~720 CSS px wide: scale down so the wide tables (the client history) fit the page. */
+  html {
+    zoom: 0.72;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

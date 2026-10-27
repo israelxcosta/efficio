@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { Tooltip } from './tooltip';
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-xl border border-border bg-surface shadow-xs', className)} {...props} />;
+  return <div className={cn('rounded-xl border border-border bg-surface', className)} {...props} />;
 }
 
 interface CardHeaderProps {

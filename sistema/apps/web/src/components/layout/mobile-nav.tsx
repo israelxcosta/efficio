@@ -34,7 +34,7 @@ export function MobileNav({ onSearch }: { onSearch: () => void }) {
       <nav
         aria-label="Navegação"
         data-bottom-bar
-        className="fixed inset-x-0 bottom-0 z-30 flex items-center border-t border-border bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex items-center border-t border-border bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden"
       >
         {items.slice(0, 2).map((i) => (
           <NavLink key={i.to} to={i.to} end={i.to === '/'} className={link}>

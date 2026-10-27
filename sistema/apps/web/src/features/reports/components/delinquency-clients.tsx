@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { ArrowUpRight, Building2, ChevronDown, Info, MessageCircle, Search, SearchX } from 'lucide-react';
+import { ArrowUpRight, Building2, ChevronDown, FileChartColumn, Info, MessageCircle, Search, SearchX } from 'lucide-react';
 import { formatBRL, formatCNPJ, formatDateBR, formatPhone, type DelinquencyClient } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -20,6 +20,10 @@ export const SCORE_HELP =
 const LOW_HISTORY_HELP = 'Menos de 3 mensalidades no período: o score ainda se apoia no ponto de partida de 20% de chance de atraso.';
 
 export const receivablesHref = (contactId: string) => `/contas-a-receber?status=overdue&modo=year&contato=${encodeURIComponent(contactId)}`;
+
+/** The client's financial report; carries the period so its score matches the row's. */
+export const clientReportHref = (contactId: string, months: number) =>
+  `/relatorios/cliente/${encodeURIComponent(contactId)}${months === 12 ? '' : `?meses=${months}`}`;
 
 const SORTS: DelinquencySort[] = ['open', 'score', 'late'];
 
@@ -111,6 +115,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
                 </dl>
                 <div className="flex flex-wrap items-center gap-2">
                   <MessageButton client={c} onMessage={onMessage} />
+                  <ReportButton client={c} months={months} />
                   <Button asChild variant="ghost" size="sm">
                     <Link to={receivablesHref(c.contactId)}>
                       Contas a receber <ArrowUpRight />
@@ -132,7 +137,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
                 <col className="w-[88px] xl:w-[100px]" />
                 <col className="w-[112px] xl:w-[128px]" />
                 <col className="w-[156px] xl:w-[176px]" />
-                <col className="w-[100px] xl:w-[196px]" />
+                <col className="w-[140px]" />
               </colgroup>
               <thead>
                 <tr className="border-b border-border text-left text-xs font-medium text-muted">
@@ -185,6 +190,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <MessageButton client={c} onMessage={onMessage} />
+                            <ReportButton client={c} months={months} />
                             <Tooltip content="Ver vencidos em contas a receber">
                               <Link
                                 to={receivablesHref(c.contactId)}
@@ -335,8 +341,10 @@ function ScoreCell({ client: c, compact }: { client: DelinquencyClient; compact?
   );
 }
 
-/** Only for clients with something overdue: the others have nothing to collect, so no button at all. */
-/** The speech-balloon icon (same size as the row's other icon actions); "Enviar mensagem" on hover. */
+/**
+ * The speech-balloon icon (same size as the row's other icon actions); "Enviar mensagem" on hover.
+ * Only for clients with something overdue: the others have nothing to collect.
+ */
 function MessageButton({ client: c, onMessage }: { client: DelinquencyClient; onMessage: (c: DelinquencyClient) => void }) {
   if (c.overdue.length === 0) return null;
   return (
@@ -349,6 +357,21 @@ function MessageButton({ client: c, onMessage }: { client: DelinquencyClient; on
       >
         <MessageCircle />
       </button>
+    </Tooltip>
+  );
+}
+
+/** Opens the client's financial report (whole history and analysis); "Relatório do cliente" on hover. */
+function ReportButton({ client: c, months }: { client: DelinquencyClient; months: number }) {
+  return (
+    <Tooltip content="Relatório do cliente">
+      <Link
+        to={clientReportHref(c.contactId, months)}
+        aria-label={`Relatório financeiro de ${collectionName(c)}`}
+        className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-muted transition-colors outline-none hover:bg-bg-subtle hover:text-fg focus-visible:ring-[3px] focus-visible:ring-brand-500/25 [&_svg]:size-4"
+      >
+        <FileChartColumn />
+      </Link>
     </Tooltip>
   );
 }

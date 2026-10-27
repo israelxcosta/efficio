@@ -69,8 +69,8 @@ export function AppShell() {
       <ImportActionsProvider>
       <div className="min-h-dvh">
         <Sidebar />
-        <div className="lg:pl-[76px]">
-          <main className="mx-auto max-w-[1440px] px-4 pt-6 pb-28 sm:px-6 lg:pt-8 lg:pb-32">
+        <div className="lg:pl-[76px] print:pl-0">
+          <main className="mx-auto max-w-[1440px] px-4 pt-6 pb-28 sm:px-6 lg:pt-8 lg:pb-32 print:max-w-none print:p-0">
             <DemoBanner />
             <SubscriptionBanner key={workspace?.id} />
             <Suspense fallback={<PageLoader />}>
