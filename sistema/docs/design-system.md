@@ -147,20 +147,32 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 ## 4. Padrões de tela
 
 - **Dashboard**: abas (Dashboard / Dashboard inteligente), navegação ‹ mês/ano › e botão
-  "Personalizar" (com o selo "N ocultos"). Faixa fixa de KPIs (Saldo em conta, Resultado do mês,
-  A pagar, A receber) e, abaixo, a grade de widgets portada do Effy:
-  - grade de 4 colunas (2 abaixo de 1000px de largura, 1 abaixo de 560px), linhas de 86px (80px
-    fora do desktop), gap 12px, empacotamento `dense`; cada widget tem tamanho C × R entre o mínimo
-    e o máximo do catálogo (`layout/specs.ts`);
-  - cinco seções recolhíveis (Visão geral, Receber e pagar, Análises do mês, Clientes e honorários,
-    Metas e recorrentes) com o selo "N exigem atenção", que abre a lista do que precisa de ação;
-  - redimensionar pelo canto (selo "C × R" durante o arraste; setas do teclado; Esc cancela);
-  - reordenar arrastando pelo cabeçalho ou pela alça (toque pela alça; setas, Home e End no
-    teclado), só dentro da própria seção, com o aviso "Cards reorganizados.";
-  - ocultar pelo olho (aviso com "Desfazer"); reexibir em "Personalizar" ou em Configurações →
-    Dashboard; "Restaurar layout padrão" volta tamanhos, ordem, ocultos, seções e opções dos cards;
-  - o layout fica no navegador, por espaço e usuário (`effinance.dashboardLayout.v1:<espaço>:<usuário>`),
-    e é sempre validado ao ler;
+  "Personalizar" (com o selo "N ocultos"). Faixa fixa de KPIs (Receitas, Despesas, Margem,
+  Patrimônio) e, abaixo, **um quadro único de cards, sem seções**:
+  - grade de 4 colunas (2 abaixo de 1000px de largura, 1 abaixo de 560px), linhas de 96px (88px
+    abaixo de 4 colunas), gap 16px; cada card tem célula (coluna × linha) e tamanho C × R entre o
+    mínimo e o máximo do catálogo (`layout/specs.ts`); os cards são posicionados em absoluto e
+    deslizam (200ms, sem animação com `prefers-reduced-motion`) quando outros os empurram;
+  - posição livre: arrastar pelo cabeçalho ou pela alça (toque só pela alça) solta o card em
+    qualquer célula, inclusive mais abaixo deixando espaço vazio; o destino aparece tracejado e os
+    cards cobertos descem (prévia ao vivo); nada sobe sozinho; Esc cancela;
+  - teclado na alça: setas movem uma célula (um card no caminho troca de lugar com ele), Home/End
+    levam ao topo/ao fim; leitor de tela ouve "Card: coluna X, linha Y" (no celular, "posição N de M");
+  - redimensionar pelo canto até a borda direita do quadro (selo "C × R"; setas; Esc cancela);
+    o que o card passa a cobrir desce;
+  - "Organizar" aparece no cabeçalho só quando há espaços vazios que dá para fechar: os cards
+    sobem na própria coluna e, se um card largo impedir, vão para um espaço livre mais alto onde
+    caibam (nunca para baixo nem só para o lado); aviso "Cards organizados." com "Desfazer";
+  - no celular (1 coluna) o quadro é uma lista: arrastar e as setas só mudam a ordem, sem vãos;
+  - 2 e 1 coluna seguem a ordem de leitura do quadro mais largo até o usuário mexer nelas; daí
+    guardam o próprio arranjo (os tamanhos são os mesmos em todas as larguras);
+  - ocultar pelo olho (deixa o espaço vazio; aviso com "Desfazer"); ligar um card em
+    "Personalizar" (lista agrupada por assunto, só para organizar) o coloca no primeiro espaço livre
+    onde ele cabe; "Restaurar layout padrão" volta posições, tamanhos, ocultos e opções dos cards;
+  - arranjo padrão: Honorários e cobrança, Caixa, Clientes, Análises do mês, Recorrentes e metas,
+    empacotados sem buracos;
+  - o layout fica no navegador, por espaço e usuário (`effinance.dashboardLayout.v1:<espaço>:<usuário>`,
+    objeto `v: 2`), e é sempre validado ao ler; layouts `v: 1` (com seções) viram posições;
   - os cards de clientes aparecem por padrão só em espaços empresariais (nos outros, ficam em
     "Personalizar").
 - **Listas** (contas a pagar/receber, extrato): filtros em linha (período segmentado + navegação

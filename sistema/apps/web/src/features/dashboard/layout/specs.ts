@@ -1,15 +1,17 @@
-// Catalog of dashboard sections and widgets: default sizes, limits and the presets offered in
-// "Personalizar". Default sizes pack every section with no holes at 4 columns (checked in tests).
+// Catalog of dashboard widgets: default sizes, limits and the presets offered in "Personalizar".
+// The array order is the default arrangement of the board: each card takes the first free space
+// at 4 columns, which packs the default board with no holes (checked in tests).
 //
 // Default order follows the office's month: first the fees to receive (who paid the competence, who
 // is late, what falls due), then cash, clients, the month's analyses and recurring entries. Widgets
 // of personal finance (health score, card invoice, goals) start hidden; "Personalizar" turns them on.
 
-import type { SectionSpec, WidgetSize, WidgetSpec } from './types';
+import type { WidgetGroupSpec, WidgetSize, WidgetSpec } from './types';
 
 const s = (c: number, r: number): WidgetSize => ({ c, r });
 
-export const SECTIONS: SectionSpec[] = [
+/** Subjects that organize the list in "Personalizar" (ids match the sections of layouts v1). */
+export const WIDGET_GROUPS: WidgetGroupSpec[] = [
   { id: 'receber-pagar', title: 'Honorários e cobrança' },
   { id: 'visao-geral', title: 'Caixa' },
   { id: 'clientes', title: 'Clientes' },
@@ -18,10 +20,53 @@ export const SECTIONS: SectionSpec[] = [
 ];
 
 export const WIDGET_SPECS: WidgetSpec[] = [
+  // Honorários e cobrança: inadimplência | devedores (2×3), vencimentos (4×3). Card invoice starts hidden.
+  {
+    id: 'inadimplencia',
+    group: 'receber-pagar',
+    title: 'Inadimplência',
+    description: 'Total vencido a receber, por faixa de atraso.',
+    defaultSize: s(2, 3),
+    min: s(1, 3),
+    max: s(4, 5),
+    presets: [s(2, 3), s(2, 4)],
+  },
+  {
+    id: 'clientes-devedores',
+    group: 'receber-pagar',
+    title: 'Clientes devedores',
+    description: 'Ranking de quem mais deve, com o título mais antigo.',
+    defaultSize: s(2, 3),
+    min: s(1, 3),
+    max: s(4, 7),
+    presets: [s(2, 3), s(2, 4), s(2, 5)],
+  },
+  {
+    id: 'proximos-vencimentos',
+    group: 'receber-pagar',
+    title: 'Próximos vencimentos',
+    description: 'Contas vencidas e dos próximos 15 dias.',
+    defaultSize: s(4, 3),
+    min: s(2, 3),
+    max: s(4, 7),
+    presets: [s(2, 4), s(4, 3), s(4, 4)],
+  },
+  {
+    id: 'fatura-cartao',
+    group: 'receber-pagar',
+    title: 'Fatura do cartão',
+    description: 'Fatura atual, vencimento e uso do limite de cada cartão.',
+    defaultSize: s(2, 4),
+    min: s(1, 3),
+    max: s(4, 5),
+    presets: [s(2, 3), s(2, 4)],
+    defaultHidden: true,
+  },
+
   // Caixa: fluxo (2×4) | saldo (2×4), then projeção (4×4) and insights (4×2). Saúde starts hidden.
   {
     id: 'fluxo-caixa',
-    section: 'visao-geral',
+    group: 'visao-geral',
     title: 'Fluxo de caixa',
     description: 'Receitas e despesas por dia, semana, mês ou ano.',
     defaultSize: s(2, 4),
@@ -31,7 +76,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
   },
   {
     id: 'saude',
-    section: 'visao-geral',
+    group: 'visao-geral',
     title: 'Saúde financeira',
     description: 'Pontuação de 0 a 1000 e os fatores que a compõem.',
     defaultSize: s(1, 3),
@@ -42,7 +87,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
   },
   {
     id: 'saldo-contas',
-    section: 'visao-geral',
+    group: 'visao-geral',
     title: 'Saldo em contas',
     description: 'Saldo de cada conta, total investido e patrimônio.',
     defaultSize: s(2, 4),
@@ -52,7 +97,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
   },
   {
     id: 'projecao-caixa',
-    section: 'visao-geral',
+    group: 'visao-geral',
     title: 'Projeção de caixa',
     description: 'Saldo previsto dia a dia nos próximos 30, 60 ou 90 dias.',
     defaultSize: s(4, 4),
@@ -60,10 +105,9 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     max: s(4, 7),
     presets: [s(2, 4), s(4, 4), s(4, 5)],
   },
-
   {
     id: 'insights',
-    section: 'visao-geral',
+    group: 'visao-geral',
     title: 'Insights',
     description: 'Análises automáticas do mês.',
     defaultSize: s(4, 2),
@@ -72,118 +116,10 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     presets: [s(1, 2), s(2, 2), s(4, 2)],
   },
 
-  // Honorários e cobrança: inadimplência | devedores (2×3), vencimentos (4×3).
-  {
-    id: 'inadimplencia',
-    section: 'receber-pagar',
-    title: 'Inadimplência',
-    description: 'Total vencido a receber, por faixa de atraso.',
-    defaultSize: s(2, 3),
-    min: s(1, 3),
-    max: s(4, 5),
-    presets: [s(2, 3), s(2, 4)],
-  },
-  {
-    id: 'clientes-devedores',
-    section: 'receber-pagar',
-    title: 'Clientes devedores',
-    description: 'Ranking de quem mais deve, com o título mais antigo.',
-    defaultSize: s(2, 3),
-    min: s(1, 3),
-    max: s(4, 7),
-    presets: [s(2, 3), s(2, 4), s(2, 5)],
-  },
-  {
-    id: 'proximos-vencimentos',
-    section: 'receber-pagar',
-    title: 'Próximos vencimentos',
-    description: 'Contas vencidas e dos próximos 15 dias.',
-    defaultSize: s(4, 3),
-    min: s(2, 3),
-    max: s(4, 7),
-    presets: [s(2, 4), s(4, 3), s(4, 4)],
-  },
-  {
-    id: 'fatura-cartao',
-    section: 'receber-pagar',
-    title: 'Fatura do cartão',
-    description: 'Fatura atual, vencimento e uso do limite de cada cartão.',
-    defaultSize: s(2, 4),
-    min: s(1, 3),
-    max: s(4, 5),
-    presets: [s(2, 3), s(2, 4)],
-    defaultHidden: true,
-  },
-
-  // Análises do mês
-  {
-    id: 'resumo-periodo',
-    section: 'analises',
-    title: 'Resumo do período',
-    description: 'Receitas e despesas do mês, pagas e pendentes.',
-    defaultSize: s(2, 4),
-    min: s(2, 3),
-    max: s(4, 5),
-    presets: [s(2, 4), s(4, 3)],
-  },
-  {
-    id: 'despesas-categoria',
-    section: 'analises',
-    title: 'Despesas por categoria',
-    description: 'Distribuição das despesas do mês por categoria.',
-    defaultSize: s(2, 4),
-    min: s(2, 3),
-    max: s(4, 7),
-    presets: [s(2, 4), s(2, 5), s(4, 5)],
-  },
-  {
-    id: 'resultado-mensal',
-    section: 'analises',
-    title: 'Resultado mês a mês',
-    description: 'Saldo (receitas − despesas) dos últimos 6 meses.',
-    defaultSize: s(4, 3),
-    min: s(1, 3),
-    max: s(4, 6),
-    presets: [s(2, 4), s(4, 3), s(4, 4)],
-  },
-  {
-    id: 'receitas-categoria',
-    section: 'analises',
-    title: 'Receitas por categoria',
-    description: 'Distribuição das receitas do mês por categoria.',
-    defaultSize: s(2, 4),
-    min: s(2, 3),
-    max: s(4, 7),
-    presets: [s(2, 4), s(2, 5), s(4, 5)],
-    defaultHidden: true,
-  },
-  {
-    id: 'evolucao',
-    section: 'analises',
-    title: 'Evolução do total',
-    description: '12 meses de realizado e previsto, com linha de tendência.',
-    defaultSize: s(4, 4),
-    min: s(2, 3),
-    max: s(4, 7),
-    presets: [s(4, 4), s(4, 5)],
-    defaultHidden: true,
-  },
-  {
-    id: 'composicao',
-    section: 'analises',
-    title: 'Composição mês a mês',
-    description: 'Barras empilhadas por categoria nos últimos 6 meses.',
-    defaultSize: s(4, 4),
-    min: s(2, 3),
-    max: s(4, 7),
-    presets: [s(4, 4), s(4, 5)],
-    defaultHidden: true,
-  },
-
   // Clientes: honorários do mês (4×3), carteira | vigências (2×4). Visible by default in business workspaces.
   {
     id: 'honorarios-mes',
-    section: 'clientes',
+    group: 'clientes',
     title: 'Honorários do mês',
     description: 'Previsto pelas vigências × faturado × recebido no mês.',
     defaultSize: s(4, 3),
@@ -194,7 +130,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
   },
   {
     id: 'carteira-clientes',
-    section: 'clientes',
+    group: 'clientes',
     title: 'Carteira de clientes',
     description: 'Clientes ativos, inativos e honorários por regime tributário.',
     defaultSize: s(2, 4),
@@ -205,7 +141,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
   },
   {
     id: 'vigencias-honorarios',
-    section: 'clientes',
+    group: 'clientes',
     title: 'Vigências de honorários',
     description: 'Clientes sem vigência atual e vigências que vencem em 60 dias.',
     defaultSize: s(2, 4),
@@ -216,7 +152,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
   },
   {
     id: 'cadastro-incompleto',
-    section: 'clientes',
+    group: 'clientes',
     title: 'Cadastro incompleto',
     description: 'Clientes ativos sem e-mail, telefone, responsável ou cidade.',
     defaultSize: s(2, 4),
@@ -227,10 +163,75 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultFor: 'business',
   },
 
+  // Análises do mês: resumo | despesas (2×4), resultado (4×3). Trends and income start hidden.
+  {
+    id: 'resumo-periodo',
+    group: 'analises',
+    title: 'Resumo do período',
+    description: 'Receitas e despesas do mês, pagas e pendentes.',
+    defaultSize: s(2, 4),
+    min: s(2, 3),
+    max: s(4, 5),
+    presets: [s(2, 4), s(4, 3)],
+  },
+  {
+    id: 'despesas-categoria',
+    group: 'analises',
+    title: 'Despesas por categoria',
+    description: 'Distribuição das despesas do mês por categoria.',
+    defaultSize: s(2, 4),
+    min: s(2, 3),
+    max: s(4, 7),
+    presets: [s(2, 4), s(2, 5), s(4, 5)],
+  },
+  {
+    id: 'resultado-mensal',
+    group: 'analises',
+    title: 'Resultado mês a mês',
+    description: 'Saldo (receitas − despesas) dos últimos 6 meses.',
+    defaultSize: s(4, 3),
+    min: s(1, 3),
+    max: s(4, 6),
+    presets: [s(2, 4), s(4, 3), s(4, 4)],
+  },
+  {
+    id: 'receitas-categoria',
+    group: 'analises',
+    title: 'Receitas por categoria',
+    description: 'Distribuição das receitas do mês por categoria.',
+    defaultSize: s(2, 4),
+    min: s(2, 3),
+    max: s(4, 7),
+    presets: [s(2, 4), s(2, 5), s(4, 5)],
+    defaultHidden: true,
+  },
+  {
+    id: 'evolucao',
+    group: 'analises',
+    title: 'Evolução do total',
+    description: '12 meses de realizado e previsto, com linha de tendência.',
+    defaultSize: s(4, 4),
+    min: s(2, 3),
+    max: s(4, 7),
+    presets: [s(4, 4), s(4, 5)],
+    defaultHidden: true,
+  },
+  {
+    id: 'composicao',
+    group: 'analises',
+    title: 'Composição mês a mês',
+    description: 'Barras empilhadas por categoria nos últimos 6 meses.',
+    defaultSize: s(4, 4),
+    min: s(2, 3),
+    max: s(4, 7),
+    presets: [s(4, 4), s(4, 5)],
+    defaultHidden: true,
+  },
+
   // Recorrentes e metas: gastos | receitas fixas (2×4). Metas start hidden.
   {
     id: 'gastos-fixos',
-    section: 'planejamento',
+    group: 'planejamento',
     title: 'Gastos fixos',
     description: 'Despesas recorrentes do mês.',
     defaultSize: s(2, 4),
@@ -240,7 +241,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
   },
   {
     id: 'receitas-fixas',
-    section: 'planejamento',
+    group: 'planejamento',
     title: 'Receitas fixas',
     description: 'Receitas recorrentes do mês.',
     defaultSize: s(2, 4),
@@ -250,7 +251,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
   },
   {
     id: 'metas',
-    section: 'planejamento',
+    group: 'planejamento',
     title: 'Metas',
     description: 'Progresso das metas ativas.',
     defaultSize: s(4, 3),

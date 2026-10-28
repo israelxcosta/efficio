@@ -193,7 +193,7 @@ sequenceDiagram
 
 | Pasta | Rota | Resumo |
 |---|---|---|
-| `dashboard` | `/` | faixa de KPIs + grade personalizável de widgets em 5 seções; aba "Dashboard inteligente" |
+| `dashboard` | `/` | faixa de KPIs + quadro único de widgets com posição livre (arrastar, redimensionar, "Organizar"); aba "Dashboard inteligente" |
 | `transactions` | `/contas-a-pagar`, `/contas-a-receber` | listas, `TransactionSheet`, ações centrais (`useTransactionActions`), confirmação com juros/multa |
 | `statement` | `/extrato` | extrato diário com saldo; links vindos do fluxo de caixa |
 | `accounts`, `cards`, `goals` | `/contas`, `/cartoes`, `/metas` | cadastros, faturas, aportes |
@@ -205,15 +205,25 @@ sequenceDiagram
 
 ### Sistema de widgets do dashboard (`features/dashboard/layout`)
 
-- `specs.ts` define cada widget: seção, título, tamanho padrão/mín./máx. (colunas × linhas de 86 px)
-  e presets; `catalog.tsx` liga cada id ao componente (o tipo `Record` quebra o build se faltar um).
-- `layout-store.ts` guarda tamanhos, ordem, ocultos, seções recolhidas e preferências em
-  `localStorage` (`effinance.dashboardLayout.v1:<espaço>:<usuário>`), sempre saneado na leitura.
-- `widget-grid.tsx`: colunas pela largura do próprio grid (4/2/1), arrastar para reordenar (só na
-  seção), canto para redimensionar (selo "C × R", setas, Esc cancela), ocultar com desfazer.
+- `specs.ts` define cada widget: grupo (só organiza a lista de "Personalizar"), título, tamanho
+  padrão/mín./máx. (colunas × linhas de 96 px) e presets. A ordem do array é o arranjo padrão
+  (primeiro espaço livre a 4 colunas, sem buracos); `catalog.tsx` liga cada id ao componente (o
+  tipo `Record` quebra o build se faltar um).
+- `layout.ts` (regras puras, testadas): `resolveBoard` monta o quadro de 4, 2 ou 1 coluna a partir
+  de `layout.cells` (célula de cada card visível por largura; sem células, segue o padrão ou o
+  quadro mais largo); `moveItem`/`resizeItem` empurram para baixo o que for coberto (1 coluna é
+  lista), `nudgeItem` (setas) troca de lugar com o card no caminho, `arrange` é o "Organizar",
+  `setWidgetVisible` põe card novo no primeiro espaço livre; `sanitizeLayout` limpa o que vem do
+  `localStorage` e migra o formato v1 (ordem por seção + `collapsed`) para células.
+- `layout-store.ts` guarda tamanhos, células, ocultos e preferências em `localStorage`
+  (`effinance.dashboardLayout.v1:<espaço>:<usuário>`, objeto `v: 2`), sempre saneado na leitura
+  (precisa do tipo do espaço, que define os cards visíveis por padrão).
+- `widget-grid.tsx`: colunas pela largura da página (medida em `pages/dashboard.tsx`, que também
+  mostra "Organizar"), cards em posição absoluta, arrastar com prévia (destino tracejado, cards
+  empurrados), canto para redimensionar (selo "C × R", setas, Esc cancela), ocultar com desfazer.
 - `widget-card.tsx`: `WidgetCard` (cabeçalho fixo, corpo que ocupa o resto), `FitList` (corta a
   lista pelo espaço real com "+ N"), `useWidgetResizing`. Gráficos usam `ChartBox`.
-- `alerts.tsx`: ponto vermelho no card e selo "N exigem atenção" na seção.
+- `alerts.tsx`: ponto vermelho no card que exige atenção.
 
 ## Convenções
 

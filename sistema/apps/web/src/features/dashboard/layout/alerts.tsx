@@ -1,7 +1,4 @@
-import { Link } from 'react-router';
 import { formatDateBR, type DashboardResponse, type WorkspaceKind } from '@effinance/shared';
-import { Button } from '@/components/ui/button';
-import { Modal } from '@/components/ui/dialog';
 import { summarizeProjection } from '@/components/charts/chart-scale';
 import { useOfficeClients, useOverduePayables, useOverdueReceivables, useProjection } from '../widgets/data';
 import { isVisible } from './layout';
@@ -12,8 +9,8 @@ export const OVERDUE_RECEIVABLES_HREF = '/contas-a-receber?status=overdue&modo=y
 export const OVERDUE_PAYABLES_HREF = '/contas-a-pagar?status=overdue&modo=year';
 
 /**
- * What needs attention in each visible widget (red dot on the card, badge on its section, also
- * while the section is collapsed). Same queries as the widgets, so no extra requests.
+ * What needs attention in each visible widget (red dot on the card). Same queries as the widgets,
+ * so no extra requests.
  */
 export function useDashboardAlerts({
   d,
@@ -58,46 +55,4 @@ export function useDashboardAlerts({
     alerts['vigencias-honorarios'] = { count: withoutFee, label: 'cliente(s) sem vigência de honorários', href: '/clientes' };
   }
   return alerts;
-}
-
-export function SectionAlertModal({
-  open,
-  onOpenChange,
-  title,
-  items,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  items: { title: string; alert: WidgetAlert }[];
-}) {
-  return (
-    <Modal
-      open={open}
-      onOpenChange={onOpenChange}
-      title={title}
-      footer={
-        <Button variant="ghost" onClick={() => onOpenChange(false)}>
-          Fechar
-        </Button>
-      }
-    >
-      <ul className="flex flex-col divide-y divide-border">
-        {items.map(({ title: widget, alert }) => (
-          <li key={widget} className="flex items-center gap-3 py-2.5">
-            <span className="size-2 shrink-0 rounded-full bg-danger" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <p className="text-body-sm font-semibold text-fg">{widget}</p>
-              <p className="text-caption text-muted">
-                {alert.count} {alert.label}
-              </p>
-            </div>
-            <Link to={alert.href} onClick={() => onOpenChange(false)} className="text-caption font-semibold text-brand-text hover:underline">
-              Ver
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Modal>
-  );
 }

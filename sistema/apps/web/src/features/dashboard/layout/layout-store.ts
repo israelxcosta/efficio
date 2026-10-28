@@ -1,23 +1,27 @@
-// Dashboard layout persisted per workspace + user in localStorage (sizes, order, hidden cards,
-// collapsed sections and the options of each widget). Storage can be missing or throw (private
-// windows, blocked site data): the layout then lives in memory for the page load.
+// Dashboard layout persisted per workspace + user in localStorage (sizes, cells of each board,
+// hidden cards and the options of each widget). Storage can be missing or throw (private windows,
+// blocked site data): the layout then lives in memory for the page load. The key keeps its `v1`;
+// the object carries its own version (v1 layouts, with sections, are migrated when read).
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import type { WorkspaceKind } from '@effinance/shared';
 import { useAuth } from '@/features/auth/auth-context';
-import { DEFAULT_PREFS, emptyLayout, mergeOrder, moveBy as moveByRule, moveWidget, sanitizeLayout } from './layout';
-import { SECTIONS, WIDGET_SPECS } from './specs';
-import type { DashboardLayout, DashboardPrefs, SectionId, WidgetId, WidgetSize } from './types';
-
-const SECTION_IDS = SECTIONS.map((s) => s.id);
+import { applySize, arrangeBoard, DEFAULT_PREFS, emptyLayout, sanitizeLayout, setWidgetVisible, showAllWidgets, withBoard } from './layout';
+import { WIDGET_SPECS } from './specs';
+import type { BoardCols, BoardItem, DashboardLayout, DashboardPrefs, WidgetId, WidgetSize } from './types';
 
 export function layoutStorageKey(workspaceId: string, userId: string): string {
   return `effinance.dashboardLayout.v1:${workspaceId}:${userId}`;
 }
 
-export function readLayout(key: string, storage: Pick<Storage, 'getItem'> | undefined = safeStorage()): DashboardLayout {
+export function readLayout(
+  key: string,
+  kind: WorkspaceKind | undefined,
+  storage: Pick<Storage, 'getItem'> | undefined = safeStorage(),
+): DashboardLayout {
   try {
     const raw = storage?.getItem(key);
-    return raw ? sanitizeLayout(JSON.parse(raw), WIDGET_SPECS, SECTION_IDS) : emptyLayout();
+    return raw ? sanitizeLayout(JSON.parse(raw), WIDGET_SPECS, kind) : emptyLayout();
   } catch {
     return emptyLayout();
   }
@@ -41,13 +45,16 @@ function safeStorage(): Storage | undefined {
 
 // One in-memory copy per key, shared by every component that reads the layout.
 const cache = new Map<string, DashboardLayout>();
+// Workspace kind of each key (default visibility, used when reading and migrating).
+const kinds = new Map<string, WorkspaceKind | undefined>();
 const listeners = new Set<() => void>();
 const MEMORY_KEY = '__memory__';
 
-function current(key: string): DashboardLayout {
+function current(key: string, kind: WorkspaceKind | undefined): DashboardLayout {
   let layout = cache.get(key);
   if (!layout) {
-    layout = key === MEMORY_KEY ? emptyLayout() : readLayout(key);
+    kinds.set(key, kind);
+    layout = key === MEMORY_KEY ? emptyLayout() : readLayout(key, kind);
     cache.set(key, layout);
   }
   return layout;
@@ -64,7 +71,7 @@ function subscribe(listener: () => void) {
   // Another tab changed the same layout.
   const onStorage = (e: StorageEvent) => {
     if (e.key && cache.has(e.key)) {
-      cache.set(e.key, readLayout(e.key));
+      cache.set(e.key, readLayout(e.key, kinds.get(e.key)));
       listener();
     }
   };
@@ -75,65 +82,52 @@ function subscribe(listener: () => void) {
   };
 }
 
-function defaultOrder(section: SectionId): WidgetId[] {
-  return WIDGET_SPECS.filter((s) => s.section === section).map((s) => s.id);
-}
-
 export interface DashboardLayoutApi {
   layout: DashboardLayout;
   prefs: DashboardPrefs;
+  /** Saves a board after a drag or a keyboard move (every visible card with its cell). */
+  saveBoard: (cols: BoardCols, items: readonly BoardItem[]) => void;
+  /** Corner handle: new stored size and the board as resized (other arranged boards push down too). */
+  resize: (cols: BoardCols, id: WidgetId, size: WidgetSize, items: readonly BoardItem[]) => void;
+  /** Size chosen in "Personalizar". */
   setSize: (id: WidgetId, size: WidgetSize) => void;
-  /** Drag and drop: `id` lands next to `targetId` (Effy's rule). */
-  move: (section: SectionId, id: WidgetId, targetId: WidgetId) => void;
-  /** Keyboard: moves among the section's currently visible widgets. */
-  moveBy: (section: SectionId, id: WidgetId, delta: number | 'first' | 'last', visibleIds: WidgetId[]) => void;
+  /** On: first free space that fits; off: the card leaves its space empty. */
   setVisible: (id: WidgetId, visible: boolean) => void;
   showAll: () => void;
-  toggleSection: (id: SectionId) => void;
+  /** "Organizar": closes the empty spaces of the board shown at `cols` columns. */
+  arrange: (cols: BoardCols) => void;
   setPref: <K extends keyof DashboardPrefs>(key: K, value: DashboardPrefs[K]) => void;
+  /** Undo: puts back a layout taken before the change. */
+  restore: (layout: DashboardLayout) => void;
   reset: () => void;
 }
 
 export function useDashboardLayout(): DashboardLayoutApi {
   const { user, workspace } = useAuth();
+  const kind = workspace?.kind;
   const key = user && workspace ? layoutStorageKey(workspace.id, user.id) : MEMORY_KEY;
   const layout = useSyncExternalStore(
     subscribe,
-    () => current(key),
-    () => current(key),
+    () => current(key, kind),
+    () => current(key, kind),
   );
 
-  const update = useCallback((fn: (l: DashboardLayout) => DashboardLayout) => commit(key, fn(current(key))), [key]);
+  const update = useCallback((fn: (l: DashboardLayout) => DashboardLayout) => commit(key, fn(current(key, kind))), [key, kind]);
 
   return useMemo<DashboardLayoutApi>(
     () => ({
       layout,
       prefs: { ...DEFAULT_PREFS, ...layout.prefs },
-      setSize: (id, size) => update((l) => ({ ...l, sizes: { ...l.sizes, [id]: size } })),
-      move: (section, id, targetId) =>
-        update((l) => ({ ...l, order: { ...l.order, [section]: moveWidget(mergeOrder(l.order[section], defaultOrder(section)), id, targetId) } })),
-      moveBy: (section, id, delta, visibleIds) =>
-        update((l) => {
-          const full = mergeOrder(l.order[section], defaultOrder(section));
-          const movedVisible = moveByRule(visibleIds, id, delta);
-          // Hidden widgets keep their slots; the visible ones take the remaining slots in the new order.
-          const visibleSet = new Set(visibleIds);
-          let i = 0;
-          const next = full.map((w) => (visibleSet.has(w) ? movedVisible[i++]! : w));
-          return { ...l, order: { ...l.order, [section]: next } };
-        }),
-      setVisible: (id, visible) => update((l) => ({ ...l, visible: { ...l.visible, [id]: visible } })),
-      showAll: () =>
-        update((l) => ({
-          ...l,
-          // Default-hidden widgets the user turned on stay on; everything else goes back to visible.
-          visible: Object.fromEntries(Object.entries(l.visible).filter(([, v]) => v)),
-        })),
-      toggleSection: (id) =>
-        update((l) => ({ ...l, collapsed: l.collapsed.includes(id) ? l.collapsed.filter((x) => x !== id) : [...l.collapsed, id] })),
+      saveBoard: (cols, items) => update((l) => withBoard(l, cols, items)),
+      resize: (cols, id, size, items) => update((l) => withBoard(applySize(l, id, size, WIDGET_SPECS, kind), cols, items)),
+      setSize: (id, size) => update((l) => applySize(l, id, size, WIDGET_SPECS, kind)),
+      setVisible: (id, visible) => update((l) => setWidgetVisible(l, id, visible, WIDGET_SPECS, kind)),
+      showAll: () => update((l) => showAllWidgets(l, WIDGET_SPECS, kind)),
+      arrange: (cols) => update((l) => arrangeBoard(l, cols, WIDGET_SPECS, kind)),
       setPref: (k, v) => update((l) => ({ ...l, prefs: { ...l.prefs, [k]: v } })),
+      restore: (previous) => update(() => previous),
       reset: () => update(() => emptyLayout()),
     }),
-    [layout, update],
+    [layout, update, kind],
   );
 }

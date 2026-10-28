@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { ChevronLeft, ChevronRight, LayoutGrid, Percent, SlidersHorizontal, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { toast } from 'sonner';
+import { ArrowUpToLine, ChevronLeft, ChevronRight, LayoutGrid, Percent, SlidersHorizontal, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import {
   MONTH_NAMES,
   addMonthKey,
@@ -18,7 +19,9 @@ import { ErrorState } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useActiveMonth } from '@/lib/active-month';
+import { useElementSize } from '@/lib/use-element-size';
 import { useAuth } from '@/features/auth/auth-context';
 import { useDashboard } from '../api';
 import { InsightsTab } from '../components/insights-tab';
@@ -27,7 +30,7 @@ import { useOverdueReceivables } from '../widgets/data';
 import { useDashboardAlerts } from '../layout/alerts';
 import { WIDGET_COMPONENTS } from '../layout/catalog';
 import { CustomizeSheet } from '../layout/customize-sheet';
-import { hiddenCount } from '../layout/layout';
+import { canArrange, columnsForWidth, hiddenCount, resolveBoard } from '../layout/layout';
 import { useDashboardLayout } from '../layout/layout-store';
 import { WIDGET_SPECS } from '../layout/specs';
 import { CUSTOMIZE_BUTTON_ID, DashboardBoard } from '../layout/widget-grid';
@@ -45,6 +48,21 @@ export default function DashboardPage() {
   const layoutApi = useDashboardLayout();
   const [customizing, setCustomizing] = useState(false);
   const hidden = hiddenCount(layoutApi.layout, WIDGET_SPECS, kind);
+  // The board spans the page, so the page's width picks its columns (also for "Organizar").
+  const { ref, width } = useElementSize();
+  const cols = columnsForWidth(width);
+  const hasGaps = useMemo(
+    () => width > 0 && canArrange(resolveBoard(layoutApi.layout, WIDGET_SPECS, kind, cols), cols),
+    [layoutApi.layout, kind, cols, width],
+  );
+
+  function arrange() {
+    const before = layoutApi.layout;
+    layoutApi.arrange(cols);
+    // The button goes away with the gaps: keep the focus in the header.
+    requestAnimationFrame(() => document.getElementById(CUSTOMIZE_BUTTON_ID)?.focus());
+    toast('Cards organizados.', { action: { label: 'Desfazer', onClick: () => layoutApi.restore(before) } });
+  }
 
   function update(patch: Record<string, string | null>) {
     const next = new URLSearchParams(params);
@@ -78,7 +96,7 @@ export default function DashboardPage() {
   const setMonth = (y: number, m: number) => setActiveMonth(`${y}-${String(m).padStart(2, '0')}`);
 
   return (
-    <div className="@container flex flex-col gap-6">
+    <div ref={ref} className="@container flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
           <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-fg">Painel financeiro</h1>
@@ -126,6 +144,13 @@ export default function DashboardPage() {
               ) : null}
             </Button>
           ) : null}
+          {tab === 'dashboard' && hasGaps ? (
+            <Tooltip content="Sobe os cards para fechar os espaços vazios do painel">
+              <Button variant="outline" size="sm" onClick={arrange}>
+                <ArrowUpToLine /> Organizar
+              </Button>
+            </Tooltip>
+          ) : null}
         </div>
       </header>
 
@@ -134,20 +159,38 @@ export default function DashboardPage() {
       ) : tab === 'insights' ? (
         <InsightsTab month={month} dashboard={d} loading={dashboard.isPending} />
       ) : (
-        <Overview d={d} loading={dashboard.isPending} month={month} kind={kind} />
+        <Overview d={d} loading={dashboard.isPending} month={month} kind={kind} width={width} onCustomize={() => setCustomizing(true)} />
       )}
       <CustomizeSheet open={customizing} onOpenChange={setCustomizing} kind={kind} />
     </div>
   );
 }
 
-function Overview({ d, loading, month, kind }: { d: DashboardResponse | undefined; loading: boolean; month: string; kind: WorkspaceKind | undefined }) {
+interface OverviewProps {
+  d: DashboardResponse | undefined;
+  loading: boolean;
+  month: string;
+  kind: WorkspaceKind | undefined;
+  width: number;
+  onCustomize: () => void;
+}
+
+function Overview({ d, loading, month, kind, width, onCustomize }: OverviewProps) {
   const { layout, prefs } = useDashboardLayout();
   const alerts = useDashboardAlerts({ d, kind, layout, prefs });
   return (
     <>
       <DashboardKpis d={d} loading={loading} />
-      <DashboardBoard month={month} d={d} loading={loading} kind={kind} components={WIDGET_COMPONENTS} alerts={alerts} />
+      <DashboardBoard
+        width={width}
+        month={month}
+        d={d}
+        loading={loading}
+        kind={kind}
+        components={WIDGET_COMPONENTS}
+        alerts={alerts}
+        onCustomize={onCustomize}
+      />
     </>
   );
 }

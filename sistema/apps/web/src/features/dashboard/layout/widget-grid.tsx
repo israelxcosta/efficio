@@ -1,42 +1,80 @@
 import {
   Component as ReactComponent,
+  memo,
   useCallback,
   useMemo,
   useRef,
   useState,
   type ComponentType,
-  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import { ChevronDown, MoveDiagonal2, TriangleAlert } from 'lucide-react';
+import { LayoutGrid, MoveDiagonal2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { DashboardResponse, WorkspaceKind } from '@effinance/shared';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip } from '@/components/ui/tooltip';
-import { useElementSize } from '@/lib/use-element-size';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
-import { clampSize, columnsForWidth, commitCols, displaySpan, GRID, moveWidget, resolveSection, rowPxFor, snapResize } from './layout';
-import { useDashboardLayout, type DashboardLayoutApi } from './layout-store';
-import { SECTIONS, WIDGET_SPECS } from './specs';
-import type { SectionId, SectionSpec, WidgetAlert, WidgetId, WidgetProps, WidgetSize, WidgetSpec } from './types';
+import {
+  boardBottom,
+  clampSize,
+  columnsForWidth,
+  commitCols,
+  GRID,
+  heightForRows,
+  moveItem,
+  nudgeItem,
+  resizeItem,
+  resolveBoard,
+  rowPxFor,
+  sameBoard,
+  snapResize,
+  type NudgeDirection,
+} from './layout';
+import { useDashboardLayout } from './layout-store';
+import { SPEC_BY_ID, WIDGET_SPECS } from './specs';
+import type { BoardCols, BoardItem, GridCell, WidgetAlert, WidgetId, WidgetProps, WidgetSize, WidgetSpec } from './types';
 import { WidgetChromeContext, type WidgetChrome } from './widget-card';
-import { SectionAlertModal } from './alerts';
 
 export type WidgetComponents = Record<WidgetId, ComponentType<WidgetProps>>;
 
-/** Id of the "Personalizar" button (focus lands there when the last card of a section is hidden). */
+/** Id of the "Personalizar" button (focus lands there when the last card is hidden). */
 export const CUSTOMIZE_BUTTON_ID = 'dashboard-personalizar';
 
 interface BoardProps {
+  /** Width of the board (the page's content box); 0 until measured. */
+  width: number;
   month: string;
   d: DashboardResponse | undefined;
   loading: boolean;
   kind: WorkspaceKind | undefined;
   components: WidgetComponents;
   alerts: Partial<Record<WidgetId, WidgetAlert>>;
+  onCustomize: () => void;
 }
+
+/** Pixel geometry of a board. */
+interface Geometry {
+  cols: BoardCols;
+  colW: number;
+  rowPx: number;
+  gap: number;
+}
+
+function geometryFor(width: number): Geometry {
+  const cols = columnsForWidth(width);
+  return { cols, colW: (width - GRID.gap * (cols - 1)) / cols, rowPx: rowPxFor(cols), gap: GRID.gap };
+}
+
+/** Pixel box of a card; edges rounded so text never sits on half pixels. */
+function boxOf(item: BoardItem, g: Geometry) {
+  const left = Math.round(item.x * (g.colW + g.gap));
+  const right = Math.round((item.x + item.c) * (g.colW + g.gap) - g.gap);
+  return { left, top: item.y * (g.rowPx + g.gap), width: right - left, height: heightForRows(item.r, g.cols) };
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
 
 /** Room kept above fixed bottom bars (mobile nav, quick bar) for the drag auto-scroll. */
 function bottomInset(): number {
@@ -61,64 +99,43 @@ function suppressNextClick() {
 /** Interactive elements inside a header never start a drag. */
 const NO_DRAG = 'button, a, input, select, textarea, label, [role="radio"], [role="tab"], [role="combobox"], [role="switch"], .recharts-wrapper';
 
-/** The dashboard grid: one collapsible section per group, each with its own widget order. */
-export function DashboardBoard({ month, d, loading, kind, components, alerts }: BoardProps) {
+const KEY_DIRECTIONS: Partial<Record<string, NudgeDirection>> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+
+/** Board being dragged or resized: what it would look like if the pointer were released now. */
+interface Preview {
+  id: WidgetId;
+  mode: 'move' | 'resize';
+  items: BoardItem[];
+}
+
+/**
+ * The dashboard board: one free grid where each card sits on any cell. Dropping a card on others
+ * pushes them down; nothing rises on its own ("Organizar", in the page header, closes the gaps).
+ */
+export function DashboardBoard({ width, month, d, loading, kind, components, alerts, onCustomize }: BoardProps) {
   const api = useDashboardLayout();
-  const { ref, width } = useElementSize();
-  const cols = columnsForWidth(width);
+  const g = useMemo(() => geometryFor(width), [width]);
+  const { cols } = g;
+  const base = useMemo(() => resolveBoard(api.layout, WIDGET_SPECS, kind, cols), [api.layout, kind, cols]);
+  const [preview, setPreview] = useState<Preview | null>(null);
   const [announcement, setAnnouncement] = useState('');
-
-  // The wrapper always renders; the sections wait for its width so charts mount once, at the right size.
-  return (
-    <div ref={ref} className="flex flex-col gap-8">
-      {width === 0 ? null : SECTIONS.map((section) => {
-        const items = resolveSection(api.layout, section.id, WIDGET_SPECS, kind);
-        if (items.length === 0) return null;
-        return (
-          <DashboardSection
-            key={section.id}
-            section={section}
-            items={items}
-            cols={cols}
-            api={api}
-            collapsed={api.layout.collapsed.includes(section.id)}
-            alerts={alerts}
-            components={components}
-            widgetProps={{ month, d, loading, prefs: api.prefs, setPref: api.setPref, business: kind === 'business' }}
-            announce={setAnnouncement}
-          />
-        );
-      })}
-      <p aria-live="polite" className="sr-only">
-        {announcement}
-      </p>
-    </div>
-  );
-}
-
-interface SectionProps {
-  section: SectionSpec;
-  items: { spec: WidgetSpec; size: WidgetSize }[];
-  cols: number;
-  api: DashboardLayoutApi;
-  collapsed: boolean;
-  alerts: Partial<Record<WidgetId, WidgetAlert>>;
-  components: WidgetComponents;
-  widgetProps: Omit<WidgetProps, 'size' | 'alert'>;
-  announce: (message: string) => void;
-}
-
-function DashboardSection({ section, items, cols, api, collapsed, alerts, components, widgetProps, announce }: SectionProps) {
-  const [drag, setDrag] = useState<{ id: WidgetId; overId: WidgetId | null } | null>(null);
-  const [alertsOpen, setAlertsOpen] = useState(false);
   const gripRefs = useRef(new Map<WidgetId, HTMLButtonElement>());
-  const gridId = `secao-${section.id}`;
-  const visibleIds = useMemo(() => items.map((i) => i.spec.id), [items]);
-  const titleOf = useCallback((id: WidgetId) => items.find((i) => i.spec.id === id)?.spec.title ?? '', [items]);
-  const sectionAlerts = items
-    .map((i) => (alerts[i.spec.id] ? { spec: i.spec, alert: alerts[i.spec.id]! } : null))
-    .filter((x): x is { spec: WidgetSpec; alert: WidgetAlert } => x !== null);
-  const alertTotal = sectionAlerts.reduce((sum, a) => sum + a.alert.count, 0);
+  const shown = useMemo(() => new Map((preview?.items ?? base).map((i) => [i.id, i])), [preview, base]);
+  const rows = Math.max(boardBottom(base), boardBottom(preview?.items ?? []));
+  const widgetProps = useMemo(
+    () => ({ month, d, loading, prefs: api.prefs, setPref: api.setPref, business: kind === 'business' }),
+    [month, d, loading, api.prefs, api.setPref, kind],
+  );
+
+  const describe = useCallback(
+    (id: WidgetId, items: BoardItem[]) => {
+      const item = items.find((i) => i.id === id);
+      if (!item) return '';
+      const where = cols === 1 ? `posição ${items.indexOf(item) + 1} de ${items.length}` : `coluna ${item.x + 1}, linha ${item.y + 1}`;
+      return `${SPEC_BY_ID[id].title}: ${where}`;
+    },
+    [cols],
+  );
 
   /** Pointer drag (mouse/pen from the header, any pointer from the grip). */
   const beginDrag = useCallback(
@@ -126,20 +143,30 @@ function DashboardSection({ section, items, cols, api, collapsed, alerts, compon
       if (e.button !== 0) return;
       if (!fromGrip && (e.pointerType === 'touch' || (e.target as HTMLElement).closest(NO_DRAG))) return;
       const card = (e.currentTarget as HTMLElement).closest<HTMLElement>('[data-widget-id]');
-      if (!card) return;
+      const start = base.find((i) => i.id === id);
+      if (!card || !start) return;
+      // A card may go below the others, not further (the board does not grow empty rows at the end).
+      const maxY = Math.max(start.y, boardBottom(base.filter((i) => i.id !== id)));
+      const step = { x: g.colW + g.gap, y: g.rowPx + g.gap };
       const startX = e.clientX;
       const startY = e.clientY;
       const startScroll = window.scrollY;
       let lastX = startX;
       let lastY = startY;
       let started = false;
-      let over: WidgetId | null = null;
+      let cell: GridCell = { x: start.x, y: start.y };
       let frame = 0;
       let scrollZone = { top: 80, bottom: window.innerHeight - 80 };
 
-      // The card follows the pointer (scroll included); pointer-events off so the target below is found.
+      // The card follows the pointer (scroll included); the board shows where it would land.
       const place = () => {
-        card.style.transform = `translate(${lastX - startX}px, ${lastY - startY + window.scrollY - startScroll}px)`;
+        const dx = lastX - startX;
+        const dy = lastY - startY + window.scrollY - startScroll;
+        card.style.translate = `${dx}px ${dy}px`;
+        const next = { x: clamp(Math.round(start.x + dx / step.x), 0, cols - start.c), y: clamp(Math.round(start.y + dy / step.y), 0, maxY) };
+        if (next.x === cell.x && next.y === cell.y) return;
+        cell = next;
+        setPreview({ id, mode: 'move', items: moveItem(base, id, cell, cols) });
       };
       const scroll = () => {
         if (lastY < scrollZone.top) window.scrollBy(0, -16);
@@ -152,21 +179,14 @@ function DashboardSection({ section, items, cols, api, collapsed, alerts, compon
           if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
           started = true;
           document.body.style.userSelect = 'none';
-          card.style.pointerEvents = 'none';
           scrollZone = { top: 80, bottom: window.innerHeight - 80 - bottomInset() };
-          setDrag({ id, overId: null });
+          setPreview({ id, mode: 'move', items: base });
           frame = requestAnimationFrame(scroll);
         }
         ev.preventDefault();
         lastX = ev.clientX;
         lastY = ev.clientY;
         place();
-        // Over a gap the last target is kept, so a drop between cards still lands.
-        const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('[data-widget-id]');
-        if (el && el.dataset.section === section.id && el.dataset.widgetId !== id && el.dataset.widgetId !== over) {
-          over = el.dataset.widgetId as WidgetId;
-          setDrag({ id, overId: over });
-        }
       };
       const end = (commit: boolean) => {
         window.removeEventListener('pointermove', onMove);
@@ -175,17 +195,16 @@ function DashboardSection({ section, items, cols, api, collapsed, alerts, compon
         window.removeEventListener('keydown', onKey);
         cancelAnimationFrame(frame);
         document.body.style.userSelect = '';
-        card.style.transform = '';
-        card.style.pointerEvents = '';
+        // With the transition back on, the card glides from where it was dropped to its cell.
+        card.style.translate = '';
         if (!started) return;
         suppressNextClick();
-        if (commit && over) {
-          const order = moveWidget(visibleIds, id, over);
-          api.move(section.id, id, over);
-          toast('Cards reorganizados.');
-          announce(`${titleOf(id)}: posição ${order.indexOf(id) + 1} de ${order.length}`);
+        const items = moveItem(base, id, cell, cols);
+        if (commit && !sameBoard(items, base)) {
+          api.saveBoard(cols, items);
+          setAnnouncement(describe(id, items));
         }
-        setDrag(null);
+        setPreview(null);
       };
       const onUp = () => end(true);
       const onCancel = () => end(false);
@@ -197,25 +216,44 @@ function DashboardSection({ section, items, cols, api, collapsed, alerts, compon
       window.addEventListener('pointercancel', onCancel);
       window.addEventListener('keydown', onKey);
     },
-    [api, section.id, visibleIds, announce, titleOf],
+    [api, base, cols, g, describe],
   );
 
+  /** Arrows move one cell (trading places with a card in the way); Home/End go to the top/bottom. */
   const moveWithKeyboard = (e: KeyboardEvent, spec: WidgetSpec) => {
-    const delta = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1, Home: 'first', End: 'last' }[e.key] as number | 'first' | 'last' | undefined;
-    if (delta === undefined) return;
+    const item = base.find((i) => i.id === spec.id);
+    const dir = KEY_DIRECTIONS[e.key];
+    if (!item || (!dir && e.key !== 'Home' && e.key !== 'End')) return;
     e.preventDefault();
-    const from = visibleIds.indexOf(spec.id);
-    const to = delta === 'first' ? 0 : delta === 'last' ? visibleIds.length - 1 : Math.min(Math.max(from + delta, 0), visibleIds.length - 1);
-    if (to === from) return;
-    api.moveBy(section.id, spec.id, delta, visibleIds);
-    announce(`${spec.title}: posição ${to + 1} de ${visibleIds.length}`);
+    const others = base.filter((i) => i.id !== spec.id);
+    // Home asks for a row above everything (clamped to the first one); End for the row below the others.
+    const next = dir
+      ? nudgeItem(base, spec.id, dir, cols)
+      : moveItem(base, spec.id, { x: item.x, y: e.key === 'Home' ? -GRID.maxRow : boardBottom(others) }, cols);
+    if (sameBoard(next, base)) return;
+    api.saveBoard(cols, next);
+    setAnnouncement(describe(spec.id, next));
+    // The card moved in the DOM (reading order): give the focus back to its grip.
     requestAnimationFrame(() => gripRefs.current.get(spec.id)?.focus());
   };
 
+  const previewResize = (id: WidgetId, size: WidgetSize | null) =>
+    setPreview(size ? { id, mode: 'resize', items: resizeItem(base, id, size, cols) } : null);
+
+  const commitResize = (spec: WidgetSpec, displayed: WidgetSize, startCols: number) => {
+    const stored = clampSize(api.layout.sizes[spec.id] ?? spec.defaultSize, spec);
+    // On narrow boards the stored (desktop) width survives a drag that did not change the shown one.
+    const size = { c: commitCols(stored.c, startCols, displayed.c), r: displayed.r };
+    if (size.c !== stored.c || size.r !== stored.r) api.resize(cols, spec.id, size, resizeItem(base, spec.id, displayed, cols));
+    setPreview(null);
+    setAnnouncement(`${spec.title}: ${displayed.c} × ${displayed.r}`);
+  };
+
   const hide = (spec: WidgetSpec) => {
+    const before = api.layout;
     // Focus goes to the next card's grip (or the previous one, or "Personalizar") instead of the page.
-    const index = visibleIds.indexOf(spec.id);
-    const nextId = visibleIds[index + 1] ?? visibleIds[index - 1];
+    const index = base.findIndex((i) => i.id === spec.id);
+    const nextId = base[index + 1]?.id ?? base[index - 1]?.id;
     api.setVisible(spec.id, false);
     requestAnimationFrame(() => {
       const target = (nextId && gripRefs.current.get(nextId)) || document.getElementById(CUSTOMIZE_BUTTON_ID);
@@ -224,139 +262,134 @@ function DashboardSection({ section, items, cols, api, collapsed, alerts, compon
     toast(`"${spec.title}" foi ocultado.`, {
       description: 'Reexiba em Personalizar.',
       duration: 8000,
-      action: { label: 'Desfazer', onClick: () => api.setVisible(spec.id, true) },
+      action: { label: 'Desfazer', onClick: () => api.restore(before) },
     });
   };
 
-  return (
-    <section aria-labelledby={`${gridId}-titulo`} className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          id={`${gridId}-titulo`}
-          aria-expanded={!collapsed}
-          aria-controls={collapsed ? undefined : gridId}
-          onClick={() => api.toggleSection(section.id)}
-          className="flex items-center gap-1.5 rounded-md py-0.5 pr-1.5 text-[17px] font-semibold tracking-tight text-fg hover:text-brand-text"
-        >
-          <ChevronDown className={cn('size-4 text-muted transition-transform', collapsed && '-rotate-90')} aria-hidden />
-          {section.title}
-        </button>
-        {alertTotal > 0 ? (
-          <Tooltip content={sectionAlerts.map((a) => `${a.spec.title}: ${a.alert.count}`).join(' · ')}>
-            <button type="button" onClick={() => setAlertsOpen(true)} className="rounded-full">
-              <Badge tone="danger">
-                <TriangleAlert />
-                {alertTotal === 1 ? '1 exige atenção' : `${alertTotal} exigem atenção`}
-              </Badge>
-            </button>
-          </Tooltip>
-        ) : null}
-      </div>
-      {collapsed ? null : (
-        <div
-          id={gridId}
-          data-widget-grid
-          className="grid grid-flow-row-dense gap-4"
-          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: `${rowPxFor(cols)}px` }}
-        >
-          {items.map(({ spec, size }) => {
-            const WidgetBody = components[spec.id];
-            return (
-              <WidgetFrame
-                key={spec.id}
-                spec={spec}
-                size={size}
-                cols={cols}
-                section={section.id}
-                api={api}
-                dragging={drag?.id === spec.id}
-                dropTarget={drag?.overId === spec.id}
-                announce={announce}
-                chrome={{
-                  id: spec.id,
-                  title: spec.title,
-                  resizing: false,
-                  onHide: () => hide(spec),
-                  headerProps: { onPointerDown: (e) => beginDrag(e, spec.id, false) },
-                  gripProps: {
-                    ref: (el: HTMLButtonElement | null) => {
-                      if (el) gripRefs.current.set(spec.id, el);
-                      else gripRefs.current.delete(spec.id);
-                    },
-                    'aria-label': `Mover ${spec.title}`,
-                    title: 'Arraste para mover (ou use as setas)',
-                    onPointerDown: (e) => {
-                      e.stopPropagation();
-                      beginDrag(e, spec.id, true);
-                    },
-                    onKeyDown: (e) => moveWithKeyboard(e, spec),
-                  },
-                }}
-              >
-                {(displayed) => <WidgetBody {...widgetProps} size={displayed} alert={alerts[spec.id]} />}
-              </WidgetFrame>
-            );
-          })}
-        </div>
-      )}
-      <SectionAlertModal
-        open={alertsOpen}
-        onOpenChange={setAlertsOpen}
-        title={`${section.title} — exigem atenção`}
-        items={sectionAlerts.map((a) => ({ title: a.spec.title, alert: a.alert }))}
+  // The board waits for its width so charts mount once, at the right size.
+  if (width === 0) return null;
+  if (base.length === 0) {
+    return (
+      <EmptyState
+        icon={<LayoutGrid />}
+        title="Nenhum card no painel"
+        description="Escolha os cards que quer acompanhar em Personalizar."
+        action={
+          <Button variant="outline" size="sm" onClick={onCustomize}>
+            Personalizar
+          </Button>
+        }
       />
-    </section>
+    );
+  }
+  const moving = preview?.mode === 'move' ? shown.get(preview.id) : undefined;
+  return (
+    <div data-widget-grid data-cols={cols} className="relative" style={{ height: rows > 0 ? rows * (g.rowPx + g.gap) - g.gap : 0 }}>
+      {moving ? (
+        <div
+          aria-hidden
+          data-drop-target
+          className="pointer-events-none absolute top-0 left-0 rounded-xl border-2 border-dashed border-primary/60 bg-primary/5 transition-transform duration-150 ease-out motion-reduce:transition-none"
+          style={ghostStyle(moving, g)}
+        />
+      ) : null}
+      {base.map((committed) => {
+        const spec = SPEC_BY_ID[committed.id];
+        const dragging = preview?.mode === 'move' && preview.id === spec.id;
+        // The dragged card stays on its cell (moved by `translate`); the others show the preview.
+        const item = dragging ? committed : (shown.get(spec.id) ?? committed);
+        return (
+          <WidgetFrame
+            key={spec.id}
+            spec={spec}
+            item={item}
+            geometry={g}
+            dragging={dragging}
+            resizing={preview?.mode === 'resize' && preview.id === spec.id}
+            Body={components[spec.id]}
+            widgetProps={widgetProps}
+            alert={alerts[spec.id]}
+            onResizePreview={(size) => previewResize(spec.id, size)}
+            onResizeCommit={(size, startCols) => commitResize(spec, size, startCols)}
+            chrome={{
+              id: spec.id,
+              title: spec.title,
+              resizing: false,
+              onHide: () => hide(spec),
+              headerProps: { onPointerDown: (e) => beginDrag(e, spec.id, false) },
+              gripProps: {
+                ref: (el: HTMLButtonElement | null) => {
+                  if (el) gripRefs.current.set(spec.id, el);
+                  else gripRefs.current.delete(spec.id);
+                },
+                'aria-label': `Mover ${spec.title}`,
+                title: 'Arraste para qualquer lugar do painel (ou use as setas)',
+                onPointerDown: (e) => {
+                  e.stopPropagation();
+                  beginDrag(e, spec.id, true);
+                },
+                onKeyDown: (e) => moveWithKeyboard(e, spec),
+              },
+            }}
+          />
+        );
+      })}
+      <p aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
+    </div>
   );
 }
 
-interface FrameProps {
-  spec: WidgetSpec;
-  size: WidgetSize;
-  cols: number;
-  section: SectionId;
-  api: DashboardLayoutApi;
-  dragging: boolean;
-  dropTarget: boolean;
-  chrome: WidgetChrome;
-  announce: (message: string) => void;
-  children: (displayed: WidgetSize) => ReactNode;
+function ghostStyle(item: BoardItem, g: Geometry) {
+  const box = boxOf(item, g);
+  return { width: box.width, height: box.height, transform: `translate(${box.left}px, ${box.top}px)` };
 }
 
-/** Grid item: spans, drag states and the corner resize handle (pointer drag or arrow keys). */
-function WidgetFrame({ spec, size, cols, section, api, dragging, dropTarget, chrome, announce, children }: FrameProps) {
-  const frameRef = useRef<HTMLDivElement>(null);
-  const [preview, setPreview] = useState<WidgetSize | null>(null);
-  const shown = preview ?? size;
-  const displayed = useMemo(() => ({ c: displaySpan(shown.c, cols), r: shown.r }), [shown.c, shown.r, cols]);
-  const style: CSSProperties = { gridColumn: `span ${displayed.c}`, gridRow: `span ${displayed.r}` };
-  const resizing = preview !== null;
-  const chromeValue = useMemo(() => ({ ...chrome, resizing }), [chrome, resizing]);
+/** Widget content, skipped while only positions change (drag and resize previews). */
+const WidgetBody = memo(function WidgetBody({ Body, ...props }: WidgetProps & { Body: ComponentType<WidgetProps> }) {
+  return <Body {...props} />;
+});
 
-  const commit = (next: WidgetSize, startDisplayed: number) => {
-    const stored = { c: commitCols(size.c, startDisplayed, next.c), r: next.r };
-    if (stored.c !== size.c || stored.r !== size.r) api.setSize(spec.id, stored);
-    announce(`${spec.title}: ${displaySpan(stored.c, cols)} × ${stored.r}`);
-  };
+interface FrameProps {
+  spec: WidgetSpec;
+  /** Cell and span as displayed (the preview while something is dragged or resized). */
+  item: BoardItem;
+  geometry: Geometry;
+  dragging: boolean;
+  resizing: boolean;
+  Body: ComponentType<WidgetProps>;
+  widgetProps: Omit<WidgetProps, 'size' | 'alert'>;
+  alert: WidgetAlert | undefined;
+  chrome: WidgetChrome;
+  onResizePreview: (size: WidgetSize | null) => void;
+  onResizeCommit: (size: WidgetSize, startCols: number) => void;
+}
+
+/** Positioned card: its box on the board and the corner resize handle (pointer drag or arrow keys). */
+function WidgetFrame({ spec, item, geometry, dragging, resizing, Body, widgetProps, alert, chrome, onResizePreview, onResizeCommit }: FrameProps) {
+  const { cols } = geometry;
+  const box = boxOf(item, geometry);
+  const size = useMemo(() => ({ c: item.c, r: item.r }), [item.c, item.r]);
+  const chromeValue = useMemo(() => ({ ...chrome, resizing }), [chrome, resizing]);
+  // The corner handle grows the card to the right edge of the board, never past it.
+  const room = cols - item.x;
 
   const onResizeStart = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    const grid = frameRef.current?.closest<HTMLElement>('[data-widget-grid]');
-    if (!grid) return;
-    const css = getComputedStyle(grid);
-    const gap = parseFloat(css.columnGap) || GRID.gap;
-    const rowPx = parseFloat(css.gridAutoRows) || rowPxFor(cols);
-    const colW = (grid.getBoundingClientRect().width - gap * (cols - 1)) / cols;
-    const start = { x: e.clientX, y: e.clientY, size: { c: displaySpan(size.c, cols), r: size.r } };
+    const start = { x: e.clientX, y: e.clientY, size: { c: item.c, r: item.r } };
+    const metrics = { ...geometry, cols: room };
     const handle = e.currentTarget;
     handle.setPointerCapture(e.pointerId);
     let latest = start.size;
     let done = false;
     const onMove = (ev: PointerEvent) => {
-      latest = snapResize(start.size, ev.clientX - start.x, ev.clientY - start.y, { colW, rowPx, gap, cols }, spec);
-      setPreview((prev) => (prev && prev.c === latest.c && prev.r === latest.r ? prev : latest));
+      const next = snapResize(start.size, ev.clientX - start.x, ev.clientY - start.y, metrics, spec);
+      if (next.c === latest.c && next.r === latest.r) return;
+      latest = next;
+      onResizePreview(next);
     };
     const finish = (save: boolean) => {
       if (done) return;
@@ -366,12 +399,12 @@ function WidgetFrame({ spec, size, cols, section, api, dragging, dropTarget, chr
       handle.removeEventListener('lostpointercapture', onLost);
       window.removeEventListener('keydown', onKey);
       if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
-      if (save) commit(latest, start.size.c);
-      setPreview(null);
+      if (save && (latest.c !== start.size.c || latest.r !== start.size.r)) onResizeCommit(latest, start.size.c);
+      else onResizePreview(null);
     };
     const onUp = () => finish(true);
     const onLost = () => finish(false);
-    // Escape puts the card back to the size it had before the drag.
+    // Escape puts the card (and the cards it pushed) back as they were before the drag.
     const onKey = (ev: globalThis.KeyboardEvent) => {
       if (ev.key === 'Escape') finish(false);
     };
@@ -385,31 +418,31 @@ function WidgetFrame({ spec, size, cols, section, api, dragging, dropTarget, chr
     const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key] as [number, number] | undefined;
     if (!step) return;
     e.preventDefault();
-    const current = { c: displaySpan(size.c, cols), r: size.r };
-    const next = clampSize({ c: Math.min(current.c + step[0], cols), r: current.r + step[1] }, spec);
-    commit({ c: Math.min(next.c, cols), r: next.r }, current.c);
+    const next = clampSize({ c: Math.min(item.c + step[0], room), r: item.r + step[1] }, spec);
+    const shown = { c: Math.min(next.c, room), r: next.r };
+    if (shown.c !== item.c || shown.r !== item.r) onResizeCommit(shown, item.c);
   };
 
   return (
     <div
-      ref={frameRef}
       data-widget-id={spec.id}
-      data-section={section}
-      data-size={`${displayed.c}x${displayed.r}`}
-      style={style}
+      data-cell={`${item.x},${item.y}`}
+      data-size={`${item.c}x${item.r}`}
+      style={{ width: box.width, height: box.height, transform: `translate(${box.left}px, ${box.top}px)` }}
       className={cn(
-        'group/widget relative min-h-0 min-w-0 rounded-xl',
-        dragging && 'z-30 opacity-90 shadow-lg',
-        dropTarget && 'outline-2 outline-offset-2 outline-primary outline-dashed',
-        preview && 'z-20 outline-2 outline-offset-2 outline-primary',
+        'group/widget absolute top-0 left-0 min-h-0 min-w-0 rounded-xl transition-[transform,translate] duration-200 ease-out motion-reduce:transition-none',
+        dragging && 'pointer-events-none z-30 shadow-lg transition-none',
+        resizing && 'z-20 outline-2 outline-offset-2 outline-primary',
       )}
     >
       <WidgetChromeContext.Provider value={chromeValue}>
-        <WidgetErrorBoundary title={spec.title}>{children(displayed)}</WidgetErrorBoundary>
+        <WidgetErrorBoundary title={spec.title}>
+          <WidgetBody Body={Body} {...widgetProps} size={size} alert={alert} />
+        </WidgetErrorBoundary>
       </WidgetChromeContext.Provider>
-      {preview ? (
+      {resizing ? (
         <span className="tabular pointer-events-none absolute right-7 bottom-1.5 z-10 rounded-md bg-fg px-1.5 py-0.5 text-mini font-semibold text-surface">
-          {displayed.c} × {displayed.r}
+          {item.c} × {item.r}
         </span>
       ) : null}
       <button
@@ -421,7 +454,7 @@ function WidgetFrame({ spec, size, cols, section, api, dragging, dropTarget, chr
         className={cn(
           'absolute right-1 bottom-1 z-10 flex size-[18px] cursor-nwse-resize touch-none items-center justify-center rounded text-muted transition-opacity',
           'opacity-0 group-hover/widget:opacity-60 hover:!opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-70',
-          preview && 'opacity-100',
+          resizing && 'opacity-100',
         )}
       >
         <MoveDiagonal2 className="size-3.5" aria-hidden />
