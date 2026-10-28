@@ -238,9 +238,12 @@ export interface Client {
   status: ClientStatus;
   /** Set while inactive. */
   inactivation: ClientInactivation | null;
-  /** Fee period that contains today, when registered. */
+  /**
+   * Fee period that contains today, when registered. Always `null` for members without access to
+   * the finances (role `viewer`): fees are financial data.
+   */
   currentFee: ClientFee | null;
-  /** Most recent registered period (may have expired or not started yet). */
+  /** Most recent registered period (may have expired or not started yet). `null` for `viewer` too. */
   latestFee: ClientFee | null;
   /** Transactions (lançamentos) linked to the client. While > 0 the client cannot be deleted. */
   transactionCount: number;
@@ -252,14 +255,17 @@ export interface ClientListResponse extends Paginated<Client> {
   summary: {
     active: number;
     inactive: number;
-    /** Sum of the current monthly fees of active clients (cents). */
-    monthlyFees: number;
+    /**
+     * Sum of the current monthly fees of active clients (cents). The three fee totals are `null` for
+     * members without access to the finances (role `viewer`).
+     */
+    monthlyFees: number | null;
     /** Active clients without a registered fee period covering today (new or due for renewal). */
-    withoutCurrentFee: number;
+    withoutCurrentFee: number | null;
     /** Active clients per tax regime. */
     byRegime: Record<TaxRegime, number>;
     /** Average current monthly fee of the active clients that have one (cents; 0 when none). */
-    averageFee: number;
+    averageFee: number | null;
   };
 }
 

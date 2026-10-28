@@ -1,9 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { transferInputSchema, transferQuerySchema } from '@effinance/shared';
+import { financeOnly } from '../../lib/finance-access';
 import { idParams } from '../common/params';
 import { createTransfer, deleteTransfer, listTransfers, updateTransfer } from './service';
 
 export const transferRoutes: FastifyPluginAsyncZod = async (app) => {
+  // Financial module: owner/editor only, reads included (lib/finance-access.ts).
+  financeOnly(app);
+
   app.get('/', { schema: { querystring: transferQuerySchema } }, async (req) =>
     listTransfers(req.db, req.workspaceId, req.query),
   );

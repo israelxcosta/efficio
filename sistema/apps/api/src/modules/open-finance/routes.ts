@@ -7,6 +7,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { connectTokenSchema, createConnectionSchema, fakeConnectSchema, linkAccountsSchema } from '@effinance/shared';
 import { audit } from '../../lib/audit';
+import { financeOnly } from '../../lib/finance-access';
 import { rateLimited } from '../../lib/platform';
 import { requestContext } from '../../lib/request-context';
 import { tenantGuards } from '../../lib/tenant-scope';
@@ -31,6 +32,8 @@ const quietLog: LogLike = { warn: () => {} };
 
 export const openFinanceRoutes: FastifyPluginAsyncZod = async (app) => {
   tenantGuards(app);
+  // Financial module: owner/editor only, reads included (lib/finance-access.ts). After authentication.
+  financeOnly(app);
   const ctx = (req: { log?: LogLike }): OpenFinanceContext => ({ db: app.db, of: app.platform.openFinance, log: req.log ?? quietLog });
   const manager = (req: { userId: string; access: { role: ConnectionManager['role'] } }): ConnectionManager => ({
     userId: req.userId,

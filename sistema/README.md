@@ -144,6 +144,10 @@ cookie httpOnly e dados no servidor.
 - **Assinantes (workspaces)**: cada conta nasce com a sua empresa e pode criar outras empresas e
   convidar membros como Editor ou Leitor; a última empresa da conta não pode ser excluída (para sair
   de vez, exclua a conta). Todo dado financeiro pertence a um workspace.
+- **Financeiro só para administradores**: proprietário e editor acessam o financeiro; o Leitor
+  ("Colaborador") usa clientes, fornecedores, tarefas e o próprio perfil, mas recebe `403` em todo
+  módulo financeiro (leituras inclusive), vê clientes sem honorários e a busca sem lançamentos,
+  contas e categorias. Detalhes em `docs/api.md` → "Permissões e assinatura".
 - **Isolamento no banco**: PostgreSQL compartilhado com **Row Level Security** forçado nas tabelas
   financeiras. Cada requisição roda numa transação com o papel `effinance_app` e o workspace ativo
   fixado em `app.workspace_id`; mesmo uma consulta sem filtro não enxerga outro assinante. O login

@@ -1,9 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { categoryInputSchema, categoryQuerySchema, categoryUpdateSchema } from '@effinance/shared';
+import { financeOnly } from '../../lib/finance-access';
 import { idParams } from '../common/params';
 import { createCategory, deleteCategory, listCategories, updateCategory } from './service';
 
 export const categoryRoutes: FastifyPluginAsyncZod = async (app) => {
+  // Financial module: owner/editor only, reads included (lib/finance-access.ts).
+  financeOnly(app);
+
   app.get('/', { schema: { querystring: categoryQuerySchema } }, async (req) =>
     listCategories(req.db, req.workspaceId, req.query),
   );

@@ -7,10 +7,14 @@ import {
   delinquencyReportQuerySchema,
   overviewReportQuerySchema,
 } from '@effinance/shared';
+import { financeOnly } from '../../lib/finance-access';
 import { cashflowReport, categoryReport, comparisonReport, contactReport, overviewReport } from './service';
 import { delinquencyReport } from './delinquency';
 
 export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
+  // Financial module: owner/editor only, reads included (lib/finance-access.ts).
+  financeOnly(app);
+
   app.get('/overview', { schema: { querystring: overviewReportQuerySchema } }, async (req) =>
     overviewReport(req.db, req.workspaceId, req.query),
   );

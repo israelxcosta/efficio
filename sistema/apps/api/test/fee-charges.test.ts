@@ -367,7 +367,9 @@ describe('permissions and tenancy', () => {
     const viewer = await registerUser(app, 'Leitora', 'leitora@teste.com');
     expect((await viewer.post(`/invites/${invite.body.inviteUrl.split('/convite/')[1]}/accept`)).status).toBe(200);
     expect((await viewer.post('/auth/switch-workspace', { workspaceId: office.body.id })).status).toBe(200);
-    expect((await viewer.get('/transactions?type=income')).body.total).toBe(2);
+    // Finances are for owner/editor only, reads included (lib/finance-access.ts).
+    expect((await c.get('/transactions?type=income')).body.total).toBe(2);
+    expect((await viewer.get('/transactions?type=income')).status).toBe(403);
     expect((await viewer.post('/fee-charges/generate', { competence: '2026-11', dryRun: true })).status).toBe(403);
     expect((await viewer.post(`/fee-charges/${fee}/employees`, { employees: 2 })).status).toBe(403);
 

@@ -141,8 +141,11 @@ describe('roles, subscription and members', () => {
     expect(accepted.body.workspaces).toHaveLength(2);
     expect((await guest.post(`/invites/${token}/accept`)).status).toBe(404);
 
-    // Viewer: reads, never writes.
-    expect((await guest.get('/accounts')).status).toBe(200);
+    // Viewer ("Colaborador"): no finances, not even reads (lib/finance-access.ts); reads the other modules, never writes.
+    const hidden = await guest.get('/accounts');
+    expect(hidden.status).toBe(403);
+    expect(hidden.body.message).toBe('O financeiro é restrito aos administradores do espaço.');
+    expect((await guest.get('/clients')).status).toBe(200);
     const denied = await guest.post('/accounts', { name: 'x', type: 'checking' });
     expect(denied.status).toBe(403);
     expect(denied.body.error).toBe('forbidden');

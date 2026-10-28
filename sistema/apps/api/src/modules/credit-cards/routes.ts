@@ -1,5 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { accountQuerySchema, creditCardInputSchema, payInvoiceSchema } from '@effinance/shared';
+import { financeOnly } from '../../lib/finance-access';
 import { idParams, invoiceParams, invoiceRangeQuery } from '../common/params';
 import {
   createCreditCard,
@@ -12,6 +13,9 @@ import {
 } from './service';
 
 export const creditCardRoutes: FastifyPluginAsyncZod = async (app) => {
+  // Financial module: owner/editor only, reads included (lib/finance-access.ts).
+  financeOnly(app);
+
   app.get('/', { schema: { querystring: accountQuerySchema } }, async (req) =>
     listCreditCards(req.db, req.workspaceId, req.query.includeArchived ?? false),
   );

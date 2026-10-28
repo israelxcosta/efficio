@@ -36,6 +36,23 @@ type InactivationInput = z.output<typeof clientInactivationSchema>;
 type FeeInput = z.output<typeof clientFeeInputSchema>;
 
 const TABLE = 'contacts';
+
+/**
+ * What the requesting member may see of the clients. Fee periods (honorários) and fee totals are
+ * financial data: hidden from members without access to the finances (lib/finance-access.ts).
+ */
+export interface ClientView {
+  fees: boolean;
+}
+
+/** Inside the service (writes, then re-read): the route decides what leaves (`withoutFees`). */
+const FULL_VIEW: ClientView = { fees: true };
+
+/** A client as seen by a member without access to the finances. */
+export function withoutFees(client: Client): Client {
+  return { ...client, currentFee: null, latestFee: null };
+}
+
 /** Due day of a client saved before migration 0010 set one (the column is filled for them). */
 const DEFAULT_FEE_DUE_DAY = 10;
 
@@ -71,11 +88,17 @@ function pickFees(fees: ClientFee[], client: Pick<ContactRow, 'contractStartDate
   return { current: fees.find((f) => f.index === index) ?? null, latest };
 }
 
-async function toClient(cipher: FieldCipher, row: ContactRow, feeRows: ClientFeeRow[], transactionCount: number): Promise<Client> {
+async function toClient(
+  cipher: FieldCipher,
+  row: ContactRow,
+  feeRows: ClientFeeRow[],
+  transactionCount: number,
+  view: ClientView,
+): Promise<Client> {
   const plain = await cipher.decryptFields(TABLE, row, CONTACT_ALL_ENCRYPTED_FIELDS);
   const contractStart = plain.contractStartDate!;
-  const fees = feeRows.map((f) => toFee(f, contractStart));
-  const { current, latest } = pickFees(fees, plain, today());
+  const fees = view.fees ? feeRows.map((f) => toFee(f, contractStart)) : [];
+  const { current, latest } = view.fees ? pickFees(fees, plain, today()) : { current: null, latest: null };
   return {
     id: plain.id,
     name: plain.name,
@@ -112,15 +135,17 @@ async function toClient(cipher: FieldCipher, row: ContactRow, feeRows: ClientFee
   };
 }
 
-/** Fees and transaction counts of a set of clients, then the API shape. */
-async function hydrate(db: DbExecutor, workspaceId: string, rows: ContactRow[]): Promise<Client[]> {
+/** Fees (when visible) and transaction counts of a set of clients, then the API shape. */
+async function hydrate(db: DbExecutor, workspaceId: string, rows: ContactRow[], view: ClientView): Promise<Client[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const [fees, counts] = await Promise.all([
-    db
-      .select()
-      .from(clientFees)
-      .where(and(eq(clientFees.workspaceId, workspaceId), inArray(clientFees.clientId, ids))),
+    view.fees
+      ? db
+          .select()
+          .from(clientFees)
+          .where(and(eq(clientFees.workspaceId, workspaceId), inArray(clientFees.clientId, ids)))
+      : Promise.resolve([] as ClientFeeRow[]),
     db
       .select({ contactId: transactions.contactId, total: countAll() })
       .from(transactions)
@@ -135,6 +160,7 @@ async function hydrate(db: DbExecutor, workspaceId: string, rows: ContactRow[]):
         row,
         fees.filter((f) => f.clientId === row.id),
         counts.find((c) => c.contactId === row.id)?.total ?? 0,
+        view,
       ),
     ),
   );
@@ -204,17 +230,22 @@ async function assertUniqueDocument(db: DbExecutor, workspaceId: string, documen
 // Clients
 // ---------------------------------------------------------------------------
 
-/** Counts and the monthly fees currently in force, over every client of the workspace. */
-async function summarize(db: DbExecutor, workspaceId: string): Promise<ClientListResponse['summary']> {
+/**
+ * Counts and the monthly fees currently in force, over every client of the workspace. Without
+ * access to the fees, only the counts: the fee totals are `null` (the fees are not even read).
+ */
+async function summarize(db: DbExecutor, workspaceId: string, view: ClientView): Promise<ClientListResponse['summary']> {
   const [rows, fees] = await Promise.all([
     db
       .select({ id: contacts.id, status: contacts.status, contractStartDate: contacts.contractStartDate, taxRegime: contacts.taxRegime })
       .from(contacts)
       .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client'))),
-    db
-      .select({ clientId: clientFees.clientId, periodIndex: clientFees.periodIndex, amount: clientFees.amount })
-      .from(clientFees)
-      .where(eq(clientFees.workspaceId, workspaceId)),
+    view.fees
+      ? db
+          .select({ clientId: clientFees.clientId, periodIndex: clientFees.periodIndex, amount: clientFees.amount })
+          .from(clientFees)
+          .where(eq(clientFees.workspaceId, workspaceId))
+      : Promise.resolve([]),
   ]);
   const byPeriod = new Map(fees.map((f) => [`${f.clientId}:${f.periodIndex}`, f.amount]));
   const now = today();
@@ -233,11 +264,17 @@ async function summarize(db: DbExecutor, workspaceId: string): Promise<ClientLis
   }
   const withFee = summary.active - summary.withoutCurrentFee;
   summary.averageFee = withFee > 0 ? Math.round(summary.monthlyFees / withFee) : 0;
+  if (!view.fees) return { ...summary, monthlyFees: null, withoutCurrentFee: null, averageFee: null };
   return summary;
 }
 
 /** Search: razão social / nome fantasia (partial) or CNPJ (exact, through the blind index). */
-export async function listClients(db: DbExecutor, workspaceId: string, q: ClientQuery): Promise<ClientListResponse> {
+export async function listClients(
+  db: DbExecutor,
+  workspaceId: string,
+  q: ClientQuery,
+  view: ClientView,
+): Promise<ClientListResponse> {
   let search;
   if (q.search) {
     const digits = onlyDigits(q.search);
@@ -265,13 +302,13 @@ export async function listClients(db: DbExecutor, workspaceId: string, q: Client
       .limit(q.pageSize)
       .offset((q.page - 1) * q.pageSize),
     db.select({ total: countAll() }).from(contacts).where(where),
-    summarize(db, workspaceId),
+    summarize(db, workspaceId, view),
   ]);
-  return { items: await hydrate(db, workspaceId, rows), total: count?.total ?? 0, page: q.page, pageSize: q.pageSize, summary };
+  return { items: await hydrate(db, workspaceId, rows, view), total: count?.total ?? 0, page: q.page, pageSize: q.pageSize, summary };
 }
 
-export async function getClient(db: DbExecutor, workspaceId: string, id: string): Promise<Client> {
-  const [client] = await hydrate(db, workspaceId, [await getClientOrThrow(db, workspaceId, id)]);
+export async function getClient(db: DbExecutor, workspaceId: string, id: string, view: ClientView): Promise<Client> {
+  const [client] = await hydrate(db, workspaceId, [await getClientOrThrow(db, workspaceId, id)], view);
   return client!;
 }
 
@@ -283,7 +320,7 @@ export async function createClient(db: DbExecutor, workspaceId: string, input: C
     .insert(contacts)
     .values({ workspaceId, kind: 'client', status: 'active', ...values })
     .returning();
-  return toClient(cipher, row!, [], 0);
+  return toClient(cipher, row!, [], 0, FULL_VIEW);
 }
 
 export async function updateClient(db: DbExecutor, workspaceId: string, id: string, input: ClientInput): Promise<Client> {
@@ -297,7 +334,7 @@ export async function updateClient(db: DbExecutor, workspaceId: string, id: stri
   const values = await encryptClientInput(cipher, input);
   await assertUniqueDocument(db, workspaceId, values.documentHash, id);
   await db.update(contacts).set(values).where(eq(contacts.id, id));
-  return getClient(db, workspaceId, id);
+  return getClient(db, workspaceId, id, FULL_VIEW);
 }
 
 /** Refused while any transaction (or series) is linked to the client: inactivate it instead. */
@@ -341,7 +378,7 @@ export async function inactivateClient(db: DbExecutor, workspaceId: string, id: 
       inactivationNotes: await cipher.encrypt(TABLE, 'inactivationNotes', input.notes),
     })
     .where(eq(contacts.id, id));
-  return getClient(db, workspaceId, id);
+  return getClient(db, workspaceId, id, FULL_VIEW);
 }
 
 export async function reactivateClient(db: DbExecutor, workspaceId: string, id: string): Promise<Client> {
@@ -350,7 +387,7 @@ export async function reactivateClient(db: DbExecutor, workspaceId: string, id: 
     .update(contacts)
     .set({ status: 'active', inactivatedAt: null, inactivationReason: null, inactivationNotes: null })
     .where(eq(contacts.id, id));
-  return getClient(db, workspaceId, id);
+  return getClient(db, workspaceId, id, FULL_VIEW);
 }
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import {
   transactionQuerySchema,
   transactionUpdateSchema,
 } from '@effinance/shared';
+import { financeOnly } from '../../lib/finance-access';
 import { idParams } from '../common/params';
 import {
   anticipateInstallments,
@@ -19,6 +20,9 @@ import {
 } from './service';
 
 export const transactionRoutes: FastifyPluginAsyncZod = async (app) => {
+  // Financial module: owner/editor only, reads included (lib/finance-access.ts).
+  financeOnly(app);
+
   app.get('/', { schema: { querystring: transactionQuerySchema } }, async (req) =>
     listTransactions(req.db, req.workspaceId, req.query),
   );

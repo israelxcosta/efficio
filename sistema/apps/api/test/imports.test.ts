@@ -311,7 +311,7 @@ describe('batches', () => {
 });
 
 describe('permissions and isolation', () => {
-  it('viewers read but cannot import; expired workspaces get 402 on writes', async () => {
+  it('viewers neither read nor import; expired workspaces get 402 on writes', async () => {
     const owner = await registerUser(app, 'Dona Import');
     const { workspaceId, viewer } = await familyWithViewer(owner);
     const accountId = await createAccount(owner);
@@ -321,7 +321,9 @@ describe('permissions and isolation', () => {
     expect((await preview(viewer, { content: fixture('bb-extrato-ofx1.ofx'), target: { kind: 'account', accountId } })).status).toBe(403);
     expect((await viewer.post('/imports', commitBody(p))).status).toBe(403);
     expect((await viewer.del(`/imports/${batch.id}`)).status).toBe(403);
-    const seen = await viewer.get('/imports');
+    // Finances are for owner/editor only, reads included (lib/finance-access.ts).
+    expect((await viewer.get('/imports')).status).toBe(403);
+    const seen = await owner.get('/imports');
     expect(seen.status).toBe(200);
     expect(seen.body.items[0]).toMatchObject({ id: batch.id, createdByName: 'Dona Import' });
 

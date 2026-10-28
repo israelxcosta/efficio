@@ -4,6 +4,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { MAX_IMPORT_CONTENT_CHARS, importCommitSchema, importListQuerySchema, importPreviewSchema } from '@effinance/shared';
 import { audit } from '../../lib/audit';
+import { financeOnly } from '../../lib/finance-access';
 import { rateLimited } from '../../lib/platform';
 import { requestContext } from '../../lib/request-context';
 import { tenantGuards } from '../../lib/tenant-scope';
@@ -20,6 +21,8 @@ export const IMPORT_COMMIT_BODY_LIMIT = 4 * 1024 * 1024;
 
 export const importRoutes: FastifyPluginAsyncZod = async (app) => {
   tenantGuards(app);
+  // Financial module: owner/editor only, reads included (lib/finance-access.ts). After authentication.
+  financeOnly(app);
 
   app.post(
     '/preview',

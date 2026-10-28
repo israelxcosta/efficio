@@ -395,4 +395,45 @@ describe('demo api (PGlite)', () => {
     expect((await call('GET', '/auth/me')).status).toBe(401);
     expect((await call('POST', '/auth/refresh')).status).toBe(401);
   });
+
+  it('restricts the finances to administrators: a viewer sees clients without fees (same guard as the API)', async () => {
+    expect((await call('POST', '/auth/login', { email: DEMO_EMAIL, password: DEMO_PASSWORD })).status).toBe(200);
+    const invite = await call('POST', '/workspaces/current/invites', { email: 'colaboradora@demo.app', role: 'viewer' });
+    expect(invite.status).toBe(201);
+    expect((await call('POST', '/auth/logout')).status).toBe(204);
+    const reg = await call('POST', '/auth/register', { name: 'Colaboradora', email: 'colaboradora@demo.app', password: 'senha12345', acceptTerms: true });
+    expect(reg.status).toBe(201);
+    const accepted = await call('POST', `/invites/${invite.body.inviteUrl.split('/convite/')[1]}/accept`);
+    expect(accepted.status).toBe(200);
+    expect(accepted.body.workspace).toMatchObject({ name: OFFICE, role: 'viewer' });
+
+    const financial = [
+      `/dashboard?month=${month}`,
+      '/accounts',
+      '/categories',
+      '/transactions',
+      `/statement?from=${from}&to=${to}`,
+      `/reports/overview?from=${from}&to=${to}`,
+      '/reports/delinquency',
+      '/imports',
+      '/open-finance/connections',
+    ];
+    for (const path of financial) {
+      const res = await call('GET', path);
+      expect(res.status, path).toBe(403);
+      expect(res.body.message, path).toBe('O financeiro é restrito aos administradores do espaço.');
+    }
+
+    const clients = (await call('GET', '/clients?status=all&pageSize=50')).body;
+    expect(clients.total).toBe(10);
+    expect(clients.summary).toMatchObject({ active: 8, inactive: 2, monthlyFees: null, withoutCurrentFee: null, averageFee: null });
+    expect(clients.items.every((c: { currentFee: unknown; latestFee: unknown }) => c.currentFee === null && c.latestFee === null)).toBe(true);
+    expect((await call('GET', `/clients/${clients.items[0].id}/fees`)).status).toBe(403);
+    expect((await call('GET', '/contacts?kind=supplier')).status).toBe(200);
+
+    const found = (await call('GET', '/search?q=a')).body;
+    expect(found).toMatchObject({ transactions: [], accounts: [], categories: [] });
+    expect(found.contacts.length).toBeGreaterThan(0);
+    expect((await call('POST', '/auth/logout')).status).toBe(204);
+  });
 });

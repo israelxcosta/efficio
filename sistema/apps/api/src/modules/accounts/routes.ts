@@ -1,9 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { accountInputSchema, accountQuerySchema } from '@effinance/shared';
+import { financeOnly } from '../../lib/finance-access';
 import { idParams } from '../common/params';
 import { createAccount, deleteAccount, getAccountWithBalance, listAccounts, updateAccount } from './service';
 
 export const accountRoutes: FastifyPluginAsyncZod = async (app) => {
+  // Financial module: owner/editor only, reads included (lib/finance-access.ts).
+  financeOnly(app);
+
   app.get('/', { schema: { querystring: accountQuerySchema } }, async (req) =>
     listAccounts(req.db, req.workspaceId, req.query.includeArchived ?? false),
   );

@@ -78,7 +78,7 @@ function FeeGapNote({
   onOpenFees,
 }: Pick<ClientsSummaryProps, 'items' | 'filter' | 'onFilter' | 'onOpenFees'> & { summary: Summary }) {
   const today = todayISO();
-  const count = summary.withoutCurrentFee;
+  const count = summary.withoutCurrentFee ?? 0;
   const pending = items?.filter((c) => c.status === 'active' && !c.currentFee) ?? [];
   const named = pending.length === count && count <= 3 ? pending : null;
 
@@ -155,7 +155,7 @@ export function ClientsSummary({ summary, items, filter, onFilter, onOpenFees }:
   if (summary && summary.active + summary.inactive === 0) return null;
 
   const regimes = regimeBreakdown(summary?.byRegime);
-  const withFee = summary ? summary.active - summary.withoutCurrentFee : 0;
+  const withFee = summary ? summary.active - (summary.withoutCurrentFee ?? 0) : 0;
   const maxCount = Math.max(1, ...regimes.map((r) => r.count));
   const inactiveShown = filter.status === 'inactive';
 
@@ -179,7 +179,7 @@ export function ClientsSummary({ summary, items, filter, onFilter, onOpenFees }:
           {summary ? (
             <>
               <p className="tabular mt-1 text-[32px] leading-10 font-semibold tracking-tight whitespace-nowrap text-fg lg:text-[28px] xl:text-[32px]">
-                {formatBRL(summary.monthlyFees)}
+                {formatBRL(summary.monthlyFees ?? 0)}
               </p>
               <p className="mt-1 text-body-sm text-muted">
                 {withFee > 0 ? (
@@ -283,7 +283,7 @@ export function ClientsSummary({ summary, items, filter, onFilter, onOpenFees }:
         </div>
       </div>
 
-      {summary && summary.withoutCurrentFee > 0 ? (
+      {summary && (summary.withoutCurrentFee ?? 0) > 0 ? (
         <FeeGapNote summary={summary} items={items} filter={filter} onFilter={onFilter} onOpenFees={onOpenFees} />
       ) : null}
     </section>

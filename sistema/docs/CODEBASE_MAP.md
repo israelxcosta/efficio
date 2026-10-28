@@ -250,6 +250,11 @@ sequenceDiagram
 7. `getCipher` deve ser chamado antes de abrir a transação de tenant (o papel de tenant não lê
    `workspaces`; o PGlite tem uma conexão só).
 8. Rótulos de risco e algumas chaves de gráfico são em português (`baixo`, `critico`, `saldo`).
+9. **Financeiro só para administradores** (`owner`/`editor`): módulo financeiro novo chama
+   `financeOnly(app)` (`lib/finance-access.ts`) no início do plugin (depois de `tenantGuards`, se
+   houver); `viewer` recebe 403 até em leituras. Dado financeiro em módulo aberto (ex.: honorários em
+   `/clients`) é omitido com `canAccessFinance(req.access)`. Todo módulo novo precisa entrar em
+   `FINANCE_MODULES` ou `OPEN_MODULES` de `apps/api/test/finance-access.test.ts`.
 
 ## Guia de navegação
 

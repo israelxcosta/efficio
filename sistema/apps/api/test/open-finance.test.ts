@@ -403,7 +403,7 @@ describe('security', () => {
     expect(sanitizeUrl(`/api/open-finance/webhooks/pluggy/${SECRET}?x=1`)).toBe('/api/open-finance/webhooks/pluggy/[secret]?x=[redacted]');
   });
 
-  it('viewers read; writes need editor/owner and an active subscription', async () => {
+  it('viewers see nothing; writes need editor/owner and an active subscription', async () => {
     const owner = await registerUser(app, 'Dona OF');
     const { workspaceId, viewer } = await familyWithViewer(owner);
     const { itemId, connection } = await connect(owner);
@@ -418,8 +418,10 @@ describe('security', () => {
     const call = (c: Client, method: string, url: string, body?: unknown) =>
       app.inject({ method: method as 'POST', url: `/api${url}`, headers: { authorization: `Bearer ${c.token}` }, ...(body !== undefined ? { payload: body as object } : {}) });
     for (const [method, url, body] of mutations) expect((await call(viewer, method, url, body)).statusCode, `${method} ${url}`).toBe(403);
-    expect((await viewer.get('/open-finance/status')).status).toBe(200);
-    expect((await viewer.get('/open-finance/connections')).body).toHaveLength(1);
+    // Finances are for owner/editor only, reads included (lib/finance-access.ts).
+    expect((await viewer.get('/open-finance/status')).status).toBe(403);
+    expect((await viewer.get('/open-finance/connections')).status).toBe(403);
+    expect((await owner.get('/open-finance/connections')).body).toHaveLength(1);
 
     await admin().execute(sql`update subscriptions set trial_ends_at = now() - interval '1 day' where workspace_id = ${workspaceId}`);
     for (const [method, url, body] of mutations) expect((await call(owner, method, url, body)).statusCode, `${method} ${url}`).toBe(402);

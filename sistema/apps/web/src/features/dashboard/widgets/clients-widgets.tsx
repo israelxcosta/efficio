@@ -196,7 +196,7 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
   } else if (!data || !summary || summary.active + summary.inactive === 0) {
     body = <NoClients />;
   } else {
-    const withFee = summary.active - summary.withoutCurrentFee;
+    const withFee = summary.active - (summary.withoutCurrentFee ?? 0);
     // Hint lines only when the card has the height and the tiles the width for them.
     const hint = (text: string) => (compact ? undefined : <span className="hidden @md:inline">{text}</span>);
     body = (
@@ -210,7 +210,7 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
           <StatTile
             className={cn('col-span-3', compact ? '@md:col-span-1' : '@3xl:col-span-1')}
             label="Honorário fixo mensal"
-            value={formatBRL(summary.monthlyFees)}
+            value={formatBRL(summary.monthlyFees ?? 0)}
             hint={hint(`ticket médio ${formatBRL(summary.averageFee ?? 0)} · ${pluralize(withFee, 'cliente', 'clientes')}`)}
             wrapLabel={compact}
           />
@@ -218,9 +218,9 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
           <StatTile label="Inativos" value={summary.inactive} hint={hint('fora da carteira')} />
           <StatTile
             label="Sem vigência"
-            value={summary.withoutCurrentFee}
-            hint={hint(summary.withoutCurrentFee > 0 ? 'cadastrar ou reajustar' : 'todas em dia')}
-            tone={summary.withoutCurrentFee > 0 ? 'danger' : undefined}
+            value={summary.withoutCurrentFee ?? 0}
+            hint={hint((summary.withoutCurrentFee ?? 0) > 0 ? 'cadastrar ou reajustar' : 'todas em dia')}
+            tone={(summary.withoutCurrentFee ?? 0) > 0 ? 'danger' : undefined}
           />
         </div>
         <div className="flex min-h-0 flex-1 gap-6">
@@ -574,12 +574,12 @@ export function FeesMonthWidget({ month, d, loading, size, alert }: WidgetProps)
     body = <NoClients />;
   } else {
     const { summary } = data;
-    const withFee = summary.active - summary.withoutCurrentFee;
+    const withFee = summary.active - (summary.withoutCurrentFee ?? 0);
     const bars: FeeBar[] = [
       {
         key: 'expected',
         label: 'Honorário fixo previsto',
-        value: summary.monthlyFees,
+        value: summary.monthlyFees ?? 0,
         hint: `${pluralize(withFee, 'cliente', 'clientes')} com vigência`,
         fill: 'bg-[var(--app-chart-neutral)]',
       },
@@ -588,8 +588,8 @@ export function FeesMonthWidget({ month, d, loading, size, alert }: WidgetProps)
         label: billedLabel,
         value: view.billed,
         hint:
-          summary.monthlyFees > 0
-            ? `${pct(view.billed, summary.monthlyFees)} do previsto${feeAware ? ` · ${pluralize(view.count, 'lançamento', 'lançamentos')}` : ''}`
+          (summary.monthlyFees ?? 0) > 0
+            ? `${pct(view.billed, summary.monthlyFees ?? 0)} do previsto${feeAware ? ` · ${pluralize(view.count, 'lançamento', 'lançamentos')}` : ''}`
             : undefined,
         fill: 'bg-[var(--app-chart-3)]',
       },

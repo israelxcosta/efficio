@@ -1,5 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { goalContributionInputSchema, goalInputSchema } from '@effinance/shared';
+import { financeOnly } from '../../lib/finance-access';
 import { contributionParams, idParams } from '../common/params';
 import {
   addContribution,
@@ -12,6 +13,9 @@ import {
 } from './service';
 
 export const goalRoutes: FastifyPluginAsyncZod = async (app) => {
+  // Financial module: owner/editor only, reads included (lib/finance-access.ts).
+  financeOnly(app);
+
   app.get('/', async (req) => listGoals(req.db, req.workspaceId));
 
   app.post('/', { schema: { body: goalInputSchema } }, async (req, reply) =>

@@ -49,14 +49,14 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | POST | `/api/contacts` | `contactInputSchema` | `Contact` (201) — cria um fornecedor |
 | PUT | `/api/contacts/:id` | `contactInputSchema` | `Contact` (só fornecedores; cliente → 404) |
 | DELETE | `/api/contacts/:id` | — | 204 (lançamentos ficam sem fornecedor; séries deixam de apontar para ele) |
-| GET | `/api/clients` | `clientQuerySchema` (`search`, `status`: `active` \| `inactive` \| `all`, `taxRegime`) | `ClientListResponse` (página + `summary`) |
+| GET | `/api/clients` | `clientQuerySchema` (`search`, `status`: `active` \| `inactive` \| `all`, `taxRegime`) | `ClientListResponse` (página + `summary`; sem honorários para `viewer`) |
 | GET | `/api/clients/:id` | — | `Client` |
 | POST | `/api/clients` | `clientInputSchema` (inclui `feeDueDay` 1–31, padrão 10) | `Client` (201); 409 se o CNPJ já é cliente |
 | PUT | `/api/clients/:id` | `clientInputSchema` | `Client` (o novo `feeDueDay` vale para os próximos honorários gerados) |
 | DELETE | `/api/clients/:id` | — | 204; **409 se há lançamentos ou séries vinculados** |
 | POST | `/api/clients/:id/inactivate` | `clientInactivationSchema` (`date`, `reason`, `notes`) | `Client`; 409 se já inativo |
 | POST | `/api/clients/:id/reactivate` | — | `Client` |
-| GET | `/api/clients/:id/fees` | — | `ClientFeesResponse` (`current`, `items` mais recente primeiro, `next`) |
+| GET | `/api/clients/:id/fees` | — | `ClientFeesResponse` (`current`, `items` mais recente primeiro, `next`) — owner/editor (`403` para `viewer`, como as escritas de vigência) |
 | POST | `/api/clients/:id/fees` | `clientFeeInputSchema` (`amount`, `employeeFee`, `discountBps` 0–9999, padrão 0) | `ClientFee` (201) — próxima vigência |
 | PUT | `/api/clients/:id/fees/:feeId` | `clientFeeInputSchema` | `ClientFee` |
 | DELETE | `/api/clients/:id/fees/:feeId` | — | 204; 422 se não for a vigência mais recente |
@@ -82,7 +82,7 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/reports/comparison` | `comparisonReportQuerySchema` | `ComparisonReportResponse` |
 | GET | `/api/reports/cashflow` | `cashflowReportQuerySchema` | `CashflowReportResponse` |
 | GET | `/api/reports/delinquency?months=3..24` | `delinquencyReportQuerySchema` (padrão 12) | `DelinquencyReportResponse` — veja "Relatório de inadimplência" |
-| GET | `/api/search?q=` | `searchQuerySchema` | `SearchResponse` — descrição, nomes e CPF/CNPJ exato |
+| GET | `/api/search?q=` | `searchQuerySchema` | `SearchResponse` — descrição, nomes e CPF/CNPJ exato; para `viewer`, só `contacts` (demais listas vazias) |
 
 ## Regras de negócio
 
@@ -272,6 +272,9 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
   filtros): `active`, `inactive`, `monthlyFees` (soma dos honorários vigentes), `withoutCurrentFee`,
   `byRegime` (clientes **ativos** por regime tributário, todos os regimes presentes, zero quando não
   há) e `averageFee` (= `monthlyFees` ÷ ativos **com** honorário vigente, arredondado; 0 sem nenhum).
+- **Honorários são financeiros**: `/clients/:id/fees*` responde `403` a `viewer`, e para ele
+  `currentFee`/`latestFee` e os totais `monthlyFees`/`withoutCurrentFee`/`averageFee` vêm `null`
+  (veja "Permissões e assinatura").
 
 ---
 
@@ -333,6 +336,28 @@ Contrato em `packages/shared/src/saas.ts`.
 
 - `viewer` só lê; `editor` altera dados financeiros; `owner` também gerencia membros, assinatura e
   exclusão. Violação → `403 forbidden`.
+- **Financeiro só para administradores** (provisório, sem migração de papéis): administrador =
+  `owner` ou `editor`; `viewer` (na interface, "Colaborador") **não lê nem grava nada financeiro**:
+  `403 forbidden` com a mensagem "O financeiro é restrito aos administradores do espaço." — inclusive
+  em leituras. Guard único `financeOnly(app)` (`apps/api/src/lib/finance-access.ts`, lista de papéis
+  permitidos; sem `req.access` nega), chamado no início de cada plugin financeiro (depois de
+  `tenantGuards` nos montados fora de `tenant-routes`): toda rota nova do módulo já nasce protegida, e
+  o demo usa o mesmo guard. O teste `test/finance-access.test.ts` percorre a árvore real de rotas:
+  todo módulo precisa estar classificado como financeiro ou aberto.
+  - **Módulos financeiros (403 para `viewer`)**: `/accounts`, `/categories`, `/credit-cards`,
+    `/goals`, `/transactions`, `/transfers`, `/statement`, `/dashboard`, `/reports/*`,
+    `/fee-charges/*`, `/imports`, `/open-finance/*` (exceto o webhook público) e as vigências de
+    honorários `/clients/:id/fees*`.
+  - **Abertos a todos os membros** (cada um com suas regras de escrita/proprietário): `/auth`,
+    `/workspaces`, `/invites`, `/billing` (inalterado: assinatura do espaço, gestão só do `owner`),
+    `/contacts`, `/clients`, `/cnpj`, `/search` e o módulo de tarefas.
+  - **Dados financeiros em módulos abertos** somem para `viewer`: em `GET /clients` e
+    `GET /clients/:id` (e nas respostas de escrita de clientes), `currentFee` e `latestFee` vêm
+    `null` e, no `summary`, `monthlyFees`, `withoutCurrentFee` e `averageFee` vêm `null` (as
+    vigências nem são lidas); `transactionCount`, contagens e `byRegime` continuam. `GET /search`
+    devolve `transactions`, `accounts` e `categories` vazios (as tabelas nem são consultadas) e só
+    `contacts`. Fornecedores (`/contacts`) não expõem totais financeiros.
+  - Mudança de papel vale na próxima requisição (o papel é relido a cada requisição).
 - Gravações exigem assinatura válida: `trialing` (14 dias, sem cartão), `active` ou `past_due` dentro
   da carência de 7 dias. Fora disso → `402 subscription_required` (leitura e exportação continuam).
 - Limite de membros por plano ao convidar.
@@ -428,8 +453,9 @@ Contrato em `packages/shared/src/integrations.ts`. Lançamentos importados são 
 
 ## Endpoints
 
-Autenticados (sessão), no workspace ativo. Mutações exigem papel `editor`/`owner` (`403`) e
-assinatura com escrita (`402`); `viewer` lê. Montados por `lib/tenant-scope.ts` (mesmas
+Autenticados (sessão), no workspace ativo. Todas as rotas (leituras inclusive) exigem papel
+`editor`/`owner` (`403`; financeiro só para administradores, veja "Permissões e assinatura") e as
+mutações também assinatura com escrita (`402`). Montados por `lib/tenant-scope.ts` (mesmas
 garantias de `tenant-routes`, em fases: transações RLS curtas e chamadas ao provedor entre elas).
 
 | Método | Rota | Entrada | Resposta |
