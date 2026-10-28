@@ -254,7 +254,23 @@ export default function ClientsPage() {
         }
       />
 
-      {clients.isError && !summary ? null : <ClientsSummary summary={summary} />}
+      {clients.isError && !summary ? null : (
+        <ClientsSummary
+          summary={summary}
+          items={data?.items}
+          filter={{ status, regime, search }}
+          onFilter={(f) => {
+            setStatus(f.status);
+            setRegime(f.regime);
+            if (f.search !== undefined) {
+              setSearchInput(f.search);
+              setSearch(f.search);
+            }
+            setPage(1);
+          }}
+          onOpenFees={setFeesFor}
+        />
+      )}
 
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">

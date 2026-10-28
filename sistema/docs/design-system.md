@@ -194,7 +194,7 @@ Prevalece sobre os itens acima quando houver conflito.
   resultado negativo); valores em tinta, zero em cinza, sinal no texto (`+R$` para receitas).
 - **Sem degradês, vidro, arco-íris ou ícones em quadradinhos coloridos.** Categorias usam a rampa azul por
   posição (`SERIES_PALETTE`); `CategoryIcon` é neutro nas listas (`tinted` só no editor/seletor de categorias).
-  Hachura só para o que está em aberto/previsto. Regimes tributários mantêm cores próprias (`REGIME_COLORS`).
+  Hachura só para o que está em aberto/previsto. Regimes tributários usam degraus da rampa de dados (`REGIME_COLORS`: tons de azul alternando escuro/claro, cinzas para Imune/Isenta e Outro).
 - **Tipografia** (densidade média): linhas e valores 14px, título de card 16px, meta 12–12,5px, eixos 11px;
   nada abaixo de 11px. Rótulos em caixa normal (sem caixa alta espaçada; `eyebrow` virou rótulo comum).
 - **Grade do dashboard:** linhas de 96px (88px em 2 colunas), espaçamento 16px, cartões com 20px de padding.
