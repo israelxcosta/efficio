@@ -12,6 +12,7 @@ import { openFinanceRoutes } from './modules/open-finance/routes';
 import { reportRoutes } from './modules/reports/routes';
 import { searchRoutes } from './modules/search/routes';
 import { statementRoutes } from './modules/statement/routes';
+import { taskRoutes } from './modules/tasks/routes';
 import { transactionRoutes } from './modules/transactions/routes';
 import { transferRoutes } from './modules/transfers/routes';
 
@@ -38,9 +39,11 @@ export const domainRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] =
 /**
  * Modules whose requests run several tenant transactions (lib/tenant-scope.ts: same authentication
  * and write checks, explicit RLS phases): mounted under `/api` next to `tenantRoutes`, not inside it.
+ * Tasks bring their own guards (modules/tasks/access.ts): every member writes there, `viewer` included.
  */
 export const scopedRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] = [
   { prefix: '/imports', plugin: importRoutes },
   { prefix: '/open-finance', plugin: openFinanceRoutes },
   { prefix: '/cnpj', plugin: cnpjRoutes },
+  { prefix: '/tasks', plugin: taskRoutes },
 ];

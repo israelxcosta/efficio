@@ -361,3 +361,130 @@ export const COLOR_SWATCHES = [
 ] as const;
 
 export const DEFAULT_COLOR = '#152B61';
+
+// ---------------------------------------------------------------------------
+// Tasks (módulo Tarefas): work items of the office, recurring obligations per client and competence
+// (monthly audit), sequential flows and their templates. See docs/api.md → "Tarefas".
+// ---------------------------------------------------------------------------
+
+/** Status of a task. "Atrasada" (overdue) is derived (open + due date before today), never stored. */
+export const TASK_STATUSES = ['todo', 'in_progress', 'waiting_client', 'done', 'canceled'] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  todo: 'A fazer',
+  in_progress: 'Em andamento',
+  waiting_client: 'Aguardando cliente',
+  done: 'Concluída',
+  canceled: 'Cancelada',
+};
+
+/** Statuses that still count as work to do (and can become overdue). */
+export const OPEN_TASK_STATUSES = ['todo', 'in_progress', 'waiting_client'] as const satisfies readonly TaskStatus[];
+export type OpenTaskStatus = (typeof OPEN_TASK_STATUSES)[number];
+
+export const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  urgent: 'Urgente',
+};
+
+/** Tie-break order (urgent first). */
+export const TASK_PRIORITY_RANK: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+/** "Minhas" (assigned to me), "Meu departamento" or "Todas". */
+export const TASK_SCOPES = ['mine', 'department', 'all'] as const;
+export type TaskScope = (typeof TASK_SCOPES)[number];
+
+export const TASK_SCOPE_LABELS: Record<TaskScope, string> = {
+  mine: 'Minhas',
+  department: 'Meu departamento',
+  all: 'Todas',
+};
+
+/**
+ * Situation filter of the lists ("Situação"). `done` = concluded or canceled; `overdue` = open with a
+ * due date before today; `waiting` = waiting for the client.
+ */
+export const TASK_SITUATIONS = ['open', 'overdue', 'waiting', 'done', 'all'] as const;
+export type TaskSituation = (typeof TASK_SITUATIONS)[number];
+
+export const TASK_SITUATION_LABELS: Record<TaskSituation, string> = {
+  open: 'Abertas',
+  overdue: 'Atrasadas',
+  waiting: 'Aguardando cliente',
+  done: 'Concluídas',
+  all: 'Todas',
+};
+
+/** "Tipo": standalone tasks, recurring occurrences or flow steps. */
+export const TASK_KINDS = ['standalone', 'recurring', 'flow'] as const;
+export type TaskKind = (typeof TASK_KINDS)[number];
+
+export const TASK_KIND_LABELS: Record<TaskKind, string> = {
+  standalone: 'Avulsas',
+  recurring: 'Recorrentes',
+  flow: 'Etapas de fluxo',
+};
+
+/** Due-date groups of the list (open tasks): Atrasadas, Hoje, Próximos 7 dias, Mais tarde, Sem vencimento. */
+export const TASK_DUE_BUCKETS = ['overdue', 'today', 'next7Days', 'later', 'noDueDate'] as const;
+export type TaskDueBucket = (typeof TASK_DUE_BUCKETS)[number];
+
+export const TASK_DUE_BUCKET_LABELS: Record<TaskDueBucket, string> = {
+  overdue: 'Atrasadas',
+  today: 'Hoje',
+  next7Days: 'Próximos 7 dias',
+  later: 'Mais tarde',
+  noDueDate: 'Sem vencimento',
+};
+
+/**
+ * Periodicity of a recurring task. The competence (`YYYY-MM`) is the month the legal deadline falls
+ * in (as in Effy); quarterly and annual ones occur in the months anchored on `dueMonth`.
+ */
+export const RECURRENCE_PERIODS = ['monthly', 'quarterly', 'annual'] as const;
+export type RecurrencePeriod = (typeof RECURRENCE_PERIODS)[number];
+
+export const RECURRENCE_PERIOD_LABELS: Record<RecurrencePeriod, string> = {
+  monthly: 'Mensal',
+  quarterly: 'Trimestral',
+  annual: 'Anual',
+};
+
+/** What happens to a legal deadline that falls on a non-business day (weekends; holidays: see utils/tasks.ts). */
+export const NON_BUSINESS_DAY_RULES = ['anticipate', 'postpone', 'keep'] as const;
+export type NonBusinessDayRule = (typeof NON_BUSINESS_DAY_RULES)[number];
+
+export const NON_BUSINESS_DAY_RULE_LABELS: Record<NonBusinessDayRule, string> = {
+  anticipate: 'Antecipar para o dia útil anterior',
+  postpone: 'Postergar para o próximo dia útil',
+  keep: 'Manter a data',
+};
+
+/** State of one client × recurring task × competence cell of the monthly audit. */
+export const OCCURRENCE_STATUSES = ['todo', 'in_progress', 'done'] as const;
+export type OccurrenceStatus = (typeof OCCURRENCE_STATUSES)[number];
+
+export const OCCURRENCE_STATUS_LABELS: Record<OccurrenceStatus, string> = {
+  todo: 'A fazer',
+  in_progress: 'Em andamento',
+  done: 'Concluída',
+};
+
+/** Step of a flow: concluded, the one whose task is active now, or waiting for the previous one. */
+export const FLOW_STEP_STATES = ['done', 'current', 'waiting'] as const;
+export type FlowStepState = (typeof FLOW_STEP_STATES)[number];
+
+export const FLOW_STEP_STATE_LABELS: Record<FlowStepState, string> = {
+  done: 'Concluída',
+  current: 'Em execução',
+  waiting: 'Aguardando a etapa anterior',
+};
+
+/** Office time zone: "today" and the day a flow step was concluded are taken here (deadlines are calendar dates). */
+export const TASK_TIME_ZONE = 'America/Sao_Paulo';

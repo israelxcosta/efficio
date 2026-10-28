@@ -258,8 +258,9 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
   observação, cifrada). Reativar limpa os três campos. Depois da data de inativação não há honorário
   vigente nem nova vigência.
 - **Exclusão** só sem vínculos: com qualquer lançamento (`transactions.contact_id`) ou série
-  (`recurrences.template.contactId`) do cliente a API responde 409 — use a inativação. As vigências
-  vão junto com o cliente (FK em cascata).
+  (`recurrences.template.contactId`) do cliente a API responde 409 — use a inativação. Tarefas do
+  cliente também impedem (409 "possui tarefas vinculadas"; FK sem cascata). As vigências e os
+  responsáveis do cliente por departamento vão junto com ele (FK em cascata).
 - **Honorários** (`client_fees`): uma linha por **vigência de 1 ano**, com honorário mensal, taxa
   por empregado (centavos) e desconto por pontualidade (`discountBps`, pontos-base; veja "Desconto
   por pontualidade"). Só o índice da vigência é gravado; as datas derivam do início do
@@ -357,6 +358,10 @@ Contrato em `packages/shared/src/saas.ts`.
     vigências nem são lidas); `transactionCount`, contagens e `byRegime` continuam. `GET /search`
     devolve `transactions`, `accounts` e `categories` vazios (as tabelas nem são consultadas) e só
     `contacts`. Fornecedores (`/contacts`) não expõem totais financeiros.
+  - **Tarefas** (`/tasks/*`): todos os membros trabalham, `viewer` inclusive — criar, editar,
+    concluir/reabrir, comentar e mexer em subtarefas. Cadastros do módulo (departamentos, departamento
+    do membro, categorias de tarefa, responsável por cliente) e excluir tarefas ficam com `owner`/
+    `editor`. Ver "Tarefas → Permissões".
   - Mudança de papel vale na próxima requisição (o papel é relido a cada requisição).
 - Gravações exigem assinatura válida: `trialing` (14 dias, sem cartão), `active` ou `past_due` dentro
   da carência de 7 dias. Fora disso → `402 subscription_required` (leitura e exportação continuam).
@@ -663,3 +668,191 @@ provider_unavailable` (agregador não respondeu; detalhes só no log do servidor
   `transactions_discount_of_uq (discount_of) WHERE discount_of IS NOT NULL`, que também serve à FK).
 - As três são re-executáveis (`IF NOT EXISTS`, `DROP … IF EXISTS` antes de cada constraint) e rodam
   também no demo (PGlite).
+
+---
+
+# Tarefas (módulo Tarefas)
+
+Gestão de tarefas do escritório (porte das regras do Effy). Especificação de UI:
+`docs/tarefas-ui.md`. Contrato em `packages/shared`: constantes e rótulos em `constants.ts`
+(`TASK_STATUSES`/`TASK_STATUS_LABELS`, `TASK_PRIORITIES`/`TASK_PRIORITY_LABELS`, `TASK_SCOPES`,
+`TASK_SITUATIONS`, `TASK_KINDS`, `TASK_DUE_BUCKETS`, `RECURRENCE_PERIODS`/`RECURRENCE_PERIOD_LABELS`,
+`NON_BUSINESS_DAY_RULES`, `OCCURRENCE_STATUSES`, `FLOW_STEP_STATES`, `TASK_TIME_ZONE`), schemas em
+`schemas.ts` (seção "Tasks"), tipos em `types.ts` (seção "Tasks") e regras puras em
+`utils/tasks.ts` (atrasada, grupos de prazo, fuso do escritório, dias úteis, agenda das recorrentes).
+
+**Fases.** A **fase 1** (núcleo) está implementada: departamentos, departamento do membro, categorias,
+tarefas avulsas, subtarefas, comentários, responsável por cliente em cada departamento, listagem com
+filtros e resumo, PATCH de estado e a página de início. As fases 2–4 (tarefas recorrentes e auditoria
+mensal, fluxos e modelos, relatórios/widgets e anotações) têm **contrato rascunhado** em
+`packages/shared` (`RecurringTask`, `AuditMatrixResponse`, `TaskFlow`, `FlowTemplate`,
+`TaskReportResponse`, `TasksDashboardResponse`, `TaskNote` e seus schemas), mas **nem banco nem API**:
+o modelo de recorrência deve mudar para o de "Processos" do Domínio/Onvio (processo com atividades
+dependentes, vínculo processo↔empresa por competência, situações no prazo/fora do prazo, conclusão
+e reabertura com histórico) e será redesenhado antes. Até lá, `GET /tasks` devolve
+`occurrences: []`, `Task.flow` é sempre `null`, `TaskDetail.flowProgress` é `null`,
+`PATCH /tasks/:id/status` devolve `activated: null` e a página de início tem `totals.recurring = 0`.
+
+## Permissões
+
+- **Todos os membros** do espaço usam o módulo, inclusive `viewer` ("Colaborador"): criar, editar
+  (autosave), concluir/reabrir/mover, subtarefas (criar, marcar, remover) e comentar.
+- **Administradores** (`owner`/`editor`, os mesmos do financeiro): cadastros do módulo
+  (departamentos, departamento do membro, categorias de tarefa, responsável por cliente) e **excluir
+  tarefa**. Violação → `403` "Somente os administradores do espaço podem fazer isso.". Na página de
+  início, só administradores pedem outro departamento ou todos (`403` para os demais).
+- Gravações exigem assinatura com escrita (`402`), como no resto da API; leituras continuam.
+- Implementação: o plugin `/tasks` é montado em `scopedRoutes` com guardas próprios
+  (`modules/tasks/access.ts`: `taskGuards` = autenticação + assinatura; `requireTaskAdmin` por rota) —
+  independente do `financeOnly` e do `assertCanWrite` dos módulos financeiros. Cada requisição lê os
+  membros (nomes e papéis) na conexão do sistema e trabalha numa transação de tenant (RLS); a resposta
+  sai depois do COMMIT. O RLS continua sendo só por espaço (uma política por tabela, como as demais);
+  o papel é checado na API.
+- **Permissão por módulo** (pendência §17.1 da spec): resolvida de forma provisória pelo mapeamento de
+  papéis (financeiro = `owner`/`editor`; tarefas = todos). Uma permissão "Tarefas: editar" separada do
+  papel continua sendo decisão de produto.
+- O web sabe quem é administrador por `GET /auth/me` (`workspace.role`) e por `GET /tasks/options`
+  (`me.isAdmin`, `me.canWrite`).
+
+## Endpoints (fase 1)
+
+| Método | Rota | Entrada | Resposta | Quem |
+| --- | --- | --- | --- | --- |
+| GET | `/api/tasks/options` | — | `TaskOptionsResponse` (hoje, você, membros com departamento, departamentos, categorias, clientes, responsáveis) | todos |
+| GET | `/api/tasks/clients` | — | `TaskClientOption[]` (clientes em leitura, sem honorários) | todos |
+| GET | `/api/tasks/members` | — | `TaskMember[]` | todos |
+| PUT | `/api/tasks/members/:userId/department` | `memberDepartmentSchema` | `TaskMember` | admin |
+| GET | `/api/tasks/departments` | — | `TaskDepartment[]` (membros, em aberto, atrasadas, total) | todos |
+| POST | `/api/tasks/departments` | `taskDepartmentInputSchema` | `TaskDepartment` (201) | admin |
+| PUT | `/api/tasks/departments/:id` | `taskDepartmentInputSchema` | `TaskDepartment` | admin |
+| DELETE | `/api/tasks/departments/:id` | — | 204; 409 com membros ou tarefas (`details`) | admin |
+| GET | `/api/tasks/categories` | — | `TaskCategory[]` (com `taskCount`) | todos |
+| POST | `/api/tasks/categories` | `taskCategoryInputSchema` | `TaskCategory` (201) | admin |
+| PUT | `/api/tasks/categories/:id` | `taskCategoryInputSchema` | `TaskCategory` | admin |
+| DELETE | `/api/tasks/categories/:id` | — | 204 (tarefas ficam sem categoria) | admin |
+| GET | `/api/tasks/client-responsibles` | — | `ClientResponsiblesResponse` (grade cliente × departamento) | todos |
+| PUT | `/api/tasks/client-responsibles` | `clientResponsibleInputSchema` | `ClientResponsible`; 204 com `userId: null` (remove) | admin |
+| GET | `/api/tasks/home` | `taskHomeQuerySchema` (`departmentId` = id ou `all`, `month`) | `TaskHomeResponse` | todos (outro depto./`all`: admin) |
+| GET | `/api/tasks/activity` | — | `TaskActivityItem[]` | todos |
+| GET | `/api/tasks` | `taskQuerySchema` | `TaskListResponse` | todos |
+| POST | `/api/tasks` | `taskInputSchema` | `TaskDetail` (201) | todos |
+| GET | `/api/tasks/:id` | — | `TaskDetail` | todos |
+| PATCH | `/api/tasks/:id` | `taskUpdateSchema` (só os campos enviados) | `TaskDetail` | todos |
+| PATCH | `/api/tasks/:id/status` | `taskStatusInputSchema` | `TaskStatusChangeResponse` | todos |
+| DELETE | `/api/tasks/:id` | — | 204 (subtarefas e comentários juntos) | admin |
+| POST | `/api/tasks/:id/subtasks` | `subtaskInputSchema` | `TaskSubtask` (201) | todos |
+| PATCH | `/api/tasks/:id/subtasks/:subtaskId` | `subtaskUpdateSchema` (`title` e/ou `done`) | `TaskSubtask` | todos |
+| DELETE | `/api/tasks/:id/subtasks/:subtaskId` | — | 204 | todos |
+| POST | `/api/tasks/:id/comments` | `taskCommentInputSchema` | `TaskComment` (201) | todos |
+
+Ids de outro espaço (tarefa, cliente, categoria, departamento) respondem 404; responsável que não é
+membro do espaço → 422.
+
+## Regras
+
+- **Estados**: `todo` (A fazer), `in_progress` (Em andamento), `waiting_client` (Aguardando cliente),
+  `done` (Concluída), `canceled` (Cancelada). Prioridades `low | medium | high | urgent` (padrão
+  `medium`).
+- **Atrasada é derivada**, nunca gravada: aberta (`todo`, `in_progress`, `waiting_client`) com
+  vencimento antes de hoje. `Task.overdue` e `daysOverdue` vêm prontos. "Hoje" é a data no fuso do
+  escritório (`America/Sao_Paulo`, `lib/clock.todayIn`), não a do servidor (UTC); `EFFINANCE_TODAY`
+  fixa a data nos testes e `EFFINANCE_NOW` fixa o instante gravado nas conclusões (nunca em produção).
+- **Departamento derivado do responsável** (Effy): o servidor grava o departamento do responsável;
+  um `departmentId` enviado junto é ignorado. Sem responsável (ou responsável sem departamento), a
+  tarefa fica na fila do `departmentId` enviado; tirar o responsável mantém o departamento em que
+  estava. **Diferença deliberada**: quando um membro muda de departamento, as tarefas **abertas** dele
+  vão junto (no Effy o departamento congelava ao salvar); as concluídas/canceladas ficam onde foram
+  feitas.
+- **Um departamento por membro** (decisão mais simples que atende à spec §12.1: "marcar aqui tira o
+  membro do departamento atual"). `PUT /tasks/departments/:id` com `memberIds` é a lista completa.
+- **Conclusão** (`PATCH /tasks/:id/status`): na transição para `done` o servidor grava `completedAt`
+  (instante) e `completedBy` (quem clicou — o usuário da sessão, não o responsável); repetir `done`
+  não muda o registro; sair de `done` apaga os dois. **Reabrir**: `reopenStatus` diz para onde voltar
+  (o estado aberto anterior à conclusão/cancelamento; `todo` sem histórico) — o web envia
+  `{ status: task.reopenStatus }`. Qualquer transição é aceita (desfazer, mover no quadro). Criar já
+  concluída também grava quem/quando. O banco garante `done` ⇔ `completed_at` (CHECK).
+- **Horário** ("compromisso"): `startTime`/`endTime` `HH:MM` de parede (sem fuso), só com
+  vencimento, término depois do início. Início ≤ vencimento. O PATCH confere de novo na tarefa
+  resultante (422).
+- **Autoria**: criação, conclusão e comentários guardam o usuário e o **nome no momento**
+  (`*_name`); a resposta usa o nome atual enquanto a pessoa é membro e o gravado depois que sai (o
+  histórico de um escritório não perde quem fez). Comentário é texto puro, autor sempre da sessão.
+- **Membro removido do espaço**: as tarefas dele ficam sem responsável (`ON DELETE SET NULL
+  (assignee_id)`, mantendo o departamento) e saem o departamento do membro e as responsabilidades por
+  cliente (cascata).
+- **Exclusões**: tarefa (admin) leva subtarefas e comentários. Departamento só sem membros e sem
+  tarefas (409 com `details: { members, recurring, tasks }`, mensagem "2 membros e 12 tarefas ainda
+  estão neste departamento. Mova-os antes de excluir."). Categoria: exclusão simples, tarefas ficam
+  sem categoria. Nomes de departamento e categoria são únicos no espaço (sem diferenciar maiúsculas;
+  409). Cliente com tarefas não é excluído (409).
+- **Responsável por cliente em cada departamento** (`task_client_responsibles`, "carteira" como no
+  Onvio/Tareffa): um membro por cliente × departamento, editável por administradores e legível por
+  todos (`options.clientResponsibles`). Na tarefa avulsa, o web sugere o responsável do cliente no
+  departamento escolhido (o usuário pode trocar). Na fase 2, a ocorrência de uma recorrente vai para o
+  responsável do cliente no departamento da recorrente, senão o responsável padrão, senão ninguém.
+
+### Listagem (`GET /tasks`)
+
+- Filtros (`taskQuerySchema`): `scope` (`mine` = responsável sou eu; `department` = departamento do
+  meu membro, vazio sem departamento; `all`), `situation` (`open`, `overdue`, `waiting`, `done` =
+  concluídas + canceladas, `all`), `status` exato, `clientId` (id ou `internal`), `assigneeId` (id ou
+  `none`), `departmentId`, `categoryId`, `priority`, `kind` (`standalone`; `recurring`/`flow` vazios
+  na fase 1), `month` (mês de vencimento), `dueDate`, `dueFrom`/`dueTo`, `dueBucket` (um grupo de
+  prazo das abertas: `overdue | today | next7Days | later | noDueDate`), `closedFrom` (quadro:
+  concluídas/canceladas só a partir dessa data, pela conclusão), `search` (título), `page`/`pageSize`
+  (até 200).
+- Ordem: vencimento (sem vencimento por último), prioridade (urgente primeiro), título; em
+  `situation=done`, a conclusão mais recente primeiro.
+- `summary` (`TaskListSummary`) usa **os mesmos filtros, exceto a situação** (e `dueBucket`/
+  `closedFrom`): atrasadas e a mais antiga, em aberto, vencem hoje / em 7 dias, aguardando cliente,
+  do mês (`month` ou o atual: que vencem no mês e quantas foram concluídas ou canceladas), em aberto
+  por responsável e por cliente. `groups` conta as abertas por grupo de prazo com a situação aplicada;
+  `byStatus` conta por estado com todos os filtros exceto a situação (cabeçalho das colunas do
+  quadro, com atrasadas). `months`: meses com tarefas no escopo, mais o atual. `today` vem junto.
+
+### Página de início (`GET /tasks/home`)
+
+- Unidade: tarefas abertas (qualquer vencimento) mais as que vencem, foram concluídas ou canceladas no
+  mês (`month`, padrão o atual) — de um departamento (padrão: o do membro), de todos (`all`,
+  administradores) ou, para membro sem departamento, só as dele (`view: 'mine'`).
+- `totals`: por estado, em aberto, atrasadas, vencem hoje / 7 dias, concluídas **no prazo** (dia da
+  conclusão no fuso do escritório ≤ vencimento; sem vencimento conta no prazo) e **com atraso**,
+  canceladas. `byAssignee` (`TaskAssigneeStats`, ranking "quem concentra mais": atrasadas, depois
+  abertas, depois volume) e `byClient` (com algo em aberto). `mine`: tarefas abertas atribuídas a você
+  (qualquer departamento), atrasadas primeiro, até 20. Tudo em SQL agregado.
+
+### Atividade (`GET /tasks/activity`)
+
+Comentários dos **outros** nos últimos 5 dias em tarefas de que você é responsável ou criador, com
+trecho de 80 caracteres, até 50 (Effy `atividadeRecente`; anexos não foram portados).
+
+## Banco (migração 0011)
+
+Tabelas de tenant (RLS `ENABLE`+`FORCE`, política única por espaço, `GRANT` só de DML ao
+`effinance_app`, FKs compostas, índice para cada FK): `task_departments` (nome único sem diferenciar
+maiúsculas), `task_department_members` (PK `(workspace_id, user_id)`: um departamento por membro;
+FK para `workspace_members` em cascata), `task_categories` (ícone de `ICON_NAMES`, cor), `tasks`
+(CHECKs de estado, prioridade, `reopen_status`, horário, datas e conclusão; FK do cliente sem cascata;
+categoria e responsável `SET NULL` só na coluna; autoria → `users` `SET NULL` + nome gravado),
+`task_subtasks` e `task_comments` (cascata com a tarefa) e `task_client_responsibles` (PK
+`(workspace_id, client_id, department_id)`; cascata com cliente, departamento e membro). A FK
+`(workspace_id, assignee_id) → workspace_members (workspace_id, user_id)` garante que só membros do
+próprio espaço sejam responsáveis. Reexecutável e roda no PGlite. O login da API não tem acesso
+direto às tabelas (só via `effinance_app`).
+
+## Diferenças deliberadas em relação ao Effy
+
+- Departamento das tarefas abertas acompanha o membro quando ele muda de departamento.
+- Nomes de quem criou/concluiu/comentou ficam gravados (o Effy impedia excluir usuário com histórico;
+  aqui o membro pode sair e a conta pode ser excluída — LGPD — sem perder a autoria).
+- "Reabrir" volta ao estado anterior à conclusão (`reopenStatus`), como a spec pede.
+- Excluir tarefa é de administrador (no Effy, a chave `delTasks`); criar/editar/concluir é de todos.
+- Anexos, recorrentes, auditoria, fluxos, relatórios e anotações ficam para as próximas fases.
+
+## Pendências
+
+- Fases 2–4 (aguardando o modelo de "Processos" do Domínio/Onvio).
+- Anexos de tarefa (armazenamento de arquivos; a spec §8.1 prevê a seção).
+- Busca global (`/search`, ⌘K) com tarefas (§17.8) e feriados no cálculo de dias úteis
+  (`HolidayCalendar` em `utils/tasks.ts`).
+- Exportação LGPD (`GET /workspaces/current/export`) ainda não inclui as tarefas.

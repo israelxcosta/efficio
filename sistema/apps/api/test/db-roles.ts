@@ -45,4 +45,12 @@ export const TENANT_TABLES = [
   'bank_connection_accounts',
   'import_tombstones',
   'client_fees',
+  // Task module, phase 1 (migration 0011).
+  'task_departments',
+  'task_department_members',
+  'task_categories',
+  'tasks',
+  'task_subtasks',
+  'task_comments',
+  'task_client_responsibles',
 ] as const;

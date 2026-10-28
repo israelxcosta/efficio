@@ -21,7 +21,7 @@ import {
 } from '@effinance/shared';
 import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
-import { clientFees, contacts, recurrences, transactions, type ClientFeeRow, type ContactRow } from '../../db/schema';
+import { clientFees, contacts, recurrences, tasks, transactions, type ClientFeeRow, type ContactRow } from '../../db/schema';
 import { today } from '../../lib/clock';
 import { getCipher } from '../../lib/crypto/keyring';
 import type { FieldCipher } from '../../lib/crypto/field-cipher';
@@ -355,6 +355,18 @@ export async function deleteClient(db: DbExecutor, workspaceId: string, id: stri
     throw new ConflictError(
       'Este cliente possui lançamentos vinculados e não pode ser excluído. Se ele deixou de ser atendido, use "Inativar".',
       { transactions: linked?.total ?? 0 },
+    );
+  }
+  // Tasks are the record of what was done for the client (Effy's rule): they block the deletion too.
+  // Task-module configuration (responsible per department) goes with the client.
+  const [withTasks] = await db
+    .select({ total: countAll() })
+    .from(tasks)
+    .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.clientId, id)));
+  if ((withTasks?.total ?? 0) > 0) {
+    throw new ConflictError(
+      'Este cliente possui tarefas vinculadas e não pode ser excluído. Se ele deixou de ser atendido, use "Inativar".',
+      { tasks: withTasks?.total ?? 0 },
     );
   }
   await db.delete(contacts).where(eq(contacts.id, id));

@@ -66,6 +66,8 @@ const UNIQUE_CONFLICTS: Record<string, string> = {
   client_fees_period_uq: 'Esta vigência já foi cadastrada. Atualize a página e tente novamente.',
   transactions_fee_competence_uq: 'O honorário deste cliente já foi gerado para esta competência.',
   transactions_fee_of_uq: 'Os empregados deste honorário já foram lançados. Atualize a página e tente novamente.',
+  task_departments_name_uq: 'Já existe um departamento com este nome',
+  task_categories_name_uq: 'Já existe uma categoria de tarefa com este nome',
 };
 
 /**

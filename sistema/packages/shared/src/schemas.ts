@@ -9,18 +9,29 @@ import {
   CATEGORY_TYPES,
   CLIENT_STATUSES,
   CONTACT_KINDS,
+  DEFAULT_COLOR,
   FREQUENCIES,
   GRANULARITIES,
   ICON_NAMES,
   INACTIVATION_REASONS,
+  NON_BUSINESS_DAY_RULES,
+  OCCURRENCE_STATUSES,
   PAYMENT_METHODS,
   RECURRENCE_KINDS,
+  RECURRENCE_PERIODS,
   SERIES_SCOPES,
   SIMPLES_ANNEXES,
+  TASK_DUE_BUCKETS,
+  TASK_KINDS,
+  TASK_PRIORITIES,
+  TASK_SCOPES,
+  TASK_SITUATIONS,
+  TASK_STATUSES,
   TAX_REGIMES,
   TRANSACTION_STATUSES,
 } from './constants';
 import { isISODate } from './utils/dates';
+import { TASK_TIME_RE } from './utils/tasks';
 import { isValidCNPJ, isValidDocument, isValidPhone, onlyDigits } from './utils/documents';
 
 // ---------------------------------------------------------------------------
@@ -663,3 +674,377 @@ export type OverviewReportQuery = z.input<typeof overviewReportQuerySchema>;
 export const searchQuerySchema = z.object({
   q: z.string().trim().min(1).max(80),
 });
+
+// ---------------------------------------------------------------------------
+// Tasks (módulo Tarefas). Every member writes tasks, subtasks, comments, audit cells, flows and notes;
+// the registries (departments, categories, recurring tasks, flow templates, client responsibles) and
+// deletions are for administrators (owner/editor). See docs/api.md → "Tarefas".
+// ---------------------------------------------------------------------------
+
+const nullableId = () => idSchema.nullish().transform((v) => v ?? null);
+
+const taskTitleSchema = z
+  .string()
+  .trim()
+  .min(1, { message: 'Informe o nome da tarefa' })
+  .max(200, { message: 'Máximo de 200 caracteres' });
+
+export const taskTimeSchema = z.string().regex(TASK_TIME_RE, { message: 'Hora inválida (use HH:MM)' });
+
+const optionalTime = () =>
+  z
+    .union([z.literal(''), taskTimeSchema])
+    .nullish()
+    .transform((v) => (v ? v : null));
+
+interface TaskDatesShape {
+  startDate?: string | null;
+  dueDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+}
+
+/** Start ≤ due; an appointment (time range) lives on the due date and ends after it starts. */
+function refineTaskDates(v: TaskDatesShape, ctx: z.RefinementCtx) {
+  if (v.startDate && v.dueDate && v.startDate > v.dueDate) {
+    ctx.addIssue({ code: 'custom', path: ['startDate'], message: 'O início não pode ser depois do vencimento' });
+  }
+  // `null` = no start time (a PATCH that omits it keeps the task's own, checked by the API).
+  if (v.endTime && v.startTime === null) {
+    ctx.addIssue({ code: 'custom', path: ['startTime'], message: 'Informe a hora de início' });
+  }
+  if (v.startTime && v.endTime && v.endTime <= v.startTime) {
+    ctx.addIssue({ code: 'custom', path: ['endTime'], message: 'A hora de término deve ser posterior à de início' });
+  }
+  if ((v.startTime || v.endTime) && v.dueDate === null) {
+    ctx.addIssue({ code: 'custom', path: ['dueDate'], message: 'Informe o vencimento para definir o horário' });
+  }
+}
+
+/**
+ * New task. The department is never chosen for an assigned task: it is the assignee's department
+ * (derived by the API). `departmentId` only places a task without assignee (or whose assignee has no
+ * department) in a department's queue. Creating it already `done` records who/when like concluding.
+ */
+export const taskInputSchema = z
+  .object({
+    title: taskTitleSchema,
+    description: optionalText(5000),
+    /** null = "Interna" (no client). */
+    clientId: nullableId(),
+    categoryId: nullableId(),
+    assigneeId: nullableId(),
+    departmentId: nullableId(),
+    priority: z.enum(TASK_PRIORITIES).default('medium'),
+    status: z.enum(TASK_STATUSES).default('todo'),
+    startDate: optionalDate(),
+    dueDate: optionalDate(),
+    /** Appointment ("compromisso") on the due date: wall-clock "HH:MM", no time zone. */
+    startTime: optionalTime(),
+    endTime: optionalTime(),
+  })
+  .superRefine(refineTaskDates);
+export type TaskInput = z.input<typeof taskInputSchema>;
+
+/**
+ * Field-by-field autosave (PATCH): only the fields sent change (no defaults here — an omitted field
+ * keeps its value). The status changes through `PATCH /tasks/:id/status`. Cross-field rules (dates,
+ * time range) are checked again by the API on the merged task.
+ */
+export const taskUpdateSchema = z
+  .object({
+    title: taskTitleSchema,
+    description: optionalText(5000),
+    clientId: idSchema.nullable(),
+    categoryId: idSchema.nullable(),
+    assigneeId: idSchema.nullable(),
+    departmentId: idSchema.nullable(),
+    priority: z.enum(TASK_PRIORITIES),
+    startDate: isoDateSchema.nullable(),
+    dueDate: isoDateSchema.nullable(),
+    startTime: taskTimeSchema.nullable(),
+    endTime: taskTimeSchema.nullable(),
+  })
+  .partial()
+  .superRefine(refineTaskDates);
+export type TaskUpdateInput = z.input<typeof taskUpdateSchema>;
+
+/** Conclude, reopen, move on the board or undo: any status, any direction. */
+export const taskStatusInputSchema = z.object({ status: z.enum(TASK_STATUSES) });
+export type TaskStatusInput = z.infer<typeof taskStatusInputSchema>;
+
+export const taskQuerySchema = paginationQuerySchema.extend({
+  scope: z.enum(TASK_SCOPES).default('all'),
+  situation: z.enum(TASK_SITUATIONS).default('all'),
+  /** Exact status (on top of `situation`). */
+  status: z.enum(TASK_STATUSES).optional(),
+  /** A client id, or `internal` for tasks without client. */
+  clientId: z.union([idSchema, z.literal('internal')]).optional(),
+  /** A member id, or `none` for unassigned. */
+  assigneeId: z.union([idSchema, z.literal('none')]).optional(),
+  departmentId: idSchema.optional(),
+  categoryId: idSchema.optional(),
+  priority: z.enum(TASK_PRIORITIES).optional(),
+  kind: z.enum(TASK_KINDS).optional(),
+  /** Due month. */
+  month: monthKeySchema.optional(),
+  /** Exact due date (the "tasks per day" widget). */
+  dueDate: isoDateSchema.optional(),
+  dueFrom: isoDateSchema.optional(),
+  dueTo: isoDateSchema.optional(),
+  /** One due-date group of open items (the list's "Mostrar mais"). */
+  dueBucket: z.enum(TASK_DUE_BUCKETS).optional(),
+  /** Concluded/canceled items only from this date on (the board shows the last 14 days); open ones are unaffected. */
+  closedFrom: isoDateSchema.optional(),
+  /** Task title / recurring task name (partial). */
+  search: z.string().trim().max(200).optional(),
+  /** Include the aggregated recurring occurrences (default true). */
+  occurrences: z.stringbool().default(true),
+});
+export type TaskQuery = z.input<typeof taskQuerySchema>;
+
+export const subtaskInputSchema = z.object({
+  title: z.string().trim().min(1, { message: 'Informe a subtarefa' }).max(200, { message: 'Máximo de 200 caracteres' }),
+});
+export type SubtaskInput = z.infer<typeof subtaskInputSchema>;
+
+export const subtaskUpdateSchema = z
+  .object({
+    title: subtaskInputSchema.shape.title,
+    done: z.boolean(),
+  })
+  .partial()
+  .refine((v) => v.title !== undefined || v.done !== undefined, { message: 'Nada para alterar' });
+export type SubtaskUpdateInput = z.infer<typeof subtaskUpdateSchema>;
+
+export const taskCommentInputSchema = z.object({
+  text: z
+    .string()
+    .trim()
+    .min(1, { message: 'Escreva um comentário antes de enviar' })
+    .max(5000, { message: 'Máximo de 5000 caracteres' }),
+});
+export type TaskCommentInput = z.infer<typeof taskCommentInputSchema>;
+
+// --- registries (administrators) -----------------------------------------------------------------
+
+/** `memberIds`, when sent, is the full member list: marking a member moves them from their current department. */
+export const taskDepartmentInputSchema = z.object({
+  name: requiredName(80),
+  memberIds: z.array(idSchema).max(500).optional(),
+});
+export type TaskDepartmentInput = z.input<typeof taskDepartmentInputSchema>;
+
+/** Department of a member (each member is in at most one department). */
+export const memberDepartmentSchema = z.object({ departmentId: idSchema.nullable() });
+export type MemberDepartmentInput = z.infer<typeof memberDepartmentSchema>;
+
+export const taskCategoryInputSchema = z.object({
+  name: requiredName(60),
+  icon: iconSchema.default('tag'),
+  color: colorSchema.default(DEFAULT_COLOR),
+});
+export type TaskCategoryInput = z.input<typeof taskCategoryInputSchema>;
+
+/** Responsible member of a client in a department (`userId: null` removes it). */
+export const clientResponsibleInputSchema = z.object({
+  clientId: idSchema,
+  departmentId: idSchema,
+  userId: idSchema.nullable(),
+});
+export type ClientResponsibleInput = z.infer<typeof clientResponsibleInputSchema>;
+
+/**
+ * Recurring task ("tarefa recorrente", Effy's obligation). PUT replaces every field (send them all).
+ * Applies to the clients of the chosen regimes and/or the chosen clients (union). Legal deadline:
+ * `dueDay` (+ `dueMonth` for quarterly/annual); internal target `targetDaysBefore` days before it.
+ */
+export const recurringTaskInputSchema = z
+  .object({
+    name: z.string().trim().min(1, { message: 'Informe o nome da tarefa' }).max(200, { message: 'Máximo de 200 caracteres' }),
+    description: optionalText(5000),
+    period: z.enum(RECURRENCE_PERIODS).default('monthly'),
+    /** Chosen in the registry (not derived): the occurrences belong to this department. */
+    departmentId: nullableId(),
+    /** Default responsible, used for clients without a responsible in the department. */
+    assigneeId: nullableId(),
+    dueDay: z.int().min(1, { message: 'Dia inválido' }).max(31, { message: 'Dia inválido' }).nullish().transform((v) => v ?? null),
+    dueMonth: z.int().min(1, { message: 'Mês inválido' }).max(12, { message: 'Mês inválido' }).nullish().transform((v) => v ?? null),
+    targetDaysBefore: z.int().min(0, { message: 'Use de 0 a 60 dias' }).max(60, { message: 'Use de 0 a 60 dias' }).default(0),
+    nonBusinessDayRule: z.enum(NON_BUSINESS_DAY_RULES).default('anticipate'),
+    regimes: z.array(z.enum(TAX_REGIMES)).max(TAX_REGIMES.length).default([]),
+    clientIds: z.array(idSchema).max(5000).default([]),
+  })
+  .superRefine((v, ctx) => {
+    if (v.regimes.length === 0 && v.clientIds.length === 0) {
+      ctx.addIssue({ code: 'custom', path: ['regimes'], message: 'Escolha ao menos um regime ou cliente' });
+    }
+    if (v.period !== 'monthly' && v.dueDay !== null && v.dueMonth === null) {
+      ctx.addIssue({ code: 'custom', path: ['dueMonth'], message: 'Informe o mês do vencimento' });
+    }
+    if (v.dueDay === null && v.targetDaysBefore > 0) {
+      ctx.addIssue({ code: 'custom', path: ['targetDaysBefore'], message: 'Informe o dia do vencimento para usar a meta interna' });
+    }
+  })
+  .transform((v) => ({
+    ...v,
+    dueMonth: v.period === 'monthly' || v.dueDay === null ? null : v.dueMonth,
+    regimes: [...new Set(v.regimes)],
+    clientIds: [...new Set(v.clientIds)],
+  }));
+export type RecurringTaskInput = z.input<typeof recurringTaskInputSchema>;
+
+export const recurringTaskQuerySchema = z.object({
+  /** Month of the progress columns (default: current). */
+  month: monthKeySchema.optional(),
+  search: z.string().trim().max(200).optional(),
+  period: z.enum(RECURRENCE_PERIODS).optional(),
+  departmentId: idSchema.optional(),
+  assigneeId: idSchema.optional(),
+  archived: z.enum(['active', 'archived', 'all']).default('active'),
+});
+export type RecurringTaskQuery = z.input<typeof recurringTaskQuerySchema>;
+
+// --- monthly audit ---------------------------------------------------------------------------------
+
+export const taskAuditQuerySchema = z.object({
+  competence: monthKeySchema,
+  taxRegime: z.enum(TAX_REGIMES).optional(),
+  departmentId: idSchema.optional(),
+});
+export type TaskAuditQuery = z.input<typeof taskAuditQuerySchema>;
+
+/** One cell (client × recurring task × competence). Reaching `done` records who/when; leaving it erases the record. */
+export const occurrenceStatusInputSchema = z.object({
+  recurringTaskId: idSchema,
+  clientId: idSchema,
+  competence: monthKeySchema,
+  status: z.enum(OCCURRENCE_STATUSES),
+});
+export type OccurrenceStatusInput = z.infer<typeof occurrenceStatusInputSchema>;
+
+// --- flows and templates ---------------------------------------------------------------------------
+
+const relativeDaysSchema = z
+  .int({ message: 'O prazo deve ser um número inteiro de dias' })
+  .min(0, { message: 'O prazo deve ficar entre 0 e 365 dias' })
+  .max(365, { message: 'O prazo deve ficar entre 0 e 365 dias' });
+
+const stepTitleSchema = z
+  .string()
+  .trim()
+  .min(1, { message: 'Informe o nome da tarefa desta etapa' })
+  .max(200, { message: 'Máximo de 200 caracteres' });
+
+/**
+ * Step of a flow built by hand. Deadline: absolute `dueDate` or `relativeDays` after the previous
+ * step is concluded (step 1: after the flow is created), computed when the step is activated.
+ */
+export const flowStepInputSchema = z
+  .object({
+    title: stepTitleSchema,
+    description: optionalText(5000),
+    /** Another client for this step only (default: the flow's). */
+    clientId: nullableId(),
+    categoryId: nullableId(),
+    assigneeId: nullableId(),
+    priority: z.enum(TASK_PRIORITIES).default('medium'),
+    dueDate: optionalDate(),
+    relativeDays: relativeDaysSchema.nullish().transform((v) => v ?? null),
+  })
+  .refine((v) => !(v.dueDate && v.relativeDays !== null), {
+    path: ['relativeDays'],
+    message: 'Use uma data ou um prazo em dias, não os dois',
+  });
+export type FlowStepInput = z.input<typeof flowStepInputSchema>;
+
+export const taskFlowInputSchema = z
+  .object({
+    title: z.string().trim().min(1, { message: 'Informe o nome do fluxo' }).max(200, { message: 'Máximo de 200 caracteres' }),
+    /** Client of every step (null = internal), unless a step sets its own. */
+    clientId: nullableId(),
+    steps: z.array(flowStepInputSchema).min(1, { message: 'Adicione pelo menos uma etapa' }).max(30, { message: 'Máximo de 30 etapas' }),
+    /** Also saves the steps as a template (administrators only; deadlines must be in days). */
+    saveAsTemplate: z.boolean().default(false),
+  })
+  .superRefine((v, ctx) => {
+    if (v.saveAsTemplate && v.steps.some((s) => s.dueDate)) {
+      ctx.addIssue({ code: 'custom', path: ['saveAsTemplate'], message: 'Para salvar como modelo, use prazos em dias' });
+    }
+  });
+export type TaskFlowInput = z.input<typeof taskFlowInputSchema>;
+
+export const taskFlowQuerySchema = z.object({
+  status: z.enum(['active', 'done', 'all']).default('active'),
+});
+
+/** Step of a template: relative deadline only (a template never ages), no client (chosen when applying). */
+export const flowTemplateStepInputSchema = z.object({
+  title: stepTitleSchema,
+  description: optionalText(5000),
+  categoryId: nullableId(),
+  assigneeId: nullableId(),
+  priority: z.enum(TASK_PRIORITIES).default('medium'),
+  relativeDays: relativeDaysSchema.default(0),
+});
+export type FlowTemplateStepInput = z.input<typeof flowTemplateStepInputSchema>;
+
+/** PUT replaces the steps; flows already applied keep theirs. */
+export const flowTemplateInputSchema = z.object({
+  title: z.string().trim().min(1, { message: 'Informe o nome do modelo' }).max(200, { message: 'Máximo de 200 caracteres' }),
+  description: optionalText(5000),
+  steps: z.array(flowTemplateStepInputSchema).min(1, { message: 'Adicione pelo menos uma etapa' }).max(30, { message: 'Máximo de 30 etapas' }),
+});
+export type FlowTemplateInput = z.input<typeof flowTemplateInputSchema>;
+
+/** Applying a template: only the client is chosen; the start date is today (set by the server). */
+export const applyFlowTemplateSchema = z.object({
+  clientId: idSchema.nullish().refine((v) => Boolean(v), { message: 'Selecione o cliente para aplicar o modelo' }).transform((v) => v!),
+  /** Name of the flow (default: "<template> · <client>"). */
+  title: z.string().trim().min(1).max(200).nullish().transform((v) => v ?? null),
+});
+export type ApplyFlowTemplateInput = z.input<typeof applyFlowTemplateSchema>;
+
+// --- home, dashboard, reports, notes ---------------------------------------------------------------
+
+/**
+ * Home summary of a department. Members see their own department; administrators any department or
+ * `all`. Default: the member's department (or only their own tasks when they have none).
+ */
+export const taskHomeQuerySchema = z.object({
+  departmentId: z.union([idSchema, z.literal('all')]).optional(),
+  /** Competence of the recurring occurrences and month of the standalone tasks (default: current). */
+  month: monthKeySchema.optional(),
+});
+export type TaskHomeQuery = z.input<typeof taskHomeQuerySchema>;
+
+export const tasksDashboardQuerySchema = z.object({
+  month: monthKeySchema.optional(),
+});
+
+export const taskReportQuerySchema = z
+  .object({
+    from: isoDateSchema,
+    to: isoDateSchema,
+    departmentId: idSchema.optional(),
+    assigneeId: z.union([idSchema, z.literal('none')]).optional(),
+    categoryId: idSchema.optional(),
+    clientId: z.union([idSchema, z.literal('internal')]).optional(),
+    /** Grouped situation: open (incl. overdue), done (concluded + canceled) or overdue. */
+    situation: z.enum(['open', 'done', 'overdue']).optional(),
+    status: z.enum(TASK_STATUSES).optional(),
+    priority: z.enum(TASK_PRIORITIES).optional(),
+    kind: z.enum(['standalone', 'recurring']).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    /** Up to 1000 rows per page (CSV export pages through). */
+    pageSize: z.coerce.number().int().min(1).max(1000).default(50),
+  })
+  .refine((v) => v.from <= v.to, { message: 'Data inicial maior que a final', path: ['to'] });
+export type TaskReportQuery = z.input<typeof taskReportQuerySchema>;
+
+/** Personal note ("Minhas anotações"): visible only to its author; stored encrypted. */
+export const taskNoteInputSchema = z.object({
+  title: z.string().trim().min(1, { message: 'Informe o título da anotação' }).max(200, { message: 'Máximo de 200 caracteres' }),
+  content: optionalText(20000),
+});
+export type TaskNoteInput = z.input<typeof taskNoteInputSchema>;

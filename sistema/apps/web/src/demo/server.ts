@@ -31,7 +31,7 @@ export { DEMO_EMAIL, DEMO_PASSWORD };
 const DATA_DIR = 'idb://effinance-demo';
 const IDB_NAME = '/pglite/effinance-demo';
 /** Bump to reseed browsers that hold demo data from an older version. */
-const SEED_VERSION = 'seed:office-v4';
+const SEED_VERSION = 'seed:office-v5-tasks';
 
 // Drizzle migrations, applied in order and tracked in a local table.
 const migrations = import.meta.glob('../../../api/drizzle/*.sql', {

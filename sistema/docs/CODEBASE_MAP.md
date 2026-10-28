@@ -62,7 +62,7 @@ sistema/
 │   └── utils/                  datas, dinheiro, documentos, fatura, recorrência, vigências,
 │                               juros/multa (late-fees) e score de inadimplência (delinquency)
 ├── apps/api/
-│   ├── drizzle/0000…0010*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
+│   ├── drizzle/0000…0011*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
 │   ├── src/app.ts, server.ts   montagem do Fastify, hooks globais, árvore de rotas
 │   ├── src/routes.ts           domainRoutes (tenantRoutes) e scopedRoutes (inTenant)
 │   ├── src/setup.ts, env.ts    providers (e-mail, cobrança, Open Finance, CNPJ) e env validado
@@ -102,6 +102,12 @@ sistema/
 - **Geração de honorários** (em andamento): `generateFeesSchema`, `feeEmployeesSchema`,
   `FEE_CATEGORY` (Serviços Prestados / Honorários contábeis | Folha de pagamento) e os campos
   `feeCompetence`, `feeKind`, `feeOf`, `employees` em `Transaction`.
+- **Tarefas**: seções "Tasks" de `constants.ts` (estados `todo…canceled` com rótulos pt-BR,
+  prioridades, escopos, situações, grupos de prazo, periodicidades, regra de dia não útil),
+  `schemas.ts` e `types.ts` (`Task`, `TaskDetail`, `TaskListResponse`, `TaskHomeResponse`,
+  `TaskOptionsResponse`…) e `utils/tasks.ts` (atrasada, `dueBucketOf`, `dateInTimeZone`, dias úteis
+  com `HolidayCalendar`, agenda das recorrentes). Contrato das fases 2–4 (recorrentes, auditoria,
+  fluxos, relatórios, anotações) já escrito, sem API ainda — ver `docs/api.md` → "Tarefas".
 
 ## API (`apps/api`)
 
@@ -129,7 +135,10 @@ sequenceDiagram
 - `authRoutes`, `workspaceRoutes`, `inviteRoutes` e `billingRoutes` rodam na conexão do sistema
   (`app.db`), com checagens explícitas.
 - `scopedRoutes` (imports, open-finance, cnpj) usam `tenantGuards` + `inTenant`, porque chamam
-  provedores externos entre fases (nunca com transação aberta).
+  provedores externos entre fases (nunca com transação aberta). `tasks` também fica em
+  `scopedRoutes`, com guardas próprios (`modules/tasks/access.ts`: todo membro escreve, `viewer`
+  inclusive; cadastros e exclusões só `owner`/`editor`): lê os membros na conexão do sistema e
+  depois trabalha numa transação de tenant (`runTasks`).
 - Erros: `AppError` (404, 409, 422, 401, 403, 429, 402); Zod vira 400 `validation_error`;
   violações únicas/FK do Postgres viram 409 amigável (`UNIQUE_CONFLICTS` em `lib/errors.ts`).
 
@@ -156,14 +165,15 @@ sequenceDiagram
 | `search` | `/search` | lançamentos, contas, categorias, contatos; ordena pela distância de hoje |
 | `imports` | `/imports` | OFX/CSV: prévia, duplicados, sugestão de categoria, lote com desfazer |
 | `open-finance` | `/open-finance/*` | Pluggy ou provedor simulado, vínculo de contas, sync incremental, webhooks |
+| `tasks` | `/tasks/*` | fase 1: departamentos (um por membro), categorias, tarefas (departamento derivado do responsável, conclusão com quem/quando, atrasada derivada), subtarefas, comentários, responsável por cliente × departamento, lista com resumo e página de início (`home.ts`); fases 2–4 só no contrato |
 
 ### Dados, segurança e migrações
 
 - **Tenancy:** `workspace_id` em toda tabela financeira, RLS `ENABLE + FORCE` com a política
   `workspace_id = current_setting('app.workspace_id')` (sem valor = nenhuma linha). Referências
   entre tabelas são **FKs compostas** `(workspace_id, x_id)`; todo pai tem `unique(workspace_id, id)`.
-- **Papéis:** o dono das tabelas migra; `effinance_app` (NOLOGIN, sem BYPASSRLS) só tem DML nas 13
-  tabelas de tenant; o login da API é membro dele e tem privilégios mínimos nas tabelas de identidade
+- **Papéis:** o dono das tabelas migra; `effinance_app` (NOLOGIN, sem BYPASSRLS) só tem DML nas 20
+  tabelas de tenant (13 financeiras + 7 de tarefas); o login da API é membro dele e tem privilégios mínimos nas tabelas de identidade
   (`test/db-roles.ts`). Consultas comuns em tabelas financeiras fora de `withTenant` falham.
 - **Criptografia por campo:** AES-256-GCM com chave por espaço (embrulhada pelo KeyProvider), AAD
   `workspace:tabela:coluna`, valor `v1.<iv>.<ct>`. Cifrados: dados pessoais de contatos (documento,
@@ -171,10 +181,11 @@ sequenceDiagram
   Busca exata por índice cego (HMAC). Nomes e descrições ficam em claro.
 - **Migrações:** 0000 inicial · 0001 divisão · 0002 espaços · 0003 RLS · 0004 integridade de tenant ·
   0005 importação/Open Finance · 0006 tombstones · 0007 clientes e vigências · 0008 juros e multa ·
-  0009 geração de honorários · 0010 vencimento por cliente e desconto por pontualidade. Escritas
-  para rodar duas vezes e também no PGlite.
+  0009 geração de honorários · 0010 vencimento por cliente e desconto por pontualidade · 0011
+  tarefas (fase 1). Escritas para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
-  2026-10-20. Tokens, sessões e trials usam o relógio real.
+  2026-10-20. Tarefas usam `todayIn('America/Sao_Paulo')` (o dia do escritório, não o do servidor
+  UTC) e `now()`, que `EFFINANCE_NOW` fixa nos testes. Tokens, sessões e trials usam o relógio real.
 
 ## Web (`apps/web`)
 
@@ -255,6 +266,12 @@ sequenceDiagram
    houver); `viewer` recebe 403 até em leituras. Dado financeiro em módulo aberto (ex.: honorários em
    `/clients`) é omitido com `canAccessFinance(req.access)`. Todo módulo novo precisa entrar em
    `FINANCE_MODULES` ou `OPEN_MODULES` de `apps/api/test/finance-access.test.ts`.
+10. **Tarefas fora do `financeOnly`**: o módulo `tasks` não passa por `tenant-routes`/`tenantGuards`
+    (que barram `viewer`); usa `taskGuards` + `requireTaskAdmin` por rota. Rotas estáticas
+    (`/tasks/departments`…) são registradas antes de `/tasks/:id`: o roteador do demo pega o primeiro
+    que casar.
+11. **Drizzle não qualifica colunas num `select` de uma tabela só**: numa subconsulta correlacionada,
+    escreva a coluna externa por extenso (`task_categories.id`), senão `"id"` vira o da subconsulta.
 
 ## Guia de navegação
 

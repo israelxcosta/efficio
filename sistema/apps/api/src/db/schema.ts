@@ -35,11 +35,14 @@ import type {
   MemberRole,
   MonthKey,
   OpenFinanceProvider,
+  OpenTaskStatus,
   PaymentMethod,
   PlanCode,
   RecurrenceKind,
   SimplesAnnex,
   SubscriptionStatus,
+  TaskPriority,
+  TaskStatus,
   TaxRegime,
   TransactionOrigin,
   TransactionType,
@@ -1051,6 +1054,216 @@ export const openFinanceEvents = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Tasks, phase 1 (migration 0011). Tenant tables like the financial ones (RLS, composite keys inside
+// the workspace). Members are referenced through `workspace_members (workspace_id, user_id)`: a task can
+// only be assigned to a member of its own workspace, and removing the member clears the assignment
+// (ON DELETE SET NULL (assignee_id)) or removes what belongs to them (department membership, client
+// responsibilities). Authorship (created/concluded/commented by) points to `users`
+// with the name recorded at the time, so history survives the person leaving the workspace.
+// ---------------------------------------------------------------------------
+
+const memberFk = (name: string, columns: [AnyPgColumn, AnyPgColumn]) =>
+  foreignKey({ name, columns, foreignColumns: [workspaceMembers.workspaceId, workspaceMembers.userId] });
+
+export const taskDepartments = pgTable(
+  'task_departments',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    name: text().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('task_departments', t),
+    uniqueIndex('task_departments_name_uq').on(t.workspaceId, sql`lower(${t.name})`),
+    check('task_departments_name_chk', sql`length(${t.name}) between 1 and 80`),
+  ],
+);
+
+/** Department of each member (at most one). */
+export const taskDepartmentMembers = pgTable(
+  'task_department_members',
+  {
+    workspaceId: workspaceRef().notNull(),
+    userId: uuid().notNull(),
+    departmentId: uuid().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.userId] }),
+    index('task_department_members_department_idx').on(t.workspaceId, t.departmentId),
+    memberFk('task_department_members_member_fk', [t.workspaceId, t.userId]).onDelete('cascade'),
+    foreignKey({
+      name: 'task_department_members_department_fk',
+      columns: [t.workspaceId, t.departmentId],
+      foreignColumns: [taskDepartments.workspaceId, taskDepartments.id],
+    }),
+  ],
+);
+
+export const taskCategories = pgTable(
+  'task_categories',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    name: text().notNull(),
+    icon: text().$type<IconName>().notNull().default('tag'),
+    color: text().notNull().default('#152B61'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('task_categories', t),
+    uniqueIndex('task_categories_name_uq').on(t.workspaceId, sql`lower(${t.name})`),
+    check('task_categories_color_chk', sql`${t.color} ~ '^#[0-9A-Fa-f]{6}$'`),
+  ],
+);
+
+export const tasks = pgTable(
+  'tasks',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    title: text().notNull(),
+    description: text(),
+    /** null = internal task (no client). */
+    clientId: uuid(),
+    /** The assignee's department (derived by the API), or the queue of an unassigned task. */
+    departmentId: uuid(),
+    categoryId: uuid(),
+    assigneeId: uuid(),
+    priority: text().$type<TaskPriority>().notNull().default('medium'),
+    status: text().$type<TaskStatus>().notNull().default('todo'),
+    /** Open status before concluding/canceling: where "Reabrir" goes back to. */
+    reopenStatus: text().$type<OpenTaskStatus>(),
+    startDate: calendarDate(),
+    dueDate: calendarDate(),
+    /** Wall-clock "HH:MM" of an appointment on the due date (no time zone on purpose). */
+    startTime: text(),
+    endTime: text(),
+    createdBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    createdByName: text().notNull(),
+    /** Who concluded it and when (server-side, on the transition to `done`; cleared when leaving it). */
+    completedAt: timestamptz(),
+    completedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    completedByName: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('tasks', t),
+    index('tasks_due_idx').on(t.workspaceId, t.dueDate),
+    index('tasks_assignee_idx').on(t.workspaceId, t.assigneeId),
+    index('tasks_department_idx').on(t.workspaceId, t.departmentId),
+    index('tasks_client_idx').on(t.workspaceId, t.clientId),
+    index('tasks_category_idx').on(t.workspaceId, t.categoryId),
+    index('tasks_created_by_idx').on(t.createdBy).where(sql`${t.createdBy} is not null`),
+    index('tasks_completed_by_idx').on(t.completedBy).where(sql`${t.completedBy} is not null`),
+    check('tasks_title_chk', sql`length(${t.title}) between 1 and 200`),
+    check('tasks_status_chk', sql`${t.status} in ('todo', 'in_progress', 'waiting_client', 'done', 'canceled')`),
+    check('tasks_reopen_status_chk', sql`${t.reopenStatus} in ('todo', 'in_progress', 'waiting_client')`),
+    check('tasks_priority_chk', sql`${t.priority} in ('low', 'medium', 'high', 'urgent')`),
+    check(
+      'tasks_time_chk',
+      sql`(${t.startTime} is null or ${t.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') and (${t.endTime} is null or (${t.endTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' and ${t.startTime} is not null and ${t.endTime} > ${t.startTime})) and (${t.startTime} is null or ${t.dueDate} is not null)`,
+    ),
+    check('tasks_dates_chk', sql`${t.startDate} is null or ${t.dueDate} is null or ${t.startDate} <= ${t.dueDate}`),
+    check(
+      'tasks_completion_chk',
+      sql`(${t.status} = 'done') = (${t.completedAt} is not null) and (${t.completedAt} is null or ${t.completedByName} is not null)`,
+    ),
+    foreignKey({ name: 'tasks_client_fk', columns: [t.workspaceId, t.clientId], foreignColumns: [contacts.workspaceId, contacts.id] }),
+    foreignKey({
+      name: 'tasks_department_fk',
+      columns: [t.workspaceId, t.departmentId],
+      foreignColumns: [taskDepartments.workspaceId, taskDepartments.id],
+    }),
+    foreignKey({
+      name: 'tasks_category_fk',
+      columns: [t.workspaceId, t.categoryId],
+      foreignColumns: [taskCategories.workspaceId, taskCategories.id],
+    }).onDelete('set null'),
+    memberFk('tasks_assignee_fk', [t.workspaceId, t.assigneeId]).onDelete('set null'),
+  ],
+);
+
+export const taskSubtasks = pgTable(
+  'task_subtasks',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    taskId: uuid().notNull(),
+    title: text().notNull(),
+    done: boolean().notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('task_subtasks', t),
+    index('task_subtasks_task_idx').on(t.workspaceId, t.taskId),
+    check('task_subtasks_title_chk', sql`length(${t.title}) between 1 and 200`),
+    foreignKey({ name: 'task_subtasks_task_fk', columns: [t.workspaceId, t.taskId], foreignColumns: [tasks.workspaceId, tasks.id] }).onDelete(
+      'cascade',
+    ),
+  ],
+);
+
+export const taskComments = pgTable(
+  'task_comments',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    taskId: uuid().notNull(),
+    authorId: uuid().references(() => users.id, { onDelete: 'set null' }),
+    authorName: text().notNull(),
+    text: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    tenantUnique('task_comments', t),
+    index('task_comments_task_idx').on(t.workspaceId, t.taskId, t.createdAt),
+    index('task_comments_author_idx').on(t.authorId).where(sql`${t.authorId} is not null`),
+    check('task_comments_text_chk', sql`length(${t.text}) between 1 and 5000`),
+    foreignKey({ name: 'task_comments_task_fk', columns: [t.workspaceId, t.taskId], foreignColumns: [tasks.workspaceId, tasks.id] }).onDelete(
+      'cascade',
+    ),
+  ],
+);
+
+/**
+ * Responsible member of a client in a department ("carteira"): suggested as the assignee of a task of
+ * that client in the department, and the responsible of the client's recurring work (later phase).
+ */
+export const taskClientResponsibles = pgTable(
+  'task_client_responsibles',
+  {
+    workspaceId: workspaceRef().notNull(),
+    clientId: uuid().notNull(),
+    departmentId: uuid().notNull(),
+    userId: uuid().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'task_client_responsibles_pk', columns: [t.workspaceId, t.clientId, t.departmentId] }),
+    index('task_client_responsibles_department_idx').on(t.workspaceId, t.departmentId),
+    index('task_client_responsibles_user_idx').on(t.workspaceId, t.userId),
+    foreignKey({
+      name: 'task_client_responsibles_client_fk',
+      columns: [t.workspaceId, t.clientId],
+      foreignColumns: [contacts.workspaceId, contacts.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'task_client_responsibles_department_fk',
+      columns: [t.workspaceId, t.departmentId],
+      foreignColumns: [taskDepartments.workspaceId, taskDepartments.id],
+    }).onDelete('cascade'),
+    memberFk('task_client_responsibles_member_fk', [t.workspaceId, t.userId]).onDelete('cascade'),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type CategoryRow = typeof categories.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
@@ -1065,3 +1278,6 @@ export type NewTransactionRow = typeof transactions.$inferInsert;
 export type ImportBatchRow = typeof importBatches.$inferSelect;
 export type BankConnectionRow = typeof bankConnections.$inferSelect;
 export type BankConnectionAccountRow = typeof bankConnectionAccounts.$inferSelect;
+export type TaskDepartmentRow = typeof taskDepartments.$inferSelect;
+export type TaskCategoryRow = typeof taskCategories.$inferSelect;
+export type TaskRow = typeof tasks.$inferSelect;
