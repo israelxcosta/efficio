@@ -12,7 +12,8 @@ import { cn, pluralize } from '@/lib/utils';
 import { fitCount } from '../layout/layout';
 import type { WidgetProps } from '../layout/types';
 import { FitList, WidgetCard } from '../layout/widget-card';
-import { BodyEmpty, CompactTransactionRow, ListSkeleton } from './shared';
+import { TransactionRow } from '@/features/transactions/components/transaction-row';
+import { BodyEmpty, ListSkeleton } from './shared';
 
 const headerLink = 'text-caption font-medium whitespace-nowrap text-brand-text hover:underline';
 
@@ -49,7 +50,6 @@ function FixedWidget({ type, d, loading, month, size, alert }: WidgetProps & { t
   const items = useMemo(() => openFirst(source ?? []), [source]);
   const total = items.reduce((a, t) => a + t.amount, 0);
   const settled = items.reduce((a, t) => a + (t.paid ? t.amount : 0), 0);
-  const today = todayISO();
   const href = `${copy.list}?data=${month}-01`;
   const showProgress = size.r >= 4 && total > 0;
 
@@ -98,7 +98,7 @@ function FixedWidget({ type, d, loading, month, size, alert }: WidgetProps & { t
           moreLabel="lançamento(s)"
           moreHref={href}
           className="flex flex-col"
-          renderItem={(tx) => <CompactTransactionRow tx={tx} today={today} />}
+          renderItem={(tx) => <TransactionRow tx={tx} density="compact" />}
         />
       </>
     );

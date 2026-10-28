@@ -8,7 +8,9 @@ import {
   formatBRL,
   formatMonthKey,
   formatPercent,
+  monthKey,
   percentChange,
+  todayISO,
   type DashboardResponse,
   type MonthKey,
   type WorkspaceKind,
@@ -25,8 +27,8 @@ import { useElementSize } from '@/lib/use-element-size';
 import { useAuth } from '@/features/auth/auth-context';
 import { useDashboard } from '../api';
 import { InsightsTab } from '../components/insights-tab';
-import { overdueFinding } from '../layout/finding';
-import { useOverdueReceivables } from '../widgets/data';
+import { monthFinding, overdueFinding } from '../layout/finding';
+import { useMonthReceivables, useOverdueReceivables } from '../widgets/data';
 import { useDashboardAlerts } from '../layout/alerts';
 import { WIDGET_COMPONENTS } from '../layout/catalog';
 import { CustomizeSheet } from '../layout/customize-sheet';
@@ -196,27 +198,38 @@ function Overview({ d, loading, month, kind, width, onCustomize }: OverviewProps
 }
 
 /**
- * The line under the title: the month and the fact that most needs attention (overdue receivables
- * and who holds most of them), with the way to act on it.
+ * The line under the title: the month and the fact that most needs attention, with the way to act
+ * on it. The current month shows everything overdue today; another month, its own receivables
+ * (still overdue, still to come, or all received).
  */
 function FindingLine({ month }: { month: MonthKey }) {
-  const overdue = useOverdueReceivables();
-  const finding = overdue.data ? overdueFinding(overdue.data.items) : null;
+  const today = todayISO();
+  const current = month === monthKey(today);
+  const overdue = useOverdueReceivables(current);
+  const ofMonth = useMonthReceivables(month, !current);
+  const finding = current
+    ? overdue.data
+      ? (overdueFinding(overdue.data.items) ?? { text: 'nenhum recebimento vencido em aberto', alert: false })
+      : null
+    : ofMonth.data
+      ? monthFinding(ofMonth.data, today)
+      : null;
+  const href = current ? '/relatorios?aba=inadimplencia' : `/contas-a-receber?data=${month}-01&status=overdue`;
   return (
     <p className="mt-1 text-sm text-muted" aria-live="polite">
       {formatMonthKey(month)}
-      {overdue.data ? (
-        finding ? (
+      {finding ? (
+        finding.alert ? (
           <>
             {' · '}
             <span className="font-medium text-danger">{finding.text}</span>
             {' · '}
-            <Link to="/relatorios?aba=inadimplencia" className="font-medium text-brand-text hover:underline">
-              Ver inadimplência
+            <Link to={href} className="font-medium text-brand-text hover:underline">
+              {current ? 'Ver inadimplência' : 'Ver vencidos'}
             </Link>
           </>
         ) : (
-          ' · nenhum recebimento vencido em aberto'
+          ` · ${finding.text}`
         )
       ) : null}
     </p>

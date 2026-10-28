@@ -21,6 +21,23 @@ export interface OverdueList {
   truncated: boolean;
 }
 
+/** Receivables due in `month` (any status), read page by page: the finding of a month other than today's. */
+export function useMonthReceivables(month: string, enabled = true) {
+  const params = { type: 'income', status: 'all', from: `${month}-01`, to: endOfMonth(`${month}-01`), sort: 'date_asc', pageSize: PAGE_SIZE } satisfies TransactionQuery;
+  return useQuery({
+    queryKey: qk.transactions({ ...params, view: 'month-finding' }),
+    enabled,
+    queryFn: async (): Promise<Transaction[]> => {
+      const items: Transaction[] = [];
+      for (let page = 1; ; page++) {
+        const res = await api<TransactionListResponse>('/transactions', { query: { ...params, page } });
+        items.push(...res.items);
+        if (items.length >= res.total || res.items.length === 0) return items;
+      }
+    },
+  });
+}
+
 /** Every overdue receivable (up to OVERDUE_LIST_LIMIT), oldest first, read page by page. */
 export function useOverdueReceivables(enabled = true) {
   const params = { type: 'income', status: 'overdue', sort: 'date_asc', pageSize: PAGE_SIZE } satisfies TransactionQuery;

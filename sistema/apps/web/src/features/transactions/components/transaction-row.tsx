@@ -146,7 +146,18 @@ export function LateFeesBadge({ tx }: { tx: Transaction }) {
   );
 }
 
-export function DueLabel({ tx }: { tx: Transaction }) {
+const daysText = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`;
+/** "05/10" in the current year, "05/10/25" otherwise (inline labels of narrow rows). */
+const shortDate = (date: string) => {
+  const [y, m, d] = date.split('-');
+  return y === todayISO().slice(0, 4) ? `${d}/${m}` : `${d}/${m}/${y!.slice(2)}`;
+};
+
+/**
+ * Due status of a row. Under the due date (`beside`) it never repeats the date: "Vence em 9 dias",
+ * "Pago no vencimento"; inline (narrow rows, no date column) it carries the date instead.
+ */
+export function DueLabel({ tx, beside = false }: { tx: Transaction; beside?: boolean }) {
   if (tx.creditCardId && tx.type !== 'transfer') {
     return (
       <span className="text-xs text-muted">
@@ -155,14 +166,15 @@ export function DueLabel({ tx }: { tx: Transaction }) {
     );
   }
   if (tx.paid) {
-    return <span className="text-xs text-muted">{tx.paidAt ? `Pago em ${formatDateBR(tx.paidAt)}` : formatDateBR(tx.date)}</span>;
+    const verb = tx.type === 'income' ? 'Recebido' : tx.type === 'transfer' ? 'Efetivada' : 'Pago';
+    const when = !tx.paidAt ? '' : !beside ? ` em ${shortDate(tx.paidAt)}` : tx.paidAt === tx.date ? ' no vencimento' : ` em ${formatDateBR(tx.paidAt)}`;
+    return <span className="text-xs text-muted">{verb}{when}</span>;
   }
   const days = diffInDays(tx.date, todayISO());
-  if (tx.overdue || days < 0)
-    return <span className="text-xs font-semibold text-danger">Venceu há {Math.abs(days)} {Math.abs(days) === 1 ? 'dia' : 'dias'}</span>;
+  if (tx.overdue || days < 0) return <span className="text-xs font-semibold text-danger">Venceu há {daysText(Math.abs(days))}</span>;
   if (days === 0) return <span className="text-xs font-semibold text-warning">Vence hoje</span>;
-  if (days <= 5) return <span className="text-xs font-medium text-warning">Vence em {days} {days === 1 ? 'dia' : 'dias'}</span>;
-  return <span className="text-xs text-muted">Vence em {formatDateBR(tx.date)}</span>;
+  if (days <= 5) return <span className="text-xs font-medium text-warning">Vence em {daysText(days)}</span>;
+  return <span className="text-xs text-muted">Vence em {beside ? daysText(days) : shortDate(tx.date)}</span>;
 }
 
 export function TxIcon({ tx, size = 'md' }: { tx: Transaction; size?: 'sm' | 'md' }) {
@@ -207,10 +219,16 @@ interface TransactionRowProps {
   trailing?: React.ReactNode;
   showDue?: boolean;
   muted?: boolean;
+  /** `compact`: the same row with less padding and smaller status/icon, for dashboard cards. */
+  density?: 'default' | 'compact';
 }
 
 /** Responsive list row used across lists (payables, receivables, dashboard, statement). */
-export function TransactionRow({ tx, amount, trailing, showDue = true, muted }: TransactionRowProps) {
+export function TransactionRow({ tx, amount, trailing, showDue = true, muted, density = 'default' }: TransactionRowProps) {
+  const compact = density === 'compact';
+  const detail = [tx.category ? `${tx.category.name}${tx.subcategory ? ` · ${tx.subcategory.name}` : ''}` : null, tx.contact?.name]
+    .filter(Boolean)
+    .join(' · ');
   const actions = useTransactionActions();
   const signed = amount ?? (tx.type === 'expense' ? -tx.amount : tx.amount);
   const isCardPurchase = Boolean(tx.creditCardId) && tx.type !== 'transfer';
@@ -224,17 +242,19 @@ export function TransactionRow({ tx, amount, trailing, showDue = true, muted }: 
     <div className="@container">
     <div
       className={cn(
-        'group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-surface-muted @lg:px-4',
+        'group flex items-center gap-3 rounded-lg transition-colors hover:bg-surface-muted',
+        compact ? 'px-2 py-2' : 'px-3 py-3 @lg:px-4',
         muted && 'opacity-70',
       )}
     >
       {tx.type !== 'transfer' ? (
         isCardPurchase ? (
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-muted" title="Quitado ao pagar a fatura">
+          <span className={cn('flex shrink-0 items-center justify-center rounded-full bg-bg-subtle text-muted', compact ? 'size-8' : 'size-9')} title="Quitado ao pagar a fatura">
             <CreditCard className="size-4" />
           </span>
         ) : (
           <PaidToggle
+            size={compact ? 'sm' : 'md'}
             paid={tx.paid}
             kind={tx.type}
             loading={actions.savingPaidId === tx.id}
@@ -244,38 +264,38 @@ export function TransactionRow({ tx, amount, trailing, showDue = true, muted }: 
           />
         )
       ) : (
-        <PaidToggle paid={tx.paid} kind="transfer" disabled disabledReason={tx.paid ? 'Efetivada' : 'Agendada'} onToggle={() => undefined} />
+        <PaidToggle size={compact ? 'sm' : 'md'} paid={tx.paid} kind="transfer" disabled disabledReason={tx.paid ? 'Efetivada' : 'Agendada'} onToggle={() => undefined} />
       )}
       <Main
         {...(readOnly ? {} : { type: 'button' as const, onClick: () => actions.edit(tx) })}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
-        <TxIcon tx={tx} />
+        {/* Phones: the status toggle is enough; the category icon gives its room to the description. */}
+        <span className="hidden @sm:contents">
+          <TxIcon tx={tx} size={compact ? 'sm' : 'md'} />
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-semibold text-fg">{tx.description}</span>
-            <SeriesBadge tx={tx} />
-            {tx.splitGroupId ? <Badge tone="neutral" title="Valor dividido entre categorias">Dividido</Badge> : null}
-            {tx.type === 'transfer' && tx.transferKind ? <Badge tone="brand">{TRANSFER_KIND_LABELS[tx.transferKind]}</Badge> : null}
-            <FeeBadges tx={tx} />
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-[4.5rem] truncate text-sm font-semibold text-fg">{tx.description}</span>
+            {/* Labels the description already implies (Fixa, Ref., Juros…) give way on phones. */}
+            <span className="hidden shrink-0 items-center gap-1.5 @md:flex">
+              <SeriesBadge tx={tx} />
+              {tx.splitGroupId ? <Badge tone="neutral" title="Valor dividido entre categorias">Dividido</Badge> : null}
+              {tx.type === 'transfer' && tx.transferKind ? <Badge tone="brand">{TRANSFER_KIND_LABELS[tx.transferKind]}</Badge> : null}
+              <FeeBadges tx={tx} />
+            </span>
             <LateFeesBadge tx={tx} />
             <DiscountBadge tx={tx} />
             <OriginBadge tx={tx} />
           </span>
-          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
-            {tx.category ? (
-              <span className="truncate">
-                {tx.category.name}
-                {tx.subcategory ? ` · ${tx.subcategory.name}` : ''}
-              </span>
-            ) : null}
-            {tx.contact ? <span className="truncate">· {tx.contact.name}</span> : null}
-            {showDue ? (
-              <span className="@xl:hidden">
-                · <DueLabel tx={tx} />
-              </span>
-            ) : null}
-          </span>
+          {detail ? <span className="mt-0.5 block truncate text-xs text-muted">{detail}</span> : null}
+          {showDue ? (
+            // Narrow rows have no date column: the due status gets its own line (compact rows up to a
+            // wider width, to leave room for the description).
+            <span className={cn('mt-0.5 block truncate', compact ? '@2xl:hidden' : '@xl:hidden')}>
+              <DueLabel tx={tx} />
+            </span>
+          ) : null}
         </span>
       </Main>
       {isFee ? (
@@ -298,12 +318,12 @@ export function TransactionRow({ tx, amount, trailing, showDue = true, muted }: 
         <SourceLabel tx={tx} />
       </div>
       {showDue ? (
-        <div className="hidden w-36 text-right @xl:block">
+        <div className={cn('hidden w-36 text-right', compact ? '@2xl:block' : '@xl:block')}>
           <p className="text-[13px] font-medium text-fg tabular">{formatDateBR(tx.date)}</p>
-          <DueLabel tx={tx} />
+          <DueLabel tx={tx} beside />
         </div>
       ) : null}
-      <div className="w-28 shrink-0 text-right @lg:w-32">
+      <div className="shrink-0 text-right @md:w-28 @lg:w-32">
         <Money value={signed} tone={tx.type === 'transfer' && amount === undefined ? 'neutral' : undefined} signed className="text-[15px]" />
         {trailing}
       </div>

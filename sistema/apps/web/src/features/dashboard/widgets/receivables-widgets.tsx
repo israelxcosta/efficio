@@ -15,7 +15,8 @@ import { OVERDUE_RECEIVABLES_HREF } from '../layout/alerts';
 import type { DashboardPrefs, WidgetProps } from '../layout/types';
 import { FitList, WidgetCard } from '../layout/widget-card';
 import { OVERDUE_LIST_LIMIT, useOpenReceivables, useOverdueReceivables } from './data';
-import { BodyEmpty, CompactTransactionRow, ListSkeleton } from './shared';
+import { TransactionRow } from '@/features/transactions/components/transaction-row';
+import { BodyEmpty, ListSkeleton } from './shared';
 
 const LIMIT_LABEL = OVERDUE_LIST_LIMIT.toLocaleString('pt-BR');
 
@@ -249,7 +250,6 @@ const FILTER_OPTIONS: { value: UpcomingFilter; label: string }[] = [
 /** Pending bills (no card purchases) overdue or due in the next 15 days, filtered by type. */
 export function UpcomingWidget({ d, loading, size, prefs, setPref, alert }: WidgetProps) {
   const filter = prefs.proximosFiltro;
-  const today = todayISO();
   const items = useMemo(
     () => (d?.upcoming ?? []).filter((t) => filter === 'todos' || t.type === (filter === 'pagar' ? 'expense' : 'income')),
     [d, filter],
@@ -287,7 +287,7 @@ export function UpcomingWidget({ d, loading, size, prefs, setPref, alert }: Widg
         moreHref={moreHref}
         className="flex flex-col"
         contentKey={filter}
-        renderItem={(tx) => <CompactTransactionRow tx={tx} today={today} />}
+        renderItem={(tx) => <TransactionRow tx={tx} density="compact" />}
       />
     );
   }
