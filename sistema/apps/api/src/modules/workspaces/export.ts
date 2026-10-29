@@ -11,6 +11,13 @@ import {
   goalContributions,
   goals,
   recurrences,
+  taskCategories,
+  taskClientResponsibles,
+  taskComments,
+  taskDepartmentMembers,
+  taskDepartments,
+  taskSubtasks,
+  tasks,
   transactions,
   workspaces,
 } from '../../db/schema';
@@ -48,6 +55,18 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
     const decrypt = (table: string, column: string, value: string | null) => cipher.decrypt(table, column, value);
     // Connections and import batches: metadata only (no aggregator ids, blind indexes or cursors).
     const integrations = await exportOpenFinance(tx);
+    // Task module (migration 0011): registries, tasks with their subtasks and comments (authorship as
+    // recorded: user id and the name at the time).
+    const [departments, departmentMembers, taskCats, taskRows, subtaskRows, commentRows, responsibleRows] =
+      await Promise.all([
+        tx.select().from(taskDepartments).orderBy(asc(taskDepartments.createdAt)),
+        tx.select().from(taskDepartmentMembers).orderBy(asc(taskDepartmentMembers.createdAt)),
+        tx.select().from(taskCategories).orderBy(asc(taskCategories.createdAt)),
+        tx.select().from(tasks).orderBy(asc(tasks.createdAt), asc(tasks.id)),
+        tx.select().from(taskSubtasks).orderBy(asc(taskSubtasks.createdAt), asc(taskSubtasks.id)),
+        tx.select().from(taskComments).orderBy(asc(taskComments.createdAt), asc(taskComments.id)),
+        tx.select().from(taskClientResponsibles).orderBy(asc(taskClientResponsibles.clientId)),
+      ]);
     return {
       categories: cats,
       accounts: accs,
@@ -72,6 +91,13 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
         txRows.map(async ({ externalId: _external, ...t }) => ({ ...t, notes: await decrypt('transactions', 'notes', t.notes) })),
       ),
       ...integrations,
+      taskDepartments: departments,
+      taskDepartmentMembers: departmentMembers,
+      taskCategories: taskCats,
+      tasks: taskRows,
+      taskSubtasks: subtaskRows,
+      taskComments: commentRows,
+      taskClientResponsibles: responsibleRows,
     };
   });
 

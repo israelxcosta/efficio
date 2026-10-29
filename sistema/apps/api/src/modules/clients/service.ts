@@ -38,8 +38,9 @@ type FeeInput = z.output<typeof clientFeeInputSchema>;
 const TABLE = 'contacts';
 
 /**
- * What the requesting member may see of the clients. Fee periods (honorários) and fee totals are
- * financial data: hidden from members without access to the finances (lib/finance-access.ts).
+ * What the requesting member may see of the clients. Fee periods (honorários), fee totals, the fee
+ * due day and the notes (observações) are for members with access to the finances only
+ * (lib/finance-access.ts).
  */
 export interface ClientView {
   fees: boolean;
@@ -48,9 +49,9 @@ export interface ClientView {
 /** Inside the service (writes, then re-read): the route decides what leaves (`withoutFees`). */
 const FULL_VIEW: ClientView = { fees: true };
 
-/** A client as seen by a member without access to the finances. */
+/** A client as seen by a member without access to the finances: no fees, fee due day or notes. */
 export function withoutFees(client: Client): Client {
-  return { ...client, currentFee: null, latestFee: null };
+  return { ...client, currentFee: null, latestFee: null, feeDueDay: null, notes: null };
 }
 
 /** Due day of a client saved before migration 0010 set one (the column is filled for them). */
@@ -99,7 +100,7 @@ async function toClient(
   const contractStart = plain.contractStartDate!;
   const fees = view.fees ? feeRows.map((f) => toFee(f, contractStart)) : [];
   const { current, latest } = view.fees ? pickFees(fees, plain, today()) : { current: null, latest: null };
-  return {
+  const client: Client = {
     id: plain.id,
     name: plain.name,
     tradeName: plain.tradeName,
@@ -133,6 +134,7 @@ async function toClient(
     transactionCount,
     createdAt: plain.createdAt.toISOString(),
   };
+  return view.fees ? client : withoutFees(client);
 }
 
 /** Fees (when visible) and transaction counts of a set of clients, then the API shape. */

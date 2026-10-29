@@ -234,8 +234,11 @@ export interface Client {
   /** Only for the Simples Nacional. */
   simplesAnnex: SimplesAnnex | null;
   contractStartDate: ISODate;
-  /** Day of the month the fee is due (month after the competence). */
-  feeDueDay: number;
+  /**
+   * Day of the month the fee is due (month after the competence). `null` for members without access
+   * to the finances (role `viewer`): it is part of the fee terms.
+   */
+  feeDueDay: number | null;
   zipCode: string | null;
   street: string | null;
   number: string | null;
@@ -243,6 +246,7 @@ export interface Client {
   district: string | null;
   city: string | null;
   state: string | null;
+  /** Observações. `null` for members without access to the finances (role `viewer`). */
   notes: string | null;
   status: ClientStatus;
   /** Set while inactive. */

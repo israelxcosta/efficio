@@ -269,7 +269,7 @@ describe('finance restricted to administrators', () => {
     expect((await viewer.get('/workspaces/current/members')).status).toBe(200);
   });
 
-  it('the search shows a viewer clients and suppliers only', async () => {
+  it('the search shows a viewer clients only', async () => {
     const owner = await registerUser(app, 'Dona');
     const viewer = await member(owner, 'viewer', 'colaboradora3@teste.com');
     await seedOffice(owner);
@@ -290,6 +290,48 @@ describe('finance restricted to administrators', () => {
       contacts: [expect.objectContaining({ name: 'Padaria Aurora Ltda', kind: 'client' })],
     });
     expect(JSON.stringify(limited.body)).not.toMatch(/123456|honorários|Conta Aurora/);
+  });
+
+  it('a viewer gets no fee due day, no client notes and no suppliers (clients, search)', async () => {
+    const owner = await registerUser(app, 'Dona');
+    const editor = await member(owner, 'editor', 'editora4@teste.com');
+    const viewer = await member(owner, 'viewer', 'colaboradora4@teste.com');
+    const client = await owner.post('/clients', {
+      ...PADARIA,
+      feeDueDay: 17,
+      notes: 'Aurora: cobrar juros do atraso de setembro',
+    });
+    expect(client.status).toBe(201);
+    const clientId = client.body.id as string;
+    expect(
+      (await owner.post('/contacts', { name: 'Fornecedor Aurora', notes: 'Aurora: prazo de 30 dias' })).status,
+    ).toBe(201);
+
+    // Administrators see both fields.
+    for (const c of [owner, editor]) {
+      const one = await c.get(`/clients/${clientId}`);
+      expect(one.body).toMatchObject({ feeDueDay: 17, notes: 'Aurora: cobrar juros do atraso de setembro' });
+      expect((await c.get('/clients')).body.items[0]).toMatchObject({ feeDueDay: 17 });
+      const found = await c.get('/search?q=aurora');
+      expect(found.body.contacts.map((x: { kind: string }) => x.kind).sort()).toEqual(['client', 'supplier']);
+      expect(found.body.contacts.find((x: { kind: string }) => x.kind === 'client').notes).toMatch(/cobrar juros/);
+    }
+
+    // The viewer: the same client, without the fee due day and the notes, in the list and the detail.
+    const one = await viewer.get(`/clients/${clientId}`);
+    expect(one.status).toBe(200);
+    expect(one.body).toMatchObject({ id: clientId, name: 'Padaria Aurora Ltda', feeDueDay: null, notes: null });
+    const list = await viewer.get('/clients?status=all');
+    expect(list.body.items[0]).toMatchObject({ id: clientId, feeDueDay: null, notes: null });
+    // Search: clients only (suppliers are financial), without the notes either.
+    const found = await viewer.get('/search?q=aurora');
+    expect(found.status).toBe(200);
+    expect(found.body.contacts).toEqual([
+      expect.objectContaining({ id: clientId, kind: 'client', name: 'Padaria Aurora Ltda', notes: null }),
+    ]);
+    for (const body of [one.body, list.body, found.body]) {
+      expect(JSON.stringify(body)).not.toMatch(/cobrar juros|prazo de 30 dias|Fornecedor Aurora|"feeDueDay":17/);
+    }
   });
 
   it('a role change takes effect on the next request', async () => {

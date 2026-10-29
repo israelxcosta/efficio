@@ -479,6 +479,8 @@ export const contacts = pgTable(
       .on(t.workspaceId, t.documentHash)
       .where(sql`${t.kind} = 'client'`),
     tenantUnique('contacts', t),
+    // Migration 0012: target of the task references, which must point to a client (`kind` included).
+    unique('contacts_workspace_id_id_kind_uq').on(t.workspaceId, t.id, t.kind),
     check('contacts_kind_chk', sql`${t.kind} in ('client', 'supplier')`),
     check('contacts_status_chk', sql`${t.status} in ('active', 'inactive')`),
     check(
@@ -1060,7 +1062,10 @@ export const openFinanceEvents = pgTable(
 // only be assigned to a member of its own workspace, and removing the member clears the assignment
 // (ON DELETE SET NULL (assignee_id)) or removes what belongs to them (department membership, client
 // responsibilities). Authorship (created/concluded/commented by) points to `users`
-// with the name recorded at the time, so history survives the person leaving the workspace.
+// with the name recorded at the time, so history survives the person leaving the workspace. Deleting
+// the account (users row) clears those ids and, through the triggers of migration 0012
+// (`tasks_forget_deleted_user`, `task_comments_forget_deleted_user`), replaces the recorded name with
+// "Usuário excluído" (LGPD): the name does not outlive the account.
 // ---------------------------------------------------------------------------
 
 const memberFk = (name: string, columns: [AnyPgColumn, AnyPgColumn]) =>
@@ -1118,6 +1123,8 @@ export const taskCategories = pgTable(
     tenantUnique('task_categories', t),
     uniqueIndex('task_categories_name_uq').on(t.workspaceId, sql`lower(${t.name})`),
     check('task_categories_color_chk', sql`${t.color} ~ '^#[0-9A-Fa-f]{6}$'`),
+    // Migration 0012: the contract's limit (taskCategoryInputSchema), like the department name.
+    check('task_categories_name_chk', sql`length(${t.name}) between 1 and 60`),
   ],
 );
 
@@ -1130,6 +1137,13 @@ export const tasks = pgTable(
     description: text(),
     /** null = internal task (no client). */
     clientId: uuid(),
+    /**
+     * Always 'client' (generated, migration 0012): third column of the foreign key to
+     * `contacts (workspace_id, id, kind)`, so a task can never point to a supplier.
+     */
+    clientKind: text()
+      .$type<'client'>()
+      .generatedAlwaysAs(sql`'client'`),
     /** The assignee's department (derived by the API), or the queue of an unassigned task. */
     departmentId: uuid(),
     categoryId: uuid(),
@@ -1161,7 +1175,25 @@ export const tasks = pgTable(
     index('tasks_category_idx').on(t.workspaceId, t.categoryId),
     index('tasks_created_by_idx').on(t.createdBy).where(sql`${t.createdBy} is not null`),
     index('tasks_completed_by_idx').on(t.completedBy).where(sql`${t.completedBy} is not null`),
+    // Migration 0012: open tasks are a small, hot slice of a history that only grows. "Minhas", the
+    // start page's `mine`, the assignee/client summaries and moving a member's open tasks read
+    // (workspace, assignee); "Meu departamento" and the open totals read (workspace, department). The
+    // predicate is spelled exactly like `OPEN_SQL` (modules/tasks/task-rows.ts), so the planner matches it.
+    index('tasks_open_assignee_idx')
+      .on(t.workspaceId, t.assigneeId, t.dueDate)
+      .where(sql`${t.status} in ('todo', 'in_progress', 'waiting_client')`),
+    index('tasks_open_department_idx')
+      .on(t.workspaceId, t.departmentId, t.dueDate)
+      .where(sql`${t.status} in ('todo', 'in_progress', 'waiting_client')`),
     check('tasks_title_chk', sql`length(${t.title}) between 1 and 200`),
+    // Migration 0012: recorded names (copies of users.name, 80 in the contract; users has no CHECK, so
+    // some slack: the copy must never stop a member from working).
+    check(
+      'tasks_people_names_chk',
+      sql`length(${t.createdByName}) between 1 and 120 and length(${t.completedByName}) between 1 and 120`,
+    ),
+    // Migration 0012: the contract's limit (taskInputSchema.description); empty text is stored as null.
+    check('tasks_description_chk', sql`length(${t.description}) between 1 and 5000`),
     check('tasks_status_chk', sql`${t.status} in ('todo', 'in_progress', 'waiting_client', 'done', 'canceled')`),
     check('tasks_reopen_status_chk', sql`${t.reopenStatus} in ('todo', 'in_progress', 'waiting_client')`),
     check('tasks_priority_chk', sql`${t.priority} in ('low', 'medium', 'high', 'urgent')`),
@@ -1174,7 +1206,11 @@ export const tasks = pgTable(
       'tasks_completion_chk',
       sql`(${t.status} = 'done') = (${t.completedAt} is not null) and (${t.completedAt} is null or ${t.completedByName} is not null)`,
     ),
-    foreignKey({ name: 'tasks_client_fk', columns: [t.workspaceId, t.clientId], foreignColumns: [contacts.workspaceId, contacts.id] }),
+    foreignKey({
+      name: 'tasks_client_fk',
+      columns: [t.workspaceId, t.clientId, t.clientKind],
+      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
+    }),
     foreignKey({
       name: 'tasks_department_fk',
       columns: [t.workspaceId, t.departmentId],
@@ -1225,7 +1261,11 @@ export const taskComments = pgTable(
     tenantUnique('task_comments', t),
     index('task_comments_task_idx').on(t.workspaceId, t.taskId, t.createdAt),
     index('task_comments_author_idx').on(t.authorId).where(sql`${t.authorId} is not null`),
+    // Migration 0012: recent activity (`GET /tasks/activity`, last 5 days) without reading every comment.
+    index('task_comments_recent_idx').on(t.workspaceId, t.createdAt),
     check('task_comments_text_chk', sql`length(${t.text}) between 1 and 5000`),
+    // Migration 0012: recorded name of the author (see tasks_people_names_chk).
+    check('task_comments_author_name_chk', sql`length(${t.authorName}) between 1 and 120`),
     foreignKey({ name: 'task_comments_task_fk', columns: [t.workspaceId, t.taskId], foreignColumns: [tasks.workspaceId, tasks.id] }).onDelete(
       'cascade',
     ),
@@ -1241,6 +1281,10 @@ export const taskClientResponsibles = pgTable(
   {
     workspaceId: workspaceRef().notNull(),
     clientId: uuid().notNull(),
+    /** Always 'client' (generated, migration 0012): the foreign key only accepts clients. */
+    clientKind: text()
+      .$type<'client'>()
+      .generatedAlwaysAs(sql`'client'`),
     departmentId: uuid().notNull(),
     userId: uuid().notNull(),
     createdAt: createdAt(),
@@ -1252,8 +1296,8 @@ export const taskClientResponsibles = pgTable(
     index('task_client_responsibles_user_idx').on(t.workspaceId, t.userId),
     foreignKey({
       name: 'task_client_responsibles_client_fk',
-      columns: [t.workspaceId, t.clientId],
-      foreignColumns: [contacts.workspaceId, contacts.id],
+      columns: [t.workspaceId, t.clientId, t.clientKind],
+      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
     }).onDelete('cascade'),
     foreignKey({
       name: 'task_client_responsibles_department_fk',

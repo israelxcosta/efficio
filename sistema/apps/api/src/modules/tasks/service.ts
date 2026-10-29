@@ -519,12 +519,29 @@ async function touch(ctx: TaskContext, id: string) {
   await ctx.db.update(tasks).set({ updatedAt: now() }).where(eq(tasks.id, id));
 }
 
+/**
+ * Ceilings per task: the detail (`GET /tasks/:id`) returns every subtask and comment, and any member
+ * adds them, so without a ceiling one task could grow a response (and its queries) without bound.
+ */
+export const MAX_SUBTASKS_PER_TASK = 100;
+export const MAX_COMMENTS_PER_TASK = 500;
+
+const childCount = sql<number>`count(*)`.mapWith(Number);
+
 export async function addSubtask(
   ctx: TaskContext,
   taskId: string,
   input: SubtaskInput,
 ): Promise<TaskSubtask> {
   await getTaskRowOrThrow(ctx, taskId);
+  const [existing] = await ctx.db
+    .select({ n: childCount })
+    .from(taskSubtasks)
+    .where(and(eq(taskSubtasks.workspaceId, ctx.workspaceId), eq(taskSubtasks.taskId, taskId)));
+  if ((existing?.n ?? 0) >= MAX_SUBTASKS_PER_TASK)
+    throw new ValidationError(
+      `Uma tarefa pode ter até ${MAX_SUBTASKS_PER_TASK} subtarefas. Remova alguma antes de adicionar outra.`,
+    );
   const [row] = await ctx.db
     .insert(taskSubtasks)
     .values({ workspaceId: ctx.workspaceId, taskId, title: input.title })
@@ -581,6 +598,14 @@ export async function addComment(
   input: CommentInput,
 ): Promise<TaskComment> {
   await getTaskRowOrThrow(ctx, taskId);
+  const [existing] = await ctx.db
+    .select({ n: childCount })
+    .from(taskComments)
+    .where(and(eq(taskComments.workspaceId, ctx.workspaceId), eq(taskComments.taskId, taskId)));
+  if ((existing?.n ?? 0) >= MAX_COMMENTS_PER_TASK)
+    throw new ValidationError(
+      `Esta tarefa chegou ao limite de ${MAX_COMMENTS_PER_TASK} comentários.`,
+    );
   const [row] = await ctx.db
     .insert(taskComments)
     .values({

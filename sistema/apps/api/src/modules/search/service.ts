@@ -12,7 +12,8 @@ import { toTransactions } from '../transactions/mapper';
 
 /**
  * What the requesting member may find. Without access to the finances (lib/finance-access.ts) the
- * search covers clients and suppliers only: transactions, accounts and categories are not queried.
+ * search covers clients only, without their notes (like `GET /clients`): transactions, accounts,
+ * categories and suppliers (fornecedores) are not queried.
  */
 export interface SearchScope {
   finance: boolean;
@@ -57,6 +58,7 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
       .where(
         and(
           eq(contacts.workspaceId, workspaceId),
+          scope.finance ? undefined : eq(contacts.kind, 'client'),
           or(
             ilike(contacts.name, pattern),
             ilike(contacts.tradeName, pattern),
@@ -74,6 +76,11 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
     transactions: await toTransactions(db, txRows),
     accounts: allAccounts.filter((a) => matchedAccounts.has(a.id)),
     categories: categoryRows.map(toCategory),
-    contacts: await Promise.all(contactRows.map((r) => toContact(cipher, r))),
+    contacts: await Promise.all(
+      contactRows.map(async (r) => {
+        const contact = await toContact(cipher, r);
+        return scope.finance ? contact : { ...contact, notes: null };
+      }),
+    ),
   };
 }

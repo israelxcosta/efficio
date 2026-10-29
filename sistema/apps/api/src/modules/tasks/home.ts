@@ -71,6 +71,9 @@ async function resolveView(ctx: TaskContext, requested: HomeQuery['departmentId'
   return { view: 'department' as const, department: { id, name: names.get(id)! } };
 }
 
+/** Tasks listed in `mine` (the counts cover all of them). */
+const MINE_LIMIT = 20;
+
 /** Overdue first (oldest first), then by due date, no due date last. */
 function byUrgency(list: Task[], today: string): Task[] {
   return [...list].sort((a, b) => {
@@ -99,8 +102,15 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
   const where = and(eq(tasks.workspaceId, ctx.workspaceId), scope, inMonth);
   const week = addDays(t, 7);
   const outcomes = outcomeCounts(t);
+  // My open tasks in any department: counted in SQL and only the first ones loaded (the default order
+  // — due date, no due date last — already puts the overdue ones first).
+  const mineWhere = and(
+    eq(tasks.workspaceId, ctx.workspaceId),
+    eq(tasks.assigneeId, ctx.userId),
+    OPEN_SQL,
+  );
 
-  const [[totals], perStatus, perAssignee, perClient, mine] = await Promise.all([
+  const [[totals], perStatus, perAssignee, perClient, mine, [mineTotals]] = await Promise.all([
     ctx.db
       .select({
         ...outcomes,
@@ -134,7 +144,15 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
       )
       .where(where)
       .groupBy(tasks.clientId, contacts.name, contacts.tradeName),
-    selectTasks(ctx, { where: and(eq(tasks.assigneeId, ctx.userId), OPEN_SQL) }),
+    selectTasks(ctx, { where: mineWhere, limit: MINE_LIMIT }),
+    ctx.db
+      .select({
+        open: sql<number>`count(*)`.mapWith(Number),
+        overdue: count(sql`${tasks.dueDate} < ${t}`),
+        dueToday: count(sql`${tasks.dueDate} = ${t}`),
+      })
+      .from(tasks)
+      .where(mineWhere),
   ]);
   const sum = totals!;
   const byStatus = Object.fromEntries(TASK_STATUSES.map((s) => [s, 0])) as Record<
@@ -196,10 +214,10 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
     byAssignee,
     byClient,
     mine: {
-      open: mine.length,
-      overdue: mine.filter((x) => x.overdue).length,
-      dueToday: mine.filter((x) => x.dueDate === t).length,
-      tasks: byUrgency(mine, t).slice(0, 20),
+      open: mineTotals?.open ?? 0,
+      overdue: mineTotals?.overdue ?? 0,
+      dueToday: mineTotals?.dueToday ?? 0,
+      tasks: byUrgency(mine, t).slice(0, MINE_LIMIT),
       occurrences: [],
     },
   };

@@ -353,11 +353,13 @@ Contrato em `packages/shared/src/saas.ts`.
     `/workspaces`, `/invites`, `/billing` (inalterado: assinatura do espaço, gestão só do `owner`),
     `/contacts`, `/clients`, `/cnpj`, `/search` e o módulo de tarefas.
   - **Dados financeiros em módulos abertos** somem para `viewer`: em `GET /clients` e
-    `GET /clients/:id` (e nas respostas de escrita de clientes), `currentFee` e `latestFee` vêm
-    `null` e, no `summary`, `monthlyFees`, `withoutCurrentFee` e `averageFee` vêm `null` (as
-    vigências nem são lidas); `transactionCount`, contagens e `byRegime` continuam. `GET /search`
-    devolve `transactions`, `accounts` e `categories` vazios (as tabelas nem são consultadas) e só
-    `contacts`. Fornecedores (`/contacts`) não expõem totais financeiros.
+    `GET /clients/:id` (e nas respostas de escrita de clientes), `currentFee`, `latestFee`,
+    `feeDueDay` (vencimento do honorário) e `notes` (observações) vêm `null` (`withoutFees`) e, no
+    `summary`, `monthlyFees`, `withoutCurrentFee` e `averageFee` vêm `null` (as vigências nem são
+    lidas); `transactionCount`, contagens e `byRegime` continuam. `GET /search` devolve
+    `transactions`, `accounts` e `categories` vazios (as tabelas nem são consultadas) e, em
+    `contacts`, só clientes (fornecedores são do financeiro e nem são consultados), com `notes`
+    `null`. Fornecedores (`/contacts`) não expõem totais financeiros.
   - **Tarefas** (`/tasks/*`): todos os membros trabalham, `viewer` inclusive — criar, editar,
     concluir/reabrir, comentar e mexer em subtarefas. Cadastros do módulo (departamentos, departamento
     do membro, categorias de tarefa, responsável por cliente) e excluir tarefas ficam com `owner`/
@@ -776,7 +778,15 @@ membro do espaço → 422.
   resultante (422).
 - **Autoria**: criação, conclusão e comentários guardam o usuário e o **nome no momento**
   (`*_name`); a resposta usa o nome atual enquanto a pessoa é membro e o gravado depois que sai (o
-  histórico de um escritório não perde quem fez). Comentário é texto puro, autor sempre da sessão.
+  histórico de um escritório não perde quem fez). Se a **conta** é excluída, o nome gravado vira
+  "Usuário excluído" (gatilho da 0012). Comentário é texto puro, autor sempre da sessão.
+- **Limites** (o detalhe devolve tudo de uma vez): até 100 subtarefas e 500 comentários por tarefa
+  (`MAX_SUBTASKS_PER_TASK`/`MAX_COMMENTS_PER_TASK` em `modules/tasks/service.ts`; acima → 422);
+  título 200, descrição e comentário 5000 caracteres; `pageSize` até 200; na página de início, `mine`
+  conta todas as abertas em SQL e carrega só as 20 primeiras. Texto com caractere NUL → 400 (em toda
+  a API: `fromDatabaseError` mapeia os SQLSTATE `22021`/`22P05`). Testes: `test/tasks-security.test.ts`
+  (inventário de rotas de administrador, ids fora do escopo, campos do servidor, limites e nada
+  financeiro ou cifrado para o colaborador).
 - **Membro removido do espaço**: as tarefas dele ficam sem responsável (`ON DELETE SET NULL
   (assignee_id)`, mantendo o departamento) e saem o departamento do membro e as responsabilidades por
   cliente (cascata).
@@ -840,11 +850,26 @@ categoria e responsável `SET NULL` só na coluna; autoria → `users` `SET NULL
 próprio espaço sejam responsáveis. Reexecutável e roda no PGlite. O login da API não tem acesso
 direto às tabelas (só via `effinance_app`).
 
+## Banco (migração 0012)
+
+Reforço de segurança das tabelas de tarefas:
+
+- **Só clientes**: coluna gerada `client_kind` (sempre `'client'`) em `tasks` e
+  `task_client_responsibles`, com FK `(workspace_id, client_id, client_kind) → contacts (workspace_id,
+  id, kind)`. Fornecedor não pode ser cliente de tarefa, e cliente com tarefas não vira fornecedor.
+- **Eliminação LGPD**: gatilhos `BEFORE UPDATE` trocam `created_by_name`, `completed_by_name` e
+  `author_name` por "Usuário excluído" quando o `ON DELETE SET NULL` de `users` limpa o id (exclusão
+  da conta). Sair do espaço mantém o nome.
+- **CHECKs** espelhando o contrato: descrição 1–5000, nome de categoria 1–60, nomes gravados 1–120.
+- **Índices** parciais das abertas por responsável e por departamento (mesmo predicado do
+  `OPEN_SQL`) e de comentários recentes.
+
 ## Diferenças deliberadas em relação ao Effy
 
 - Departamento das tarefas abertas acompanha o membro quando ele muda de departamento.
 - Nomes de quem criou/concluiu/comentou ficam gravados (o Effy impedia excluir usuário com histórico;
-  aqui o membro pode sair e a conta pode ser excluída — LGPD — sem perder a autoria).
+  aqui o membro pode sair sem perder a autoria; se a conta for excluída, o nome vira "Usuário
+  excluído" — LGPD).
 - "Reabrir" volta ao estado anterior à conclusão (`reopenStatus`), como a spec pede.
 - Excluir tarefa é de administrador (no Effy, a chave `delTasks`); criar/editar/concluir é de todos.
 - Anexos, recorrentes, auditoria, fluxos, relatórios e anotações ficam para as próximas fases.
@@ -855,4 +880,4 @@ direto às tabelas (só via `effinance_app`).
 - Anexos de tarefa (armazenamento de arquivos; a spec §8.1 prevê a seção).
 - Busca global (`/search`, ⌘K) com tarefas (§17.8) e feriados no cálculo de dias úteis
   (`HolidayCalendar` em `utils/tasks.ts`).
-- Exportação LGPD (`GET /workspaces/current/export`) ainda não inclui as tarefas.
+- Descrição e comentários de tarefas em texto claro (a política prevê cifra de observações).

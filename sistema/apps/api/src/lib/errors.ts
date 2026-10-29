@@ -71,14 +71,25 @@ const UNIQUE_CONFLICTS: Record<string, string> = {
 };
 
 /**
+ * Text Postgres cannot store, sent by the client: a NUL character in a text column (22021) or a
+ * `\u0000` escape in jsonb (22P05). Valid JSON and any length-checked string may carry it, so it is
+ * the client's input (400), not an unexpected error (500, logged as one).
+ */
+const INVALID_TEXT_CODES = new Set(['22021', '22P05']);
+
+/**
  * Maps integrity errors raised by Postgres (Drizzle wraps them; PGlite in the demo too) to 409:
  * unique violations (23505) from concurrent requests and foreign-key violations (23503) when a
- * referenced row was deleted meanwhile. Anything else stays an unexpected error (500).
+ * referenced row was deleted meanwhile; text Postgres cannot store maps to 400. Anything else stays an
+ * unexpected error (500).
  */
 export function fromDatabaseError(error: unknown): AppError | null {
   let current: unknown = error;
   for (let depth = 0; current && typeof current === 'object' && depth < 4; depth++) {
     const e = current as { code?: unknown; constraint_name?: unknown; constraint?: unknown; cause?: unknown };
+    if (typeof e.code === 'string' && INVALID_TEXT_CODES.has(e.code)) {
+      return new AppError(400, 'validation_error', 'O texto enviado contém caracteres inválidos.');
+    }
     const constraint = String(e.constraint_name ?? e.constraint ?? '');
     if (e.code === '23505') {
       return new ConflictError(
