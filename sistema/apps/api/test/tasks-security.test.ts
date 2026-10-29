@@ -8,8 +8,10 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { App } from '../src/app';
+import { getCipher } from '../src/lib/crypto/keyring';
 import { executeRows } from '../src/lib/sql';
 import { TASK_ADMIN_MESSAGE } from '../src/modules/tasks/access';
+import { encryptTaskText, TASK_COMMENT_TEXT } from '../src/modules/tasks/encrypted-text';
 import { MAX_COMMENTS_PER_TASK, MAX_SUBTASKS_PER_TASK } from '../src/modules/tasks/service';
 import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
 
@@ -415,9 +417,11 @@ describe('tasks security: input limits', () => {
       sql`insert into task_subtasks (workspace_id, task_id, title)
           select ${ws}::uuid, ${id}::uuid, 'Item ' || g from generate_series(1, ${MAX_SUBTASKS_PER_TASK - 1}::int) g`,
     );
+    // Comments are stored encrypted (migration 0013): the same ciphertext for all of them is enough.
+    const text = await encryptTaskText(await getCipher(ws), TASK_COMMENT_TEXT, 'Comentário');
     await admin().execute(
       sql`insert into task_comments (workspace_id, task_id, author_id, author_name, text)
-          select ${ws}::uuid, ${id}::uuid, ${ana.userId}::uuid, 'Ana', 'Comentário ' || g
+          select ${ws}::uuid, ${id}::uuid, ${ana.userId}::uuid, 'Ana', ${text}
           from generate_series(1, ${MAX_COMMENTS_PER_TASK - 1}::int) g`,
     );
     expect((await carla.post(`/tasks/${id}/subtasks`, { title: 'Última' })).status).toBe(201);

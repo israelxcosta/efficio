@@ -1,7 +1,7 @@
 // Loading tasks as the API shows them (row, card, widgets): joins for the names shown with every row
 // and correlated counts (subtasks, comments). Shared by the task services.
 
-import { and, eq, sql, type SQL } from 'drizzle-orm';
+import { and, eq, getTableColumns, sql, type SQL } from 'drizzle-orm';
 import { daysOverdue, isTaskOverdue, type Task } from '@effinance/shared';
 import { contacts, taskCategories, taskDepartments, tasks } from '../../db/schema';
 import type { TaskContext } from './access';
@@ -13,10 +13,16 @@ export const priorityRank = sql`case ${tasks.priority} when 'urgent' then 0 when
 export const OPEN_SQL = sql`${tasks.status} in ('todo', 'in_progress', 'waiting_client')`;
 export const CLOSED_SQL = sql`${tasks.status} in ('done', 'canceled')`;
 
+/**
+ * Columns of a task row as lists show it: everything but the description, which only the detail reads
+ * (and decrypts) — no list carries up to a page of ciphertexts it never uses.
+ */
+const { description: _description, ...TASK_ROW_COLUMNS } = getTableColumns(tasks);
+
 function rowQuery(ctx: Pick<TaskContext, 'db' | 'workspaceId'>) {
   return ctx.db
     .select({
-      task: tasks,
+      task: TASK_ROW_COLUMNS,
       clientName: contacts.name,
       clientTradeName: contacts.tradeName,
       departmentName: taskDepartments.name,

@@ -11,6 +11,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { DbExecutor } from '../db/client';
 import { assertCanWrite, isMutation } from '../modules/workspaces/access';
+import type { FieldCipher } from './crypto/field-cipher';
 import { getCipher } from './crypto/keyring';
 import { withTenant } from './tenant';
 
@@ -27,9 +28,14 @@ export function tenantGuards(app: Hooks): void {
 /**
  * One tenant transaction. The workspace data key is unwrapped first, outside the transaction: no
  * key-provider (KMS) call while holding a connection, and no system-connection lookup from inside
- * it (the browser demo has a single PGlite connection).
+ * it (the browser demo has a single PGlite connection). `fn` receives that cipher, so encrypting or
+ * decrypting fields inside the transaction never depends on the keyring cache.
  */
-export async function inTenant<T>(db: DbExecutor, workspaceId: string, fn: (tx: DbExecutor) => Promise<T>): Promise<T> {
-  await getCipher(workspaceId);
-  return withTenant(db, workspaceId, fn);
+export async function inTenant<T>(
+  db: DbExecutor,
+  workspaceId: string,
+  fn: (tx: DbExecutor, cipher: FieldCipher) => Promise<T>,
+): Promise<T> {
+  const cipher = await getCipher(workspaceId);
+  return withTenant(db, workspaceId, (tx) => fn(tx, cipher));
 }

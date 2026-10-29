@@ -213,7 +213,10 @@ export async function updateDepartment(
   input: DepartmentInput,
 ): Promise<TaskDepartment> {
   await getDepartmentOrThrow(ctx.db, ctx.workspaceId, id);
-  await ctx.db.update(taskDepartments).set({ name: input.name }).where(eq(taskDepartments.id, id));
+  await ctx.db
+    .update(taskDepartments)
+    .set({ name: input.name })
+    .where(and(eq(taskDepartments.workspaceId, ctx.workspaceId), eq(taskDepartments.id, id)));
   await applyMembers(ctx, id, input.memberIds);
   return getDepartment(ctx, id);
 }
@@ -254,7 +257,9 @@ export async function deleteDepartment(ctx: TaskContext, id: string): Promise<vo
     );
   }
   // Client responsibilities in the department are configuration: they go with it (cascade).
-  await ctx.db.delete(taskDepartments).where(eq(taskDepartments.id, id));
+  await ctx.db
+    .delete(taskDepartments)
+    .where(and(eq(taskDepartments.workspaceId, ctx.workspaceId), eq(taskDepartments.id, id)));
 }
 
 // ---------------------------------------------------------------------------
@@ -308,14 +313,19 @@ export async function updateCategory(
   input: CategoryInput,
 ): Promise<TaskCategory> {
   await getTaskCategoryOrThrow(ctx.db, ctx.workspaceId, id);
-  await ctx.db.update(taskCategories).set(input).where(eq(taskCategories.id, id));
+  await ctx.db
+    .update(taskCategories)
+    .set(input)
+    .where(and(eq(taskCategories.workspaceId, ctx.workspaceId), eq(taskCategories.id, id)));
   return getCategory(ctx, id);
 }
 
 /** Simple delete (Effy): tasks and template steps lose the category (ON DELETE SET NULL). */
 export async function deleteCategory(ctx: TaskContext, id: string): Promise<void> {
   await getTaskCategoryOrThrow(ctx.db, ctx.workspaceId, id);
-  await ctx.db.delete(taskCategories).where(eq(taskCategories.id, id));
+  await ctx.db
+    .delete(taskCategories)
+    .where(and(eq(taskCategories.workspaceId, ctx.workspaceId), eq(taskCategories.id, id)));
 }
 
 // ---------------------------------------------------------------------------

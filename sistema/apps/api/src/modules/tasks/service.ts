@@ -6,6 +6,8 @@
 // - concluding records who/when on the server, only on the transition to `done`; leaving `done`
 //   clears both; "Atrasada" is derived (open + due date before today), never stored;
 // - every member works on tasks; deleting one is for administrators.
+// Every statement filters by the workspace, even after an ownership check (test/tasks-scope.test.ts);
+// descriptions and comments are encrypted per field (encrypted-text.ts).
 // Phase 1: recurring occurrences and flows come later (the list returns `occurrences: []` and
 // `flow: null` until then).
 
@@ -45,6 +47,12 @@ import { NotFoundError, ValidationError } from '../../lib/errors';
 import { likePattern } from '../../lib/sql';
 import type { TaskContext } from './access';
 import {
+  decryptTaskText,
+  encryptTaskText,
+  TASK_COMMENT_TEXT,
+  TASK_DESCRIPTION,
+} from './encrypted-text';
+import {
   assertMember,
   clientRef,
   departmentOfMember,
@@ -78,14 +86,16 @@ const isOpen = (s: TaskStatus) => OPEN_STATUSES.includes(s);
 // Loading
 // ---------------------------------------------------------------------------
 
+/** A task of the request's workspace, by id. */
+function taskKey(ctx: Pick<TaskContext, 'workspaceId'>, id: string): SQL {
+  return and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.id, id))!;
+}
+
 export async function getTaskRowOrThrow(
   ctx: Pick<TaskContext, 'db' | 'workspaceId'>,
   id: string,
 ): Promise<TaskRow> {
-  const [row] = await ctx.db
-    .select()
-    .from(tasks)
-    .where(and(eq(tasks.id, id), eq(tasks.workspaceId, ctx.workspaceId)));
+  const [row] = await ctx.db.select().from(tasks).where(taskKey(ctx, id));
   if (!row) throw new NotFoundError('Tarefa não encontrada');
   return row;
 }
@@ -96,7 +106,7 @@ export async function getTaskDetail(ctx: TaskContext, id: string): Promise<TaskD
   const [row] = await ctx.db
     .select({ description: tasks.description })
     .from(tasks)
-    .where(eq(tasks.id, id));
+    .where(taskKey(ctx, id));
   const [subtasks, comments] = await Promise.all([
     ctx.db
       .select()
@@ -109,11 +119,15 @@ export async function getTaskDetail(ctx: TaskContext, id: string): Promise<TaskD
       .where(and(eq(taskComments.workspaceId, ctx.workspaceId), eq(taskComments.taskId, id)))
       .orderBy(asc(taskComments.createdAt), asc(taskComments.id)),
   ]);
+  const [description, texts] = await Promise.all([
+    decryptTaskText(ctx.cipher, TASK_DESCRIPTION, row?.description ?? null),
+    Promise.all(comments.map((c) => decryptTaskText(ctx.cipher, TASK_COMMENT_TEXT, c.text))),
+  ]);
   return {
     ...task,
-    description: row?.description ?? null,
+    description,
     subtasks: subtasks.map(toSubtask),
-    comments: comments.map((c) => toComment(ctx, c)),
+    comments: comments.map((c, i) => toComment(ctx, c, texts[i]!)),
     flowProgress: null,
   };
 }
@@ -122,11 +136,16 @@ function toSubtask(row: typeof taskSubtasks.$inferSelect): TaskSubtask {
   return { id: row.id, title: row.title, done: row.done, createdAt: row.createdAt.toISOString() };
 }
 
-function toComment(ctx: TaskContext, row: typeof taskComments.$inferSelect): TaskComment {
+/** `text` is the decrypted comment (the row holds the ciphertext). */
+function toComment(
+  ctx: TaskContext,
+  row: typeof taskComments.$inferSelect,
+  text: string,
+): TaskComment {
   return {
     id: row.id,
     author: personRef(ctx, row.authorId, row.authorName),
-    text: row.text,
+    text,
     isYours: row.authorId === ctx.userId,
     createdAt: row.createdAt.toISOString(),
   };
@@ -441,7 +460,7 @@ export async function createTask(ctx: TaskContext, input: TaskInput): Promise<Ta
     .values({
       workspaceId: ctx.workspaceId,
       title: input.title,
-      description: input.description,
+      description: await encryptTaskText(ctx.cipher, TASK_DESCRIPTION, input.description),
       clientId: input.clientId,
       categoryId: input.categoryId,
       assigneeId: input.assigneeId,
@@ -475,6 +494,8 @@ export async function updateTask(
   });
   const set: Partial<typeof tasks.$inferInsert> = { ...patch };
   delete set.departmentId;
+  if (patch.description !== undefined)
+    set.description = await encryptTaskText(ctx.cipher, TASK_DESCRIPTION, patch.description);
   if (patch.assigneeId !== undefined || patch.departmentId !== undefined) {
     set.departmentId = await resolveTaskDepartment(
       ctx,
@@ -482,7 +503,7 @@ export async function updateTask(
       patch.departmentId !== undefined ? patch.departmentId : current.departmentId,
     );
   }
-  if (Object.keys(set).length > 0) await ctx.db.update(tasks).set(set).where(eq(tasks.id, id));
+  if (Object.keys(set).length > 0) await ctx.db.update(tasks).set(set).where(taskKey(ctx, id));
   return getTaskDetail(ctx, id);
 }
 
@@ -500,7 +521,7 @@ export async function changeTaskStatus(
     await ctx.db
       .update(tasks)
       .set(statusFields(ctx, current, status))
-      .where(eq(tasks.id, id));
+      .where(taskKey(ctx, id));
   }
   return { task: await getTaskDetail(ctx, id), activated: null };
 }
@@ -508,7 +529,7 @@ export async function changeTaskStatus(
 /** Administrators. Subtasks and comments go with it. */
 export async function deleteTask(ctx: TaskContext, id: string): Promise<void> {
   await getTaskRowOrThrow(ctx, id);
-  await ctx.db.delete(tasks).where(eq(tasks.id, id));
+  await ctx.db.delete(tasks).where(taskKey(ctx, id));
 }
 
 // ---------------------------------------------------------------------------
@@ -516,7 +537,7 @@ export async function deleteTask(ctx: TaskContext, id: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function touch(ctx: TaskContext, id: string) {
-  await ctx.db.update(tasks).set({ updatedAt: now() }).where(eq(tasks.id, id));
+  await ctx.db.update(tasks).set({ updatedAt: now() }).where(taskKey(ctx, id));
 }
 
 /**
@@ -550,17 +571,20 @@ export async function addSubtask(
   return toSubtask(row!);
 }
 
+/** A subtask of the request's workspace, reached through its own task. */
+function subtaskKey(ctx: Pick<TaskContext, 'workspaceId'>, taskId: string, subtaskId: string): SQL {
+  return and(
+    eq(taskSubtasks.workspaceId, ctx.workspaceId),
+    eq(taskSubtasks.taskId, taskId),
+    eq(taskSubtasks.id, subtaskId),
+  )!;
+}
+
 async function getSubtaskOrThrow(ctx: TaskContext, taskId: string, subtaskId: string) {
   const [row] = await ctx.db
     .select()
     .from(taskSubtasks)
-    .where(
-      and(
-        eq(taskSubtasks.id, subtaskId),
-        eq(taskSubtasks.taskId, taskId),
-        eq(taskSubtasks.workspaceId, ctx.workspaceId),
-      ),
-    );
+    .where(subtaskKey(ctx, taskId, subtaskId));
   if (!row) throw new NotFoundError('Subtarefa não encontrada');
   return row;
 }
@@ -575,7 +599,7 @@ export async function updateSubtask(
   const [row] = await ctx.db
     .update(taskSubtasks)
     .set(patch)
-    .where(eq(taskSubtasks.id, subtaskId))
+    .where(subtaskKey(ctx, taskId, subtaskId))
     .returning();
   await touch(ctx, taskId);
   return toSubtask(row!);
@@ -587,7 +611,7 @@ export async function deleteSubtask(
   subtaskId: string,
 ): Promise<void> {
   await getSubtaskOrThrow(ctx, taskId, subtaskId);
-  await ctx.db.delete(taskSubtasks).where(eq(taskSubtasks.id, subtaskId));
+  await ctx.db.delete(taskSubtasks).where(subtaskKey(ctx, taskId, subtaskId));
   await touch(ctx, taskId);
 }
 
@@ -613,10 +637,10 @@ export async function addComment(
       taskId,
       authorId: ctx.userId,
       authorName: myName(ctx),
-      text: input.text,
+      text: await encryptTaskText(ctx.cipher, TASK_COMMENT_TEXT, input.text),
     })
     .returning();
-  return toComment(ctx, row!);
+  return toComment(ctx, row!, input.text);
 }
 
 const ACTIVITY_DAYS = 5;
@@ -644,12 +668,17 @@ export async function recentActivity(ctx: TaskContext): Promise<TaskActivityItem
     )
     .orderBy(desc(taskComments.createdAt))
     .limit(50);
-  return rows.map(({ comment, taskTitle }) => ({
-    id: comment.id,
-    taskId: comment.taskId,
-    taskTitle,
-    author: personRef(ctx, comment.authorId, comment.authorName),
-    text: comment.text.length > 80 ? `${comment.text.slice(0, 80)}…` : comment.text,
-    createdAt: comment.createdAt.toISOString(),
-  }));
+  return Promise.all(
+    rows.map(async ({ comment, taskTitle }) => {
+      const text = await decryptTaskText(ctx.cipher, TASK_COMMENT_TEXT, comment.text);
+      return {
+        id: comment.id,
+        taskId: comment.taskId,
+        taskTitle,
+        author: personRef(ctx, comment.authorId, comment.authorName),
+        text: text.length > 80 ? `${text.slice(0, 80)}…` : text,
+        createdAt: comment.createdAt.toISOString(),
+      };
+    }),
+  );
 }

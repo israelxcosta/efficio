@@ -1128,12 +1128,25 @@ export const taskCategories = pgTable(
   ],
 );
 
+/**
+ * Shape of a field encrypted by FieldCipher (`v1.<iv>.<ct>`, base64url without padding: a 12-byte IV
+ * is 16 characters; at least 1 byte of text plus the 16-byte tag is 23). Used by the CHECKs of the
+ * encrypted task texts (migration 0013).
+ */
+const ENCRYPTED_TEXT_PATTERN = '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$';
+/**
+ * Ceiling of an encrypted task text: the contract allows 5000 UTF-16 code units, at most 15000 UTF-8
+ * bytes, i.e. 20042 characters of ciphertext; 28000 also covers 5000 four-byte characters (26708).
+ */
+const ENCRYPTED_TEXT_MAX = 28000;
+
 export const tasks = pgTable(
   'tasks',
   {
     id: id(),
     workspaceId: workspaceRef().notNull(),
     title: text().notNull(),
+    /** Encrypted with the workspace key (`v1.<iv>.<ct>`, modules/tasks/encrypted-text.ts; migration 0013). */
     description: text(),
     /** null = internal task (no client). */
     clientId: uuid(),
@@ -1192,8 +1205,10 @@ export const tasks = pgTable(
       'tasks_people_names_chk',
       sql`length(${t.createdByName}) between 1 and 120 and length(${t.completedByName}) between 1 and 120`,
     ),
-    // Migration 0012: the contract's limit (taskInputSchema.description); empty text is stored as null.
-    check('tasks_description_chk', sql`length(${t.description}) between 1 and 5000`),
+    // Migration 0013 (replaces 0012's 1–5000): the description is encrypted, so the database checks the
+    // format (`v1.<iv>.<ct>`: never clear text) and bounds the ciphertext; the 5000-character limit is
+    // the contract's (taskInputSchema.description). Empty text is stored as null.
+    check('tasks_description_chk', sql`${t.description} ~ ${sql.raw(`'${ENCRYPTED_TEXT_PATTERN}'`)} and length(${t.description}) <= ${sql.raw(String(ENCRYPTED_TEXT_MAX))}`),
     check('tasks_status_chk', sql`${t.status} in ('todo', 'in_progress', 'waiting_client', 'done', 'canceled')`),
     check('tasks_reopen_status_chk', sql`${t.reopenStatus} in ('todo', 'in_progress', 'waiting_client')`),
     check('tasks_priority_chk', sql`${t.priority} in ('low', 'medium', 'high', 'urgent')`),
@@ -1254,6 +1269,7 @@ export const taskComments = pgTable(
     taskId: uuid().notNull(),
     authorId: uuid().references(() => users.id, { onDelete: 'set null' }),
     authorName: text().notNull(),
+    /** Encrypted with the workspace key (`v1.<iv>.<ct>`, modules/tasks/encrypted-text.ts; migration 0013). */
     text: text().notNull(),
     createdAt: createdAt(),
   },
@@ -1263,7 +1279,8 @@ export const taskComments = pgTable(
     index('task_comments_author_idx').on(t.authorId).where(sql`${t.authorId} is not null`),
     // Migration 0012: recent activity (`GET /tasks/activity`, last 5 days) without reading every comment.
     index('task_comments_recent_idx').on(t.workspaceId, t.createdAt),
-    check('task_comments_text_chk', sql`length(${t.text}) between 1 and 5000`),
+    // Migration 0013 (replaces 1–5000): encrypted, like tasks_description_chk.
+    check('task_comments_text_chk', sql`${t.text} ~ ${sql.raw(`'${ENCRYPTED_TEXT_PATTERN}'`)} and length(${t.text}) <= ${sql.raw(String(ENCRYPTED_TEXT_MAX))}`),
     // Migration 0012: recorded name of the author (see tasks_people_names_chk).
     check('task_comments_author_name_chk', sql`length(${t.authorName}) between 1 and 120`),
     foreignKey({ name: 'task_comments_task_fk', columns: [t.workspaceId, t.taskId], foreignColumns: [tasks.workspaceId, tasks.id] }).onDelete(

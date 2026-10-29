@@ -2,6 +2,7 @@
 // who cannot sign in — only Marina can), the departments Fiscal, Contábil, Pessoal/DP and Societário,
 // task categories, the responsible of each client per department, and ~25 tasks of an accounting
 // office (some overdue, some concluded on time or late, appointments, subtasks and comments).
+// Written through the task services, so descriptions and comments are encrypted like the API's.
 // Recurring work, flows and notes come with the next phases. Keep it free of Node-only imports.
 
 import { and, eq } from 'drizzle-orm';
@@ -19,6 +20,7 @@ import {
 import type { DbExecutor } from './client';
 import { contacts, users, workspaceMembers } from './schema';
 import { todayIn } from '../lib/clock';
+import { getCipher } from '../lib/crypto/keyring';
 import { withTenant } from '../lib/tenant';
 import { loadMembers, type TaskContext } from '../modules/tasks/access';
 import { createCategory, createDepartment, setClientResponsible } from '../modules/tasks/registry';
@@ -62,8 +64,10 @@ export async function seedTasks(
     await db.insert(workspaceMembers).values({ workspaceId, userId: user!.id, role: person.role });
     ids[person.email.split('.')[0] as Exclude<Who, 'marina'>] = user!.id;
   }
-  // Members are read on the system connection, before the tenant transaction (as in a request).
+  // Members and the workspace key are read on the system connection, before the tenant transaction
+  // (as in a request; the demo's PGlite has a single connection).
   const members = await loadMembers(db, workspaceId);
+  const cipher = await getCipher(workspaceId);
   const today = todayIn(TASK_TIME_ZONE);
   const month = monthKey(today);
   const previous = formatMonthKey(addMonthKey(month, -1)).toLowerCase();
@@ -79,6 +83,7 @@ export async function seedTasks(
       canWrite: true,
       members,
       today,
+      cipher,
     });
     const admin = as('marina');
 

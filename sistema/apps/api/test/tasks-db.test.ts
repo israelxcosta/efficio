@@ -1,10 +1,14 @@
-// Regression tests of the database security review of the task module (migrations 0011 and 0012):
+// Regression tests of the database security review of the task module (migrations 0011 to 0013):
 // Row Level Security on every task table, composite foreign keys that never cross workspaces, ON DELETE
 // behaviour (member leaving, client, department, category, workspace, account), CHECKs, the partial
-// indexes the hot reads rely on, and LGPD (export and account deletion).
+// indexes the hot reads rely on, LGPD (export and account deletion) and the encryption of descriptions
+// and comments (0013: stored as `v1.…`, bound to the workspace, backfilled, exported decrypted).
 // Today is pinned to 2026-10-20 (vitest.config.ts).
 
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { OPEN_TASK_STATUSES, TASK_PRIORITIES, TASK_STATUSES } from '@effinance/shared';
@@ -23,8 +27,12 @@ import {
   workspaceMembers,
   workspaces,
 } from '../src/db/schema';
+import { backfillEncryption, needsBackfill } from '../src/db/backfill';
+import { DecryptionError } from '../src/lib/crypto/field-cipher';
+import { getCipher } from '../src/lib/crypto/keyring';
 import { executeRows } from '../src/lib/sql';
 import { withTenant } from '../src/lib/tenant';
+import { encryptTaskText, TASK_COMMENT_TEXT, TASK_DESCRIPTION } from '../src/modules/tasks/encrypted-text';
 import { OPEN_SQL } from '../src/modules/tasks/task-rows';
 import { TENANT_TABLES } from './db-roles';
 import { admin, createTestApp, registerUser, resetDb, TEST_PASSWORD } from './helpers';
@@ -42,6 +50,12 @@ beforeEach(async () => {
 
 const TASK_TABLES = TENANT_TABLES.filter((t) => t.startsWith('task'));
 const DELETED_USER = 'Usuário excluído';
+/**
+ * Something shaped like a field ciphertext (`v1.<16>.<23+>`, the CHECKs of 0013), for writes meant to
+ * fail on something else (RLS, foreign keys): clear text would be refused by the CHECK first.
+ */
+const CIPHERTEXT_SHAPED = `v1.${'A'.repeat(16)}.${'B'.repeat(23)}`;
+const CIPHERTEXT = /^v1\.[\w-]{16}\.[\w-]{23,}$/;
 
 interface PgFailure {
   code: string | undefined;
@@ -116,9 +130,11 @@ async function seedOffice(label: string) {
     })
     .returning();
   const [subtask] = await db.insert(taskSubtasks).values({ workspaceId: ws, taskId: task!.id, title: 'Conferir saldos' }).returning();
+  // Comments are encrypted with the workspace key (generated here on first use, like a migrated one).
+  const commentText = await encryptTaskText(await getCipher(ws), TASK_COMMENT_TEXT, 'Enviado ao cliente');
   const [comment] = await db
     .insert(taskComments)
-    .values({ workspaceId: ws, taskId: task!.id, authorId: staff!.id, authorName: staff!.name, text: 'Enviado ao cliente' })
+    .values({ workspaceId: ws, taskId: task!.id, authorId: staff!.id, authorName: staff!.name, text: commentText })
     .returning();
   return {
     ws,
@@ -132,11 +148,15 @@ async function seedOffice(label: string) {
     task: task!.id,
     subtask: subtask!.id,
     comment: comment!.id,
+    commentText,
   };
 }
 
 const taskRow = async (id: string) => (await admin().select().from(tasks).where(eq(tasks.id, id)))[0];
 const commentRow = async (id: string) => (await admin().select().from(taskComments).where(eq(taskComments.id, id)))[0];
+const storedDescription = async (id: string) =>
+  (await rows<{ description: string | null }>(sql`select description from tasks where id = ${id}`))[0]!.description;
+const storedComment = async (id: string) => (await rows<{ text: string }>(sql`select text from task_comments where id = ${id}`))[0]!.text;
 
 // ---------------------------------------------------------------------------
 // Row Level Security
@@ -174,7 +194,7 @@ describe('task tables: row level security', () => {
       ['task_categories', (tx) => tx.insert(taskCategories).values({ workspaceId: a.ws, name: 'Intrusa' })],
       ['tasks', (tx) => tx.insert(tasks).values({ workspaceId: a.ws, title: 'Intrusa', createdByName: 'X' })],
       ['task_subtasks', (tx) => tx.insert(taskSubtasks).values({ workspaceId: a.ws, taskId: a.task, title: 'Intrusa' })],
-      ['task_comments', (tx) => tx.insert(taskComments).values({ workspaceId: a.ws, taskId: a.task, authorName: 'X', text: 'oi' })],
+      ['task_comments', (tx) => tx.insert(taskComments).values({ workspaceId: a.ws, taskId: a.task, authorName: 'X', text: CIPHERTEXT_SHAPED })],
       [
         'task_department_members',
         (tx) => tx.insert(taskDepartmentMembers).values({ workspaceId: a.ws, userId: a.owner, departmentId: a.department }),
@@ -214,7 +234,7 @@ describe('task tables: references never cross workspaces', () => {
       ['task_subtasks.task_id', (tx, id) => tx.insert(taskSubtasks).values({ workspaceId: b.ws, taskId: id, title: 'x' }), a.task],
       [
         'task_comments.task_id',
-        (tx, id) => tx.insert(taskComments).values({ workspaceId: b.ws, taskId: id, authorName: 'X', text: 'x' }),
+        (tx, id) => tx.insert(taskComments).values({ workspaceId: b.ws, taskId: id, authorName: 'X', text: CIPHERTEXT_SHAPED }),
         a.task,
       ],
       [
@@ -327,7 +347,7 @@ describe('task tables: ON DELETE', () => {
       completedByName: DELETED_USER,
       status: 'done',
     });
-    expect(await commentRow(a.comment)).toMatchObject({ authorId: null, authorName: DELETED_USER, text: 'Enviado ao cliente' });
+    expect(await commentRow(a.comment)).toMatchObject({ authorId: null, authorName: DELETED_USER, text: a.commentText });
     // No copy of the name is left in any task table.
     for (const table of ['tasks', 'task_comments']) {
       const [found] = await rows<{ n: number }>(
@@ -396,15 +416,19 @@ describe('task tables: CHECKs', () => {
     expect(values('tasks_reopen_status_chk')).toEqual([...OPEN_TASK_STATUSES].sort());
   });
 
-  it('rejects values outside the contract, oversized text and inconsistent conclusions', async () => {
+  it('rejects values outside the contract, oversized text, clear text where encrypted and inconsistent conclusions', async () => {
     const a = await seedOffice('A');
+    // Ciphertext shaped, one character over the ceiling of 0013.
+    const oversized = `v1.${'A'.repeat(16)}.${'B'.repeat(28_000 - 20 + 1)}`;
     const checks: [string, ReturnType<typeof sql>][] = [
       ['category name empty', sql`update task_categories set name = '' where id = ${a.category}`],
       ['category name size (0012)', sql`update task_categories set name = ${'x'.repeat(61)} where id = ${a.category}`],
       ['category color', sql`update task_categories set color = 'red' where id = ${a.category}`],
       ['department name size', sql`update task_departments set name = ${'x'.repeat(81)} where id = ${a.department}`],
-      ['description empty (0012)', sql`update tasks set description = '' where id = ${a.task}`],
-      ['description size (0012)', sql`update tasks set description = ${'x'.repeat(5001)} where id = ${a.task}`],
+      ['description empty', sql`update tasks set description = '' where id = ${a.task}`],
+      ['description in clear text (0013)', sql`update tasks set description = 'Pedir na Receita' where id = ${a.task}`],
+      ['description malformed ciphertext (0013)', sql`update tasks set description = ${'v1.abc.def'} where id = ${a.task}`],
+      ['description over the ceiling (0013)', sql`update tasks set description = ${oversized} where id = ${a.task}`],
       ['title size', sql`update tasks set title = ${'x'.repeat(201)} where id = ${a.task}`],
       ['status', sql`update tasks set status = 'archived' where id = ${a.task}`],
       ['priority', sql`update tasks set priority = 'whenever' where id = ${a.task}`],
@@ -417,15 +441,23 @@ describe('task tables: CHECKs', () => {
       ['end before start', sql`update tasks set start_time = '10:00', end_time = '09:30' where id = ${a.task}`],
       ['malformed time', sql`update tasks set start_time = '24:00' where id = ${a.task}`],
       ['subtask title', sql`update task_subtasks set title = '' where id = ${a.subtask}`],
-      ['comment size', sql`update task_comments set text = ${'x'.repeat(5001)} where id = ${a.comment}`],
+      ['comment in clear text (0013)', sql`update task_comments set text = 'Enviado ao cliente' where id = ${a.comment}`],
+      ['comment over the ceiling (0013)', sql`update task_comments set text = ${oversized} where id = ${a.comment}`],
       ['creator name empty (0012)', sql`update tasks set created_by_name = '' where id = ${a.task}`],
       ['concluder name size (0012)', sql`update tasks set completed_by_name = ${'x'.repeat(121)} where id = ${a.task}`],
       ['author name size (0012)', sql`update task_comments set author_name = ${'x'.repeat(121)} where id = ${a.comment}`],
     ];
     for (const [label, q] of checks) expect((await pgFailure(admin().execute(q)))?.code, label).toBe('23514');
-    // The limits themselves are accepted.
+    // The limits themselves are accepted: the longest text the contract allows (5000 characters of 3
+    // UTF-8 bytes each) encrypted, and the ceiling.
     await admin().execute(sql`update task_categories set name = ${'x'.repeat(60)} where id = ${a.category}`);
-    await admin().execute(sql`update tasks set description = ${'x'.repeat(5000)} where id = ${a.task}`);
+    const cipher = await getCipher(a.ws);
+    const longest = await encryptTaskText(cipher, TASK_DESCRIPTION, '€'.repeat(5000));
+    expect(longest.length).toBeLessThanOrEqual(28_000);
+    await admin().execute(sql`update tasks set description = ${longest} where id = ${a.task}`);
+    const longestComment = await encryptTaskText(cipher, TASK_COMMENT_TEXT, '€'.repeat(5000));
+    await admin().execute(sql`update task_comments set text = ${longestComment} where id = ${a.comment}`);
+    await admin().execute(sql`update tasks set description = ${oversized.slice(0, 28_000)} where id = ${a.task}`);
   });
 });
 
@@ -530,6 +562,10 @@ describe('task data and LGPD', () => {
     expect(data.taskComments).toEqual([
       expect.objectContaining({ taskId: task.body.id, text: 'Cliente enviou o CNPJ', authorName: 'Ana Titular' }),
     ]);
+    // Exported decrypted (like the other encrypted fields), stored encrypted (0013).
+    expect(await storedDescription(task.body.id)).toMatch(CIPHERTEXT);
+    expect(await storedComment(data.taskComments[0].id)).toMatch(CIPHERTEXT);
+    expect(JSON.stringify([data.tasks, data.taskComments])).not.toMatch(/v1\.[\w-]{16}\./);
     expect(data.taskClientResponsibles).toEqual([
       expect.objectContaining({ clientId: client.body.id, departmentId: department.body.id, userId: owner.userId }),
     ]);
@@ -565,5 +601,186 @@ describe('task data and LGPD', () => {
                + (select count(*) from task_comments where author_name like 'Bruno%') as n`,
     );
     expect(Number(left!.n)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Descriptions and comments encrypted (migration 0013)
+// ---------------------------------------------------------------------------
+
+const migrationsFolder = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../drizzle');
+
+/** Applies a migration file again as the owner, split like the migrator does. */
+async function rerunMigration(file: string) {
+  const source = await readFile(path.join(migrationsFolder, file), 'utf8');
+  for (const statement of source.split('--> statement-breakpoint')) {
+    if (statement.trim()) await admin().execute(sql.raw(statement));
+  }
+}
+
+/** A member of `owner`'s workspace (invite accepted: the session switches to it). */
+async function join(owner: Awaited<ReturnType<typeof registerUser>>, name: string) {
+  const email = `membro-${randomUUID()}@teste.com`;
+  const invite = await owner.post('/workspaces/current/invites', { email, role: 'viewer' });
+  expect(invite.status).toBe(201);
+  const guest = await registerUser(app, name, email);
+  expect((await guest.post(`/invites/${invite.body.inviteUrl.split('/convite/')[1]}/accept`)).status).toBe(200);
+  return guest;
+}
+
+/** Rows of the task tables whose text (any column) contains `needle`. */
+async function clearTextCopies(needle: string): Promise<number> {
+  const [found] = await rows<{ n: number }>(
+    sql`select (select count(*) from tasks t where position(${needle} in t::text) > 0)
+             + (select count(*) from task_comments c where position(${needle} in c::text) > 0) as n`,
+  );
+  return Number(found!.n);
+}
+
+describe('task descriptions and comments encrypted (migration 0013)', () => {
+  it('are stored as ciphertext and come back as text from every route that shows them', async () => {
+    const ana = await registerUser(app, 'Ana Titular');
+    const carla = await join(ana, 'Carla Souza');
+    const ws = (await ana.get('/auth/me')).body.workspace.id as string;
+    const cipher = await getCipher(ws);
+
+    const created = await ana.post('/tasks', { title: 'Certidão negativa', description: 'Pedir a CND na Receita', assigneeId: carla.userId });
+    expect(created.status).toBe(201);
+    expect(created.body.description).toBe('Pedir a CND na Receita');
+    const id = created.body.id as string;
+    const first = await storedDescription(id);
+    expect(first).toMatch(CIPHERTEXT);
+    expect(await cipher.decrypt('tasks', 'description', first)).toBe('Pedir a CND na Receita');
+
+    // Autosave: a new ciphertext (fresh IV) each time; clearing stores null.
+    const edited = await carla.patch(`/tasks/${id}`, { description: 'Pedir a CND na Receita e na PGFN' });
+    expect(edited.body.description).toBe('Pedir a CND na Receita e na PGFN');
+    const second = await storedDescription(id);
+    expect(second).toMatch(CIPHERTEXT);
+    expect(second).not.toBe(first);
+    expect((await carla.patch(`/tasks/${id}`, { description: null })).body.description).toBeNull();
+    expect(await storedDescription(id)).toBeNull();
+    expect((await carla.patch(`/tasks/${id}`, { description: 'Pedir a CND na Receita' })).body.description).toBe('Pedir a CND na Receita');
+
+    const long = `Cliente enviou o contrato social e a última alteração; falta a procuração assinada ${'.'.repeat(20)}`;
+    const comment = await carla.post(`/tasks/${id}/comments`, { text: long });
+    expect(comment.status).toBe(201);
+    expect(comment.body.text).toBe(long);
+    expect(await storedComment(comment.body.id)).toMatch(CIPHERTEXT);
+
+    const detail = (await ana.get(`/tasks/${id}`)).body;
+    expect(detail.description).toBe('Pedir a CND na Receita');
+    expect(detail.comments).toEqual([expect.objectContaining({ id: comment.body.id, text: long })]);
+    // Ana created the task: Carla's comment shows up in her activity, as an 80-character excerpt.
+    expect((await ana.get('/tasks/activity')).body).toEqual([expect.objectContaining({ taskId: id, text: `${long.slice(0, 80)}…` })]);
+
+    // The list never carries descriptions; its search looks at titles only (descriptions are encrypted).
+    const list = await ana.get('/tasks');
+    expect(list.body.items).toHaveLength(1);
+    expect(list.raw.body).not.toMatch(/v1\.[\w-]{16}\./);
+    expect(list.raw.body).not.toContain('Receita');
+    expect((await ana.get('/tasks?search=Receita')).body.total).toBe(0);
+    expect((await ana.get('/tasks?search=certid')).body.total).toBe(1);
+
+    // No clear-text copy anywhere in the task tables.
+    expect(await clearTextCopies('Receita')).toBe(0);
+    expect(await clearTextCopies('procuração')).toBe(0);
+  });
+
+  it('a ciphertext only opens in its own workspace, table and column', async () => {
+    const ana = await registerUser(app, 'Ana Titular');
+    const bruno = await registerUser(app, 'Bruno Outro');
+    const wsA = (await ana.get('/auth/me')).body.workspace.id as string;
+    const wsB = (await bruno.get('/auth/me')).body.workspace.id as string;
+    const taskA = await ana.post('/tasks', { title: 'Folha', description: 'Salário do diretor: confidencial' });
+    const taskB = await bruno.post('/tasks', { title: 'Balancete', description: 'Do Bruno' });
+    expect(taskB.status).toBe(201);
+    const stolen = (await storedDescription(taskA.body.id))!;
+
+    // Copied into the other workspace's task (a database-level move): B's key does not open it.
+    await admin().execute(sql`update tasks set description = ${stolen} where id = ${taskB.body.id}`);
+    const res = await bruno.get(`/tasks/${taskB.body.id}`);
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'internal_error', message: 'Erro inesperado. Tente novamente.' });
+    expect(res.raw.body).not.toContain('confidencial');
+    await expect((await getCipher(wsB)).decrypt(TASK_DESCRIPTION.table, TASK_DESCRIPTION.column, stolen)).rejects.toBeInstanceOf(
+      DecryptionError,
+    );
+    // Same workspace, another column: a description is not a comment.
+    await expect((await getCipher(wsA)).decrypt(TASK_COMMENT_TEXT.table, TASK_COMMENT_TEXT.column, stolen)).rejects.toBeInstanceOf(
+      DecryptionError,
+    );
+    expect(await (await getCipher(wsA)).decrypt(TASK_DESCRIPTION.table, TASK_DESCRIPTION.column, stolen)).toBe(
+      'Salário do diretor: confidencial',
+    );
+    // A's own task is intact.
+    expect((await ana.get(`/tasks/${taskA.body.id}`)).body.description).toBe('Salário do diretor: confidencial');
+  });
+
+  it('text with a NUL character is refused before encrypting (the database never sees it)', async () => {
+    const ana = await registerUser(app, 'Ana Titular');
+    const task = await ana.post('/tasks', { title: 'Base' });
+    for (const res of [
+      await ana.post('/tasks', { title: 'Com descrição', description: 'a\u0000b' }),
+      await ana.patch(`/tasks/${task.body.id}`, { description: 'a\u0000b' }),
+      await ana.post(`/tasks/${task.body.id}/comments`, { text: 'oi\u0000' }),
+    ]) {
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: 'validation_error', message: 'O texto enviado contém caracteres inválidos.' });
+    }
+    expect((await ana.get('/tasks')).body.total).toBe(1);
+  });
+
+  it('the backfill encrypts rows written before 0013, and the migration runs again over them', async () => {
+    const ana = await registerUser(app, 'Ana Titular');
+    const ws = (await ana.get('/auth/me')).body.workspace.id as string;
+    const current = await ana.post('/tasks', { title: 'Já cifrada', description: 'Escrita depois da 0013' });
+    const currentComment = await ana.post(`/tasks/${current.body.id}/comments`, { text: 'Também cifrado' });
+    const keptDescription = await storedDescription(current.body.id);
+    const keptComment = await storedComment(currentComment.body.id);
+
+    // The database as it was before 0013 (0012's CHECKs), with clear text written by the old API.
+    let restored = false;
+    await admin().execute(sql.raw(`alter table tasks drop constraint tasks_description_chk;
+      alter table tasks add constraint tasks_description_chk check (length(description) between 1 and 5000);
+      alter table task_comments drop constraint task_comments_text_chk;
+      alter table task_comments add constraint task_comments_text_chk check (length(text) between 1 and 5000)`));
+    try {
+      const [legacy] = await admin()
+        .insert(tasks)
+        .values({ workspaceId: ws, title: 'Antiga', description: 'Contrato social antigo', createdByName: 'Ana Titular' })
+        .returning();
+      const [legacyComment] = await admin()
+        .insert(taskComments)
+        .values({ workspaceId: ws, taskId: legacy!.id, authorId: ana.userId, authorName: 'Ana Titular', text: 'Comentário de antes da cifra' })
+        .returning();
+      expect(await needsBackfill(app.db)).toBe(false);
+
+      // 0013 again (re-runnable, NOT VALID over the clear text) marks every workspace for the backfill…
+      await rerunMigration('0013_tasks_encrypted_text.sql');
+      restored = true;
+      expect(await needsBackfill(app.db)).toBe(true);
+      // …and refuses new clear text right away.
+      expect((await pgFailure(admin().execute(sql`update tasks set title = 'Antiga!' where id = ${legacy!.id}`)))?.code).toBe('23514');
+
+      expect(await backfillEncryption(app.db)).toEqual({ workspaces: 1, rows: 2 });
+      expect(await needsBackfill(app.db)).toBe(false);
+      expect(await storedDescription(legacy!.id)).toMatch(CIPHERTEXT);
+      expect(await storedComment(legacyComment!.id)).toMatch(CIPHERTEXT);
+      expect(await clearTextCopies('Contrato social antigo')).toBe(0);
+      expect(await clearTextCopies('antes da cifra')).toBe(0);
+      // What was already encrypted is left as it was.
+      expect(await storedDescription(current.body.id)).toBe(keptDescription);
+      expect(await storedComment(currentComment.body.id)).toBe(keptComment);
+
+      const detail = (await ana.get(`/tasks/${legacy!.id}`)).body;
+      expect(detail.description).toBe('Contrato social antigo');
+      expect(detail.comments).toEqual([expect.objectContaining({ text: 'Comentário de antes da cifra' })]);
+      // A second backfill finds nothing to do.
+      await admin().update(workspaces).set({ encryptionBackfilledAt: null }).where(eq(workspaces.id, ws));
+      expect(await backfillEncryption(app.db)).toEqual({ workspaces: 1, rows: 0 });
+    } finally {
+      if (!restored) await rerunMigration('0013_tasks_encrypted_text.sql');
+    }
   });
 });

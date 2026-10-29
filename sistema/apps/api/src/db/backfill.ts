@@ -1,18 +1,30 @@
-// Encrypts data written before field encryption existed (contacts, notes) and gives every workspace
-// a data key. Idempotent: values already in the `v1.` format are skipped. Runs after migrations.
+// Encrypts data written before field encryption existed (contacts, notes, task descriptions and
+// comments) and gives every workspace a data key. Idempotent: values already in the `v1.` format are
+// skipped. Runs after migrations (`db:migrate`, the demo's boot); a migration that encrypts a new
+// field clears `encryption_backfilled_at` so every workspace is checked again (0013).
 //
 // Completion is tracked per workspace (`workspaces.encryption_backfilled_at`), not by the presence of
 // the data key: keys are created outside the tenant transaction (and lazily by the API), so "has a
 // key" never proved that its rows were encrypted — a run interrupted after the key was stored, or a
 // workspace first opened by the API before `db:migrate`, would have kept plain text forever.
 
-import { eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import type { DbExecutor } from './client';
-import { contacts, goalContributions, goals, recurrences, transactions, workspaces } from './schema';
+import {
+  contacts,
+  goalContributions,
+  goals,
+  recurrences,
+  taskComments,
+  tasks,
+  transactions,
+  workspaces,
+} from './schema';
 import { getCipher } from '../lib/crypto/keyring';
 import { isEncrypted } from '../lib/crypto/field-cipher';
 import { withTenant } from '../lib/tenant';
 import { CONTACT_ENCRYPTED_FIELDS, encryptContactInput } from '../modules/contacts/service';
+import { encryptTaskText, TASK_COMMENT_TEXT, TASK_DESCRIPTION } from '../modules/tasks/encrypted-text';
 
 const pendingWorkspaces = or(isNull(workspaces.wrappedKey), isNull(workspaces.encryptionBackfilledAt));
 
@@ -57,6 +69,29 @@ export async function backfillEncryption(db: DbExecutor): Promise<{ workspaces: 
           .update(goalContributions)
           .set({ note: await cipher.encrypt('goal_contributions', 'note', c.note) })
           .where(eq(goalContributions.id, c.id));
+        n++;
+      }
+      // Task module (migration 0013): descriptions and comments.
+      for (const t of await tx
+        .select({ id: tasks.id, description: tasks.description })
+        .from(tasks)
+        .where(eq(tasks.workspaceId, id))) {
+        if (!plain(t.description)) continue;
+        await tx
+          .update(tasks)
+          .set({ description: await encryptTaskText(cipher, TASK_DESCRIPTION, t.description) })
+          .where(and(eq(tasks.workspaceId, id), eq(tasks.id, t.id)));
+        n++;
+      }
+      for (const c of await tx
+        .select({ id: taskComments.id, text: taskComments.text })
+        .from(taskComments)
+        .where(eq(taskComments.workspaceId, id))) {
+        if (!plain(c.text)) continue;
+        await tx
+          .update(taskComments)
+          .set({ text: await encryptTaskText(cipher, TASK_COMMENT_TEXT, c.text) })
+          .where(and(eq(taskComments.workspaceId, id), eq(taskComments.id, c.id)));
         n++;
       }
       return n;

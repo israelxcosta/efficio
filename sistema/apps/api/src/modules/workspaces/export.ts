@@ -25,6 +25,7 @@ import { getCipher } from '../../lib/crypto/keyring';
 import { withTenant } from '../../lib/tenant';
 import { CONTACT_ALL_ENCRYPTED_FIELDS } from '../contacts/service';
 import { exportOpenFinance } from '../open-finance/service';
+import { decryptTaskText, TASK_COMMENT_TEXT, TASK_DESCRIPTION } from '../tasks/encrypted-text';
 import { getSubscriptionRow, listMembers } from './service';
 import { summarizeSubscription } from '../billing/entitlements';
 import type { Access } from './access';
@@ -56,7 +57,7 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
     // Connections and import batches: metadata only (no aggregator ids, blind indexes or cursors).
     const integrations = await exportOpenFinance(tx);
     // Task module (migration 0011): registries, tasks with their subtasks and comments (authorship as
-    // recorded: user id and the name at the time).
+    // recorded: user id and the name at the time; descriptions and comments decrypted, migration 0013).
     const [departments, departmentMembers, taskCats, taskRows, subtaskRows, commentRows, responsibleRows] =
       await Promise.all([
         tx.select().from(taskDepartments).orderBy(asc(taskDepartments.createdAt)),
@@ -94,9 +95,13 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
       taskDepartments: departments,
       taskDepartmentMembers: departmentMembers,
       taskCategories: taskCats,
-      tasks: taskRows,
+      tasks: await Promise.all(
+        taskRows.map(async (t) => ({ ...t, description: await decryptTaskText(cipher, TASK_DESCRIPTION, t.description) })),
+      ),
       taskSubtasks: subtaskRows,
-      taskComments: commentRows,
+      taskComments: await Promise.all(
+        commentRows.map(async (c) => ({ ...c, text: await decryptTaskText(cipher, TASK_COMMENT_TEXT, c.text) })),
+      ),
       taskClientResponsibles: responsibleRows,
     };
   });

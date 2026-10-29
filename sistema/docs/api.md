@@ -303,7 +303,8 @@ Contrato em `packages/shared/src/saas.ts`.
   protegida pelo AWS KMS (`KEY_PROVIDER=aws`; em desenvolvimento, `local` com
   `ENCRYPTION_MASTER_KEY`). Campos sensíveis são gravados cifrados com AES-256-GCM (AAD =
   workspace + tabela + coluna): contatos (CPF/CNPJ, e-mail, telefone, endereço completo,
-  observações), observações de lançamentos e metas, segredo TOTP do usuário (chave mestra). CPF/CNPJ
+  observações), observações de lançamentos e metas, descrição e comentários de tarefas (0013),
+  segredo TOTP do usuário (chave mestra). CPF/CNPJ
   tem índice cego (HMAC) para busca exata. Excluir o workspace apaga a chave (crypto-shredding).
 - **Em trânsito e em repouso**: TLS obrigatório (`DATABASE_SSL=verify-full` com o CA do RDS);
   RDS com armazenamento e snapshots criptografados pelo KMS e backups com PITR.
@@ -419,7 +420,8 @@ Contrato em `packages/shared/src/saas.ts`.
   não ficam sob RLS: são acessados pelo login da API, com checagem explícita de papel.
 - **Busca com dados cifrados**: observações não são pesquisáveis (a busca de lançamentos usa só a
   descrição). Contatos: busca parcial por nome ou exata por CPF/CNPJ (índice cego); e-mail e
-  telefone não são pesquisáveis.
+  telefone não são pesquisáveis. Tarefas: a busca (`GET /tasks?search=`) é só pelo título; descrição
+  e comentários são cifrados.
 - **Limite de membros**: plano pago → `maxMembers` do plano; em teste → 1 (pessoal), 5 (família),
   15 (empresa). Membros + convites pendentes acima do limite → `422`. Convites pedem assinatura
   com escrita liberada (`402`).
@@ -437,7 +439,9 @@ Contrato em `packages/shared/src/saas.ts`.
   Se o membro foi removido do workspace da sessão, o refresh troca para outro workspace dele.
 - **Corpo vazio**: `Content-Type: application/json` com corpo vazio é aceito como "sem corpo".
 - **Dados legados**: `db:migrate` gera as chaves dos workspaces migrados e cifra campos ainda em
-  texto puro (idempotente). A demo faz o mesmo ao abrir uma base antiga do IndexedDB.
+  texto puro (idempotente). A demo faz o mesmo ao abrir uma base antiga do IndexedDB. Uma migração
+  que passa a cifrar um campo limpa `workspaces.encryption_backfilled_at` para que o backfill confira
+  todos os espaços de novo (0013: descrição e comentários de tarefas).
 - **Demo (PGlite)**: mesmas rotas e serviços, inclusive RLS e criptografia (chave mestra fixa e
   pública da demo), sessão no `localStorage` e provedor de pagamento fake.
 
@@ -710,6 +714,12 @@ e reabertura com histórico) e será redesenhado antes. Até lá, `GET /tasks` d
   membros (nomes e papéis) na conexão do sistema e trabalha numa transação de tenant (RLS); a resposta
   sai depois do COMMIT. O RLS continua sendo só por espaço (uma política por tabela, como as demais);
   o papel é checado na API.
+- **Filtro por espaço em toda consulta**: todo SELECT/UPDATE/DELETE do módulo filtra por
+  `workspace_id` do pedido — inclusive os UPDATE/DELETE por id que vêm depois da checagem de posse
+  (`taskKey`/`subtaskKey` em `service.ts`); o RLS é a segunda barreira. `test/tasks-scope.test.ts`
+  roda todos os serviços exportados numa conexão de superusuário (sem RLS), captura cada SQL pelo
+  logger do Drizzle e exige `workspace_id = <espaço>` (ou igualdade com uma tabela já filtrada, em
+  joins e subconsultas) para toda tabela de tenant; também confere que outro escritório fica intacto.
 - **Permissão por módulo** (pendência §17.1 da spec): resolvida de forma provisória pelo mapeamento de
   papéis (financeiro = `owner`/`editor`; tarefas = todos). Uma permissão "Tarefas: editar" separada do
   papel continua sendo decisão de produto.
@@ -779,14 +789,25 @@ membro do espaço → 422.
 - **Autoria**: criação, conclusão e comentários guardam o usuário e o **nome no momento**
   (`*_name`); a resposta usa o nome atual enquanto a pessoa é membro e o gravado depois que sai (o
   histórico de um escritório não perde quem fez). Se a **conta** é excluída, o nome gravado vira
-  "Usuário excluído" (gatilho da 0012). Comentário é texto puro, autor sempre da sessão.
+  "Usuário excluído" (gatilho da 0012). Comentário é texto simples (sem formatação; gravado
+  cifrado), autor sempre da sessão.
 - **Limites** (o detalhe devolve tudo de uma vez): até 100 subtarefas e 500 comentários por tarefa
   (`MAX_SUBTASKS_PER_TASK`/`MAX_COMMENTS_PER_TASK` em `modules/tasks/service.ts`; acima → 422);
-  título 200, descrição e comentário 5000 caracteres; `pageSize` até 200; na página de início, `mine`
-  conta todas as abertas em SQL e carrega só as 20 primeiras. Texto com caractere NUL → 400 (em toda
-  a API: `fromDatabaseError` mapeia os SQLSTATE `22021`/`22P05`). Testes: `test/tasks-security.test.ts`
+  título 200, descrição e comentário 5000 caracteres (limite do contrato; no banco o texto é cifrado);
+  `pageSize` até 200; na página de início, `mine` conta todas as abertas em SQL e carrega só as 20
+  primeiras. Texto com caractere NUL → 400 (em toda a API: `fromDatabaseError` mapeia os SQLSTATE
+  `22021`/`22P05`; na descrição e nos comentários, que o banco só vê cifrados, a API recusa antes de
+  cifrar com a mesma resposta, `InvalidTextError`). Testes: `test/tasks-security.test.ts`
   (inventário de rotas de administrador, ids fora do escopo, campos do servidor, limites e nada
   financeiro ou cifrado para o colaborador).
+- **Descrição e comentários cifrados** (migração 0013; política de privacidade §5, "observações"):
+  gravados com a chave do espaço (AES-256-GCM, AAD `workspace:tabela:coluna` — `tasks:description` e
+  `task_comments:text` —, formato `v1.<iv>.<ct>`; `modules/tasks/encrypted-text.ts`, cifra entregue
+  pelo `inTenant` no `TaskContext.cipher`). Criar, editar (autosave), detalhe, comentar, atividade
+  recente e a exportação LGPD devolvem o texto decifrado (o formato das respostas não mudou); a
+  listagem não carrega a descrição. Título de tarefa e de subtarefa continuam em claro (busca e
+  listas). Um texto cifrado copiado para outro espaço, tabela ou coluna não decifra (erro 500
+  genérico, sem o conteúdo). Testes: `test/tasks-db.test.ts` ("encrypted (migration 0013)").
 - **Membro removido do espaço**: as tarefas dele ficam sem responsável (`ON DELETE SET NULL
   (assignee_id)`, mantendo o departamento) e saem o departamento do membro e as responsabilidades por
   cliente (cascata).
@@ -809,8 +830,8 @@ membro do espaço → 422.
   `none`), `departmentId`, `categoryId`, `priority`, `kind` (`standalone`; `recurring`/`flow` vazios
   na fase 1), `month` (mês de vencimento), `dueDate`, `dueFrom`/`dueTo`, `dueBucket` (um grupo de
   prazo das abertas: `overdue | today | next7Days | later | noDueDate`), `closedFrom` (quadro:
-  concluídas/canceladas só a partir dessa data, pela conclusão), `search` (título), `page`/`pageSize`
-  (até 200).
+  concluídas/canceladas só a partir dessa data, pela conclusão), `search` (só o título: descrição e
+  comentários são cifrados e não entram na busca), `page`/`pageSize` (até 200).
 - Ordem: vencimento (sem vencimento por último), prioridade (urgente primeiro), título; em
   `situation=done`, a conclusão mais recente primeiro.
 - `summary` (`TaskListSummary`) usa **os mesmos filtros, exceto a situação** (e `dueBucket`/
@@ -834,7 +855,8 @@ membro do espaço → 422.
 ### Atividade (`GET /tasks/activity`)
 
 Comentários dos **outros** nos últimos 5 dias em tarefas de que você é responsável ou criador, com
-trecho de 80 caracteres, até 50 (Effy `atividadeRecente`; anexos não foram portados).
+trecho de 80 caracteres (do texto decifrado), até 50 (Effy `atividadeRecente`; anexos não foram
+portados).
 
 ## Banco (migração 0011)
 
@@ -860,9 +882,29 @@ Reforço de segurança das tabelas de tarefas:
 - **Eliminação LGPD**: gatilhos `BEFORE UPDATE` trocam `created_by_name`, `completed_by_name` e
   `author_name` por "Usuário excluído" quando o `ON DELETE SET NULL` de `users` limpa o id (exclusão
   da conta). Sair do espaço mantém o nome.
-- **CHECKs** espelhando o contrato: descrição 1–5000, nome de categoria 1–60, nomes gravados 1–120.
+- **CHECKs** espelhando o contrato: descrição 1–5000 (substituído na 0013, quando a descrição passou a
+  ser cifrada), nome de categoria 1–60, nomes gravados 1–120.
 - **Índices** parciais das abertas por responsável e por departamento (mesmo predicado do
   `OPEN_SQL`) e de comentários recentes.
+
+## Banco (migração 0013)
+
+Descrição e comentários cifrados por campo (CWE-312):
+
+- **CHECKs** `tasks_description_chk` e `task_comments_text_chk` trocam o tamanho 1–5000 (que recusaria
+  o texto cifrado: 5000 caracteres viram até ~20 mil, ~27 mil com caracteres de 4 bytes) pelo
+  **formato** `^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$` (texto em claro é recusado) e um **teto**
+  de 28000 caracteres. O limite de 5000 continua no contrato (Zod). Criadas `NOT VALID`: linhas
+  anteriores à migração ficam em claro até o backfill, e toda linha inserida ou alterada depois é
+  conferida (um UPDATE numa linha legada antes do backfill falha com 23514).
+- **Backfill**: a migração limpa `workspaces.encryption_backfilled_at` de todos os espaços (o dono
+  das tabelas não enxerga as linhas de tarefas: RLS forçado), e o `backfillEncryption` — logo depois
+  das migrações no `db:migrate` e na abertura do demo — cifra descrições e comentários em claro
+  (`db/backfill.ts`; ignora o que já está cifrado). Depois, rode `VACUUM FULL tasks, task_comments`
+  numa janela de manutenção (as versões antigas ficam em tuplas mortas, WAL e backups até expirarem).
+- Reexecutável (`DROP … IF EXISTS` antes de cada constraint; rodar de novo só faz o backfill conferir
+  outra vez) e roda no PGlite (sem `CONCURRENTLY`). Teste: `test/tasks-db.test.ts` reaplica a 0013
+  sobre linhas legadas e roda o backfill.
 
 ## Diferenças deliberadas em relação ao Effy
 
@@ -880,4 +922,3 @@ Reforço de segurança das tabelas de tarefas:
 - Anexos de tarefa (armazenamento de arquivos; a spec §8.1 prevê a seção).
 - Busca global (`/search`, ⌘K) com tarefas (§17.8) e feriados no cálculo de dias úteis
   (`HolidayCalendar` em `utils/tasks.ts`).
-- Descrição e comentários de tarefas em texto claro (a política prevê cifra de observações).

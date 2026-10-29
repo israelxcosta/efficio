@@ -62,7 +62,7 @@ sistema/
 │   └── utils/                  datas, dinheiro, documentos, fatura, recorrência, vigências,
 │                               juros/multa (late-fees) e score de inadimplência (delinquency)
 ├── apps/api/
-│   ├── drizzle/0000…0012*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
+│   ├── drizzle/0000…0013*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
 │   ├── src/app.ts, server.ts   montagem do Fastify, hooks globais, árvore de rotas
 │   ├── src/routes.ts           domainRoutes (tenantRoutes) e scopedRoutes (inTenant)
 │   ├── src/setup.ts, env.ts    providers (e-mail, cobrança, Open Finance, CNPJ) e env validado
@@ -165,7 +165,7 @@ sequenceDiagram
 | `search` | `/search` | lançamentos, contas, categorias, contatos; ordena pela distância de hoje |
 | `imports` | `/imports` | OFX/CSV: prévia, duplicados, sugestão de categoria, lote com desfazer |
 | `open-finance` | `/open-finance/*` | Pluggy ou provedor simulado, vínculo de contas, sync incremental, webhooks |
-| `tasks` | `/tasks/*` | fase 1: departamentos (um por membro), categorias, tarefas (departamento derivado do responsável, conclusão com quem/quando, atrasada derivada), subtarefas, comentários, responsável por cliente × departamento, lista com resumo e página de início (`home.ts`); fases 2–4 só no contrato |
+| `tasks` | `/tasks/*` | fase 1: departamentos (um por membro), categorias, tarefas (departamento derivado do responsável, conclusão com quem/quando, atrasada derivada), subtarefas, comentários, responsável por cliente × departamento, lista com resumo e página de início (`home.ts`); descrição e comentários cifrados (`encrypted-text.ts`, `TaskContext.cipher`); toda consulta filtra por espaço (`test/tasks-scope.test.ts`); fases 2–4 só no contrato |
 
 ### Dados, segurança e migrações
 
@@ -177,12 +177,16 @@ sequenceDiagram
   (`test/db-roles.ts`). Consultas comuns em tabelas financeiras fora de `withTenant` falham.
 - **Criptografia por campo:** AES-256-GCM com chave por espaço (embrulhada pelo KeyProvider), AAD
   `workspace:tabela:coluna`, valor `v1.<iv>.<ct>`. Cifrados: dados pessoais de contatos (documento,
-  e-mail, telefone, endereço, responsável…), notas de lançamentos/séries/metas, ids do Open Finance.
-  Busca exata por índice cego (HMAC). Nomes e descrições ficam em claro.
+  e-mail, telefone, endereço, responsável…), notas de lançamentos/séries/metas, descrição e
+  comentários de tarefas (0013), ids do Open Finance. Busca exata por índice cego (HMAC). Nomes,
+  títulos de tarefas e descrições de lançamentos ficam em claro (são pesquisáveis). Campo novo
+  cifrado: migração limpa `encryption_backfilled_at` e o backfill (`db/backfill.ts`) cifra o legado.
 - **Migrações:** 0000 inicial · 0001 divisão · 0002 espaços · 0003 RLS · 0004 integridade de tenant ·
   0005 importação/Open Finance · 0006 tombstones · 0007 clientes e vigências · 0008 juros e multa ·
   0009 geração de honorários · 0010 vencimento por cliente e desconto por pontualidade · 0011
-  tarefas (fase 1) · 0012 reforço de tarefas (só clientes, nomes na exclusão da conta, CHECKs, índices). Escritas para rodar duas vezes e também no PGlite.
+  tarefas (fase 1) · 0012 reforço de tarefas (só clientes, nomes na exclusão da conta, CHECKs, índices) ·
+  0013 descrição e comentários de tarefas cifrados (CHECK de formato `NOT VALID` + backfill). Escritas
+  para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tarefas usam `todayIn('America/Sao_Paulo')` (o dia do escritório, não o do servidor
   UTC) e `now()`, que `EFFINANCE_NOW` fixa nos testes. Tokens, sessões e trials usam o relógio real.
@@ -260,7 +264,8 @@ sequenceDiagram
 6. `d.overdue.count` (dashboard) exclui compras no cartão; `summary.overdueCount` de
    `/transactions` inclui cada compra de fatura vencida.
 7. `getCipher` deve ser chamado antes de abrir a transação de tenant (o papel de tenant não lê
-   `workspaces`; o PGlite tem uma conexão só).
+   `workspaces`; o PGlite tem uma conexão só). `inTenant` já faz isso e entrega a cifra ao callback
+   (`(tx, cipher)`); no módulo de tarefas ela chega em `TaskContext.cipher`.
 8. Rótulos de risco e algumas chaves de gráfico são em português (`baixo`, `critico`, `saldo`).
 9. **Financeiro só para administradores** (`owner`/`editor`): módulo financeiro novo chama
    `financeOnly(app)` (`lib/finance-access.ts`) no início do plugin (depois de `tenantGuards`, se

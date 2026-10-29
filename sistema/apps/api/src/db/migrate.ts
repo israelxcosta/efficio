@@ -22,7 +22,7 @@ export async function runMigrations(url?: string) {
       console.log(`✔ encryption backfill: ${result.workspaces} workspaces, ${result.rows} rows encrypted`);
       // Old plain-text versions of the updated rows stay in dead tuples until vacuumed (and in WAL and
       // backups until they expire). When rows > 0, run `VACUUM FULL contacts, transactions,
-      // recurrences, goals, goal_contributions` in a maintenance window.
+      // recurrences, goals, goal_contributions, tasks, task_comments` in a maintenance window.
     }
     const purged = await purgeExpiredSecurityRows(db);
     console.log(

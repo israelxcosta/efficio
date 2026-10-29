@@ -92,6 +92,13 @@
       "when": 1793260856541,
       "tag": "0012_tasks_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793262761606,
+      "tag": "0013_tasks_encrypted_text",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ import { TASK_TIME_ZONE, type ISODate, type MemberRole } from '@effinance/shared
 import type { DbExecutor } from '../../db/client';
 import { users, workspaceMembers } from '../../db/schema';
 import { todayIn } from '../../lib/clock';
+import type { FieldCipher } from '../../lib/crypto/field-cipher';
 import { ForbiddenError, SubscriptionRequiredError } from '../../lib/errors';
 import { inTenant } from '../../lib/tenant-scope';
 import { isMutation, type Access } from '../workspaces/access';
@@ -36,6 +37,11 @@ export interface TaskContext {
   members: ReadonlyMap<string, MemberInfo>;
   /** Today in the office time zone. */
   today: ISODate;
+  /**
+   * Field cipher of the workspace (task descriptions and comments: `encrypted-text.ts`), unwrapped
+   * before the tenant transaction opened (the tenant role cannot read `workspaces`).
+   */
+  cipher: FieldCipher;
   log?: { warn: (obj: object, msg: string) => void };
 }
 
@@ -80,7 +86,7 @@ export async function runTasks<T>(
   fn: (ctx: TaskContext) => Promise<T>,
 ): Promise<T> {
   const members = await loadMembers(system, req.workspaceId);
-  return inTenant(system, req.workspaceId, (db) =>
+  return inTenant(system, req.workspaceId, (db, cipher) =>
     fn({
       db,
       workspaceId: req.workspaceId,
@@ -90,6 +96,7 @@ export async function runTasks<T>(
       canWrite: req.access.subscription.canWrite,
       members,
       today: todayIn(TASK_TIME_ZONE),
+      cipher,
       log: req.log,
     }),
   );

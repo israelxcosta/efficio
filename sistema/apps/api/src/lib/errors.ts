@@ -57,6 +57,17 @@ export class SubscriptionRequiredError extends AppError {
   }
 }
 
+/**
+ * Text Postgres cannot store (a NUL character), sent by the client: a 400, the same answer whether the
+ * database refused it (`fromDatabaseError`) or the API did before encrypting it (the database never
+ * sees the clear text of an encrypted field).
+ */
+export class InvalidTextError extends AppError {
+  constructor() {
+    super(400, 'validation_error', 'O texto enviado contém caracteres inválidos.');
+  }
+}
+
 /** Unique constraints whose violation the user can cause (races, double submits) → friendly 409. */
 const UNIQUE_CONFLICTS: Record<string, string> = {
   users_email_unique: 'Já existe uma conta com este e-mail',
@@ -88,7 +99,7 @@ export function fromDatabaseError(error: unknown): AppError | null {
   for (let depth = 0; current && typeof current === 'object' && depth < 4; depth++) {
     const e = current as { code?: unknown; constraint_name?: unknown; constraint?: unknown; cause?: unknown };
     if (typeof e.code === 'string' && INVALID_TEXT_CODES.has(e.code)) {
-      return new AppError(400, 'validation_error', 'O texto enviado contém caracteres inválidos.');
+      return new InvalidTextError();
     }
     const constraint = String(e.constraint_name ?? e.constraint ?? '');
     if (e.code === '23505') {
