@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router';
-import { ChevronDown, LogOut, Moon, Settings, Sun, UserRound } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { BriefcaseBusiness, ChevronDown, LogOut, Moon, Settings, Sun, UserRound, Wallet } from 'lucide-react';
 import { WORKSPACE_KIND_LABELS } from '@effinance/shared';
 import { cn, initials } from '@/lib/utils';
 import { useTheme } from '@/lib/theme';
@@ -17,9 +17,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { WorkspaceMenuItems, WorkspaceSheet } from '@/features/workspaces/workspace-switcher';
 import { WORKSPACE_KIND_ICONS } from '@/features/workspaces/kind-icon';
-import { NAV_ITEMS, SETTINGS_ITEM, splitRail, type NavItem } from './nav';
+import { usePermissions } from '@/features/auth/permissions';
+import { lastPathOf, type AreaMemory } from './area-memory';
+import { AREA_HOME, AREA_SHORT_LABELS, isActivePath, navItemsFor, SETTINGS_ITEM, splitRail, type Area, type NavItem } from './nav';
 
-export function Sidebar() {
+interface SidebarProps {
+  /** Area whose rail is shown (Gestão or Financeiro). */
+  area: Area;
+  /** Last page of each area in this session (destination of the switch button). */
+  memory: AreaMemory;
+}
+
+export function Sidebar({ area, memory }: SidebarProps) {
   const { user, workspace, logout } = useAuth();
   const { resolved, toggle } = useTheme();
   const navigate = useNavigate();
@@ -27,20 +36,37 @@ export function Sidebar() {
   const KindIcon = workspace ? WORKSPACE_KIND_ICONS[workspace.kind] : null;
   // Icons that do not fit the window height go to the "more" menu beside the rail (no scrollbar).
   const rail = useElementSize<HTMLElement>();
-  const { visible, hidden } = splitRail(NAV_ITEMS, rail.height);
+  const { visible, hidden } = splitRail(navItemsFor(area), rail.height);
+  // Only members with both areas see the area label and the switch button.
+  const { canAccessFinance } = usePermissions();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col items-center border-r border-border bg-bg-subtle py-5 lg:flex print:hidden">
-      <NavLink to="/" className="mb-6 text-[13px] font-extrabold tracking-tight text-fg" aria-label="Efficio — início">
-        efficio
-      </NavLink>
-      <nav ref={rail.ref} aria-label="Navegação principal" className="flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-hidden">
+      <Link
+        to={AREA_HOME[area]}
+        className={cn('flex flex-col items-center', canAccessFinance ? 'mb-5' : 'mb-6')}
+        aria-label={area === 'financeiro' ? 'Efficio — painel financeiro' : 'Efficio — início da gestão'}
+      >
+        <span className="text-[13px] font-extrabold tracking-tight text-fg">efficio</span>
+        {canAccessFinance ? <span className="mt-0.5 text-micro font-semibold text-muted">{AREA_SHORT_LABELS[area]}</span> : null}
+      </Link>
+      <nav
+        ref={rail.ref}
+        aria-label={area === 'financeiro' ? 'Navegação do financeiro' : 'Navegação da gestão de tarefas'}
+        className="flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-hidden"
+      >
         {visible.map((item) => (
           <SidebarLink key={item.to} {...item} />
         ))}
         {hidden.length ? <MoreLinks items={hidden} /> : null}
       </nav>
       <div className="mt-4 flex flex-col items-center gap-3">
+        {canAccessFinance ? (
+          <>
+            <span className="my-1 h-px w-6 bg-border" aria-hidden />
+            <AreaSwitchButton area={area} to={lastPathOf(memory, area === 'gestao' ? 'financeiro' : 'gestao')} />
+          </>
+        ) : null}
         <SidebarLink {...SETTINGS_ITEM} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -100,8 +126,26 @@ export function Sidebar() {
   );
 }
 
-function isActivePath(pathname: string, to: string): boolean {
-  return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`);
+/**
+ * Fixed button at the foot of the rail that goes to the other area (administrators only), always in
+ * the same place in both areas. It has a fill and a ring at rest, so it reads as "change place", and
+ * it is never active.
+ */
+function AreaSwitchButton({ area, to }: { area: Area; to: string }) {
+  const toFinance = area === 'gestao';
+  const label = toFinance ? 'Ir para o financeiro' : 'Ir para a gestão de tarefas';
+  const Icon = toFinance ? Wallet : BriefcaseBusiness;
+  return (
+    <Tooltip content={label} side="right" delay={150}>
+      <Link
+        to={to}
+        aria-label={label}
+        className="flex size-11 shrink-0 items-center justify-center rounded-md bg-surface text-muted shadow-xs ring-1 ring-border transition-colors duration-150 hover:text-fg hover:ring-border-strong"
+      >
+        <Icon className="size-5" />
+      </Link>
+    </Tooltip>
+  );
 }
 
 /**
@@ -111,7 +155,7 @@ function isActivePath(pathname: string, to: string): boolean {
 function MoreLinks({ items }: { items: NavItem[] }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const active = items.some((i) => isActivePath(pathname, i.to));
+  const active = items.some((i) => isActivePath(pathname, i));
   return (
     <DropdownMenu>
       <Tooltip content={`Mais ${items.length} ${items.length === 1 ? 'item' : 'itens'}`} side="right" delay={150}>
@@ -130,7 +174,7 @@ function MoreLinks({ items }: { items: NavItem[] }) {
       </Tooltip>
       <DropdownMenuContent side="right" align="end" sideOffset={14} className="w-60">
         {items.map((item) => {
-          const current = isActivePath(pathname, item.to);
+          const current = isActivePath(pathname, item);
           return (
             <DropdownMenuItem
               key={item.to}
@@ -148,9 +192,9 @@ function MoreLinks({ items }: { items: NavItem[] }) {
   );
 }
 
-function SidebarLink({ to, label, icon: Icon }: { to: string; label: string; icon: React.ComponentType<{ className?: string }> }) {
+function SidebarLink({ to, label, icon: Icon, end }: { to: string; label: string; end?: boolean; icon: React.ComponentType<{ className?: string }> }) {
   const { pathname } = useLocation();
-  const isActive = isActivePath(pathname, to);
+  const isActive = isActivePath(pathname, { to, end });
   // Plain Link with a string className: Tooltip's Slot cannot merge NavLink's function className.
   return (
     <Tooltip content={label} side="right" delay={150}>

@@ -3,9 +3,12 @@ import {
   Building2,
   ChartLine,
   CreditCard,
+  FolderCog,
   HandCoins,
+  House,
   Landmark,
   LayoutGrid,
+  ListChecks,
   Receipt,
   ScrollText,
   Settings,
@@ -24,10 +27,34 @@ export interface NavItem {
   /** One-word label of the mobile bottom bar; the first word of `label` when omitted. */
   short?: string;
   keywords?: string;
+  /** Active only on the exact path (Tarefas: the other Gestão pages live under `/tarefas/`). */
+  end?: boolean;
 }
 
-export const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', short: 'Painel', icon: LayoutGrid, mobile: true, keywords: 'inicio resumo visao geral' },
+/**
+ * The two areas of the app. Gestão de tarefas (everyone, the start page after login) and Financeiro
+ * (administrators only). `/configuracoes` and unknown paths belong to neither (`common`).
+ */
+export type Area = 'gestao' | 'financeiro';
+
+/** Gestão de tarefas, phase 1: Início, Tarefas, Clientes and Cadastros (in order of use). */
+export const GESTAO_NAV_ITEMS: NavItem[] = [
+  { to: '/', label: 'Início', icon: House, mobile: true, end: true, keywords: 'painel resumo departamento hoje minhas' },
+  {
+    to: '/tarefas',
+    label: 'Tarefas',
+    icon: ListChecks,
+    mobile: true,
+    end: true,
+    keywords: 'solicitacoes pedidos afazeres prazos kanban quadro agenda compromissos',
+  },
+  { to: '/tarefas/clientes', label: 'Clientes', icon: Building2, mobile: true, keywords: 'empresas cnpj regime contatos responsaveis carteira' },
+  { to: '/tarefas/cadastros', label: 'Cadastros', icon: FolderCog, keywords: 'departamentos categorias equipe usuarios membros' },
+];
+
+/** Financeiro: the rail of the finance app, with the panel at `/financeiro`. */
+export const FINANCE_NAV_ITEMS: NavItem[] = [
+  { to: '/financeiro', label: 'Painel financeiro', short: 'Painel', icon: LayoutGrid, mobile: true, keywords: 'dashboard inicio resumo visao geral caixa' },
   { to: '/extrato', label: 'Extrato', icon: ScrollText, keywords: 'lancamentos movimentacoes saldo' },
   { to: '/contas-a-pagar', label: 'Contas a pagar', icon: Receipt, keywords: 'despesas boletos vencimentos' },
   { to: '/contas-a-receber', label: 'Contas a receber', short: 'Receber', icon: HandCoins, mobile: true, keywords: 'receitas entradas honorarios' },
@@ -42,6 +69,40 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const SETTINGS_ITEM: NavItem = { to: '/configuracoes', label: 'Configurações', icon: Settings, keywords: 'perfil tema senha seguranca 2fa sessoes membros convites assinatura plano integracoes open finance importacoes privacidade exportar lgpd' };
+
+export const AREA_LABELS: Record<Area, string> = { gestao: 'Gestão de tarefas', financeiro: 'Financeiro' };
+/** Short name under the logo. */
+export const AREA_SHORT_LABELS: Record<Area, string> = { gestao: 'Gestão', financeiro: 'Financeiro' };
+export const AREA_HOME: Record<Area, string> = { gestao: '/', financeiro: '/financeiro' };
+
+export function navItemsFor(area: Area): NavItem[] {
+  return area === 'financeiro' ? FINANCE_NAV_ITEMS : GESTAO_NAV_ITEMS;
+}
+
+/** Old address of the suppliers page, still a finance path (it redirects). */
+const LEGACY_FINANCE_PATHS = ['/contatos'];
+
+function underPath(pathname: string, to: string): boolean {
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+/**
+ * Area of a route: `/` and `/tarefas/*` are Gestão; the finance rail's paths and their sub-paths
+ * (`/cartoes/:id`, `/relatorios/cliente/:id`, the old `/contatos`) are Financeiro; anything else
+ * (`/configuracoes`, unknown paths) is common.
+ */
+export function areaOf(pathname: string): Area | 'common' {
+  const path = pathname.split(/[?#]/)[0] || '/';
+  if (path === '/' || underPath(path, '/tarefas')) return 'gestao';
+  if ([...FINANCE_NAV_ITEMS.map((i) => i.to), ...LEGACY_FINANCE_PATHS].some((to) => underPath(path, to))) return 'financeiro';
+  return 'common';
+}
+
+/** Whether a rail item is the current page (`end` items only on their exact path). */
+export function isActivePath(pathname: string, item: Pick<NavItem, 'to' | 'end'>): boolean {
+  if (item.to === '/' || item.end) return pathname === item.to;
+  return underPath(pathname, item.to);
+}
 
 /** Rail geometry (px): a 44px icon button every 50px (6px gap). */
 export const RAIL_ITEM_PX = 44;

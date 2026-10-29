@@ -306,7 +306,7 @@ export function InsightsWidget({ d, loading, size, alert }: WidgetProps) {
           ))}
         </ul>
         {insights.length > shown.length ? (
-          <Link to="/?aba=insights" className="mt-1.5 shrink-0 text-caption font-medium text-brand-text hover:underline">
+          <Link to="/financeiro?aba=insights" className="mt-1.5 shrink-0 text-caption font-medium text-brand-text hover:underline">
             + {pluralize(insights.length - shown.length, 'insight', 'insights')} no Dashboard inteligente
           </Link>
         ) : null}
@@ -318,7 +318,7 @@ export function InsightsWidget({ d, loading, size, alert }: WidgetProps) {
         items={insights}
         getKey={(ins) => `${ins.kind}:${ins.title}`}
         moreLabel="insight(s)"
-        moreHref="/?aba=insights"
+        moreHref="/financeiro?aba=insights"
         className="flex flex-col divide-y divide-border"
         renderItem={(ins) => (
           <div className="py-1.5 first:pt-0">

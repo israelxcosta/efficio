@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { MailWarning } from 'lucide-react';
 import { toast } from 'sonner';
-import { MEMBER_ROLE_HINTS, MEMBER_ROLE_LABELS, WORKSPACE_KIND_LABELS } from '@effinance/shared';
+import { WORKSPACE_KIND_LABELS } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiRequestError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/features/auth/auth-context';
+import { ROLE_HINTS, ROLE_LABELS } from '@/features/auth/roles';
 import { AuthLayout } from '@/features/auth/pages/auth-layout';
 import { acceptInvite, useInvitePreview } from '../api';
 import { WORKSPACE_KIND_ICONS } from '../kind-icon';
@@ -103,9 +104,9 @@ export default function InvitePage() {
           <div className="min-w-0">
             <p className="truncate font-semibold">{invite.workspaceName}</p>
             <p className="text-xs text-muted">
-              {WORKSPACE_KIND_LABELS[invite.workspaceKind]} · como <strong className="font-semibold text-fg">{MEMBER_ROLE_LABELS[invite.role]}</strong>
+              {WORKSPACE_KIND_LABELS[invite.workspaceKind]} · como <strong className="font-semibold text-fg">{ROLE_LABELS[invite.role]}</strong>
             </p>
-            <p className="mt-0.5 text-xs text-subtle">{MEMBER_ROLE_HINTS[invite.role]}</p>
+            <p className="mt-0.5 text-xs text-subtle">{ROLE_HINTS[invite.role]}</p>
           </div>
         </div>
 

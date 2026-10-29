@@ -14,11 +14,13 @@ import { useTheme, type ThemePreference } from '@/lib/theme';
 import { toastError } from '@/lib/notify';
 import { initials } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
+import { usePermissions } from '@/features/auth/permissions';
 import { Cell, TabGrid } from './layout';
 
 export function ProfileTab() {
   const { user, updateProfile } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { canAccessFinance } = usePermissions();
   const form = useForm<z.input<typeof updateProfileSchema>, unknown, z.output<typeof updateProfileSchema>>({
     resolver: zodResolver(updateProfileSchema),
     defaultValues: { name: user?.name ?? '' },
@@ -83,16 +85,18 @@ export function ProfileTab() {
         </Card>
       </Cell>
 
-      <Cell>
-        <Card className="p-6">
-          <CardHeader title="Dashboard" subtitle="Cards exibidos, tamanhos e cards ocultos pelo botão de olho" />
-          <Button className="mt-5" variant="outline" asChild>
-            <Link to="/?personalizar=1">
-              <SlidersHorizontal /> Personalizar dashboard
-            </Link>
-          </Button>
-        </Card>
-      </Cell>
+      {canAccessFinance ? (
+        <Cell>
+          <Card className="p-6">
+            <CardHeader title="Painel financeiro" subtitle="Cards exibidos, tamanhos e cards ocultos pelo botão de olho" />
+            <Button className="mt-5" variant="outline" asChild>
+              <Link to="/financeiro?personalizar=1">
+                <SlidersHorizontal /> Personalizar painel
+              </Link>
+            </Button>
+          </Card>
+        </Cell>
+      ) : null}
     </TabGrid>
   );
 }

@@ -7,8 +7,6 @@ import { toast } from 'sonner';
 import type { z } from 'zod';
 import {
   inviteInputSchema,
-  MEMBER_ROLE_HINTS,
-  MEMBER_ROLE_LABELS,
   PLANS,
   WORKSPACE_KIND_LABELS,
   type Invite,
@@ -28,6 +26,7 @@ import { formatDateTime } from '@/lib/datetime';
 import { toastError } from '@/lib/notify';
 import { cn, initials } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
+import { ROLE_HINTS, ROLE_LABELS } from '@/features/auth/roles';
 import { usePermissions } from '@/features/auth/permissions';
 import { useSubscription } from '@/features/billing/api';
 import { useSwitchWorkspace } from '@/features/workspaces/workspace-switcher';
@@ -104,7 +103,7 @@ function WorkspaceCard() {
           <div className="min-w-0">
             <p className="truncate font-semibold">{workspace.name}</p>
             <p className="text-xs text-muted">
-              {WORKSPACE_KIND_LABELS[workspace.kind]} · você é {MEMBER_ROLE_LABELS[workspace.role].toLowerCase()}
+              {WORKSPACE_KIND_LABELS[workspace.kind]} · você é {ROLE_LABELS[workspace.role].toLowerCase()}
             </p>
           </div>
         )}
@@ -130,7 +129,7 @@ function MembersCard() {
   async function changeRole(m: Member, role: 'editor' | 'viewer') {
     try {
       await updateRole.mutateAsync({ userId: m.userId, role });
-      toast.success(`${m.name} agora é ${MEMBER_ROLE_LABELS[role].toLowerCase()}`);
+      toast.success(`${m.name} agora é ${ROLE_LABELS[role].toLowerCase()}`);
     } catch (error) {
       toastError(error);
     }
@@ -200,16 +199,16 @@ function MembersCard() {
                       disabled={updateRole.isPending}
                       onChange={(e) => void changeRole(m, e.target.value as 'editor' | 'viewer')}
                     >
-                      <option value="editor">{MEMBER_ROLE_LABELS.editor}</option>
-                      <option value="viewer">{MEMBER_ROLE_LABELS.viewer}</option>
+                      <option value="editor">{ROLE_LABELS.editor}</option>
+                      <option value="viewer">{ROLE_LABELS.viewer}</option>
                     </Select>
                     <Button variant="ghost" size="icon-sm" aria-label={`Remover ${m.name}`} title="Remover do espaço" onClick={() => setToRemove(m)}>
                       <Trash2 />
                     </Button>
                   </div>
                 ) : (
-                  <Badge tone={m.role === 'owner' ? 'solid' : 'neutral'} size="md" title={MEMBER_ROLE_HINTS[m.role]}>
-                    {MEMBER_ROLE_LABELS[m.role]}
+                  <Badge tone={m.role === 'owner' ? 'solid' : 'neutral'} size="md" title={ROLE_HINTS[m.role]}>
+                    {ROLE_LABELS[m.role]}
                   </Badge>
                 )}
               </li>
@@ -220,7 +219,7 @@ function MembersCard() {
       <div className="mt-4 grid gap-2 rounded-lg bg-surface-muted px-4 py-3 text-xs text-muted sm:grid-cols-3">
         {(['owner', 'editor', 'viewer'] as const).map((r) => (
           <p key={r}>
-            <span className="font-semibold text-fg">{MEMBER_ROLE_LABELS[r]}:</span> {MEMBER_ROLE_HINTS[r]}
+            <span className="font-semibold text-fg">{ROLE_LABELS[r]}:</span> {ROLE_HINTS[r]}
           </p>
         ))}
       </div>
@@ -306,8 +305,8 @@ function InvitesCard() {
           </Field>
           <Field label="Permissão">
             <Select {...form.register('role')}>
-              <option value="editor">{MEMBER_ROLE_LABELS.editor}</option>
-              <option value="viewer">{MEMBER_ROLE_LABELS.viewer}</option>
+              <option value="editor">{ROLE_LABELS.editor}</option>
+              <option value="viewer">{ROLE_LABELS.viewer}</option>
             </Select>
           </Field>
           <Button type="submit" className="sm:mt-[26px]" loading={form.formState.isSubmitting}>
@@ -360,7 +359,7 @@ function InviteRow({ invite, onRevoke, revoking }: { invite: Invite; onRevoke: (
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold">{invite.email}</p>
         <p className="text-xs text-muted">
-          {MEMBER_ROLE_LABELS[invite.role]} · {expired ? 'expirou em' : 'expira em'} {formatDateTime(invite.expiresAt)}
+          {ROLE_LABELS[invite.role]} · {expired ? 'expirou em' : 'expira em'} {formatDateTime(invite.expiresAt)}
         </p>
       </div>
       {expired ? <Badge tone="warning">Expirado</Badge> : null}

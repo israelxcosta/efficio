@@ -204,7 +204,8 @@ sequenceDiagram
 
 | Pasta | Rota | Resumo |
 |---|---|---|
-| `dashboard` | `/` | faixa de KPIs + quadro único de widgets com posição livre (arrastar, redimensionar, "Organizar"); aba "Dashboard inteligente" |
+| `tasks` | `/`, `/tarefas`, `/tarefas/clientes`, `/tarefas/cadastros` | Gestão de tarefas (fase 1), a página inicial de todos: Início por departamento, Tarefas (lista agrupada por prazo e quadro; filtros na URL, `url-state.ts`), Clientes em leitura com responsável por departamento, Cadastros (departamentos, categorias, equipe). `TaskSheet` abre por `?tarefa=`/`?nova=1` sobre qualquer página da Gestão (`gestao-layout.tsx`); concluir/mover com "Desfazer" (`use-task-status.ts`) |
+| `dashboard` | `/financeiro` | faixa de KPIs + quadro único de widgets com posição livre (arrastar, redimensionar, "Organizar"); aba "Dashboard inteligente". Sem widgets de tarefas |
 | `transactions` | `/contas-a-pagar`, `/contas-a-receber` | listas, `TransactionSheet`, ações centrais (`useTransactionActions`), confirmação com juros/multa |
 | `statement` | `/extrato` | extrato diário com saldo; links vindos do fluxo de caixa |
 | `accounts`, `cards`, `goals` | `/contas`, `/cartoes`, `/metas` | cadastros, faturas, aportes |
@@ -273,13 +274,20 @@ sequenceDiagram
 11. **Drizzle não qualifica colunas num `select` de uma tabela só**: numa subconsulta correlacionada,
     escreva a coluna externa por extenso (`task_categories.id`), senão `"id"` vira o da subconsulta.
 
+12. **Duas áreas no web**: Gestão (`/`, `/tarefas/*`, todos) e Financeiro (rotas de sempre, painel em
+    `/financeiro`, só `owner`/`editor`). `areaOf` (`components/layout/nav.ts`) decide a área; as rotas
+    financeiras ficam dentro do `FinanceGate` (`app/routes.tsx`), que mostra "Acesso restrito" ao
+    colaborador sem montar a página. Consulta financeira montada fora dessas páginas (shell, sino, ⌘K)
+    precisa de `enabled: canAccessFinance`, senão o colaborador recebe 403. Rótulos de papel na tela:
+    `features/auth/roles.ts` (Proprietário, Administrador, Colaborador).
+
 ## Guia de navegação
 
 - **Novo endpoint:** schema e tipos em `packages/shared` → `apps/api/src/modules/<x>/service.ts` e
   `routes.ts` → registrar em `src/routes.ts` → teste em `apps/api/test/` → linha em `docs/api.md`.
 - **Nova coluna/tabela:** `src/db/schema.ts` → `pnpm --filter @effinance/api db:generate` →
   reescrever o SQL no padrão reexecutável → rodar API e `apps/web` `vitest run src/demo`.
-- **Nova tela:** `features/<x>/api.ts` (hooks com `qk`) + `pages/` → rota em `app/router.tsx` →
+- **Nova tela:** `features/<x>/api.ts` (hooks com `qk`) + `pages/` → rota em `app/routes.tsx` (financeira: dentro do `FinanceGate`) →
   item em `components/layout/nav.ts`.
 - **Novo widget do dashboard:** id em `layout/types.ts` → spec em `layout/specs.ts` → componente em
   `features/dashboard/widgets/` usando `WidgetCard` → entrada em `layout/catalog.tsx`.

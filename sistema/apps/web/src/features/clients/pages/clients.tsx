@@ -172,6 +172,18 @@ export default function ClientsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewParam]);
 
+  // From the Gestão ("Editar no financeiro"): /clientes?editar=<id> opens the edit sheet.
+  const editParam = params.get('editar');
+  const editing = useClient(isUuid(editParam) ? editParam : null);
+  useEffect(() => {
+    if (!isUuid(editParam) || !editing.data) return;
+    setSheet({ open: true, client: editing.data });
+    const next = new URLSearchParams(params);
+    next.delete('editar');
+    setParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, editing.data]);
+
   const data = clients.data;
   const summary = data?.summary;
 

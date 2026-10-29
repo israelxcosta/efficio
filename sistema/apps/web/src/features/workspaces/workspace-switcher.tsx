@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Check, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import type { z } from 'zod';
-import { MEMBER_ROLE_LABELS, PLANS, TRIAL_DAYS, workspaceInputSchema, type WorkspaceSummary } from '@effinance/shared';
+import { PLANS, TRIAL_DAYS, workspaceInputSchema, type WorkspaceSummary } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Field, Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { toastError } from '@/lib/notify';
 import { useAuth } from '@/features/auth/auth-context';
+import { ROLE_LABELS } from '@/features/auth/roles';
 import { useCreateWorkspace } from './api';
 import { WORKSPACE_KIND_ICONS } from './kind-icon';
 
@@ -52,7 +53,7 @@ function WorkspaceRow({ ws, active }: { ws: WorkspaceSummary; active: boolean })
       <span className="min-w-0 flex-1 text-left">
         <span className="block truncate text-sm font-semibold text-fg">{ws.name}</span>
         <span className="block text-[11px] font-medium text-muted">
-          {MEMBER_ROLE_LABELS[ws.role]}
+          {ROLE_LABELS[ws.role]}
           {ws.subscription.canWrite ? '' : ' · somente leitura'}
         </span>
       </span>

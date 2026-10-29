@@ -39,6 +39,10 @@ export function Sheet({
             width === 'md' ? 'sm:max-w-[460px]' : width === 'lg' ? 'sm:max-w-[620px]' : 'sm:max-w-[1040px]',
             className,
           )}
+          // "Desfazer" in a toast must not close the sheet.
+          onInteractOutside={(e) => {
+            if ((e.target as Element | null)?.closest?.('[data-sonner-toaster]')) e.preventDefault();
+          }}
           onOpenAutoFocus={(e) => {
             // Focus the first field instead of the close button.
             const target = (e.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>(
@@ -51,7 +55,7 @@ export function Sheet({
           }}
         >
           <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <Dialog.Title className="text-xl font-semibold tracking-tight text-fg">{title}</Dialog.Title>
               {description ? (
                 <Dialog.Description className="mt-1 text-sm text-muted">{description}</Dialog.Description>

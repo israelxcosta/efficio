@@ -1,8 +1,8 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '@/features/auth/auth-context';
-import { VIEWER_REASON } from '@/features/auth/permissions';
+import { usePermissions } from '@/features/auth/permissions';
 import { SubscriptionBanner } from '@/features/billing/subscription-banner';
 import { onAccessError } from '@/lib/api';
 import { TransactionActionsProvider } from '@/features/transactions/transaction-actions';
@@ -14,6 +14,8 @@ import { MobileNav } from './mobile-nav';
 import { CommandPalette } from './command-palette';
 import { IS_DEMO } from '@/lib/demo';
 import { DemoBanner } from './demo-banner';
+import { areaMemoryKey, clearAreaMemories, railAreaFor, readAreaMemory, rememberAreaPath } from './area-memory';
+import { areaOf } from './nav';
 
 export function AppShell() {
   const { user, workspace, loading, refreshMe, resyncSession } = useAuth();
@@ -21,6 +23,23 @@ export function AppShell() {
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const role = workspace?.role;
+  const { canAccessFinance } = usePermissions();
+
+  // Area of the page (Gestão or Financeiro) and the last page of each area in this session, for the
+  // rail, the switch button, the bars and ⌘K. Collaborators always see the Gestão.
+  const memoryKey = workspace && user ? areaMemoryKey(workspace.id, user.id) : null;
+  const pathWithSearch = location.pathname + location.search;
+  const memory = useMemo(() => (memoryKey ? readAreaMemory(memoryKey) : {}), [memoryKey, pathWithSearch]);
+  const area = railAreaFor(location.pathname, memory, canAccessFinance);
+  useEffect(() => {
+    // Another workspace (or user) starts with a clean memory.
+    if (memoryKey) clearAreaMemories(memoryKey);
+  }, [memoryKey]);
+  useEffect(() => {
+    if (!memoryKey) return;
+    if (!canAccessFinance && areaOf(location.pathname) === 'financeiro') return;
+    rememberAreaPath(memoryKey, pathWithSearch);
+  }, [memoryKey, pathWithSearch, location.pathname, canAccessFinance]);
 
   // 402/403 from any request: explain once (deduplicated toast) and refresh the session state,
   // since the subscription or the member's role may have changed since it was loaded.
@@ -40,7 +59,7 @@ export function AppShell() {
           action: role === 'owner' ? { label: 'Assinar', onClick: () => navigate('/configuracoes?aba=assinatura') } : undefined,
         });
       } else {
-        toast.error(role === 'viewer' ? VIEWER_REASON : error.message, { id: 'forbidden' });
+        toast.error(error.message, { id: 'forbidden' });
       }
     });
     return () => onAccessError(null);
@@ -68,7 +87,7 @@ export function AppShell() {
     <TransactionActionsProvider>
       <ImportActionsProvider>
       <div className="min-h-dvh">
-        <Sidebar />
+        <Sidebar area={area} memory={memory} />
         <div className="lg:pl-[76px] print:pl-0">
           <main className="mx-auto max-w-[1440px] px-4 pt-6 pb-28 sm:px-6 lg:pt-8 lg:pb-32 print:max-w-none print:p-0">
             <DemoBanner />
@@ -78,9 +97,9 @@ export function AppShell() {
             </Suspense>
           </main>
         </div>
-        <QuickBar onSearch={() => setPaletteOpen(true)} />
-        <MobileNav onSearch={() => setPaletteOpen(true)} />
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+        <QuickBar area={area} onSearch={() => setPaletteOpen(true)} />
+        <MobileNav area={area} memory={memory} onSearch={() => setPaletteOpen(true)} />
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} area={area} memory={memory} />
       </div>
       </ImportActionsProvider>
     </TransactionActionsProvider>

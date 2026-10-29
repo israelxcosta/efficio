@@ -5,6 +5,7 @@ import { WORKSPACE_KIND_LABELS } from '@effinance/shared';
 import { PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { useAuth } from '@/features/auth/auth-context';
+import { usePermissions } from '@/features/auth/permissions';
 import { ProfileTab } from '../tabs/profile-tab';
 import { SecurityTab } from '../tabs/security-tab';
 import { MembersTab } from '../tabs/members-tab';
@@ -14,12 +15,20 @@ import { IntegrationsTab } from '../tabs/integrations-tab';
 
 const TABS = ['perfil', 'seguranca', 'membros', 'assinatura', 'integracoes', 'privacidade'] as const;
 type Tab = (typeof TABS)[number];
+/** Collaborators (no finance access) see Perfil, Segurança, Membros and Privacidade (spec §2.6). */
+const ADMIN_TABS: readonly Tab[] = ['assinatura', 'integracoes'];
+
+export function settingsTabsFor(canAccessFinance: boolean): readonly Tab[] {
+  return canAccessFinance ? TABS : TABS.filter((t) => !ADMIN_TABS.includes(t));
+}
 
 export default function SettingsPage() {
   const { workspace } = useAuth();
+  const { canAccessFinance } = usePermissions();
+  const tabs = settingsTabsFor(canAccessFinance);
   const [params, setParams] = useSearchParams();
   const raw = params.get('aba');
-  const tab: Tab = (TABS as readonly string[]).includes(raw ?? '') ? (raw as Tab) : 'perfil';
+  const tab: Tab = (tabs as readonly string[]).includes(raw ?? '') ? (raw as Tab) : 'perfil';
 
   // Narrow screens scroll the tab bar: keep the active tab (e.g. from a link) in view.
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -58,13 +67,13 @@ export default function SettingsPage() {
           value={tab}
           onChange={select}
           options={[
-            { value: 'perfil', label: 'Perfil', icon: <UserRound /> },
-            { value: 'seguranca', label: 'Segurança', icon: <ShieldCheck /> },
-            { value: 'membros', label: 'Membros', icon: <Users /> },
-            { value: 'assinatura', label: 'Assinatura', icon: <CreditCard /> },
-            { value: 'integracoes', label: 'Integrações', icon: <Plug /> },
-            { value: 'privacidade', label: 'Privacidade', icon: <ShieldEllipsis /> },
-          ]}
+            { value: 'perfil' as const, label: 'Perfil', icon: <UserRound /> },
+            { value: 'seguranca' as const, label: 'Segurança', icon: <ShieldCheck /> },
+            { value: 'membros' as const, label: 'Membros', icon: <Users /> },
+            { value: 'assinatura' as const, label: 'Assinatura', icon: <CreditCard /> },
+            { value: 'integracoes' as const, label: 'Integrações', icon: <Plug /> },
+            { value: 'privacidade' as const, label: 'Privacidade', icon: <ShieldEllipsis /> },
+          ].filter((o) => tabs.includes(o.value))}
         />
       </div>
       {tab === 'perfil' ? <ProfileTab /> : null}

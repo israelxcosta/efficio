@@ -29,7 +29,8 @@ function ThemedToaster() {
       position="top-right"
       richColors
       closeButton
-      toastOptions={{ className: 'font-sans', style: { borderRadius: 14 } }}
+      // Toasts stay clickable over open sheets and modals (Radix disables pointer events outside them).
+      toastOptions={{ className: 'font-sans', style: { borderRadius: 14, pointerEvents: 'auto' } }}
     />
   );
 }

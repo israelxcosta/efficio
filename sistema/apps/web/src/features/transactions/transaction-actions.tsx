@@ -69,7 +69,7 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
   const deleteTx = useDeleteTransaction();
   const deleteTransfer = useDeleteTransfer();
   const setPaid = useSetPaid();
-  const { readOnlyReason } = usePermissions();
+  const { readOnlyReason, canAccessFinance } = usePermissions();
 
   /** Every entry point (quick bar, palette, rows, dashboard) goes through here: read-only blocks it. */
   const blocked = useCallback(() => {
@@ -212,45 +212,50 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
   return (
     <Ctx.Provider value={value}>
       {children}
-      {/* Mounted on first use so their option queries don't run on every page load. */}
-      {txSheetUsed ? (
-        <TransactionSheet state={txSheet} onOpenChange={(open) => setTxSheet((s) => (open ? s : { ...s, open: false }))} />
+      {/* Collaborators never reach the finances: none of these (nor their queries) mount for them. */}
+      {canAccessFinance ? (
+        <>
+          {/* Mounted on first use so their option queries don't run on every page load. */}
+          {txSheetUsed ? (
+            <TransactionSheet state={txSheet} onOpenChange={(open) => setTxSheet((s) => (open ? s : { ...s, open: false }))} />
+          ) : null}
+          {transferSheetUsed ? (
+            <TransferSheet
+              state={transferSheet}
+              onOpenChange={(open) => setTransferSheet((s) => (open ? s : { ...s, open: false }))}
+            />
+          ) : null}
+          <ScopeDialog
+            open={Boolean(toDelete) && isSeries}
+            onOpenChange={(o) => !o && setToDelete(null)}
+            action="delete"
+            kind={toDelete?.recurrenceKind}
+            loading={deleteTx.isPending}
+            onConfirm={(scope) => void confirmDelete(scope)}
+          />
+          <ConfirmDialog
+            open={Boolean(toDelete) && !isSeries}
+            onOpenChange={(o) => !o && setToDelete(null)}
+            title="Excluir lançamento?"
+            description={
+              toDelete ? `"${toDelete.description}" de ${formatBRL(toDelete.amount)} será excluído. Esta ação não pode ser desfeita.` : undefined
+            }
+            confirmLabel="Excluir"
+            loading={deleteTx.isPending || deleteTransfer.isPending}
+            onConfirm={() => void confirmDelete('one')}
+          />
+          <ConfirmPaymentDialog
+            tx={payTarget}
+            onClose={() => setPayTarget(null)}
+            onConfirm={(extra) => {
+              const tx = payTarget!;
+              setPayTarget(null);
+              void applyPaid(tx, true, extra);
+            }}
+          />
+          <AnticipateDialog tx={anticipateTarget} onClose={() => setAnticipateTarget(null)} />
+        </>
       ) : null}
-      {transferSheetUsed ? (
-        <TransferSheet
-          state={transferSheet}
-          onOpenChange={(open) => setTransferSheet((s) => (open ? s : { ...s, open: false }))}
-        />
-      ) : null}
-      <ScopeDialog
-        open={Boolean(toDelete) && isSeries}
-        onOpenChange={(o) => !o && setToDelete(null)}
-        action="delete"
-        kind={toDelete?.recurrenceKind}
-        loading={deleteTx.isPending}
-        onConfirm={(scope) => void confirmDelete(scope)}
-      />
-      <ConfirmDialog
-        open={Boolean(toDelete) && !isSeries}
-        onOpenChange={(o) => !o && setToDelete(null)}
-        title="Excluir lançamento?"
-        description={
-          toDelete ? `"${toDelete.description}" de ${formatBRL(toDelete.amount)} será excluído. Esta ação não pode ser desfeita.` : undefined
-        }
-        confirmLabel="Excluir"
-        loading={deleteTx.isPending || deleteTransfer.isPending}
-        onConfirm={() => void confirmDelete('one')}
-      />
-      <ConfirmPaymentDialog
-        tx={payTarget}
-        onClose={() => setPayTarget(null)}
-        onConfirm={(extra) => {
-          const tx = payTarget!;
-          setPayTarget(null);
-          void applyPaid(tx, true, extra);
-        }}
-      />
-      <AnticipateDialog tx={anticipateTarget} onClose={() => setAnticipateTarget(null)} />
     </Ctx.Provider>
   );
 }
@@ -327,21 +332,21 @@ function ConfirmPaymentDialog({
       description={tx ? `${tx.description} · ${formatBRL(tx.amount)} · venc. ${formatDateBR(tx.date)}` : undefined}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={() =>
-              onConfirm({
-                accountId: tx?.accountId ? undefined : accountId || null,
-                paidAt,
-                ...(late > 0 ? { interest, fine } : {}),
-                ...(discountable ? { discount: granted } : {}),
-              })
-            }
-          >
-            Confirmar
-          </Button>
+            <Button variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() =>
+                onConfirm({
+                  accountId: tx?.accountId ? undefined : accountId || null,
+                  paidAt,
+                  ...(late > 0 ? { interest, fine } : {}),
+                  ...(discountable ? { discount: granted } : {}),
+                })
+              }
+            >
+              Confirmar
+            </Button>
         </>
       }
     >
@@ -455,12 +460,12 @@ function AnticipateDialog({ tx, onClose }: { tx: Transaction | null; onClose: ()
       description={tx ? `${tx.description} · parcela ${tx.installmentNumber}/${tx.installmentTotal}` : undefined}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={() => void confirm()} loading={anticipate.isPending} disabled={n < 1}>
-            Antecipar {n > 0 ? `${n} ${n === 1 ? 'parcela' : 'parcelas'}` : ''}
-          </Button>
+            <Button variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void confirm()} loading={anticipate.isPending} disabled={n < 1}>
+              Antecipar {n > 0 ? `${n} ${n === 1 ? 'parcela' : 'parcelas'}` : ''}
+            </Button>
         </>
       }
     >

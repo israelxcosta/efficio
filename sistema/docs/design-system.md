@@ -107,6 +107,13 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 
 ## 2. Layout (app shell)
 
+- **Duas áreas, a mesma casca** (`docs/tarefas-ui.md` §2): Gestão de tarefas (página inicial de todos) e
+  Financeiro (administradores). Trilho, barra flutuante, barra do celular e ⌘K mudam de itens conforme a
+  área; sem cor por área. Para administradores, rótulo "Gestão"/"Financeiro" sob o logotipo e o
+  `AreaSwitchButton` no rodapé do trilho, acima de Configurações (44×44, `bg-surface ring-1 ring-border
+  shadow-xs`, nunca ativo), que leva à última página da outra área (sessionStorage). Colaborador numa URL
+  financeira vê "Acesso restrito" (`FinanceGate`), não 404.
+
 - **Sidebar** fixa de 76px (`bg-subtle`, borda direita): logo "Effinance" em texto no topo; ícones
   `lucide` 20px em botões 44×44 com raio 12; ativo = `surface` + sombra xs; tooltip com o nome à
   direita; rodapé com Configurações e avatar com iniciais (menu de conta e tema).
@@ -139,6 +146,10 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 | InsightCard        | gradiente `brand-700 → brand-900`, texto branco, cartão interno vidro (`white/8`, borda `white/12`), chip overline |
 | BankLogo           | círculo com cor oficial aproximada do banco e sigla (Nu, Itaú, BB, Cx...) — sem marcas registradas |
 | CategoryIcon       | quadrado raio md com fundo `cor/12%` e ícone lucide na cor da categoria |
+| TaskRow            | linha de tarefa no esqueleto do `TransactionRow` (`features/tasks/components/task-row.tsx`): `TaskStatusButton` no lugar do 👍/👎, ícone neutro da categoria, título com selos (Urgente, Alta, Aguardando cliente), subtítulo, colunas por largura do contêiner (Cliente `@3xl`, Responsável `@2xl`, Situação `@4xl`, Vencimento `@xl`) e menu "⋯" com "Mudar situação ›" |
+| TaskStatusButton   | botão redondo de estado: glifo por forma (`TaskStatusGlyph`), só "Em andamento" (`primary-soft`) e "Concluída" (`success-soft`) com cor; hover mostra o ✓ de concluir; concluída reabre; "pop" ao mudar |
+| MemberAvatar       | iniciais em círculo `primary-soft` (sm 24, md 32, lg 40); sem responsável = círculo tracejado com `UserRound`; `AvatarStack` sobrepõe até N e "+N" |
+| SearchSelect       | lista do `Select` com campo de busca no topo (base de `ClientPicker` e `MemberPicker`); aceita grupos, dica à direita e gatilho próprio (célula de tabela) |
 | WidgetCard         | card de widget do dashboard (`features/dashboard/layout/widget-card.tsx`): cabeçalho fixo (título 14px, subtítulo 11.5px, ação à direita que desce para uma 2ª linha abaixo de 384px, alça de mover e olho "Ocultar card" que aparecem no hover/foco), corpo `flex-1` que ocupa a altura restante; variante `hero` (gradiente); com alerta, ponto vermelho no título e barra vermelha de 3px à esquerda |
 | FitList            | lista cortada às linhas que cabem no card (mede cada linha a cada redimensionamento) com a linha "+ N …"; aceita o total real do servidor |
 | ChartBox           | envolve um gráfico Recharts e ocupa a altura restante do card (mínimo 96px), para o gráfico crescer junto |

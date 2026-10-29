@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { CircleAlert, Clock, Eye, Lock, X } from 'lucide-react';
+import { CircleAlert, Clock, Lock, X } from 'lucide-react';
 import { formatDateBR } from '@effinance/shared';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
@@ -21,7 +21,10 @@ function readDismissed(key: string): boolean {
   }
 }
 
-/** Subscription / role state of the active workspace, above every page. */
+/**
+ * Subscription state of the active workspace, above every page. Collaborators (viewer) work on the
+ * tasks like everyone: their only restriction, the finances, is told by the restricted pages.
+ */
 export function SubscriptionBanner() {
   const { workspace } = useAuth();
   const trialKey = `effinance:trial-banner:${workspace?.id ?? ''}`;
@@ -53,15 +56,6 @@ export function SubscriptionBanner() {
           continuam disponíveis para consulta e exportação.
         </span>
         {isOwner ? subscribe : askOwner}
-      </>
-    );
-  } else if (workspace.role === 'viewer') {
-    tone = 'neutral';
-    icon = <Eye />;
-    content = (
-      <>
-        <span className="font-semibold">Acesso somente leitura</span>
-        <span className="text-muted">Você pode consultar os dados de {workspace.name}, mas não criar ou editar.</span>
       </>
     );
   } else if (sub.status === 'past_due') {

@@ -37,6 +37,18 @@ export const qk = {
   openFinanceStatus: ['open-finance', 'status'] as const,
   bankConnections: ['open-finance', 'connections'] as const,
   fakeInstitutions: ['open-finance', 'dev', 'institutions'] as const,
+  // Task module (Gestão de tarefas): everything under the `tasks` domain is invalidated together.
+  taskOptions: ['tasks', 'options'] as const,
+  tasks: (params?: Params) => ['tasks', 'list', params ?? {}] as const,
+  task: (id: string) => ['tasks', 'detail', id] as const,
+  taskHome: (params?: Params) => ['tasks', 'home', params ?? {}] as const,
+  taskDepartments: ['tasks', 'departments'] as const,
+  taskCategories: ['tasks', 'categories'] as const,
+  taskMembers: ['tasks', 'members'] as const,
+  clientResponsibles: ['tasks', 'client-responsibles'] as const,
+  taskActivity: ['tasks', 'activity'] as const,
+  /** Every client (all pages of /clients) for the read-only clients screen of the Gestão. */
+  allClients: ['clients', 'all'] as const,
 };
 
 /** Everything derived from transactions/balances. Called after any money-moving mutation. */

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { loginSchema } from '@effinance/shared';
+import { loginSchema, type MeResponse } from '@effinance/shared';
 import type { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { CodeInput } from '@/components/ui/code-input';
@@ -15,11 +15,12 @@ import { AuthLayout } from './auth-layout';
 import { FullPageLoader } from '@/components/layout/app-shell';
 import { IS_DEMO } from '@/lib/demo';
 import { safeInternalPath } from '@/lib/safe-url';
+import { landingPath } from '@/components/layout/area-memory';
 
 type LoginForm = z.input<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { user, loading, login } = useAuth();
+  const { user, workspace, loading, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [show, setShow] = useState(false);
@@ -33,7 +34,7 @@ export default function LoginPage() {
   const from = safeInternalPath((location.state as { from?: unknown } | null)?.from);
 
   if (loading) return <FullPageLoader />;
-  if (user) return <Navigate to={from} replace />;
+  if (user) return <Navigate to={landingPath(from, workspace?.role)} replace />;
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
@@ -43,7 +44,7 @@ export default function LoginPage() {
         form.setValue('password', '');
         setMfaToken(result.mfaToken);
       }
-      else navigate(from, { replace: true });
+      else navigate(landingPath(from, result.me.workspace?.role), { replace: true });
     } catch (error) {
       toast.error(errorMessage(error));
     }
@@ -53,7 +54,7 @@ export default function LoginPage() {
     return (
       <MfaStep
         mfaToken={mfaToken}
-        onDone={() => navigate(from, { replace: true })}
+        onDone={(me) => navigate(landingPath(from, me.workspace?.role), { replace: true })}
         onBack={() => {
           setMfaToken(null);
           form.setValue('password', '');
@@ -105,7 +106,7 @@ export default function LoginPage() {
 }
 
 /** Second login step when the account has two-factor authentication enabled. */
-function MfaStep({ mfaToken, onDone, onBack }: { mfaToken: string; onDone: () => void; onBack: () => void }) {
+function MfaStep({ mfaToken, onDone, onBack }: { mfaToken: string; onDone: (me: MeResponse) => void; onBack: () => void }) {
   const { verifyMfa } = useAuth();
   const [recovery, setRecovery] = useState(false);
   const [code, setCode] = useState('');
@@ -121,8 +122,8 @@ function MfaStep({ mfaToken, onDone, onBack }: { mfaToken: string; onDone: () =>
     setSubmitting(true);
     setError(null);
     try {
-      await verifyMfa({ mfaToken, code: trimmed });
-      onDone();
+      const me = await verifyMfa({ mfaToken, code: trimmed });
+      onDone(me);
     } catch (err) {
       // An expired challenge (5 min) can't be retried: the user has to sign in again.
       if (err instanceof ApiRequestError && err.status === 401 && /expir/i.test(err.message)) {
