@@ -4,6 +4,8 @@
 
 import {
   addDays,
+  isoDateSchema,
+  monthKeySchema,
   TASK_PRIORITIES,
   type ISODate,
   type MonthKey,
@@ -51,8 +53,11 @@ function fromParam<T extends string>(map: Record<T, string>, value: string | nul
   return (Object.keys(map) as T[]).find((k) => map[k] === value);
 }
 
-const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
-const DATE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+/**
+ * Highest page accepted from the URL (500 thousand tasks at 50 per page). A larger number would only
+ * get a 400 from the API (`page` must be a safe integer) and leave the list on an error.
+ */
+export const MAX_TASK_PAGE = 10_000;
 
 export interface TaskViewPreference {
   scope: TaskScope;
@@ -61,7 +66,11 @@ export interface TaskViewPreference {
 
 export const DEFAULT_TASK_VIEW: TaskViewPreference = { scope: 'mine', view: 'list' };
 
-/** Reads the URL; anything malformed (ids, dates, enums) is ignored instead of reaching the API. */
+/**
+ * Reads the URL; anything malformed (ids, dates, enums, pages) is ignored instead of reaching the API.
+ * Dates and months go through the API's own schemas (real calendar day, years 1900–2199), so a shared
+ * link like `vencimento=2026-02-31` or `mes=0001-01` cannot break the list with a 400.
+ */
 export function parseTaskFilters(params: URLSearchParams, defaults: TaskViewPreference = DEFAULT_TASK_VIEW): TaskFilters {
   const client = params.get('cliente') ?? '';
   const assignee = params.get('responsavel') ?? '';
@@ -79,10 +88,10 @@ export function parseTaskFilters(params: URLSearchParams, defaults: TaskViewPref
     department: id(params.get('departamento')),
     category: id(params.get('categoria')),
     priority: fromParam(PRIORITY_PARAM, params.get('prioridade')) ?? '',
-    month: MONTH.test(month) ? (month as MonthKey) : '',
-    dueDate: DATE.test(dueDate) ? (dueDate as ISODate) : '',
+    month: monthKeySchema.safeParse(month).success ? (month as MonthKey) : '',
+    dueDate: isoDateSchema.safeParse(dueDate).success ? (dueDate as ISODate) : '',
     onlyOverdue: params.get('atrasadas') === '1',
-    page: Number.isInteger(page) && page > 0 ? page : 1,
+    page: Number.isInteger(page) && page > 0 && page <= MAX_TASK_PAGE ? page : 1,
   };
 }
 

@@ -4,6 +4,7 @@ import {
   CLEARED_FILTERS,
   homeDepartmentKey,
   isGroupedSituation,
+  MAX_TASK_PAGE,
   parseTaskFilters,
   readHomeDepartment,
   readTaskView,
@@ -51,6 +52,17 @@ describe('parseTaskFilters', () => {
   it('ignores malformed values instead of sending them to the API', () => {
     const f = parseTaskFilters(p('escopo=tudo&situacao=x&cliente=../../billing&responsavel=1&mes=2026-13&vencimento=2026-02-31x&prioridade=altissima&pagina=-2'));
     expect(f).toMatchObject({ scope: 'mine', situation: 'open', client: '', assignee: '', month: '', dueDate: '', priority: '', page: 1 });
+  });
+
+  it('drops what only looks valid but the API refuses (security regression: a shared link cannot break the list)', () => {
+    // Impossible calendar days, years outside 1900–2199 and pages beyond a safe integer were sent and
+    // answered with 400, leaving the list on an error (with an English message for the page number).
+    for (const qs of ['vencimento=2026-02-31', 'vencimento=0001-01-01', 'mes=0001-01', 'mes=9999-12', 'pagina=100000000000000000000', 'pagina=1e21']) {
+      const f = parseTaskFilters(p(qs));
+      expect({ dueDate: f.dueDate, month: f.month, page: f.page }).toEqual({ dueDate: '', month: '', page: 1 });
+    }
+    expect(parseTaskFilters(p(`pagina=${MAX_TASK_PAGE}`)).page).toBe(MAX_TASK_PAGE);
+    expect(parseTaskFilters(p('vencimento=2028-02-29&mes=2199-12'))).toMatchObject({ dueDate: '2028-02-29', month: '2199-12' });
   });
 
   it('understands "Internas"', () => {

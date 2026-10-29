@@ -87,12 +87,32 @@ function underPath(pathname: string, to: string): boolean {
 }
 
 /**
+ * The path as the router matches it: without query and hash, each segment percent-decoded (an
+ * encoded `/` stays encoded, as in React Router) and in lower case (routes are case-insensitive).
+ * Otherwise `/FINANCEIRO` or `/%65xtrato` would open a finance page while counting as "common".
+ */
+function routePath(pathname: string): string {
+  const path = pathname.split(/[?#]/)[0] || '/';
+  return path
+    .split('/')
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment).replace(/\//g, '%2F');
+      } catch {
+        return segment;
+      }
+    })
+    .join('/')
+    .toLowerCase();
+}
+
+/**
  * Area of a route: `/` and `/tarefas/*` are Gestão; the finance rail's paths and their sub-paths
  * (`/cartoes/:id`, `/relatorios/cliente/:id`, the old `/contatos`) are Financeiro; anything else
- * (`/configuracoes`, unknown paths) is common.
+ * (`/configuracoes`, unknown paths) is common. Matches like the router (see `routePath`).
  */
 export function areaOf(pathname: string): Area | 'common' {
-  const path = pathname.split(/[?#]/)[0] || '/';
+  const path = routePath(pathname);
   if (path === '/' || underPath(path, '/tarefas')) return 'gestao';
   if ([...FINANCE_NAV_ITEMS.map((i) => i.to), ...LEGACY_FINANCE_PATHS].some((to) => underPath(path, to))) return 'financeiro';
   return 'common';

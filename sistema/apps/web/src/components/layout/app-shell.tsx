@@ -14,7 +14,7 @@ import { MobileNav } from './mobile-nav';
 import { CommandPalette } from './command-palette';
 import { IS_DEMO } from '@/lib/demo';
 import { DemoBanner } from './demo-banner';
-import { areaMemoryKey, clearAreaMemories, railAreaFor, readAreaMemory, rememberAreaPath } from './area-memory';
+import { areaMemoryKey, forgetStaleAreaMemories, railAreaFor, readAreaMemory, rememberAreaPath } from './area-memory';
 import { areaOf } from './nav';
 
 export function AppShell() {
@@ -32,9 +32,9 @@ export function AppShell() {
   const memory = useMemo(() => (memoryKey ? readAreaMemory(memoryKey) : {}), [memoryKey, pathWithSearch]);
   const area = railAreaFor(location.pathname, memory, canAccessFinance);
   useEffect(() => {
-    // Another workspace (or user) starts with a clean memory.
-    if (memoryKey) clearAreaMemories(memoryKey);
-  }, [memoryKey]);
+    // Another workspace (or user) starts with a clean memory; signing out forgets every memory.
+    forgetStaleAreaMemories({ loading, signedIn: Boolean(user), key: memoryKey });
+  }, [loading, user, memoryKey]);
   useEffect(() => {
     if (!memoryKey) return;
     if (!canAccessFinance && areaOf(location.pathname) === 'financeiro') return;

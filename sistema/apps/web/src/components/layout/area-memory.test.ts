@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   areaMemoryKey,
   clearAreaMemories,
+  forgetStaleAreaMemories,
   landingPath,
   lastPathOf,
   railAreaFor,
@@ -95,6 +96,25 @@ describe('area memory', () => {
     expect(sessionStorage.getItem('effinance.activeMonth')).toBe('2026-10');
   });
 
+  it('forgets every memory when the member signs out, and none while the session loads (security regression)', () => {
+    const other = areaMemoryKey('ws-2', 'user-1');
+    rememberAreaPath(KEY, '/tarefas/clientes?busca=12345678000190');
+    rememberAreaPath(other, '/fornecedores?busca=Fulano');
+    sessionStorage.setItem('effinance.activeMonth', '2026-10');
+
+    // Reload: the session is still loading, nothing is lost.
+    forgetStaleAreaMemories({ loading: true, signedIn: false, key: null });
+    expect(readAreaMemory(KEY)).toMatchObject({ gestao: '/tarefas/clientes?busca=12345678000190' });
+    // Signed in, workspace open: only the other workspaces are forgotten.
+    forgetStaleAreaMemories({ loading: false, signedIn: true, key: KEY });
+    expect(readAreaMemory(other)).toEqual({});
+    expect(readAreaMemory(KEY)).not.toEqual({});
+    // Logout (or the session expired): the paths visited, with their search terms, used to stay in the tab.
+    forgetStaleAreaMemories({ loading: false, signedIn: false, key: null });
+    expect(readAreaMemory(KEY)).toEqual({});
+    expect(sessionStorage.getItem('effinance.activeMonth')).toBe('2026-10');
+  });
+
   it('survives a browser without storage', () => {
     delete (globalThis as { sessionStorage?: Storage }).sessionStorage;
     // The page still knows where it is; nothing is stored.
@@ -122,6 +142,16 @@ describe('landingPath', () => {
   it('sends a collaborator with a finance `from` to the start page', () => {
     expect(landingPath('/contas-a-pagar?status=overdue', 'viewer')).toBe('/');
     expect(landingPath('/financeiro', null)).toBe('/');
+  });
+
+  it('also for finance paths written in another case or percent-encoded (security regression)', () => {
+    expect(landingPath('/FINANCEIRO', 'viewer')).toBe('/');
+    expect(landingPath('/Contas-a-Pagar?status=overdue', 'viewer')).toBe('/');
+    expect(landingPath('/%65xtrato', 'viewer')).toBe('/');
+  });
+
+  it('keeps a remembered page only in its own area, whatever the letter case', () => {
+    expect(sanitizeAreaMemory({ gestao: '/EXTRATO', financeiro: '/TAREFAS' })).toEqual({});
   });
 
   it('keeps the page otherwise', () => {

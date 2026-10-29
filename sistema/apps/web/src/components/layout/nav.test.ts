@@ -38,6 +38,16 @@ describe('areas', () => {
       expect(areaOf(path)).toBe('financeiro');
   });
 
+  it('matches like the router: any letter case and percent-encoded letters (security regression)', () => {
+    // React Router opens /FINANCEIRO and /%65xtrato as finance pages; they must count as finance too.
+    for (const path of ['/FINANCEIRO', '/Extrato/', '/%65xtrato', '/Contas-A-Pagar?status=overdue', '/Cartoes/ABC'])
+      expect(areaOf(path)).toBe('financeiro');
+    expect(areaOf('/TAREFAS/Clientes')).toBe('gestao');
+    // An encoded slash stays one segment (the router answers 404 there), and bad encodings do not throw.
+    expect(areaOf('/financeiro%2F..')).toBe('common');
+    expect(areaOf('/%E0%A4%A')).toBe('common');
+  });
+
   it('treats settings and unknown pages as common, and does not confuse prefixes', () => {
     expect(areaOf('/configuracoes')).toBe('common');
     expect(areaOf('/nada')).toBe('common');

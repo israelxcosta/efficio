@@ -98,6 +98,17 @@ export function clearAreaMemories(keep?: string): void {
 }
 
 /**
+ * Keeps the memories in step with the session: with a workspace open, only its own memory stays
+ * (switching workspaces starts clean); signed out (logout, expired session, account deleted), every
+ * memory goes, so the tab keeps no trace of the pages visited (ids and search terms in the query)
+ * for the scripts of the next session. Nothing happens while the session is loading (a reload keeps it).
+ */
+export function forgetStaleAreaMemories(session: { loading: boolean; signedIn: boolean; key: string | null }): void {
+  if (session.key) clearAreaMemories(session.key);
+  else if (!session.loading && !session.signedIn) clearAreaMemories();
+}
+
+/**
  * Area whose rail a page shows. Gestão and Financeiro pages show their own; common pages keep the
  * last area used. Members without finance access always see the Gestão rail (also on a finance URL,
  * where the page says "Acesso restrito").

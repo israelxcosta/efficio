@@ -26,6 +26,21 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
+/**
+ * What the search may show: transactions, accounts and categories only with access to the finances
+ * (the API omits them for collaborators, but the web does not rely on it alone: an answer cached
+ * before a role change, or an API regression, must not put amounts on a collaborator's screen), and
+ * suppliers only in the finance area's audience.
+ */
+export function visibleSearchHits(r: SearchResponse | undefined, canAccessFinance: boolean) {
+  return {
+    transactions: canAccessFinance ? (r?.transactions ?? []) : [],
+    accounts: canAccessFinance ? (r?.accounts ?? []) : [],
+    categories: canAccessFinance ? (r?.categories ?? []) : [],
+    contacts: (r?.contacts ?? []).filter((c) => canAccessFinance || c.kind === 'client'),
+  };
+}
+
 const groupClass = '[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-subtle';
 
 const itemClass =
@@ -68,8 +83,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
   }
 
   const r = search.data;
-  // Suppliers live only in the finance area.
-  const contacts = (r?.contacts ?? []).filter((c) => canAccessFinance || c.kind === 'client');
+  const { transactions, accounts, categories, contacts } = visibleSearchHits(r, canAccessFinance);
 
   const taskActions = canWriteTasks ? (
     <Command.Group heading="Ações da gestão" className={groupClass}>
@@ -153,9 +167,9 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
 
               {r && q.length >= 2 ? (
                 <>
-                  {r.transactions.length ? (
+                  {transactions.length ? (
                     <Command.Group heading="Lançamentos" className={groupClass}>
-                      {r.transactions.map((t) => (
+                      {transactions.map((t) => (
                         <Command.Item key={t.id} value={`tx-${t.id}`} className={itemClass} onSelect={() => run(() => actions.edit(t))}>
                           <CategoryIcon icon={t.category?.icon ?? (t.type === 'transfer' ? 'landmark' : 'tag')} color={t.category?.color ?? '#6B6F76'} size="sm" />
                           <span className="flex-1 truncate">
@@ -169,9 +183,9 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                       ))}
                     </Command.Group>
                   ) : null}
-                  {r.accounts.length ? (
+                  {accounts.length ? (
                     <Command.Group heading="Contas" className={groupClass}>
-                      {r.accounts.map((a) => (
+                      {accounts.map((a) => (
                         <Command.Item key={a.id} value={`acc-${a.id}`} className={itemClass} onSelect={() => run(() => navigate(`/extrato?conta=${a.id}`))}>
                           <BankLogo bank={a.bank} color={a.color} size="sm" />
                           <span className="flex-1 truncate">{a.name}</span>
@@ -180,9 +194,9 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                       ))}
                     </Command.Group>
                   ) : null}
-                  {r.categories.length ? (
+                  {categories.length ? (
                     <Command.Group heading="Categorias" className={groupClass}>
-                      {r.categories.map((c) => (
+                      {categories.map((c) => (
                         <Command.Item key={c.id} value={`cat-${c.id}`} className={itemClass} onSelect={() => run(() => navigate(`/categorias?tipo=${c.type}`))}>
                           <CategoryIcon icon={c.icon} color={c.color} size="sm" />
                           <span className="flex-1 truncate">{c.name}</span>
