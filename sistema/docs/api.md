@@ -19,7 +19,7 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | POST | `/api/auth/register` | `registerSchema` (`companyName` opcional) | `AuthResponse` (201) — cria a empresa (`business`, "Minha empresa" se em branco) com categorias empresariais e a conta "Caixa" |
 | POST | `/api/auth/login` | `loginSchema` | `AuthResponse` |
 | POST | `/api/auth/logout` | — | 204 |
-| GET | `/api/auth/me` | — | `MeResponse` (usuário + workspace ativo + lista) |
+| GET | `/api/auth/me` | — | `MeResponse` (usuário com `photoUpdatedAt` + workspace ativo com `permissions` efetivas + lista) |
 | PUT | `/api/auth/me` | `updateProfileSchema` | `MeUser` |
 | GET | `/api/categories` | `categoryQuerySchema` | `CategoryWithChildren[]` |
 | POST | `/api/categories` | `categoryInputSchema` | `Category` (201) |
@@ -56,11 +56,11 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | DELETE | `/api/clients/:id` | — | 204; **409 se há lançamentos ou séries vinculados** |
 | POST | `/api/clients/:id/inactivate` | `clientInactivationSchema` (`date`, `reason`, `notes`) | `Client`; 409 se já inativo |
 | POST | `/api/clients/:id/reactivate` | — | `Client` |
-| GET | `/api/clients/:id/fees` | — | `ClientFeesResponse` (`current`, `items` mais recente primeiro, `next`) — owner/editor (`403` para `viewer`, como as escritas de vigência) |
+| GET | `/api/clients/:id/fees` | — | `ClientFeesResponse` (`current`, `items` mais recente primeiro, `next`) — permissão `finance` (`403` sem ela, como as escritas de vigência) |
 | POST | `/api/clients/:id/fees` | `clientFeeInputSchema` (`amount`, `employeeFee`, `discountBps` 0–9999, padrão 0) | `ClientFee` (201) — próxima vigência |
 | PUT | `/api/clients/:id/fees/:feeId` | `clientFeeInputSchema` | `ClientFee` |
 | DELETE | `/api/clients/:id/fees/:feeId` | — | 204; 422 se não for a vigência mais recente |
-| GET | `/api/cnpj/:cnpj` | `cnpjParamsSchema` (14 dígitos válidos) | `CnpjLookupResult`; 404 não encontrado, 502 Receita indisponível, 503 desabilitado |
+| GET | `/api/cnpj/:cnpj` | `cnpjParamsSchema` (14 dígitos válidos) | `CnpjLookupResult`; 404 não encontrado, 502 Receita indisponível, 503 desabilitado — quem cadastra: `finance`, `registry` ou `office` (fase 3; 403 sem nenhuma) |
 | GET | `/api/transactions` | `transactionQuerySchema` (inclui `origin`: `manual` \| `file` \| `open_finance`) | `TransactionListResponse` |
 | GET | `/api/transactions/:id` | — | `Transaction` |
 | POST | `/api/transactions` | `transactionInputSchema` | `Transaction[]` (201) — todas as ocorrências criadas (e todas as partes, se dividido) |
@@ -82,7 +82,7 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/reports/comparison` | `comparisonReportQuerySchema` | `ComparisonReportResponse` |
 | GET | `/api/reports/cashflow` | `cashflowReportQuerySchema` | `CashflowReportResponse` |
 | GET | `/api/reports/delinquency?months=3..24` | `delinquencyReportQuerySchema` (padrão 12) | `DelinquencyReportResponse` — veja "Relatório de inadimplência" |
-| GET | `/api/search?q=` | `searchQuerySchema` | `SearchResponse` — descrição, nomes e CPF/CNPJ exato; para `viewer`, só `contacts` (demais listas vazias) |
+| GET | `/api/search?q=` | `searchQuerySchema` | `SearchResponse` — descrição, nomes e CPF/CNPJ exato; sem `finance`, só clientes em `contacts` (listas financeiras vazias); `tasks`, `recurringTasks` e `unions` (fase 3) para todos; acessos de clientes nunca |
 
 ## Regras de negócio
 
@@ -339,6 +339,12 @@ Contrato em `packages/shared/src/saas.ts`.
 
 - `viewer` só lê; `editor` altera dados financeiros; `owner` também gerencia membros, assinatura e
   exclusão. Violação → `403 forbidden`.
+- **Fase 3: permissões por pessoa** (spec §13.10): o papel dá o padrão e cada membro pode ter ajustes
+  (chaves ligadas/desligadas). Toda guarda abaixo passou a conferir uma **chave** — `finance` no lugar
+  de "owner/editor", `members` no lugar de "owner" em membros e convites, `registry`/`deleteRegistry`/
+  `deleteTasks` no módulo de tarefas — com **padrões idênticos** ao comportamento anterior. Assinatura,
+  renomear/excluir o espaço, exportação LGPD e o log de auditoria continuam só do `owner`. Ver
+  "Fase 3 → Permissões por pessoa".
 - **Financeiro só para administradores** (provisório, sem migração de papéis): administrador =
   `owner` ou `editor`; `viewer` (na interface, "Colaborador") **não lê nem grava nada financeiro**:
   `403 forbidden` com a mensagem "O financeiro é restrito aos administradores do espaço." — inclusive
@@ -398,14 +404,16 @@ Contrato em `packages/shared/src/saas.ts`.
 | PUT | `/api/workspaces/current` | `workspaceUpdateSchema` | `WorkspaceSummary` (owner) |
 | DELETE | `/api/workspaces/current` | `deleteWorkspaceSchema` | 204 (owner; cancela assinatura e destrói a chave); 422 se for o último espaço do qual é proprietário |
 | GET | `/api/workspaces/current/members` | — | `Member[]` |
-| PATCH | `/api/workspaces/current/members/:userId` | `memberRoleSchema` | `Member` (owner) |
-| DELETE | `/api/workspaces/current/members/:userId` | — | 204 (owner remove; membro pode sair) |
-| GET | `/api/workspaces/current/invites` | — | `Invite[]` (owner) |
-| POST | `/api/workspaces/current/invites` | `inviteInputSchema` | `Invite` (201, owner) |
-| DELETE | `/api/workspaces/current/invites/:id` | — | 204 (owner) |
+| PATCH | `/api/workspaces/current/members/:userId` | `memberRoleSchema` | `Member` (`members`; ninguém concede o que não tem) |
+| GET | `/api/workspaces/current/members/:userId/permissions` | — | `MemberPermissions` (`members`; fase 3) |
+| PUT | `/api/workspaces/current/members/:userId/permissions` | `memberPermissionsInputSchema` (`role?`, `overrides`) | `MemberPermissions` (`members`; 402 sem assinatura; fase 3) |
+| DELETE | `/api/workspaces/current/members/:userId` | — | 204 (`members` remove; membro pode sair) |
+| GET | `/api/workspaces/current/invites` | — | `Invite[]` (`members`) |
+| POST | `/api/workspaces/current/invites` | `inviteInputSchema` | `Invite` (201, `members`; o papel convidado não pode dar o que quem convida não tem) |
+| DELETE | `/api/workspaces/current/invites/:id` | — | 204 (`members`) |
 | GET | `/api/invites/:token` | — | `InvitePreview` (público) |
 | POST | `/api/invites/:token/accept` | — | `MeResponse` (e-mail do convite = e-mail logado) |
-| GET | `/api/workspaces/current/export` | — | JSON com todos os dados decifrados (owner, LGPD) |
+| GET | `/api/workspaces/current/export` | — | JSON com todos os dados decifrados (owner, LGPD) — inclui, na fase 3, os acessos dos clientes decifrados e a foto de quem exporta |
 | GET | `/api/workspaces/current/audit` | `auditQuerySchema` | `Paginated<AuditLogEntry>` (owner) |
 | GET | `/api/billing/plans` | — | `Plan[]` |
 | GET | `/api/billing/subscription` | — | `Subscription` |
@@ -698,13 +706,18 @@ responsável por cliente, lista, início) e a **fase 2** estão implementadas: t
 ocorrências geradas por cliente e competência, auditoria mensal, processos e modelos, relatórios e
 exportação CSV, calendário, anotações pessoais, anexos, histórico (linha do tempo) da tarefa, busca
 global com tarefas e responsáveis em lote. A fase 3 da spec (sindicatos, dados fiscais e documentos do
-cliente, escritório e contrato, permissões por pessoa, foto do perfil) não tem banco nem API.
+cliente, escritório e contrato, permissões por pessoa, foto do perfil) está implementada: ver
+"Fase 3" no fim deste documento.
 
 ## Permissões
 
 - **Todos os membros** do espaço usam o módulo, inclusive `viewer` ("Colaborador"); cadastros e
   exclusões são dos **administradores** (`owner`/`editor`, os mesmos do financeiro). Violação → `403`
-  "Somente os administradores do espaço podem fazer isso." (`TASK_ADMIN_MESSAGE`). Gravações exigem
+  "Somente os administradores do espaço podem fazer isso." (`TASK_ADMIN_MESSAGE`). **Fase 3**: cada
+  linha "admin" abaixo é uma chave — cadastros `registry`, exclusão de cadastros `deleteRegistry`,
+  excluir tarefa/processo e remover comentário/anexo de outra pessoa `deleteTasks`, reabrir ocorrência
+  concluída por outra pessoa `reopenOthers`, salvar processo como modelo e o Início de outro
+  departamento/"Todos" `registry` — com os mesmos padrões (owner/editor). Gravações exigem
   assinatura com escrita (`402`), como no resto da API; leituras continuam.
 - **Matriz** (rota → quem; as linhas "serviço" são conferidas dentro do serviço, com a mensagem própria):
 
@@ -738,13 +751,14 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) não te
   conexão de superusuário (sem RLS), captura cada SQL pelo logger do Drizzle e exige
   `workspace_id = <espaço>` (ou igualdade com uma tabela já filtrada, em joins e subconsultas) para
   toda tabela de tenant; também confere que outro escritório fica intacto, byte a byte.
-- **Permissão por pessoa** (spec §13.10 e §18, item 11, fase 3): até lá, o mapeamento de papéis acima
-  (financeiro = `owner`/`editor`; tarefas = todos; cadastros e exclusões = administradores). Rótulos
+- **Permissão por pessoa** (spec §13.10 e §18, item 11, fase 3): implementada — ver "Fase 3 →
+  Permissões por pessoa"; `test/tasks-security.test.ts` confere a chave de cada rota de administrador. Rótulos
   dos papéis no contrato (`MEMBER_ROLE_LABELS`/`MEMBER_ROLE_HINTS`, `saas.ts`): **Proprietário**,
   **Administrador** e **Colaborador** (os mesmos de `apps/web/src/features/auth/roles.ts`).
-- O web sabe quem é administrador por `GET /auth/me` (`workspace.role`) e por `GET /tasks/options`
-  (`me.isAdmin`, `me.canWrite`); por registro, `TaskDetail.canReopen`, `TaskComment.canDelete`,
-  `TaskAttachment.canDelete` e `OccurrenceCell.canReopen`.
+- O web sabe quem é administrador por `GET /auth/me` (`workspace.role`, e na fase 3
+  `workspace.permissions`) e por `GET /tasks/options` (`me.isAdmin` — só para rótulos —, `me.canWrite`
+  e, na fase 3, `me.permissions`); por registro, `TaskDetail.canReopen`, `TaskComment.canDelete`,
+  `TaskAttachment.canDelete` e `OccurrenceCell.canReopen` (calculados pelas chaves).
 
 ## Endpoints
 
@@ -1271,8 +1285,7 @@ dados cifrados pela API: não há backfill.
 
 ## Pendências
 
-- **Fase 3 da spec** (§13.7 a §13.10, §15.3, §18 itens 11 a 18): sindicatos, dados fiscais, acessos e
-  documentos do cliente, escritório e modelo de contrato, permissões por pessoa, foto do perfil.
+- **Fase 3**: ver "Fase 3 → Lacunas".
 - **Um membro em mais de um departamento** não existe (spec rev. 3, §1: no máximo um; mantido).
 - **Feriados estaduais e municipais** (por cidade do escritório) e a confirmação de Carnaval e Corpus
   Christi como dias não úteis (§18, item 19d).
@@ -1287,3 +1300,211 @@ dados cifrados pela API: não há backfill.
 - **Notificações persistentes** (atribuição, menção): o sino usa a atividade recente e as atrasadas.
 - **Processos em andamento** (§12.1, §18 item 9): a API oferece a lista; o produto confirma se a tela a
   mostra.
+
+---
+
+# Fase 3: permissões, sindicatos, dados fiscais, escritório e foto
+
+Especificação: `docs/tarefas-ui.md` rev. 3, §2.6, §6.10, §13.7–§13.10, §15.3 e §18 itens 11–18.
+Contrato em `packages/shared`: `permissions.ts` (chaves, rótulos, padrões, `effectivePermissions`…),
+seção "Phase 3" de `constants.ts` (tipos de documento, faixas de vencimento, campos de acesso, situações
+do sindicato, tipos de chave Pix, tipos de bloco e limites do contrato), `schemas.ts`, `types.ts`,
+`utils/deadlines.ts` (faixas e ciclo da convenção), `utils/contract.ts` (campos, números por extenso,
+preenchimento) e `contract-template.ts`/`contract-watermark.ts` (modelo de fábrica). Testes unitários
+em `packages/shared/test/phase3.test.ts`.
+
+## Endpoints
+
+| Método | Rota | Entrada | Resposta | Quem |
+| --- | --- | --- | --- | --- |
+| GET | `/api/workspaces/current/members/:userId/permissions` | — | `MemberPermissions` | `members` |
+| PUT | `/api/workspaces/current/members/:userId/permissions` | `memberPermissionsInputSchema` | `MemberPermissions` | `members` (+ assinatura) |
+| GET | `/api/unions` | `unionQuerySchema` (`search`, `status` active\|inactive\|all, `situation`, página) | `UnionListResponse` (ordem de urgência + `summary` do espaço) | todos |
+| POST | `/api/unions` | `unionInputSchema` | `UnionDetail` (201) | `registry` |
+| GET | `/api/unions/:id` | — | `UnionDetail` (convenções e clientes) | todos |
+| PUT | `/api/unions/:id` | `unionInputSchema` (cadastro; `active`/`clientIds` ausentes = mantêm; **sem** ciclos) | `UnionDetail` | `registry` |
+| PUT | `/api/unions/:id/conventions` | `unionConventionsInputSchema` (lista substitutiva) | `UnionDetail` | `registry` |
+| PATCH | `/api/unions/:id/conventions/:year` | `unionConventionPublishSchema` (`published`) | `UnionDetail` | `registry` |
+| DELETE | `/api/unions/:id` | — | 204 (ciclos e vínculos juntos; auditado) | `deleteRegistry` |
+| GET | `/api/deadlines` | `deadlinesQuerySchema` (`kind` documents\|conventions) | `DeadlinesResponse` | todos |
+| GET | `/api/deadlines/summary` | — | `DeadlinesSummary` (faixa do Início e sino) | todos |
+| GET | `/api/deadlines/clients` | — | `ClientDocumentAlertsResponse` (filtro e subtítulo de Clientes da Gestão) | todos |
+| GET | `/api/office/branding` | — | `OfficeBranding` (nome e logo) | todos |
+| GET | `/api/office` | — | `Office` (decifrado, com `missingForContract` e o resumo do contrato) | `office` |
+| PUT | `/api/office` | `officeInputSchema` | `Office` (auditado) | `office` |
+| PUT | `/api/office/logo` | `officeLogoInputSchema` (data URI, até 500 KB) | `OfficeBranding` | `office` |
+| DELETE | `/api/office/logo` | — | 204 | `office` |
+| GET | `/api/office/contract-template` | — | `ContractTemplateResponse` (o modelo em uso: próprio ou de fábrica) | `office` |
+| PUT | `/api/office/contract-template` | `contractTemplateInputSchema` (ausente = mantém; `null` = fábrica; corpo até 3 MB) | `ContractTemplateResponse` (auditado sem o texto) | `office` |
+| POST | `/api/office/contract-template/reset` | — | `ContractTemplateResponse` ("voltar ao modelo de fábrica", grava na hora) | `office` |
+| GET | `/api/clients/:id/contract` | — | `ClientContractResponse` (blocos preenchidos + o que falta) | `finance` |
+| POST | `/api/clients/:id/contract/issues` | — | 204 (registra a emissão: quem, quando, versão do modelo) | `finance` (+ assinatura) |
+| POST | `/api/clients/:id/credentials/reveal` | `clientCredentialRevealSchema` (`field`) | `ClientCredentialReveal` (`no-store`) | `clientCredentials` |
+| GET | `/api/clients/:id/credentials/views` | — | `ClientCredentialView[]` (até 50, mais recentes) | `clientCredentials` |
+| PUT | `/api/profile/photo` | `profilePhotoInputSchema` (data URI, até 100 KB) | `ProfilePhotoResponse` | a própria pessoa |
+| DELETE | `/api/profile/photo` | — | 204 | a própria pessoa |
+| GET | `/api/profile/photos/:userId` | `?v=<photoUpdatedAt>` | a imagem (`image/png\|jpeg\|webp`, `private, max-age=300`) | você ou membros do seu espaço atual |
+
+Mudanças aditivas em rotas existentes: `GET /auth/me` (e `switch-workspace`, `/workspaces`) trazem
+`WorkspaceSummary.permissions` e `MeUser.photoUpdatedAt`; `GET /workspaces/current/members` traz
+`permissionOverrides` e `photoUpdatedAt`; `GET /tasks/options` traz `me.permissions` e, em cada membro,
+`permissionOverrides` e `photoUpdatedAt`; `Client` (lista, detalhe e respostas de escrita) traz
+`stateRegistration`, `stateRegistrationExempt`, `municipalRegistration`, `responsibleDocument` (`null`
+sem `finance`), `credentials` (só se cada acesso existe), `documents` e `unions`; `clientInputSchema`
+aceita os campos da fase 3, todos opcionais; `GET /search` traz `unions`.
+
+Ids de outro espaço (membro, sindicato, cliente, documento) respondem 404. Escritas pedem assinatura
+com escrita (402), exceto a foto do perfil (dado da pessoa, como o nome) e revelar um acesso (é
+leitura). Mensagens em pt-BR; sem a chave → 403 com o texto de `PERMISSION_FORBIDDEN_MESSAGES`
+(`lib/permissions.ts`): "Somente os administradores do espaço podem fazer isso." (cadastros e
+exclusões), "O financeiro é restrito aos administradores do espaço.", "O modelo de contrato e os dados
+do escritório são restritos aos administradores do espaço.", "Você não tem permissão para ver este
+acesso.", "Somente quem gerencia os membros do espaço pode fazer isso.".
+
+## Permissões por pessoa
+
+- **Chaves** (`PERMISSION_KEYS`): ações `finance`, `registry`, `deleteRegistry`, `deleteTasks`,
+  `reopenOthers`, `clientCredentials`, `office`, `members` e páginas `page.audit`, `page.recurring`,
+  `page.processes`, `page.clients`, `page.reports`, `page.registry`. Padrões (`ROLE_PERMISSION_DEFAULTS`):
+  proprietário tudo; administrador tudo menos `members`; colaborador só as páginas — exatamente o
+  comportamento das fases 1 e 2. As chaves `page.*` só escondem a página no web; a API não as usa.
+- **Guardado**: `workspace_members.permissions` (jsonb) com **só os ajustes** (as chaves que diferem do
+  padrão do papel; `normalizePermissionOverrides`). Trocar o papel leva junto tudo o que não foi
+  ajustado; os ajustes ficam. Chaves desconhecidas e valores não booleanos são descartados na entrada e
+  na leitura (`sanitizePermissionOverrides`). O proprietário nunca tem ajuste (CHECK no banco).
+- **Efetivas a cada requisição**: `loadAccess` lê o papel e os ajustes junto com o membro (uma consulta)
+  e expõe `req.access.permissions`; uma mudança vale na próxima requisição.
+- **Guardas trocadas pelas chaves**: `financeOnly`/`canAccessFinance` → `finance`; o `assertCanWrite`
+  da fronteira financeira (`tenant-routes`/`tenant-scope`: clientes, fornecedores, lançamentos…) →
+  `finance` (mensagem "Você tem acesso somente leitura neste espaço" de sempre); tarefas → `registry`,
+  `deleteRegistry`, `deleteTasks` por rota (`requireTaskPermission`), `reopenOthers` e `deleteTasks`
+  nos serviços (reabrir ocorrência, remover comentário/anexo de outra pessoa), `registry` em "salvar como
+  modelo" e no Início de outro departamento; membros, papéis e convites → `members`; consulta de CNPJ →
+  `finance`, `registry` ou `office`; sindicatos, escritório e acessos de clientes → as chaves novas.
+- **Regras de quem ajusta**: precisa de `members`; ninguém altera as próprias permissões nem o próprio
+  papel (422); o proprietário não é ajustável (422); **ninguém concede o que não tem**: toda chave que
+  passa de desligada para ligada (por ajuste, troca de papel ou papel de um convite) tem de estar com
+  quem faz a mudança (403 com `details.keys`), e uma chave que quem edita não tem também não pode ser
+  ajustada para desligar (403) — é o switch desabilitado da tela.
+- **Auditoria**: `member.permissions_changed` (e `member.role_changed`) em `audit_logs`, com quem
+  (usuário da linha), quando e `metadata.changes = { chave: { from, to } }` das chaves efetivas que
+  mudaram, mais o papel de/para e os ajustes gravados — sem nomes nem e-mails.
+
+## Sindicatos e convenções coletivas
+
+- Cadastro por espaço (`unions`): razão social, CNPJ (único no espaço: 409 "Já existe um sindicato
+  com este CNPJ."), sigla, categoria, base territorial, endereço, contato, responsável (nome, e-mail e
+  telefone **cifrados**), mês da data-base (1–12 ou nulo), observações (cifradas), ativo. Até
+  `MAX_UNIONS` (1000) por espaço — a ordem de urgência é calculada em memória sobre esse conjunto
+  limitado; contagens de clientes em SQL.
+- Ciclos (`union_conventions`, um por ano: 2026 = "2026/2027"): publicado, quando e por quem — gravados
+  pelo servidor e mantidos enquanto o ciclo continua publicado; observação cifrada. O cadastro **não
+  aceita** ciclos (o schema nem tem o campo): gravar o sindicato nunca os apaga. `PUT …/conventions` é
+  substitutivo; `PATCH …/conventions/:year` marca/desmarca um ciclo (cria se faltar).
+- **Ciclo acompanhado** (`trackedConvention`, regra do Effy): começa no ano corrente (fuso do
+  escritório) e avança enquanto o ciclo daquele ano estiver publicado; vencimento = dia 1º do mês da
+  data-base nesse ano. Faixas: `overdue` (antes de hoje), `within30` (hoje a hoje+30), `within60`
+  (+31 a +60), `ok`, `noBaseMonth`. Sem marcar, o sindicato continua no alerta mesmo vencido.
+- Vínculo N:N com clientes (`union_clients`, só clientes: FK com `client_kind`): `clientIds` no
+  cadastro (lista completa; ausente = mantém). A ficha do cliente (`Client.unions`) mostra os sindicatos
+  com o ciclo acompanhado. Inativo sai dos alertas e da lista padrão.
+- **Alertas** (`/deadlines`): só sindicatos **ativos com clientes ativos vinculados**, vencidos ou em
+  até 60 dias. O resumo da lista (`summary`) conta todos os ativos por situação e `overdueClients`
+  (clientes ativos afetados por convenção vencida).
+
+## Dados fiscais, acessos e documentos do cliente
+
+- `contacts` ganha `state_registration`, `state_registration_exempt` (isenta ⇒ sem número),
+  `municipal_registration` (em claro: legíveis por todos os membros na ficha da Gestão),
+  `responsible_document` (CPF, cifrado; `null` para quem não tem `finance`) e os acessos
+  `simples_access_code` e `accountant_password` (cifrados por campo com a chave do espaço, AAD
+  `workspace:contacts:<coluna>`; CHECK só aceita o formato cifrado).
+- **Acessos nunca saem** em listagens, detalhe, busca, opções de tarefas, alertas ou mensagens de erro:
+  o cliente diz só se cada um existe (`credentials`). Gravação em três estados por campo
+  (`credentialUpdateSchema`: `keep` ou ausente, `set` com o valor, `clear`), para o formulário nunca
+  precisar ler o valor. O código do Simples só com regime Simples Nacional ou MEI (400); trocar o regime
+  depois mantém o código gravado.
+- **Revelar** (`POST /clients/:id/credentials/reveal`): permissão `clientCredentials` (padrão:
+  administradores), POST sem cache, limite por IP (30/min) e **por membro** (10 por minuto, contados
+  nos registros de auditoria: 429), e o registro `client.credential_revealed` (quem, quando, `field`;
+  nunca o valor) é gravado **antes** de o valor sair. `GET …/credentials/views` lista quem viu.
+- Campos novos ausentes num PUT **mantêm** o que está gravado (o formulário das fases 1/2 não os
+  conhece); vazio remove.
+- **Documentos** (`client_documents`): tipo do catálogo `CLIENT_DOCUMENT_KINDS` (certificado digital,
+  CNDs federal/estadual/municipal, CRF do FGTS, CNDT, alvará, licença sanitária, AVCB/CLCB, licença
+  ambiental, PCMSO, PGR, LTCAT, registro em órgão de classe, outro — "outro" exige nome), vencimento
+  opcional, observação até 200 caracteres (cifrada), quem alterou (nome gravado; "Usuário excluído" se a
+  conta sair). Lista **substitutiva** em `documents` do cliente (ausente = não mexe; ids mantêm o
+  documento e quem o alterou só muda se algo mudou; id de outro cliente → 404); até 50. Leitura por todos
+  os membros em `Client.documents` (mais urgente primeiro, sem data no fim); escrita só com `finance`.
+- **Alertas**: `GET /deadlines` (documentos de clientes **ativos**: vencidos, até 30, 31–60 e sem data,
+  até 500 com `truncated`; convenções), `GET /deadlines/summary` (contagens; o sino soma
+  `overdueTotal` — documentos e convenções **vencidos** — ao que já mostra; `overdueConvention` quando há
+  uma só, para "convenção do SINDCOM vencida há 12 dias") e `GET /deadlines/clients` (por cliente ativo:
+  vencidos, 30, 60, total e o mais urgente; totais para a célula Documentos). Faixas por
+  `deadlineStatus`, no fuso do escritório; contagens com `FILTER` em SQL. Todos os membros (vencimento
+  não é dado financeiro).
+- **Exportação LGPD** (decisão): a exportação do proprietário leva os acessos e o CPF **decifrados** —
+  é a portabilidade dos dados do próprio espaço, só do proprietário, com limite e auditada
+  (`data.exported` com `includesCredentials: true`); sem eles, a exportação não serviria para migrar o
+  escritório. O arquivo deve ser guardado como segredo.
+
+## Escritório e modelo de contrato
+
+- `offices`: um por espaço (único), dados do escritório; CPF, e-mail e telefone do responsável e a
+  chave Pix **cifrados**; tipo da chave Pix validado e normalizado (`normalizePixKey`: CNPJ, CPF,
+  e-mail, telefone `+55…`, aleatória); logo e marca d'água como bytes, PNG/JPG/WebP até 500 KB, tipo
+  conferido pela assinatura (`lib/images.ts`; nunca SVG; 422 "O conteúdo do arquivo não corresponde…").
+  Nome e logo legíveis por todos (`/office/branding`); o resto com `office`. Quem alterou e quando.
+- **Modelo de contrato**: blocos `{ type, text?, rule? }` (`CONTRACT_BLOCK_TYPES`; `rule: 'discount'`
+  = só com desconto), limites de 500 blocos, 20.000 caracteres por bloco e 400.000 no total (schema +
+  CHECK no banco); `contract_blocks` nulo = **modelo de fábrica** (`CONTRACT_FACTORY_BLOCKS`, o
+  contrato do próprio escritório vindo do Effy, versão `CONTRACT_FACTORY_VERSION`), marca d'água nula =
+  a de fábrica, `contract_watermark_enabled` liga/desliga. "Voltar ao modelo de fábrica" grava na hora
+  (texto, marca d'água e o liga voltam ao padrão). No modelo de fábrica, a chave Pix que o Effy tinha
+  fixa na cláusula 2.4 virou o campo `[CHAVE PIX ESCRITORIO]`.
+- **Contrato de um cliente** (`GET /clients/:id/contract`, `finance`; não precisa de `office`): o modelo
+  em uso com os campos preenchidos (`contractValues` + `fillContractBlocks`: CNPJ/CPF/CEP formatados, UF
+  por extenso, valores e "por extenso", início do contrato por extenso), a cláusula de desconto só com
+  desconto na vigência que cobre hoje, a marca d'água (ou `null` desligada), nome e logo do escritório e
+  `missing` por origem (cadastro do cliente, honorário — "Nenhuma vigência cobre hoje" —, escritório).
+  O contrato não é gravado; `POST …/contract/issues` registra a emissão (opcional) em `audit_logs`.
+
+## Foto do perfil
+
+- `user_photos` (identidade, fora do RLS: uma foto em todos os espaços): PNG/JPG/WebP até 100 KB
+  (o navegador manda 256×256 WebP), assinatura conferida, **cifrada** com uma chave de plataforma
+  (AES-GCM, AAD com o id do usuário; `platformEncryptBytes`). Lida só por você e pelos membros do seu
+  espaço atual (outro → 404), sai com a conta (cascata) e entra na exportação de quem exporta (só a
+  própria). `photoUpdatedAt` nos membros (lista de membros, `/tasks/options`) e em `/auth/me` serve de
+  versão na URL (`?v=`); o web busca a imagem pela API (no demo, pelo `fetch` falso).
+
+## Banco (migração 0015)
+
+Escrita à mão, reexecutável (IF NOT EXISTS, DROP … IF EXISTS antes de cada constraint, política e
+gatilho) e roda no PGlite (sem CONCURRENTLY). Tabelas de tenant novas — `client_documents`, `unions`,
+`union_conventions`, `union_clients`, `offices` — com RLS `ENABLE`+`FORCE` e política única por espaço,
+`GRANT` só de DML ao `effinance_app`, FKs compostas `(workspace_id, …)`, índice para cada FK e CHECKs
+espelhando o contrato (catálogo de documentos, formato cifrado, imagens, Pix, limites do contrato).
+Identidade: `workspace_members.permissions` (CHECK objeto até 2000 caracteres, nunca no proprietário) e
+`user_photos` (login da API com SELECT/INSERT/UPDATE/DELETE: `test/db-roles.ts` e
+`docs/deploy-aws.md`). Colunas novas em `contacts` só recebem dados cifrados pela API: sem backfill.
+LGPD: gatilhos trocam por "Usuário excluído" os nomes gravados em `client_documents`,
+`union_conventions` e `offices` quando a conta sai. Testes: `test/phase3-db.test.ts` (RLS, FKs entre
+espaços, CHECKs, LGPD, reexecução), `test/phase3-scope.test.ts` (todo SQL dos serviços novos filtra por
+espaço; o verificador ficou em `test/scope-checker.ts`, compartilhado com `tasks-scope`),
+`permissions`, `unions`, `client-records`, `office`, `profile-photo` e `demo-seed-phase3`.
+
+## Lacunas
+
+- **Assinatura de PDF e importação de .docx** do contrato (o Effy importava .docx): não há; o web tem
+  `blocksFromPlainText` para "Importar texto".
+- **Histórico de emissões** do contrato: só o registro em `audit_logs` (sem tela própria nem leitura
+  na API além do log de auditoria do proprietário).
+- **Quem viu um acesso** fica em `audit_logs` (que segue a retenção do log de auditoria).
+- **Consulta de CNPJ** passou a exigir `finance`, `registry` ou `office` (antes qualquer membro chamava
+  a rota, embora a tela só a oferecesse a administradores) — §18.12.
+- **Itens a confirmar** (§18.19): colaborador do Fiscal atualizar vencimento de certificado sem
+  `finance` (hoje não); `clientCredentials` ligada para algum colaborador (padrão: só administradores).
+- O demo do navegador só ganha os dados da fase 3 num banco novo: o marcador `SEED_VERSION` de
+  `apps/web/src/demo/server.ts` precisa subir para reaplicar o seed em quem já tem o demo.

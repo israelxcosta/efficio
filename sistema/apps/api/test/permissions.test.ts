@@ -45,7 +45,10 @@ describe('permissions: defaults are the behavior of phases 1 and 2', () => {
     ] as const) {
       const me = await c.get('/auth/me');
       expect(me.body.workspace.permissions).toEqual(rolePermissions(role));
-      expect(me.body.workspaces[0].permissions).toEqual(rolePermissions(role));
+      // Each workspace of the list carries the permissions of the user in it (guests own a company too).
+      const listed = me.body.workspaces.find((w: { id: string }) => w.id === me.body.workspace.id);
+      expect(listed.permissions).toEqual(rolePermissions(role));
+      for (const w of me.body.workspaces) expect(w.permissions).toEqual(rolePermissions(w.role));
       const options = await c.get('/tasks/options');
       expect(options.body.me.permissions).toEqual(rolePermissions(role));
       expect(options.body.members.every((m: { permissionOverrides: object }) => Object.keys(m.permissionOverrides).length === 0)).toBe(true);

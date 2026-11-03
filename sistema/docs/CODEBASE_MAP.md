@@ -31,7 +31,7 @@ graph TB
         Tenant["tenantRoutes / inTenant<br/>transação RLS por requisição"]
     end
     subgraph Dados
-        PG[("PostgreSQL 16<br/>RLS forçado em 13 tabelas")]
+        PG[("PostgreSQL 16<br/>RLS forçado em 34 tabelas")]
         KMS[["KeyProvider<br/>local ou AWS KMS"]]
         Redis[("Redis opcional<br/>rate limit")]
     end
@@ -57,17 +57,21 @@ sistema/
 │   ├── constants.ts            enums + rótulos pt-BR (tipos, regimes, juros/multa, riscos…)
 │   ├── schemas.ts              Zod de entrada (transações, clientes, relatórios, honorários…)
 │   ├── types.ts                tipos de resposta (Transaction, DashboardResponse, Delinquency…)
-│   ├── saas.ts                 espaços, papéis, planos, assinatura, auth/MFA
+│   ├── saas.ts                 espaços, papéis, planos, assinatura, auth/MFA, foto do perfil
+│   ├── permissions.ts          chaves de permissão por pessoa, padrões por papel, ajustes (fase 3)
+│   ├── contract-template.ts    modelo de contrato de fábrica (+ contract-watermark.ts, a marca d'água)
 │   ├── integrations.ts         importação OFX/CSV e Open Finance
 │   └── utils/                  datas, dinheiro, documentos, fatura, recorrência, vigências,
-│                               juros/multa (late-fees) e score de inadimplência (delinquency)
+│                               juros/multa (late-fees), score de inadimplência (delinquency),
+│                               faixas de vencimento/ciclo da convenção (deadlines) e contrato
 ├── apps/api/
-│   ├── drizzle/0000…0013*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
+│   ├── drizzle/0000…0015*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
 │   ├── src/app.ts, server.ts   montagem do Fastify, hooks globais, árvore de rotas
 │   ├── src/routes.ts           domainRoutes (tenantRoutes) e scopedRoutes (inTenant)
 │   ├── src/setup.ts, env.ts    providers (e-mail, cobrança, Open Finance, CNPJ) e env validado
 │   ├── src/db/                 schema.ts, client, migrate, retention, backfill, seed, demo-seed
-│   ├── src/lib/                auth, tenant, crypto (cifra por campo, keyring), errors, sql, clock
+│   ├── src/lib/                auth, tenant, crypto (cifra por campo, keyring), errors, sql, clock,
+│   │                           permissions (chaves), scoped-context (módulos da fase 3), images
 │   ├── src/modules/<domínio>/  routes.ts + service.ts por domínio (ver "Módulos da API")
 │   └── test/                   integração com Postgres real (vitest, um arquivo por vez)
 ├── apps/web/src/
@@ -113,6 +117,17 @@ sistema/
   nacionais** fixos e móveis pela Páscoa, dias úteis, `occurrencesInCompetence` com competência,
   referência, prazo legal e meta, `occurrenceSituationOf`, `sanitizeFileName`). Rótulos de papel em
   `saas.ts`: Proprietário, Administrador, Colaborador. Ver `docs/api.md` → "Tarefas".
+- **Fase 3** (`docs/api.md` → "Fase 3"): `permissions.ts` (`PERMISSION_KEYS`, `ROLE_PERMISSION_DEFAULTS`
+  = comportamento das fases 1 e 2, `effectivePermissions`, `normalizePermissionOverrides` — só os
+  ajustes são gravados —, `memberPermissionsInputSchema`, `MemberPermissions`); constantes "Phase 3"
+  (`CLIENT_DOCUMENT_KINDS` com grupos, `DEADLINE_BUCKETS`, `CLIENT_CREDENTIAL_FIELDS`, `UNION_SITUATIONS`,
+  `PIX_KEY_TYPES`, `CONTRACT_BLOCK_TYPES` e limites); `utils/deadlines.ts` (`deadlineStatus`,
+  `trackedConvention` — a regra única do ciclo acompanhado —, `unionSituationOf`); `utils/contract.ts`
+  (`CONTRACT_PLACEHOLDERS`, números/valores/datas por extenso, `contractValues`, `fillContractBlocks`,
+  avisos de campos); `contract-template.ts` (modelo de fábrica do Effy, com `[CHAVE PIX ESCRITORIO]`);
+  campos novos de `Client` (inscrições, `credentials` só com presença, `documents`, `unions`), tipos de
+  sindicatos, vencimentos, escritório e contrato; `WorkspaceSummary.permissions`,
+  `TaskOptionsResponse.me.permissions`, `permissionOverrides`/`photoUpdatedAt` nos membros.
 
 ## API (`apps/api`)
 
@@ -139,6 +154,13 @@ sequenceDiagram
 
 - `authRoutes`, `workspaceRoutes`, `inviteRoutes` e `billingRoutes` rodam na conexão do sistema
   (`app.db`), com checagens explícitas.
+- **Permissões (fase 3)**: `loadAccess` devolve `access.permissions` (papel + ajustes do membro, a cada
+  requisição). Guardas usam chaves (`lib/permissions.ts`: `can`, `assertPermission`,
+  `requirePermission`); `financeOnly` = `finance`; o `assertCanWrite` da fronteira financeira = `finance`
+  + assinatura.
+- Módulos da fase 3 em `scopedRoutes` (`unions`, `deadlines`, `office`, `client-records` em `/clients`,
+  `profile`) usam `memberGuards` + `runScoped` (`lib/scoped-context.ts`: autenticação, assinatura nas
+  escritas, uma transação de tenant com a cifra e o "hoje" do escritório) e uma chave por rota.
 - `scopedRoutes` (imports, open-finance, cnpj) usam `tenantGuards` + `inTenant`, porque chamam
   provedores externos entre fases (nunca com transação aberta). `tasks` também fica em
   `scopedRoutes`, com guardas próprios (`modules/tasks/access.ts`: todo membro escreve, `viewer`
@@ -160,14 +182,19 @@ sequenceDiagram
 | `credit-cards` | `/credit-cards` | faturas, limite usado, pagamento integral (`card_payment`), `listInvoicesToPay` |
 | `goals` | `/goals` | metas e aportes (notas cifradas) |
 | `contacts` | `/contacts` | fornecedores; busca por nome ou CPF/CNPJ (índice cego) |
-| `clients` | `/clients`, `/cnpj/:cnpj` | clientes, inativação, vigências, resumo (`byRegime`, `averageFee`), BrasilAPI |
+| `clients` | `/clients`, `/cnpj/:cnpj` | clientes, inativação, vigências, resumo (`byRegime`, `averageFee`), BrasilAPI; fase 3 em `fiscal.ts` (inscrições, CPF e acessos cifrados em três estados, documentos substitutivos, sindicatos do cliente) e `GET /clients/:id/contract` (`finance`) |
+| `client-records` | `/clients/:id/credentials/*`, `/clients/:id/contract/issues` | revelar acesso (`clientCredentials`, limite por membro, auditoria antes do valor), quem viu, registrar emissão do contrato |
+| `unions` | `/unions` | sindicatos, ciclos de convenção (substitutivos; o cadastro não os apaga), vínculo N:N com clientes, ordem de urgência; `registry`/`deleteRegistry` |
+| `deadlines` | `/deadlines` | vencimentos de documentos (clientes ativos) e convenções (sindicatos ativos com clientes): lista, resumo do sino, resumo por cliente |
+| `office` | `/office` | escritório (CPF/Pix cifrados), logo e marca d'água por assinatura, modelo de contrato (null = fábrica), contrato do cliente; `office` (nome e logo para todos) |
+| `profile` | `/profile` | foto do perfil (cifrada com chave de plataforma, `user_photos`) |
 | `transactions` | `/transactions` | parcelas, séries (`ensureMaterialized`), divisão por categoria, pago/juros/multa (`setPaid`) |
 | `transfers` | `/transfers` | transferência/aplicação/resgate (`deriveTransferKind`) |
 | `statement` | `/statement` | extrato por data efetiva com saldo corrente |
 | `dashboard` | `/dashboard` | payload único: resumo, 6 meses, categorias, vencimentos (50 + totais), faturas a pagar, saúde, insights |
 | `reports` | `/reports/*` | overview, categories, contacts, comparison, cashflow, delinquency |
 | `fee-charges` | `/fee-charges/*` | gerar honorários da competência (vigência do fim do mês, `ON CONFLICT`) e "+ Empregados" |
-| `search` | `/search` | lançamentos, contas, categorias, contatos (financeiro só para admin); tarefas e recorrentes para todos; ordena pela distância de hoje |
+| `search` | `/search` | lançamentos, contas, categorias, contatos (financeiro só com `finance`); tarefas, recorrentes e sindicatos para todos; ordena pela distância de hoje |
 | `imports` | `/imports` | OFX/CSV: prévia, duplicados, sugestão de categoria, lote com desfazer |
 | `open-finance` | `/open-finance/*` | Pluggy ou provedor simulado, vínculo de contas, sync incremental, webhooks |
 | `tasks` | `/tasks/*` | fases 1 e 2: departamentos (um por membro), categorias, tarefas, subtarefas, comentários, responsável por cliente (um e em lote, com reatribuição); **recorrentes** (`recurring.ts`) com ocorrências materializadas como tarefas, geradas de forma idempotente (`generation.ts`: janela −24/+2 competências, `ON CONFLICT`, ressincronização ao editar) e agregadas em SQL (`occurrences.ts`); **auditoria mensal** (`audit.ts`); **processos e modelos** (`flows.ts`, motor em `flow-engine.ts`); início (`home.ts`), relatórios/CSV/calendário (`insights.ts`, `csv.ts`); **histórico** (`events.ts`, `task_events`); **anexos** cifrados no banco (`attachments.ts`, assinatura e ZIP em `file-check.ts`); **anotações** (`notes.ts`); texto livre cifrado (`encrypted-text.ts`); toda consulta filtra por espaço (`test/tasks-scope.test.ts` roda todos os serviços) |
@@ -177,15 +204,17 @@ sequenceDiagram
 - **Tenancy:** `workspace_id` em toda tabela financeira, RLS `ENABLE + FORCE` com a política
   `workspace_id = current_setting('app.workspace_id')` (sem valor = nenhuma linha). Referências
   entre tabelas são **FKs compostas** `(workspace_id, x_id)`; todo pai tem `unique(workspace_id, id)`.
-- **Papéis:** o dono das tabelas migra; `effinance_app` (NOLOGIN, sem BYPASSRLS) só tem DML nas 29
-  tabelas de tenant (13 financeiras + 16 de tarefas); o login da API é membro dele e tem privilégios mínimos nas tabelas de identidade
-  (`test/db-roles.ts`). Consultas comuns em tabelas financeiras fora de `withTenant` falham.
+- **Papéis:** o dono das tabelas migra; `effinance_app` (NOLOGIN, sem BYPASSRLS) só tem DML nas 34
+  tabelas de tenant (13 financeiras + 16 de tarefas + 5 da fase 3); o login da API é membro dele e tem
+  privilégios mínimos nas tabelas de identidade (inclusive `user_photos`, fase 3) (`test/db-roles.ts`). Consultas comuns em tabelas financeiras fora de `withTenant` falham.
 - **Criptografia por campo:** AES-256-GCM com chave por espaço (embrulhada pelo KeyProvider), AAD
   `workspace:tabela:coluna`, valor `v1.<iv>.<ct>`. Cifrados: dados pessoais de contatos (documento,
   e-mail, telefone, endereço, responsável…), notas de lançamentos/séries/metas, descrição e
   comentários de tarefas (0013), descrições de recorrentes/etapas/modelos, notas do histórico,
   anotações pessoais e nome e conteúdo dos anexos (0014; o conteúdo com `encryptBytes`, AAD com o id
-  do anexo), ids do Open Finance. Busca exata por índice cego (HMAC). Nomes,
+  do anexo), ids do Open Finance; na 0015, CPF do responsável e acessos dos clientes (nunca em listas),
+  observação dos documentos, contato/observações dos sindicatos e dos ciclos, CPF/e-mail/telefone e
+  chave Pix do escritório; a foto do perfil com uma chave de plataforma (`platformEncryptBytes`). Busca exata por índice cego (HMAC). Nomes,
   títulos de tarefas e descrições de lançamentos ficam em claro (são pesquisáveis). Campo novo
   cifrado: migração limpa `encryption_backfilled_at` e o backfill (`db/backfill.ts`) cifra o legado.
 - **Migrações:** 0000 inicial · 0001 divisão · 0002 espaços · 0003 RLS · 0004 integridade de tenant ·
@@ -194,7 +223,9 @@ sequenceDiagram
   tarefas (fase 1) · 0012 reforço de tarefas (só clientes, nomes na exclusão da conta, CHECKs, índices) ·
   0013 descrição e comentários de tarefas cifrados (CHECK de formato `NOT VALID` + backfill) · 0014
   tarefas fase 2 (recorrentes e colunas de ocorrência em `tasks`, processos e modelos, histórico,
-  anexos, anotações, gatilhos LGPD). Escritas para rodar duas vezes e também no PGlite.
+  anexos, anotações, gatilhos LGPD) · 0015 fase 3 (ajustes de permissão em `workspace_members`, dados
+  fiscais/acessos em `contacts`, documentos, sindicatos/convenções/vínculos, escritório, fotos). Escritas
+  para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tarefas usam `todayIn('America/Sao_Paulo')` (o dia do escritório, não o do servidor
   UTC) e `now()` (conclusões, criação, histórico), que `EFFINANCE_NOW` fixa nos testes. Tokens, sessões e trials usam o relógio real.
@@ -209,7 +240,8 @@ sequenceDiagram
   e, no demo, troca o `fetch` por `demo/fetch.ts`.
 - **Demo:** `demo/server.ts` abre PGlite em `idb://effinance-demo`, aplica `apps/api/drizzle/*.sql`
   (via `import.meta.glob`), configura uma chave mestre pública, roda `seedDemo` (marcador
-  `SEED_VERSION`, hoje `seed:office-v6-tasks-phase2`) e registra os módulos reais da API num roteador
+  `SEED_VERSION`, hoje `seed:office-v6-tasks-phase2`; o seed da fase 3 está em `db/demo-seed-phase3.ts`
+  e só entra num banco novo até o marcador subir) e registra os módulos reais da API num roteador
   falso (`fake-fastify.ts`; respostas JSON, ou bytes/texto quando a rota define o `content-type` —
   download de anexo e CSV —, repassados por `fetch.ts`). `demo.test.ts` roda tudo isso no Node,
   inclusive a fase 2 de tarefas.
@@ -277,7 +309,7 @@ sequenceDiagram
    `workspaces`; o PGlite tem uma conexão só). `inTenant` já faz isso e entrega a cifra ao callback
    (`(tx, cipher)`); no módulo de tarefas ela chega em `TaskContext.cipher`.
 8. Rótulos de risco e algumas chaves de gráfico são em português (`baixo`, `critico`, `saldo`).
-9. **Financeiro só para administradores** (`owner`/`editor`): módulo financeiro novo chama
+9. **Financeiro = permissão `finance`** (padrão `owner`/`editor`; ajustável por pessoa): módulo financeiro novo chama
    `financeOnly(app)` (`lib/finance-access.ts`) no início do plugin (depois de `tenantGuards`, se
    houver); `viewer` recebe 403 até em leituras. Dado financeiro em módulo aberto (ex.: honorários em
    `/clients`) é omitido com `canAccessFinance(req.access)`. Todo módulo novo precisa entrar em
@@ -305,12 +337,21 @@ sequenceDiagram
 15. **Módulos de serviço novos** de tarefas entram em `test/tasks-scope.test.ts` (o teste exige que
     todo export de função seja chamado); helpers internos ficam em módulos fora da lista
     (`generation.ts`, `occurrences.ts`, `events.ts`, `flow-engine.ts`, `task-rows.ts`, `file-check.ts`,
-    `csv.ts`).
+    `csv.ts`). Os da fase 3 (`unions`, `deadlines`, `office`, `clients/fiscal.ts`) entram em
+    `test/phase3-scope.test.ts` (mesmo verificador, `test/scope-checker.ts`).
+16. **Permissão nova** = chave em `packages/shared/src/permissions.ts` (com padrão por papel igual ao
+    comportamento atual) + `PERMISSION_FORBIDDEN_MESSAGES` em `lib/permissions.ts`; rota de tarefas nova
+    com chave entra em `ROUTE_KEYS`/`ADMIN_ROUTES` de `test/tasks-security.test.ts`. Ninguém concede o que
+    não tem: `assertGrantable` (`workspaces/service.ts`) vale para ajustes, papéis e convites.
+17. **Acessos de clientes** (`simplesAccessCode`, `accountantPassword`): nunca entram em `toClient`,
+    busca, opções ou alertas — só `revealCredential` (rota com `clientCredentials` e auditoria). Campo
+    cifrado novo em `contacts` não vai para `CONTACT_ALL_ENCRYPTED_FIELDS` (que alimenta `toClient`).
 
 ## Guia de navegação
 
 - **Novo endpoint:** schema e tipos em `packages/shared` → `apps/api/src/modules/<x>/service.ts` e
   `routes.ts` → registrar em `src/routes.ts` → teste em `apps/api/test/` → linha em `docs/api.md`.
+  Módulo novo entra em `FINANCE_MODULES` ou `OPEN_MODULES` de `test/finance-access.test.ts`.
   No módulo de tarefas: classificar a rota em `test/tasks-security.test.ts` (admin ou membro).
 - **Nova coluna/tabela:** `src/db/schema.ts` → `pnpm --filter @effinance/api db:generate` →
   reescrever o SQL no padrão reexecutável → rodar API e `apps/web` `vitest run src/demo`.
