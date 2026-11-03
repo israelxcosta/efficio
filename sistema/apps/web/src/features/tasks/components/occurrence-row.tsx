@@ -9,7 +9,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { areaOf } from '@/components/layout/nav';
 import { cn, pluralize } from '@/lib/utils';
 import { DUE_TONE_CLASS } from '../due';
-import { assigneesTip, auditHref, deadlineTip, doneFraction, groupDeadlineInfo, occurrenceParams, pendingText } from '../occurrence';
+import { assigneesTip, auditHref, deadlineTip, doneFraction, groupDeadlineInfo, occurrenceParams, pendingText, periodLabel } from '../occurrence';
 import { TaskStatusGlyph } from './task-status';
 
 /** Which clients the occurrence sheet starts with (`ocorrencias=` in the URL). */
@@ -121,6 +121,7 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
             <span className="mt-0.5 block truncate text-xs text-muted">
               {pendingText(o, Boolean(mine))}
               {showDepartment && o.department ? ` · ${o.department.name}` : ''}
+              {o.period === 'weekly' ? ` · ${periodLabel(o, today)}` : ''}
             </span>
             <span className={cn('mt-0.5 block truncate text-xs', compact ? '@2xl:hidden' : '@xl:hidden', DUE_TONE_CLASS[inline.tone])}>{inline.text}</span>
           </span>
@@ -141,17 +142,20 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
         {!compact ? (
           <div className="hidden w-36 @4xl:block">
             <span className="tabular text-[13px] text-muted">
-              {o.done}/{live} concluídas
+              {/* In "Abertas" the view only has the pending ones: say so instead of a misleading 0/N. */}
+              {o.done === 0 && o.pending === live ? `${o.pending} ${o.pending === 1 ? 'pendente' : 'pendentes'}` : `${o.done}/${live} concluídas`}
             </span>
           </div>
         ) : null}
-        <div className={cn('hidden w-36 text-right', compact ? '@2xl:block' : '@xl:block')}>
+        <div className={cn('hidden min-w-0 text-right', compact ? 'w-44 @2xl:block' : 'w-48 @xl:block')}>
           <Tooltip content={deadlineTip(o, today)}>
             <p className="tabular text-[13px] font-medium text-fg" tabIndex={-1}>
               {formatDateBR(o.targetDate)}
             </p>
           </Tooltip>
-          <span className={cn('text-xs', DUE_TONE_CLASS[deadline.tone])}>{deadline.text}</span>
+          <span className={cn('block truncate text-xs', DUE_TONE_CLASS[deadline.tone])} title={deadline.text}>
+            {deadline.text}
+          </span>
         </div>
         <OccurrenceRowMenu occurrence={o} />
       </div>

@@ -180,7 +180,7 @@ function toComment(
     author: personRef(ctx, row.authorId, row.authorName),
     text,
     isYours: row.authorId === ctx.userId,
-    canDelete: ctx.isAdmin || row.authorId === ctx.userId,
+    canDelete: ctx.permissions.deleteTasks || row.authorId === ctx.userId,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -799,7 +799,8 @@ export async function deleteComment(ctx: TaskContext, taskId: string, commentId:
   );
   const [row] = await ctx.db.select({ authorId: taskComments.authorId }).from(taskComments).where(key);
   if (!row) throw new NotFoundError('Comentário não encontrado');
-  if (!ctx.isAdmin && row.authorId !== ctx.userId)
+  // The author, or whoever may delete tasks (`deleteTasks`: removing someone else's content).
+  if (!ctx.permissions.deleteTasks && row.authorId !== ctx.userId)
     throw new ForbiddenError('Só quem escreveu ou um administrador pode remover este comentário.');
   await ctx.db.delete(taskComments).where(key);
   await recordEvents(ctx, [{ taskId, kind: 'comment_removed', data: { commentId } }]);

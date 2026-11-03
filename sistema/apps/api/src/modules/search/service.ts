@@ -9,6 +9,7 @@ import {
   taskFlowSteps,
   tasks,
   transactions,
+  unions,
   type CategoryRow,
   type TransactionRow,
 } from '../../db/schema';
@@ -33,7 +34,8 @@ export interface SearchScope {
 const none = <T>(): Promise<T[]> => Promise.resolve([]);
 
 /**
- * Notes and contact details are encrypted: search covers descriptions, names and exact CPF/CNPJ. Tasks
+ * Notes and contact details are encrypted: search covers descriptions, names and exact CPF/CNPJ (the
+ * clients' accesses are never searched nor returned). Unions by name, acronym, category or CNPJ. Tasks
  * (standalone and process steps, by title) and recurring tasks (by name) are found by every member;
  * occurrences of recurring tasks are not listed one by one (the recurring task stands for them).
  */
@@ -44,7 +46,7 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
   const documentHash =
     digits.length === 11 || digits.length === 14 ? await documentIndex(cipher, digits) : null;
   const day = todayIn(TASK_TIME_ZONE);
-  const [txRows, accountRows, categoryRows, contactRows, taskRows, recurringRows] = await Promise.all([
+  const [txRows, accountRows, categoryRows, contactRows, taskRows, recurringRows, unionRows] = await Promise.all([
     !scope.finance
       ? none<TransactionRow>()
       : db
@@ -111,6 +113,23 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
       .where(and(eq(recurringTasks.workspaceId, workspaceId), ilike(recurringTasks.name, pattern)))
       .orderBy(sql`lower(${recurringTasks.name})`)
       .limit(5),
+    // Unions (phase 3): public data of the entity, for every member. Name, acronym, category or CNPJ.
+    db
+      .select({ id: unions.id, name: unions.name, acronym: unions.acronym, category: unions.category, active: unions.active })
+      .from(unions)
+      .where(
+        and(
+          eq(unions.workspaceId, workspaceId),
+          or(
+            ilike(unions.name, pattern),
+            ilike(unions.acronym, pattern),
+            ilike(unions.category, pattern),
+            digits.length >= 4 ? ilike(unions.document, likePattern(digits)) : undefined,
+          ),
+        ),
+      )
+      .orderBy(desc(unions.active), sql`lower(coalesce(${unions.acronym}, ${unions.name}))`)
+      .limit(5),
   ]);
 
   const matchedAccounts = new Set(accountRows.map((a) => a.id));
@@ -136,5 +155,6 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
       client: t.clientId && t.clientName ? { id: t.clientId, name: t.clientTradeName?.trim() ? t.clientTradeName : t.clientName } : null,
     })),
     recurringTasks: recurringRows,
+    unions: unionRows,
   };
 }

@@ -1,6 +1,6 @@
 // Builders for the task module tests.
 
-import type { Task, TaskDetail, TaskOptionsResponse } from '@effinance/shared';
+import { rolePermissions, type Task, type TaskDetail, type TaskOptionsResponse } from '@effinance/shared';
 
 export function makeTask(patch: Partial<Task>): Task {
   return {
@@ -54,12 +54,12 @@ export const CONTABIL = { id: '22222222-2222-4222-8222-222222222222', name: 'Con
 export function makeOptions(patch: Partial<TaskOptionsResponse> = {}): TaskOptionsResponse {
   return {
     today: '2026-10-28',
-    me: { id: 'me', name: 'Marina Costa', role: 'owner', department: FISCAL, isAdmin: true, canWrite: true },
+    me: { id: 'me', name: 'Marina Costa', role: 'owner', department: FISCAL, isAdmin: true, canWrite: true, permissions: rolePermissions('owner') },
     members: [
-      { id: 'me', name: 'Marina Costa', role: 'owner', isAdmin: true, department: FISCAL, isYou: true },
-      { id: 'ana', name: 'Ana Paula Ribeiro', role: 'editor', isAdmin: true, department: FISCAL, isYou: false },
-      { id: 'bruno', name: 'Bruno Carvalho', role: 'viewer', isAdmin: false, department: CONTABIL, isYou: false },
-      { id: 'rafael', name: 'Rafael Lima', role: 'viewer', isAdmin: false, department: null, isYou: false },
+      { id: 'me', name: 'Marina Costa', role: 'owner', isAdmin: true, department: FISCAL, isYou: true, permissionOverrides: {}, photoUpdatedAt: null },
+      { id: 'ana', name: 'Ana Paula Ribeiro', role: 'editor', isAdmin: true, department: FISCAL, isYou: false, permissionOverrides: {}, photoUpdatedAt: null },
+      { id: 'bruno', name: 'Bruno Carvalho', role: 'viewer', isAdmin: false, department: CONTABIL, isYou: false, permissionOverrides: {}, photoUpdatedAt: null },
+      { id: 'rafael', name: 'Rafael Lima', role: 'viewer', isAdmin: false, department: null, isYou: false, permissionOverrides: {}, photoUpdatedAt: null },
     ],
     departments: [CONTABIL, FISCAL],
     categories: [{ id: 'cat', name: 'Impostos', icon: 'receipt', color: '#152B61', taskCount: 0, createdAt: '2026-01-01T00:00:00Z' }],

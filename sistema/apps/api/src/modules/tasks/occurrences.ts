@@ -184,12 +184,15 @@ export const CELL_COLUMNS = {
   completedByName: tasks.completedByName,
 };
 
-/** Only who concluded an occurrence, or an administrator, may reopen it (it is an audit record). */
-export function canReopenOccurrence(ctx: Pick<TaskContext, 'isAdmin' | 'userId'>, row: Pick<CellRow, 'status' | 'completedBy'>): boolean {
-  return row.status === 'done' && (ctx.isAdmin || row.completedBy === ctx.userId);
+/**
+ * Only who concluded an occurrence, or whoever may reopen others' conclusions (`reopenOthers`; by
+ * default the administrators), may reopen it (it is an audit record).
+ */
+export function canReopenOccurrence(ctx: Pick<TaskContext, 'permissions' | 'userId'>, row: Pick<CellRow, 'status' | 'completedBy'>): boolean {
+  return row.status === 'done' && (ctx.permissions.reopenOthers || row.completedBy === ctx.userId);
 }
 
-export function toOccurrenceCell(ctx: Pick<TaskContext, 'members' | 'today' | 'isAdmin' | 'userId'>, row: CellRow): OccurrenceCell {
+export function toOccurrenceCell(ctx: Pick<TaskContext, 'members' | 'today' | 'permissions' | 'userId'>, row: CellRow): OccurrenceCell {
   const legal = row.dueDate!;
   const target = row.targetDate!;
   const done = row.status === 'done' && row.completedAt !== null;

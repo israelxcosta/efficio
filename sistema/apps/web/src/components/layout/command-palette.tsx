@@ -3,8 +3,26 @@ import { Command } from 'cmdk';
 import { Dialog } from 'radix-ui';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeftRight, BriefcaseBusiness, Building2, CalendarClock, FileUp, Landmark, ListChecks, Minus, Plus, Search, TrendingUp, Truck, Wallet } from 'lucide-react';
-import { formatBRL, formatDateBR, type SearchResponse } from '@effinance/shared';
+import {
+  ArrowLeftRight,
+  BriefcaseBusiness,
+  Building2,
+  CalendarClock,
+  FileUp,
+  Landmark,
+  ListChecks,
+  Minus,
+  NotebookPen,
+  Plus,
+  Repeat,
+  Search,
+  SquarePen,
+  TrendingUp,
+  Truck,
+  Wallet,
+  Workflow,
+} from 'lucide-react';
+import { formatBRL, formatDateBR, RECURRENCE_PERIOD_LABELS, todayISO, type SearchResponse } from '@effinance/shared';
 import { api } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { BankLogo } from '@/components/ui/bank-logo';
@@ -14,6 +32,8 @@ import { useImportActions } from '@/features/imports/import-actions';
 import { useOpenFinanceStatus } from '@/features/open-finance/api';
 import { usePermissions } from '@/features/auth/permissions';
 import { useTaskSheetLinks } from '@/features/tasks/task-links';
+import { useTaskActions } from '@/features/tasks/task-actions';
+import { shortDate } from '@/features/tasks/due';
 import { lastPathOf, type AreaMemory } from './area-memory';
 import { FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS, SETTINGS_ITEM, type Area, type NavItem } from './nav';
 
@@ -38,6 +58,9 @@ export function visibleSearchHits(r: SearchResponse | undefined, canAccessFinanc
     accounts: canAccessFinance ? (r?.accounts ?? []) : [],
     categories: canAccessFinance ? (r?.categories ?? []) : [],
     contacts: (r?.contacts ?? []).filter((c) => canAccessFinance || c.kind === 'client'),
+    // Tasks and recurring tasks are for every member (titles only; never a client's access data).
+    tasks: r?.tasks ?? [],
+    recurringTasks: r?.recurringTasks ?? [],
   };
 }
 
@@ -61,8 +84,9 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
   const navigate = useNavigate();
   const actions = useTransactionActions();
   const { openImport } = useImportActions();
-  const { canAccessFinance, canWriteTasks } = usePermissions();
-  const { newTask } = useTaskSheetLinks();
+  const { canAccessFinance, canWriteTasks, canManage } = usePermissions();
+  const { newTask, openTask } = useTaskSheetLinks();
+  const taskActionsCtx = useTaskActions();
   const openFinance = useOpenFinanceStatus(open && canAccessFinance);
   const [query, setQuery] = useState('');
   const q = useDebounced(query.trim(), 200);
@@ -83,7 +107,8 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
   }
 
   const r = search.data;
-  const { transactions, accounts, categories, contacts } = visibleSearchHits(r, canAccessFinance);
+  const { transactions, accounts, categories, contacts, tasks, recurringTasks } = visibleSearchHits(r, canAccessFinance);
+  const today = todayISO();
 
   const taskActions = canWriteTasks ? (
     <Command.Group heading="Ações da gestão" className={groupClass}>
@@ -93,8 +118,28 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
       <Command.Item value="novo compromisso horario agenda reuniao" className={itemClass} onSelect={() => run(() => newTask({ appointment: true }))}>
         <CalendarClock /> Novo compromisso
       </Command.Item>
+      <Command.Item value="aplicar modelo de processo fluxo etapas roteiro" className={itemClass} onSelect={() => run(taskActionsCtx.openTemplatePicker)}>
+        <Workflow /> Aplicar modelo de processo
+      </Command.Item>
+      <Command.Item value="minhas anotacoes notas lembretes" className={itemClass} onSelect={() => run(taskActionsCtx.openNotes)}>
+        <NotebookPen /> Minhas anotações
+      </Command.Item>
+      <Command.Item value="nova anotacao nota lembrete" className={itemClass} onSelect={() => run(taskActionsCtx.newNote)}>
+        <SquarePen /> Nova anotação
+      </Command.Item>
+      {canManage ? (
+        <Command.Item value="nova tarefa recorrente obrigacao das dctfweb" className={itemClass} onSelect={() => run(() => navigate('/tarefas/recorrentes?recorrente=nova'))}>
+          <Repeat /> Nova tarefa recorrente
+        </Command.Item>
+      ) : null}
     </Command.Group>
-  ) : null;
+  ) : (
+    <Command.Group heading="Ações da gestão" className={groupClass}>
+      <Command.Item value="minhas anotacoes notas lembretes" className={itemClass} onSelect={() => run(taskActionsCtx.openNotes)}>
+        <NotebookPen /> Minhas anotações
+      </Command.Item>
+    </Command.Group>
+  );
 
   const financeActions = canAccessFinance ? (
     <Command.Group heading="Ações do financeiro" className={groupClass}>
@@ -147,7 +192,9 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
         <Dialog.Content className="fixed top-[12vh] left-1/2 z-50 w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-lg outline-none data-[state=open]:animate-fade-in">
           <Dialog.Title className="sr-only">Buscar</Dialog.Title>
           <Dialog.Description className="sr-only">
-            {canAccessFinance ? 'Busque transações, contas, categorias, clientes, fornecedores ou navegue' : 'Busque clientes ou navegue pela gestão de tarefas'}
+            {canAccessFinance
+              ? 'Busque tarefas, transações, contas, categorias, clientes, fornecedores ou navegue'
+              : 'Busque tarefas, tarefas recorrentes e clientes ou navegue pela gestão de tarefas'}
           </Dialog.Description>
           <Command shouldFilter={!q || q.length < 2} label="Busca global">
             <div className="flex items-center gap-3 border-b border-border px-4">
@@ -155,7 +202,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
               <Command.Input
                 value={query}
                 onValueChange={setQuery}
-                placeholder={canAccessFinance ? 'Buscar transações, clientes, páginas ou ações…' : 'Buscar clientes, páginas ou ações…'}
+                placeholder={canAccessFinance ? 'Buscar tarefas, transações, clientes, páginas ou ações…' : 'Buscar tarefas, clientes, páginas ou ações…'}
                 className="h-14 flex-1 bg-transparent text-[15px] outline-none placeholder:text-subtle"
               />
               <kbd className="rounded-md border border-border bg-bg-subtle px-1.5 py-0.5 text-[11px] font-semibold text-muted">ESC</kbd>
@@ -167,6 +214,33 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
 
               {r && q.length >= 2 ? (
                 <>
+                  {tasks.length ? (
+                    <Command.Group heading="Tarefas" className={groupClass}>
+                      {tasks.map((t) => (
+                        <Command.Item key={t.id} value={`task-${t.id}`} className={itemClass} onSelect={() => run(() => openTask(t.id))}>
+                          <ListChecks />
+                          <span className="min-w-0 flex-1 truncate">
+                            {t.title}
+                            <span className="ml-2 text-xs text-muted">{t.client?.name ?? 'Interna'}</span>
+                          </span>
+                          <span className={t.overdue ? 'text-xs font-semibold text-danger' : 'text-xs text-muted'}>
+                            {t.status === 'done' ? 'Concluída' : t.status === 'canceled' ? 'Cancelada' : t.dueDate ? `${t.overdue ? 'Venceu' : 'Vence'} ${shortDate(t.dueDate, today)}` : 'Sem vencimento'}
+                          </span>
+                        </Command.Item>
+                      ))}
+                    </Command.Group>
+                  ) : null}
+                  {recurringTasks.length ? (
+                    <Command.Group heading="Tarefas recorrentes" className={groupClass}>
+                      {recurringTasks.map((t) => (
+                        <Command.Item key={t.id} value={`rec-${t.id}`} className={itemClass} onSelect={() => run(() => navigate(`/tarefas/recorrentes?recorrente=${t.id}`))}>
+                          <Repeat />
+                          <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                          <span className="text-xs text-muted">{RECURRENCE_PERIOD_LABELS[t.period]}</span>
+                        </Command.Item>
+                      ))}
+                    </Command.Group>
+                  ) : null}
                   {transactions.length ? (
                     <Command.Group heading="Lançamentos" className={groupClass}>
                       {transactions.map((t) => (

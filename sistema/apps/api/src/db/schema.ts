@@ -25,8 +25,10 @@ import type {
   BankConnectionStatus,
   CardBrand,
   CategoryType,
+  ClientDocumentKind,
   ClientStatus,
   ContactKind,
+  ContractBlock,
   FeeEntryKind,
   Frequency,
   IconName,
@@ -40,7 +42,11 @@ import type {
   OpenTaskStatus,
   PaymentMethod,
   NonBusinessDayRule,
+  PermissionOverrides,
+  PixKeyType,
   PlanCode,
+  ProfilePhotoContentType,
+  OfficeImageContentType,
   RecurrenceKind,
   RecurrencePeriod,
   SimplesAnnex,
@@ -140,12 +146,21 @@ export const workspaceMembers = pgTable(
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     userId: userRef(),
     role: text().$type<MemberRole>().notNull(),
+    /**
+     * Adjustments of the person over the role's defaults (migration 0015, spec §13.10): only the keys
+     * that differ (`{ "finance": true }`). Read through `sanitizePermissionOverrides`; `{}` for the owner.
+     */
+    permissions: jsonb().$type<PermissionOverrides>().notNull().default({}),
     createdAt: createdAt(),
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.userId] }),
     index('workspace_members_user_idx').on(t.userId),
     check('workspace_members_role_chk', sql`${t.role} in ('owner', 'editor', 'viewer')`),
+    check(
+      'workspace_members_permissions_chk',
+      sql`jsonb_typeof(${t.permissions}) = 'object' and length(${t.permissions}::text) <= 2000 and (${t.role} <> 'owner' or ${t.permissions} = '{}'::jsonb)`,
+    ),
     // Exactly one owner: owner-only actions (billing, deletion, members) and account deletion
     // ("workspaces where I am the owner") rely on it.
     uniqueIndex('workspace_members_single_owner_uq').on(t.workspaceId).where(sql`${t.role} = 'owner'`),
@@ -474,6 +489,18 @@ export const contacts = pgTable(
     inactivatedAt: calendarDate(),
     inactivationReason: text().$type<InactivationReason>(),
     inactivationNotes: text(),
+    // Clients only, phase 3 (migration 0015, spec §13.8): registrations in clear (public data, read by
+    // every member), the responsible's CPF and the two accesses encrypted with the workspace key. The
+    // accesses never leave in lists: only `POST /clients/:id/credentials/reveal` decrypts them.
+    stateRegistration: text(),
+    stateRegistrationExempt: boolean().notNull().default(false),
+    municipalRegistration: text(),
+    /** Encrypted (`v1.<iv>.<ct>`). */
+    responsibleDocument: text(),
+    /** Encrypted: access code of the Simples Nacional portal. */
+    simplesAccessCode: text(),
+    /** Encrypted: the office's password in this client's portals. */
+    accountantPassword: text(),
     createdAt: createdAt(),
   },
   (t) => [
@@ -509,6 +536,14 @@ export const contacts = pgTable(
       sql`(${t.status} = 'inactive') = (${t.inactivatedAt} is not null and ${t.inactivationReason} is not null)`,
     ),
     check('contacts_fee_due_day_chk', sql`${t.feeDueDay} between 1 and 31`),
+    check(
+      'contacts_registrations_chk',
+      sql`length(${t.stateRegistration}) <= 40 and length(${t.municipalRegistration}) <= 40 and not (${t.stateRegistrationExempt} and ${t.stateRegistration} is not null)`,
+    ),
+    check(
+      'contacts_secrets_chk',
+      sql`${t.responsibleDocument} ~ '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$' and length(${t.responsibleDocument}) <= 200 and ${t.simplesAccessCode} ~ '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$' and length(${t.simplesAccessCode}) <= 1200 and ${t.accountantPassword} ~ '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$' and length(${t.accountantPassword}) <= 1200`,
+    ),
   ],
 );
 
@@ -1752,6 +1787,277 @@ export const taskNotes = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Phase 3 (migration 0015): clients' documents, unions and collective agreements, the office, profile
+// photos. Same tenant pattern as 0004–0014 (photos are identity data, outside RLS).
+// ---------------------------------------------------------------------------
+
+/** Document with expiry date of a client (Effy's CompanyReport); the note encrypted like free text. */
+export const clientDocuments = pgTable(
+  'client_documents',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    clientId: uuid().notNull(),
+    /** Always 'client' (generated): the foreign key only accepts clients. */
+    clientKind: text()
+      .$type<'client'>()
+      .generatedAlwaysAs(sql`'client'`),
+    kind: text().$type<ClientDocumentKind>().notNull(),
+    /** Name of an "Outro…" document (null for the catalog kinds). */
+    customName: text(),
+    expiresAt: calendarDate(),
+    /** Encrypted with the workspace key. */
+    note: text(),
+    updatedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    updatedByName: text().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('client_documents', t),
+    index('client_documents_client_idx').on(t.workspaceId, t.clientId),
+    index('client_documents_expires_idx').on(t.workspaceId, t.expiresAt).where(sql`${t.expiresAt} is not null`),
+    index('client_documents_updated_by_idx').on(t.updatedBy).where(sql`${t.updatedBy} is not null`),
+    check(
+      'client_documents_kind_chk',
+      sql`${t.kind} in ('digital_certificate', 'cnd_federal', 'cnd_state', 'cnd_municipal', 'crf_fgts', 'cndt', 'operating_license', 'sanitary_license', 'fire_certificate', 'environmental_license', 'pcmso', 'pgr', 'ltcat', 'professional_registration', 'other')`,
+    ),
+    check(
+      'client_documents_name_chk',
+      sql`(${t.kind} = 'other') = (${t.customName} is not null) and length(${t.customName}) between 1 and 80`,
+    ),
+    encryptedCheck('client_documents_note_chk', t.note, 2000),
+    check('client_documents_updated_by_name_chk', sql`length(${t.updatedByName}) between 1 and 120`),
+    foreignKey({
+      name: 'client_documents_client_fk',
+      columns: [t.workspaceId, t.clientId, t.clientKind],
+      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
+    }).onDelete('cascade'),
+  ],
+);
+
+/**
+ * Union (sindicato, Effy's Union): public data of the entity in clear (searchable); the responsible
+ * person's contact and the notes encrypted. The base month (1–12) renews the agreement every year.
+ */
+export const unions = pgTable(
+  'unions',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    name: text().notNull(),
+    /** CNPJ, digits (public, unique in the workspace). */
+    document: text().notNull(),
+    acronym: text(),
+    category: text(),
+    territory: text(),
+    zipCode: text(),
+    street: text(),
+    number: text(),
+    complement: text(),
+    district: text(),
+    city: text(),
+    state: text(),
+    phone: text(),
+    email: text(),
+    website: text(),
+    /** Encrypted. */
+    responsibleName: text(),
+    responsibleRole: text(),
+    /** Encrypted. */
+    responsibleEmail: text(),
+    /** Encrypted. */
+    responsiblePhone: text(),
+    baseMonth: integer(),
+    /** Encrypted. */
+    notes: text(),
+    active: boolean().notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('unions', t),
+    uniqueIndex('unions_document_uq').on(t.workspaceId, t.document),
+    index('unions_name_idx').on(t.workspaceId, t.active, t.name),
+    check('unions_name_chk', sql`length(${t.name}) between 1 and 200`),
+    check('unions_document_chk', sql`${t.document} ~ '^[0-9]{14}$'`),
+    check('unions_base_month_chk', sql`${t.baseMonth} between 1 and 12`),
+    check(
+      'unions_lengths_chk',
+      sql`length(${t.acronym}) <= 30 and length(${t.category}) <= 120 and length(${t.territory}) <= 300 and length(${t.responsibleRole}) <= 120 and length(${t.website}) <= 300`,
+    ),
+    check('unions_state_chk', sql`${t.state} ~ '^[A-Z]{2}$'`),
+    encryptedCheck('unions_responsible_name_chk', t.responsibleName, 2000),
+    encryptedCheck('unions_responsible_email_chk', t.responsibleEmail, 2000),
+    encryptedCheck('unions_responsible_phone_chk', t.responsiblePhone, 2000),
+    encryptedCheck('unions_notes_chk', t.notes, 28000),
+  ],
+);
+
+/** One collective agreement cycle per year ("Convenção Coletiva 2026/2027"), marked as published. */
+export const unionConventions = pgTable(
+  'union_conventions',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    unionId: uuid().notNull(),
+    year: integer().notNull(),
+    published: boolean().notNull().default(false),
+    publishedAt: timestamptz(),
+    publishedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    publishedByName: text(),
+    /** Encrypted. */
+    note: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('union_conventions', t),
+    uniqueIndex('union_conventions_year_uq').on(t.workspaceId, t.unionId, t.year),
+    index('union_conventions_published_by_idx').on(t.publishedBy).where(sql`${t.publishedBy} is not null`),
+    check('union_conventions_year_chk', sql`${t.year} between 2000 and 2100`),
+    check(
+      'union_conventions_published_chk',
+      sql`${t.published} = (${t.publishedAt} is not null) and (${t.publishedByName} is null or length(${t.publishedByName}) between 1 and 120) and (${t.published} or ${t.publishedByName} is null)`,
+    ),
+    encryptedCheck('union_conventions_note_chk', t.note, 4000),
+    foreignKey({
+      name: 'union_conventions_union_fk',
+      columns: [t.workspaceId, t.unionId],
+      foreignColumns: [unions.workspaceId, unions.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+/** Clients whose employees follow the union's agreement (N:N). */
+export const unionClients = pgTable(
+  'union_clients',
+  {
+    workspaceId: workspaceRef().notNull(),
+    unionId: uuid().notNull(),
+    clientId: uuid().notNull(),
+    clientKind: text()
+      .$type<'client'>()
+      .generatedAlwaysAs(sql`'client'`),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'union_clients_pk', columns: [t.workspaceId, t.unionId, t.clientId] }),
+    index('union_clients_client_idx').on(t.workspaceId, t.clientId),
+    foreignKey({
+      name: 'union_clients_union_fk',
+      columns: [t.workspaceId, t.unionId],
+      foreignColumns: [unions.workspaceId, unions.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'union_clients_client_fk',
+      columns: [t.workspaceId, t.clientId, t.clientKind],
+      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
+    }).onDelete('cascade'),
+  ],
+);
+
+/**
+ * The office that runs the workspace (Effy's Office): one row per workspace. The responsible's CPF,
+ * e-mail and phone and the Pix key are encrypted; logo and watermark are images checked by signature.
+ * `contract_blocks` null = the factory template; `contract_watermark` null = the factory watermark.
+ */
+export const offices = pgTable(
+  'offices',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    document: text(),
+    legalName: text(),
+    tradeName: text(),
+    stateRegistration: text(),
+    municipalRegistration: text(),
+    zipCode: text(),
+    street: text(),
+    number: text(),
+    complement: text(),
+    district: text(),
+    city: text(),
+    state: text(),
+    phone: text(),
+    email: text(),
+    website: text(),
+    responsibleName: text(),
+    /** Encrypted. */
+    responsibleDocument: text(),
+    /** Encrypted. */
+    responsibleEmail: text(),
+    /** Encrypted. */
+    responsiblePhone: text(),
+    pixKeyType: text().$type<PixKeyType>(),
+    /** Encrypted. */
+    pixKey: text(),
+    logo: bytea(),
+    logoType: text().$type<OfficeImageContentType>(),
+    contractBlocks: jsonb().$type<ContractBlock[]>(),
+    contractWatermark: bytea(),
+    contractWatermarkType: text().$type<OfficeImageContentType>(),
+    contractWatermarkEnabled: boolean().notNull().default(true),
+    contractUpdatedAt: timestamptz(),
+    contractUpdatedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    contractUpdatedByName: text(),
+    updatedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    updatedByName: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('offices', t),
+    uniqueIndex('offices_workspace_uq').on(t.workspaceId),
+    index('offices_updated_by_idx').on(t.updatedBy).where(sql`${t.updatedBy} is not null`),
+    index('offices_contract_updated_by_idx').on(t.contractUpdatedBy).where(sql`${t.contractUpdatedBy} is not null`),
+    check('offices_document_chk', sql`${t.document} ~ '^[0-9]{14}$'`),
+    check('offices_names_chk', sql`length(${t.legalName}) between 1 and 200 and length(${t.tradeName}) <= 200 and length(${t.responsibleName}) <= 200`),
+    check('offices_state_chk', sql`${t.state} ~ '^[A-Z]{2}$'`),
+    check('offices_pix_chk', sql`${t.pixKeyType} in ('cnpj', 'cpf', 'email', 'phone', 'random') and (${t.pixKey} is null) = (${t.pixKeyType} is null)`),
+    encryptedCheck('offices_responsible_document_chk', t.responsibleDocument, 2000),
+    encryptedCheck('offices_responsible_email_chk', t.responsibleEmail, 2000),
+    encryptedCheck('offices_responsible_phone_chk', t.responsiblePhone, 2000),
+    encryptedCheck('offices_pix_key_chk', t.pixKey, 2000),
+    check(
+      'offices_logo_chk',
+      sql`(${t.logo} is null) = (${t.logoType} is null) and ${t.logoType} in ('image/png', 'image/jpeg', 'image/webp') and octet_length(${t.logo}) between 1 and 512000`,
+    ),
+    check(
+      'offices_watermark_chk',
+      sql`(${t.contractWatermark} is null) = (${t.contractWatermarkType} is null) and ${t.contractWatermarkType} in ('image/png', 'image/jpeg', 'image/webp') and octet_length(${t.contractWatermark}) between 1 and 512000`,
+    ),
+    // 500 blocks of up to 20 000 characters, 400 000 in total (checked by the API): the JSON stays under ~1 MB.
+    check(
+      'offices_contract_chk',
+      sql`jsonb_typeof(${t.contractBlocks}) = 'array' and jsonb_array_length(${t.contractBlocks}) <= 500 and length(${t.contractBlocks}::text) <= 1200000`,
+    ),
+    check('offices_recorded_names_chk', sql`length(${t.updatedByName}) between 1 and 120 and length(${t.contractUpdatedByName}) between 1 and 120`),
+  ],
+);
+
+/**
+ * Profile photo of a user (identity data, outside RLS: one photo across workspaces), encrypted with a
+ * platform key (12-byte IV + ciphertext + 16-byte tag, AAD bound to the user). Goes with the account.
+ */
+export const userPhotos = pgTable(
+  'user_photos',
+  {
+    userId: uuid()
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    contentType: text().$type<ProfilePhotoContentType>().notNull(),
+    sizeBytes: integer().notNull(),
+    content: bytea().notNull(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('user_photos_type_chk', sql`${t.contentType} in ('image/png', 'image/jpeg', 'image/webp')`),
+    check('user_photos_size_chk', sql`${t.sizeBytes} between 1 and 102400 and octet_length(${t.content}) = ${t.sizeBytes} + 28`),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type CategoryRow = typeof categories.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
@@ -1776,3 +2082,7 @@ export type TaskFlowTemplateRow = typeof taskFlowTemplates.$inferSelect;
 export type TaskFlowTemplateStepRow = typeof taskFlowTemplateSteps.$inferSelect;
 export type TaskEventRow = typeof taskEvents.$inferSelect;
 export type TaskNoteRow = typeof taskNotes.$inferSelect;
+export type ClientDocumentRow = typeof clientDocuments.$inferSelect;
+export type UnionRow = typeof unions.$inferSelect;
+export type UnionConventionRow = typeof unionConventions.$inferSelect;
+export type OfficeRow = typeof offices.$inferSelect;

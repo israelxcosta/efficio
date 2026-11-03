@@ -86,6 +86,8 @@ export async function listMembers(ctx: TaskContext): Promise<TaskMember[]> {
         isAdmin: m.role === 'owner' || m.role === 'editor',
         department: departments.find((d) => d.id === departmentId) ?? null,
         isYou: m.id === ctx.userId,
+        permissionOverrides: m.permissionOverrides ?? {},
+        photoUpdatedAt: m.photoUpdatedAt?.toISOString() ?? null,
       };
     })
     .sort(byName);
@@ -484,6 +486,7 @@ export async function taskOptions(ctx: TaskContext): Promise<TaskOptionsResponse
       department: me?.department ?? null,
       isAdmin: ctx.isAdmin,
       canWrite: ctx.canWrite,
+      permissions: ctx.permissions,
     },
     members,
     departments,

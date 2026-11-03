@@ -27,10 +27,14 @@ const ClientsPage = lazy(() => import('@/features/clients/pages/clients'));
 const ReportsPage = lazy(() => import('@/features/reports/pages/reports'));
 const ClientReportPage = lazy(() => import('@/features/reports/pages/client-report'));
 const SettingsPage = lazy(() => import('@/features/settings/pages/settings'));
-// Gestão de tarefas (phase 1): Início, Tarefas, Clientes and Cadastros.
+// Gestão de tarefas: Início, Tarefas, Auditoria, Recorrentes, Processos, Clientes, Relatórios, Cadastros.
 const GestaoLayout = lazy(() => import('@/features/tasks/gestao-layout'));
 const TaskHomePage = lazy(() => import('@/features/tasks/pages/home'));
 const TasksPage = lazy(() => import('@/features/tasks/pages/tasks'));
+const TaskAuditPage = lazy(() => import('@/features/tasks/pages/audit'));
+const RecurringTasksPage = lazy(() => import('@/features/tasks/pages/recurring'));
+const ProcessesPage = lazy(() => import('@/features/tasks/pages/processes'));
+const TaskReportsPage = lazy(() => import('@/features/tasks/pages/task-reports'));
 const TaskClientsPage = lazy(() => import('@/features/tasks/pages/clients'));
 const TaskRegistryPage = lazy(() => import('@/features/tasks/pages/registry'));
 
@@ -73,7 +77,11 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <TaskHomePage /> },
           { path: 'tarefas', element: <TasksPage /> },
+          { path: 'tarefas/auditoria', element: <TaskAuditPage /> },
+          { path: 'tarefas/recorrentes', element: <RecurringTasksPage /> },
+          { path: 'tarefas/processos', element: <ProcessesPage /> },
           { path: 'tarefas/clientes', element: <TaskClientsPage /> },
+          { path: 'tarefas/relatorios', element: <TaskReportsPage /> },
           { path: 'tarefas/cadastros', element: <TaskRegistryPage /> },
         ],
       },

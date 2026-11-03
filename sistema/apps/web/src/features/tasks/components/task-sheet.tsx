@@ -994,6 +994,8 @@ interface NewTaskValues extends PropertyValues {
 export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsResponse | undefined, copy: TaskDetail | undefined): NewTaskValues {
   const today = options?.today ?? todayISO();
   const appointment = params.get('horario') === '1';
+  const day = params.get('prazo');
+  const dueDay = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
   const dept = params.get('departamento');
   const client = params.get('cliente');
   const escopo = params.get('escopo');
@@ -1005,7 +1007,7 @@ export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsRes
     departmentId: isUuid(dept) && options?.departments.some((d) => d.id === dept) ? dept : '',
     assigneeId: escopo === 'minhas' && options ? options.me.id : '',
     clientId: isUuid(client) ? client : '',
-    dueDate: appointment ? today : '',
+    dueDate: dueDay ?? (appointment ? today : ''),
     categoryId: '',
     startDate: '',
     startTime: appointment ? '09:00' : '',
@@ -1048,7 +1050,7 @@ function NewTaskSheet({
     () => newTaskDefaults(params, options, copy.data),
     // Only when the sheet opens or the data it copies arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [Boolean(options), copy.data?.id, params.get('estado'), params.get('horario')],
+    [Boolean(options), copy.data?.id, params.get('estado'), params.get('horario'), params.get('prazo')],
   );
   const form = useForm<NewTaskValues>({ defaultValues: defaults });
   const [errors, setErrors] = useState<Partial<Record<keyof NewTaskValues, string>>>({});

@@ -3,8 +3,20 @@
 
 import { and, asc, count, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import {
+  effectivePermissions,
+  grantedPermissions,
+  normalizePermissionOverrides,
+  PERMISSION_KEYS,
+  PERMISSION_LABELS,
+  permissionChanges,
+  rolePermissions,
+  sanitizePermissionOverrides,
   TRIAL_DAYS,
   type AuditLogEntry,
+  type MemberPermissions,
+  type PermissionKey,
+  type PermissionMap,
+  type PermissionOverrides,
   type Invite,
   type InvitePreview,
   type MeResponse,
@@ -19,6 +31,7 @@ import type { DbExecutor } from '../../db/client';
 import {
   auditLogs,
   subscriptions,
+  userPhotos,
   users,
   workspaceInvites,
   workspaceMembers,
@@ -69,7 +82,7 @@ export async function createWorkspace(
 
 export async function listWorkspaceSummaries(db: DbExecutor, userId: string): Promise<WorkspaceSummary[]> {
   const rows = await db
-    .select({ role: workspaceMembers.role, workspace: workspaces, subscription: subscriptions })
+    .select({ role: workspaceMembers.role, permissions: workspaceMembers.permissions, workspace: workspaces, subscription: subscriptions })
     .from(workspaceMembers)
     .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
     .leftJoin(subscriptions, eq(subscriptions.workspaceId, workspaces.id))
@@ -81,18 +94,26 @@ export async function listWorkspaceSummaries(db: DbExecutor, userId: string): Pr
     name: r.workspace.name,
     kind: r.workspace.kind,
     role: r.role,
+    permissions: effectivePermissions(r.role, r.role === 'owner' ? {} : r.permissions),
     subscription: summarizeSubscription(r.subscription, now),
   }));
 }
 
-export function toMeUser(row: UserRow): MeUser {
+export function toMeUser(row: UserRow, photoUpdatedAt: Date | null = null): MeUser {
   return {
     id: row.id,
     name: row.name,
     email: row.email,
     createdAt: row.createdAt.toISOString(),
     mfaEnabled: row.mfaEnabled,
+    photoUpdatedAt: photoUpdatedAt?.toISOString() ?? null,
   };
+}
+
+/** When the user's profile photo was last changed (null without one). */
+export async function photoUpdatedAtOf(db: DbExecutor, userId: string): Promise<Date | null> {
+  const [row] = await db.select({ updatedAt: userPhotos.updatedAt }).from(userPhotos).where(eq(userPhotos.userId, userId));
+  return row?.updatedAt ?? null;
 }
 
 export async function getUserRow(db: DbExecutor, userId: string): Promise<UserRow> {
@@ -102,10 +123,14 @@ export async function getUserRow(db: DbExecutor, userId: string): Promise<UserRo
 }
 
 export async function getMe(db: DbExecutor, userId: string, workspaceId: string): Promise<MeResponse> {
-  const [user, list] = await Promise.all([getUserRow(db, userId), listWorkspaceSummaries(db, userId)]);
+  const [user, list, photo] = await Promise.all([
+    getUserRow(db, userId),
+    listWorkspaceSummaries(db, userId),
+    photoUpdatedAtOf(db, userId),
+  ]);
   const workspace = list.find((w) => w.id === workspaceId);
   if (!workspace) throw new ForbiddenError('Você não participa deste espaço');
-  return { user: toMeUser(user), workspace, workspaces: list };
+  return { user: toMeUser(user, photo), workspace, workspaces: list };
 }
 
 /**
@@ -184,11 +209,12 @@ export async function getSubscriptionRow(db: DbExecutor, workspaceId: string) {
 // Members
 // ---------------------------------------------------------------------------
 
-export async function listMembers(db: DbExecutor, access: Access): Promise<Member[]> {
+export async function listMembers(db: DbExecutor, access: Pick<Access, 'workspaceId' | 'userId'>): Promise<Member[]> {
   const rows = await db
-    .select({ member: workspaceMembers, name: users.name, email: users.email })
+    .select({ member: workspaceMembers, name: users.name, email: users.email, photoUpdatedAt: userPhotos.updatedAt })
     .from(workspaceMembers)
     .innerJoin(users, eq(users.id, workspaceMembers.userId))
+    .leftJoin(userPhotos, eq(userPhotos.userId, workspaceMembers.userId))
     .where(eq(workspaceMembers.workspaceId, access.workspaceId))
     .orderBy(sql`${workspaceMembers.role} = 'owner' desc`, asc(users.name));
   return rows.map((r) => ({
@@ -196,6 +222,8 @@ export async function listMembers(db: DbExecutor, access: Access): Promise<Membe
     name: r.name,
     email: r.email,
     role: r.member.role,
+    permissionOverrides: r.member.role === 'owner' ? {} : sanitizePermissionOverrides(r.member.permissions),
+    photoUpdatedAt: r.photoUpdatedAt?.toISOString() ?? null,
     joinedAt: r.member.createdAt.toISOString(),
     isYou: r.member.userId === access.userId,
   }));
@@ -209,13 +237,57 @@ export async function memberCount(db: DbExecutor, workspaceId: string): Promise<
   return row?.n ?? 0;
 }
 
+/** "Ninguém concede o que não tem": the keys a change grants must all be held by who makes it. */
+export function assertGrantable(actor: PermissionMap, before: PermissionMap, after: PermissionMap): void {
+  const missing = grantedPermissions(before, after).filter((k) => !actor[k]);
+  if (missing.length > 0) {
+    throw new ForbiddenError(
+      `Você não pode conceder uma permissão que não tem: ${missing.map((k) => PERMISSION_LABELS[k]).join(', ')}.`,
+      { keys: missing },
+    );
+  }
+}
+
+interface MembershipRow {
+  userId: string;
+  role: MemberRole;
+  permissions: PermissionOverrides;
+  name: string;
+}
+
+async function getMembershipOrThrow(db: DbExecutor, workspaceId: string, userId: string): Promise<MembershipRow> {
+  const [row] = await db
+    .select({ userId: workspaceMembers.userId, role: workspaceMembers.role, permissions: workspaceMembers.permissions, name: users.name })
+    .from(workspaceMembers)
+    .innerJoin(users, eq(users.id, workspaceMembers.userId))
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)));
+  if (!row) throw new NotFoundError('Membro não encontrado');
+  return { ...row, permissions: row.role === 'owner' ? {} : sanitizePermissionOverrides(row.permissions) };
+}
+
+export interface MemberRoleChange {
+  member: Member;
+  from: MemberRole;
+  changes: ReturnType<typeof permissionChanges>;
+}
+
+/**
+ * Changes a member's role (permission `members`; by default the owner, as before). The adjustments are
+ * kept (only what was not adjusted follows the new role). Nobody grants what they do not have: every key
+ * the new role turns on must be held by the requester.
+ */
 export async function changeMemberRole(
   db: DbExecutor,
   access: Access,
   userId: string,
   role: Exclude<MemberRole, 'owner'>,
-): Promise<Member> {
+): Promise<MemberRoleChange> {
   if (userId === access.userId) throw new ValidationError('Você não pode alterar o seu próprio papel');
+  const current = await getMembershipOrThrow(db, access.workspaceId, userId);
+  if (current.role === 'owner') throw new NotFoundError('Membro não encontrado');
+  const before = effectivePermissions(current.role, current.permissions);
+  const after = effectivePermissions(role, current.permissions);
+  assertGrantable(access.permissions, before, after);
   const [row] = await db
     .update(workspaceMembers)
     .set({ role })
@@ -229,16 +301,94 @@ export async function changeMemberRole(
     .returning();
   if (!row) throw new NotFoundError('Membro não encontrado');
   const member = (await listMembers(db, access)).find((m) => m.userId === userId);
-  return member!;
+  return { member: member!, from: current.role, changes: permissionChanges(before, after) };
 }
 
-/** Owner removes a member, or a member leaves. The owner cannot leave (delete the workspace). */
+function toMemberPermissions(access: Access, row: MembershipRow): MemberPermissions {
+  const editable = row.role !== 'owner' && row.userId !== access.userId;
+  return {
+    userId: row.userId,
+    name: row.name,
+    role: row.role,
+    overrides: row.permissions,
+    defaults: rolePermissions(row.role),
+    effective: effectivePermissions(row.role, row.permissions),
+    editable,
+    grantable: editable ? PERMISSION_KEYS.filter((k) => access.permissions[k]) : [],
+  };
+}
+
+/** The adjustments of a member, with the role's defaults and what the requester may change. */
+export async function getMemberPermissions(db: DbExecutor, access: Access, userId: string): Promise<MemberPermissions> {
+  return toMemberPermissions(access, await getMembershipOrThrow(db, access.workspaceId, userId));
+}
+
+export interface MemberPermissionsChange {
+  result: MemberPermissions;
+  from: { role: MemberRole; effective: PermissionMap };
+  changes: ReturnType<typeof permissionChanges>;
+}
+
+/**
+ * Saves the adjustments of a member (and, optionally, the role). Rules (spec §13.10 and §18.11): the
+ * owner has every key and is never adjusted; nobody changes their own permissions; nobody grants a key
+ * they do not have, and a key the requester does not have cannot be adjusted either (its switch is
+ * disabled on screen). Only the keys that differ from the role's default are stored.
+ */
+export async function setMemberPermissions(
+  db: DbExecutor,
+  access: Access,
+  userId: string,
+  input: { role?: Exclude<MemberRole, 'owner'>; overrides: PermissionOverrides },
+): Promise<MemberPermissionsChange> {
+  if (userId === access.userId) throw new ValidationError('Você não pode alterar as suas próprias permissões');
+  const current = await getMembershipOrThrow(db, access.workspaceId, userId);
+  if (current.role === 'owner') {
+    throw new ValidationError('O proprietário tem todas as permissões, sempre, e não pode ser ajustado');
+  }
+  const role = input.role ?? (current.role as Exclude<MemberRole, 'owner'>);
+  const overrides = normalizePermissionOverrides(role, input.overrides);
+  const before = effectivePermissions(current.role, current.permissions);
+  const after = effectivePermissions(role, overrides);
+  assertGrantable(access.permissions, before, after);
+  // Adjusting (on or off) a key the requester does not have is refused too.
+  const touched = (PERMISSION_KEYS as readonly PermissionKey[]).filter((k) => current.permissions[k] !== overrides[k]);
+  const notHeld = touched.filter((k) => !access.permissions[k]);
+  if (notHeld.length > 0) {
+    throw new ForbiddenError(
+      `Você não tem estas permissões para ajustar: ${notHeld.map((k) => PERMISSION_LABELS[k]).join(', ')}.`,
+      { keys: notHeld },
+    );
+  }
+  const [row] = await db
+    .update(workspaceMembers)
+    .set({ role, permissions: overrides })
+    .where(
+      and(
+        eq(workspaceMembers.workspaceId, access.workspaceId),
+        eq(workspaceMembers.userId, userId),
+        sql`${workspaceMembers.role} <> 'owner'`,
+      ),
+    )
+    .returning({ userId: workspaceMembers.userId });
+  if (!row) throw new NotFoundError('Membro não encontrado');
+  return {
+    result: toMemberPermissions(access, { ...current, role, permissions: overrides }),
+    from: { role: current.role, effective: before },
+    changes: permissionChanges(before, after),
+  };
+}
+
+/**
+ * Removes a member (permission `members`; by default the owner), or a member leaves. The owner cannot
+ * leave (delete the workspace) nor be removed.
+ */
 export async function removeMember(db: DbExecutor, access: Access, userId: string): Promise<'removed' | 'left'> {
   const leaving = userId === access.userId;
   if (leaving && access.role === 'owner') {
     throw new ValidationError('O proprietário não pode sair do espaço. Exclua o espaço se não for mais usá-lo.');
   }
-  if (!leaving && access.role !== 'owner') throw new ForbiddenError('Somente o proprietário pode remover membros');
+  if (!leaving && !access.permissions.members) throw new ForbiddenError('Somente quem gerencia os membros do espaço pode remover membros');
   const rows = await db
     .delete(workspaceMembers)
     .where(
@@ -304,6 +454,8 @@ export async function createInvite(
   access: Access,
   input: { email: string; role: Exclude<MemberRole, 'owner'> },
 ): Promise<{ invite: Invite; token: string }> {
+  // Nobody grants what they do not have: the invited role's defaults must be held by the requester.
+  assertGrantable(access.permissions, rolePermissions(null), rolePermissions(input.role));
   const [existing] = await db
     .select({ id: users.id })
     .from(workspaceMembers)

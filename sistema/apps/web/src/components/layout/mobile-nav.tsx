@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router';
-import { ArrowLeftRight, Bell, BriefcaseBusiness, CalendarClock, ListChecks, LogOut, Menu, Minus, Plus, Search, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowLeftRight, Bell, BriefcaseBusiness, CalendarClock, ListChecks, LogOut, Menu, Minus, NotebookPen, Plus, Search, TrendingUp, Wallet, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
 import { WorkspaceList, WorkspaceSheet } from '@/features/workspaces/workspace-switcher';
 import { useTransactionActions } from '@/features/transactions/transaction-actions';
 import { useTaskSheetLinks } from '@/features/tasks/task-links';
+import { useTaskActions } from '@/features/tasks/task-actions';
 import { tasksHref } from '@/features/tasks/url-state';
 import { Sheet } from '@/components/ui/sheet';
 import {
@@ -29,6 +30,7 @@ const menuRow = 'flex items-center gap-3 rounded-md px-3 py-3 text-sm font-semib
 export function MobileNav({ area, memory, onSearch }: { area: Area; memory: AreaMemory; onSearch: () => void }) {
   const { logout } = useAuth();
   const { canAccessFinance } = usePermissions();
+  const { openNotes } = useTaskActions();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -154,6 +156,16 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
           ))}
           <button
             type="button"
+            className={cn(menuRow, 'text-fg hover:bg-bg-subtle')}
+            onClick={() => {
+              close();
+              openNotes();
+            }}
+          >
+            <NotebookPen className="size-5" /> Minhas anotações
+          </button>
+          <button
+            type="button"
             className={cn(menuRow, 'mt-2 text-danger hover:bg-danger-soft')}
             onClick={async () => {
               await logout();
@@ -174,6 +186,7 @@ const plusClass =
 
 function TaskCreate() {
   const { newTask } = useTaskSheetLinks();
+  const { openTemplatePicker } = useTaskActions();
   return (
     <DropdownMenu>
       <WriteGate scope="tasks">
@@ -189,6 +202,10 @@ function TaskCreate() {
         </DropdownMenuItem>
         <DropdownMenuItem icon={<CalendarClock />} onSelect={() => newTask({ appointment: true })}>
           Compromisso
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem icon={<Workflow />} onSelect={openTemplatePicker}>
+          Aplicar modelo de processo
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

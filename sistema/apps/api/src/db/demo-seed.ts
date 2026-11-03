@@ -35,6 +35,7 @@ import { generateFees, setFeeEmployees } from '../modules/fee-charges/service';
 import { commitImport, previewImport } from '../modules/imports/service';
 import { FakeOpenFinanceProvider } from '../modules/open-finance/providers/fake';
 import { createConnection, linkAccounts, syncConnection } from '../modules/open-finance/service';
+import { seedPhase3 } from './demo-seed-phase3';
 import { DEMO_TEAM, seedTasks } from './demo-seed-tasks';
 
 export const DEMO_EMAIL = 'demo@efficio.app';
@@ -594,6 +595,7 @@ export async function seedDemo(db: DbExecutor) {
   await seedCompany(db, workspaceId);
   await seedIntegrations(db, workspaceId, user.id);
   await seedTasks(db, workspaceId, user.id);
+  await seedPhase3(db, workspaceId, user.id);
   const [{ n } = { n: 0 }] = await withTenant(db, workspaceId, (tx) =>
     tx.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(transactions).where(eq(transactions.workspaceId, workspaceId)),
   );

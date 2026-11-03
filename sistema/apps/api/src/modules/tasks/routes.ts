@@ -1,9 +1,11 @@
 // Task module routes under /api/tasks. Mounted next to the financial boundary, with its own guards
 // (access.ts): every member reads and writes tasks, occurrences, audit cells, processes, comments,
 // attachments and their own notes; registries (departments, categories, client responsibles,
-// recurring tasks, process templates) and deletions are for administrators (`onRequest:
-// requireTaskAdmin`); a few rules are checked by the services (removing someone else's comment or
-// attachment, reopening an occurrence someone else concluded, saving a process as a template). Static
+// recurring tasks, process templates) need `registry`, their deletion `deleteRegistry`, and deleting a
+// task or a process `deleteTasks` (`onRequest: requireTaskPermission(key)`; by default the
+// administrators, spec §13.10); a few rules are checked by the services (removing someone else's
+// comment or attachment: `deleteTasks`; reopening an occurrence someone else concluded: `reopenOthers`;
+// saving a process as a template: `registry`). Static
 // paths are registered before `/:id` (the browser demo's router takes the first match).
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -42,7 +44,7 @@ import {
 } from '@effinance/shared';
 import { rateLimited } from '../../lib/platform';
 import { idParams } from '../common/params';
-import { requireTaskAdmin, runTasks, taskGuards } from './access';
+import { requireTaskPermission, runTasks, taskGuards } from './access';
 import { addAttachment, deleteAttachment, downloadAttachment, listAttachments } from './attachments';
 import { auditMatrix } from './audit';
 import { contentDisposition } from './file-check';
@@ -109,7 +111,9 @@ const commentParams = z.object({ id: idSchema, commentId: idSchema });
 const attachmentParams = z.object({ id: idSchema, attachmentId: idSchema });
 const occurrenceParams = z.object({ id: idSchema, period: occurrencePeriodSchema });
 const monthQuery = z.object({ month: monthKeySchema.optional() });
-const admin = { onRequest: requireTaskAdmin };
+const registry = { onRequest: requireTaskPermission('registry') };
+const deleteRegistry = { onRequest: requireTaskPermission('deleteRegistry') };
+const deleteTasks = { onRequest: requireTaskPermission('deleteTasks') };
 
 /** The file in base64 (4/3 of the bytes) plus the rest of the JSON. */
 export const ATTACHMENT_BODY_LIMIT = Math.ceil(MAX_ATTACHMENT_BYTES / 3) * 4 + 64 * 1024;
@@ -124,7 +128,7 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/members', async (req) => run(req, (ctx) => listMembers(ctx)));
   app.put(
     '/members/:userId/department',
-    { ...admin, schema: { params: memberParams, body: memberDepartmentSchema } },
+    { ...registry, schema: { params: memberParams, body: memberDepartmentSchema } },
     async (req) =>
       run(req, (ctx) => setMemberDepartment(ctx, req.params.userId, req.body.departmentId)),
   );
@@ -132,16 +136,16 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/departments', async (req) => run(req, (ctx) => listDepartments(ctx)));
   app.post(
     '/departments',
-    { ...admin, schema: { body: taskDepartmentInputSchema } },
+    { ...registry, schema: { body: taskDepartmentInputSchema } },
     async (req, reply) =>
       reply.code(201).send(await run(req, (ctx) => createDepartment(ctx, req.body))),
   );
   app.put(
     '/departments/:id',
-    { ...admin, schema: { params: idParams, body: taskDepartmentInputSchema } },
+    { ...registry, schema: { params: idParams, body: taskDepartmentInputSchema } },
     async (req) => run(req, (ctx) => updateDepartment(ctx, req.params.id, req.body)),
   );
-  app.delete('/departments/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
+  app.delete('/departments/:id', { ...deleteRegistry, schema: { params: idParams } }, async (req, reply) => {
     await run(req, (ctx) => deleteDepartment(ctx, req.params.id));
     return reply.code(204).send();
   });
@@ -149,16 +153,16 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/categories', async (req) => run(req, (ctx) => listCategories(ctx)));
   app.post(
     '/categories',
-    { ...admin, schema: { body: taskCategoryInputSchema } },
+    { ...registry, schema: { body: taskCategoryInputSchema } },
     async (req, reply) =>
       reply.code(201).send(await run(req, (ctx) => createCategory(ctx, req.body))),
   );
   app.put(
     '/categories/:id',
-    { ...admin, schema: { params: idParams, body: taskCategoryInputSchema } },
+    { ...registry, schema: { params: idParams, body: taskCategoryInputSchema } },
     async (req) => run(req, (ctx) => updateCategory(ctx, req.params.id, req.body)),
   );
-  app.delete('/categories/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
+  app.delete('/categories/:id', { ...deleteRegistry, schema: { params: idParams } }, async (req, reply) => {
     await run(req, (ctx) => deleteCategory(ctx, req.params.id));
     return reply.code(204).send();
   });
@@ -166,12 +170,12 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/client-responsibles', async (req) => run(req, (ctx) => listClientResponsibles(ctx)));
   app.put(
     '/client-responsibles',
-    { ...admin, schema: { body: clientResponsibleInputSchema } },
+    { ...registry, schema: { body: clientResponsibleInputSchema } },
     async (req) => run(req, (ctx) => setClientResponsible(ctx, req.body)),
   );
   app.put(
     '/client-responsibles/batch',
-    { ...admin, schema: { body: clientResponsibleBatchSchema } },
+    { ...registry, schema: { body: clientResponsibleBatchSchema } },
     async (req) => run(req, (ctx) => setClientResponsibles(ctx, req.body)),
   );
 
@@ -210,12 +214,12 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   );
   app.post(
     '/recurring',
-    { ...admin, schema: { body: recurringTaskInputSchema } },
+    { ...registry, schema: { body: recurringTaskInputSchema } },
     async (req, reply) => reply.code(201).send(await run(req, (ctx) => createRecurring(ctx, req.body))),
   );
   app.post(
     '/recurring/generate',
-    { ...admin, schema: { body: recurringGenerateSchema } },
+    { ...registry, schema: { body: recurringGenerateSchema } },
     async (req) => run(req, (ctx) => generateOccurrences(ctx, req.body.competence)),
   );
   app.get('/recurring/:id', { schema: { params: idParams, querystring: monthQuery } }, async (req) =>
@@ -223,10 +227,10 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   );
   app.put(
     '/recurring/:id',
-    { ...admin, schema: { params: idParams, body: recurringTaskInputSchema } },
+    { ...registry, schema: { params: idParams, body: recurringTaskInputSchema } },
     async (req) => run(req, (ctx) => updateRecurring(ctx, req.params.id, req.body)),
   );
-  app.delete('/recurring/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
+  app.delete('/recurring/:id', { ...deleteRegistry, schema: { params: idParams } }, async (req, reply) => {
     await run(req, (ctx) => deleteRecurring(ctx, req.params.id));
     return reply.code(204).send();
   });
@@ -242,14 +246,14 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
     reply.code(201).send(await run(req, (ctx) => createFlow(ctx, req.body))),
   );
   app.get('/flows/:id', { schema: { params: idParams } }, async (req) => run(req, (ctx) => getFlow(ctx, req.params.id)));
-  app.delete('/flows/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
+  app.delete('/flows/:id', { ...deleteTasks, schema: { params: idParams } }, async (req, reply) => {
     await run(req, (ctx) => deleteFlow(ctx, req.params.id));
     return reply.code(204).send();
   });
   app.get('/flow-templates', async (req) => run(req, (ctx) => listTemplates(ctx)));
   app.post(
     '/flow-templates',
-    { ...admin, schema: { body: flowTemplateInputSchema } },
+    { ...registry, schema: { body: flowTemplateInputSchema } },
     async (req, reply) => reply.code(201).send(await run(req, (ctx) => createTemplate(ctx, req.body))),
   );
   app.get('/flow-templates/:id', { schema: { params: idParams } }, async (req) =>
@@ -257,10 +261,10 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   );
   app.put(
     '/flow-templates/:id',
-    { ...admin, schema: { params: idParams, body: flowTemplateInputSchema } },
+    { ...registry, schema: { params: idParams, body: flowTemplateInputSchema } },
     async (req) => run(req, (ctx) => updateTemplate(ctx, req.params.id, req.body)),
   );
-  app.delete('/flow-templates/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
+  app.delete('/flow-templates/:id', { ...deleteRegistry, schema: { params: idParams } }, async (req, reply) => {
     await run(req, (ctx) => deleteTemplate(ctx, req.params.id));
     return reply.code(204).send();
   });
@@ -301,7 +305,7 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
     { schema: { params: idParams, body: taskStatusInputSchema } },
     async (req) => run(req, (ctx) => changeTaskStatus(ctx, req.params.id, req.body.status, req.body.reason)),
   );
-  app.delete('/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
+  app.delete('/:id', { ...deleteTasks, schema: { params: idParams } }, async (req, reply) => {
     await run(req, (ctx) => deleteTask(ctx, req.params.id));
     return reply.code(204).send();
   });

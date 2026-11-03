@@ -61,11 +61,12 @@ export function invalidateTasks(qc: QueryClient, { keepDetail }: { keepDetail?: 
 }
 
 /** Pickers, today, who I am and whether I am an administrator: one request for the whole module. */
-export function useTaskOptions() {
+export function useTaskOptions(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.taskOptions,
     queryFn: () => api<TaskOptionsResponse>('/tasks/options'),
     staleTime: 60_000,
+    enabled: options.enabled ?? true,
   });
 }
 
@@ -464,11 +465,12 @@ export async function exportTaskReport(query: Omit<TaskReportQuery, 'page' | 'pa
   saveBlob(blob, fileName);
 }
 
-export function useTaskAudit(query: TaskAuditQuery) {
+export function useTaskAudit(query: TaskAuditQuery, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.taskAudit(query as Record<string, unknown>),
     queryFn: () => api<AuditMatrixResponse>('/tasks/audit', { query: query as Query }),
     placeholderData: keepPreviousData,
+    enabled: options.enabled ?? true,
   });
 }
 

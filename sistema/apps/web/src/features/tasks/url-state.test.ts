@@ -25,7 +25,7 @@ const p = (qs: string) => new URLSearchParams(qs);
 describe('parseTaskFilters', () => {
   it('reads every filter of the URL', () => {
     const f = parseTaskFilters(
-      p(`escopo=todas&visao=quadro&situacao=atrasadas&busca=balancete&cliente=${ID}&responsavel=nenhum&departamento=${ID2}&categoria=${ID}&prioridade=urgente&mes=2026-10&vencimento=2026-10-30&pagina=3&atrasadas=1`),
+      p(`escopo=todas&visao=quadro&situacao=atrasadas&busca=balancete&cliente=${ID}&responsavel=nenhum&departamento=${ID2}&categoria=${ID}&prioridade=urgente&mes=2026-10&vencimento=2026-10-30&tipo=recorrentes&pagina=3&atrasadas=1`),
     );
     expect(f).toEqual({
       scope: 'all',
@@ -39,6 +39,7 @@ describe('parseTaskFilters', () => {
       priority: 'urgent',
       month: '2026-10',
       dueDate: '2026-10-30',
+      kind: 'recurring',
       onlyOverdue: true,
       page: 3,
     });
@@ -101,9 +102,15 @@ describe('writeTaskFilters', () => {
 });
 
 describe('toTaskQuery', () => {
-  it('builds the list query with paging and without recurring occurrences (phase 1)', () => {
+  it('builds the list query with paging and the recurring occurrences (phase 2)', () => {
     const f = parseTaskFilters(p(`escopo=todas&situacao=atrasadas&responsavel=${ID}&pagina=2`));
-    expect(toTaskQuery(f, TODAY)).toMatchObject({ scope: 'all', situation: 'overdue', assigneeId: ID, page: 2, pageSize: 50, occurrences: 'false' });
+    const q = toTaskQuery(f, TODAY);
+    expect(q).toMatchObject({ scope: 'all', situation: 'overdue', assigneeId: ID, page: 2, pageSize: 50 });
+    // Occurrences come aggregated by default; "Avulsas" and "Etapas de processo" leave them out.
+    expect(q.occurrences).toBeUndefined();
+    expect(toTaskQuery(parseTaskFilters(p('tipo=avulsas')), TODAY)).toMatchObject({ kind: 'standalone', occurrences: 'false' });
+    expect(toTaskQuery(parseTaskFilters(p('tipo=processos')), TODAY)).toMatchObject({ kind: 'flow', occurrences: 'false' });
+    expect(toTaskQuery(parseTaskFilters(p('tipo=recorrentes')), TODAY)).toMatchObject({ kind: 'recurring' });
   });
 
   it('never filters "Minhas" by another assignee', () => {

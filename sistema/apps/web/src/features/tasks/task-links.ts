@@ -5,9 +5,10 @@ import { areaOf } from '@/components/layout/nav';
 
 // The task sheet opens over any Gestão page through the URL (spec §2.5): `?tarefa=<id>` for an
 // existing task, `?nova=1` to create one (with `&horario=1` for an appointment, `&estado=` from a
-// board column, `&duplicar=<id>` to copy one). Elsewhere it opens over the task list.
+// board column, `&duplicar=<id>` to copy one, `&prazo=<date>` from a calendar day). Elsewhere it opens
+// over the task list. (`prazo`, not `vencimento`: on the list `vencimento` is a filter that must stay.)
 
-export const SHEET_PARAMS = ['tarefa', 'nova', 'horario', 'estado', 'duplicar'] as const;
+export const SHEET_PARAMS = ['tarefa', 'nova', 'horario', 'estado', 'duplicar', 'prazo'] as const;
 
 const STATUS_PARAM: Partial<Record<TaskStatus, string>> = {
   in_progress: 'em-andamento',
@@ -25,6 +26,8 @@ export interface NewTaskOptions {
   appointment?: boolean;
   status?: TaskStatus;
   duplicateOf?: string;
+  /** Due date of the new task (a calendar day). */
+  dueDate?: string;
 }
 
 /** Search string with the sheet params of `base` replaced. */
@@ -41,6 +44,7 @@ function newTaskParams(options: NewTaskOptions): Record<string, string> {
   const status = options.status ? STATUS_PARAM[options.status] : undefined;
   if (status) out.estado = status;
   if (options.duplicateOf) out.duplicar = options.duplicateOf;
+  if (options.dueDate) out.prazo = options.dueDate;
   return out;
 }
 

@@ -58,8 +58,9 @@ async function assertTask(ctx: TaskContext, taskId: string): Promise<void> {
   if (!row) throw new NotFoundError('Tarefa não encontrada');
 }
 
-const canDelete = (ctx: Pick<TaskContext, 'isAdmin' | 'userId'>, row: Pick<MetaRow, 'uploadedBy'>) =>
-  ctx.isAdmin || row.uploadedBy === ctx.userId;
+/** The uploader, or whoever may delete tasks (`deleteTasks`; by default the administrators). */
+const canDelete = (ctx: Pick<TaskContext, 'permissions' | 'userId'>, row: Pick<MetaRow, 'uploadedBy'>) =>
+  ctx.permissions.deleteTasks || row.uploadedBy === ctx.userId;
 
 async function toAttachment(ctx: TaskContext, row: MetaRow): Promise<TaskAttachment> {
   return {

@@ -1,7 +1,7 @@
 import { useMemo, useState, type DragEvent } from 'react';
 import { Link } from 'react-router';
 import { Building2, ChevronLeft, CircleX, ListChecks, MessageSquare, Plus } from 'lucide-react';
-import { TASK_PRIORITY_RANK, TASK_STATUS_LABELS, TASK_STATUSES, type ISODate, type Task, type TaskStatus, type TaskStatusCount } from '@effinance/shared';
+import { TASK_PRIORITY_RANK, TASK_STATUS_LABELS, TASK_STATUSES, type ISODate, type RecurringOccurrence, type Task, type TaskStatus, type TaskStatusCount } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/misc';
 import { MemberAvatar } from '@/components/ui/member-avatar';
@@ -14,6 +14,10 @@ import { useTaskSheetLinks } from '../task-links';
 import { useTaskStatusChange } from '../use-task-status';
 import { PriorityBadge, TaskDueLabel, TaskStatusGlyph } from './task-status';
 import { TaskRowMenu } from './task-row';
+import { AvatarStack } from '@/components/ui/member-avatar';
+import { DUE_TONE_CLASS } from '../due';
+import { assigneesTip, doneFraction, groupDeadlineInfo, occurrenceCards, type OccurrenceCard } from '../occurrence';
+import { OccurrenceRowMenu, ProgressRing, useOccurrenceSheetLinks } from './occurrence-row';
 
 const OPEN_COLUMNS: TaskStatus[] = ['todo', 'in_progress', 'waiting_client'];
 
@@ -33,6 +37,9 @@ export function boardColumns(tasks: Task[]): Record<TaskStatus, Task[]> {
 
 interface TaskBoardProps {
   tasks: Task[] | undefined;
+  /** Recurring tasks of the view: one card per recurring task and status (counted per client). */
+  occurrences?: RecurringOccurrence[];
+  mine?: boolean;
   byStatus: Record<TaskStatus, TaskStatusCount> | undefined;
   today: ISODate;
   loading: boolean;
@@ -48,8 +55,14 @@ interface TaskBoardProps {
  * screens show every column; tablets scroll sideways inside the board; phones show one column at a
  * time with tabs.
  */
-export function TaskBoard({ tasks, byStatus, today, loading, error, onRetry, doneHref }: TaskBoardProps) {
+export function TaskBoard({ tasks, occurrences, mine, byStatus, today, loading, error, onRetry, doneHref }: TaskBoardProps) {
   const columns = useMemo(() => boardColumns(tasks ?? []), [tasks]);
+  const cards = useMemo(() => {
+    const out = Object.fromEntries(TASK_STATUSES.map((s) => [s, [] as OccurrenceCard[]])) as Record<TaskStatus, OccurrenceCard[]>;
+    for (const c of occurrenceCards(occurrences ?? [])) out[c.status].push(c);
+    for (const s of TASK_STATUSES) out[s].sort((a, b) => a.occurrence.targetDate.localeCompare(b.occurrence.targetDate));
+    return out;
+  }, [occurrences]);
   const [showCanceled, setShowCanceled] = useState(false);
   const [mobileColumn, setMobileColumn] = useState<TaskStatus>('todo');
   const [dragging, setDragging] = useState<Task | null>(null);
@@ -59,8 +72,10 @@ export function TaskBoard({ tasks, byStatus, today, loading, error, onRetry, don
 
   if (error && !tasks) return <ErrorState error={error} onRetry={onRetry} />;
 
-  const count = (s: TaskStatus) => (tasks ? columns[s].length : 0);
-  const overdue = (s: TaskStatus) => (tasks ? columns[s].filter((t) => t.overdue).length : (byStatus?.[s].overdue ?? 0));
+  // A card of a recurring task counts the clients it shows (spec §8.4).
+  const count = (s: TaskStatus) => (tasks ? columns[s].length + cards[s].reduce((n, c) => n + c.count, 0) : 0);
+  const overdue = (s: TaskStatus) =>
+    tasks ? columns[s].filter((t) => t.overdue).length + cards[s].filter((c) => c.occurrence.overdue && (s === 'todo' || s === 'in_progress')).reduce((n, c) => n + c.count, 0) : (byStatus?.[s].overdue ?? 0);
 
   function drop(target: TaskStatus) {
     const task = dragging;
@@ -156,7 +171,12 @@ export function TaskBoard({ tasks, byStatus, today, loading, error, onRetry, don
                 </li>
               ))
             : null}
-          {tasks && columns[s].length === 0 ? (
+          {cards[s].map((c) => (
+            <li key={c.key}>
+              <OccurrenceBoardCard card={c} today={today} mine={mine} />
+            </li>
+          ))}
+          {tasks && columns[s].length === 0 && cards[s].length === 0 ? (
             <li className="flex h-16 items-center justify-center rounded-lg border border-dashed border-border-strong/80 text-caption text-subtle">
               Nenhuma tarefa
             </li>
@@ -286,5 +306,49 @@ export function TaskCard({ task, today, draggable, dragging, onDragStart, onDrag
         <TaskRowMenu task={task} moveLabel="Mover para" className="size-7 opacity-100" />
       </div>
     </div>
+  );
+}
+
+/**
+ * Card of a recurring task in one status (spec §8.2): "DCTFWeb · 18 clientes" with the progress ring,
+ * the target and legal deadline and the responsibles. Not draggable: each client is marked in the
+ * occurrence sheet.
+ */
+function OccurrenceBoardCard({ card, today, mine }: { card: OccurrenceCard; today: ISODate; mine?: boolean }) {
+  const { openOccurrence } = useOccurrenceSheetLinks();
+  const o = card.occurrence;
+  const live = o.total - o.canceled;
+  const dl = groupDeadlineInfo(o, today);
+  const names = o.assignees.filter((a) => a.assignee).map((a) => a.assignee!.name);
+  return (
+    <Tooltip content="Concluída por cliente: abra para marcar">
+      <div aria-disabled="true" className="group relative rounded-lg border border-border bg-surface p-3 transition-colors hover:border-border-strong">
+        <button
+          type="button"
+          onClick={() => openOccurrence(o, mine ? 'mine' : card.status === 'done' || card.status === 'canceled' ? 'all' : 'pending')}
+          className="absolute inset-0 rounded-lg"
+          aria-label={`Abrir ${o.name}: ${card.count} ${card.count === 1 ? 'cliente' : 'clientes'} em ${TASK_STATUS_LABELS[card.status]}`}
+        />
+        <div className="pointer-events-none relative flex flex-col gap-1.5">
+          <div className="flex items-start gap-2 pr-7">
+            <ProgressRing value={doneFraction(o)} size={24} label={`${o.done} de ${live} clientes concluídos`} />
+            <p className={cn('line-clamp-2 text-body-sm font-semibold', card.status === 'done' || card.status === 'canceled' ? 'text-muted' : 'text-fg')}>
+              {o.name} · {card.count} {card.count === 1 ? 'cliente' : 'clientes'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={cn('min-w-0 flex-1 truncate text-xs', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span>
+            {names.length && !mine ? (
+              <span title={assigneesTip(o)}>
+                <AvatarStack names={names} max={3} />
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="pointer-events-auto absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+          <OccurrenceRowMenu occurrence={o} className="size-7 opacity-100" />
+        </div>
+      </div>
+    </Tooltip>
   );
 }

@@ -8,6 +8,7 @@ import {
   deleteWorkspaceSchema,
   idSchema,
   inviteInputSchema,
+  memberPermissionsInputSchema,
   memberRoleSchema,
   workspaceInputSchema,
   workspaceUpdateSchema,
@@ -17,8 +18,9 @@ import { audit } from '../../lib/audit';
 import { ValidationError } from '../../lib/errors';
 import { oneLine } from '../../lib/mailer';
 import { rateLimited } from '../../lib/platform';
+import { assertPermission } from '../../lib/permissions';
 import { requestContext } from '../../lib/request-context';
-import { assertCanWrite, assertOwner } from './access';
+import { assertOwner, assertSubscriptionAllowsWrite } from './access';
 import { prepareWorkspaceDeletion } from './deletion';
 import { exportWorkspace } from './export';
 import {
@@ -29,6 +31,7 @@ import {
   createSharedWorkspace,
   deleteWorkspaceRow,
   getMe,
+  getMemberPermissions,
   inviteUrl,
   listAudit,
   listInvites,
@@ -40,6 +43,7 @@ import {
   renameWorkspace,
   resolveWorkspaceFor,
   revokeInvite,
+  setMemberPermissions,
 } from './service';
 
 const userParams = z.object({ userId: idSchema });
@@ -91,12 +95,47 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get('/current/members', async (req) => listMembers(app.db, req.access));
 
+  // Members, invites and permissions: the `members` key (by default the owner only, as before).
   app.patch('/current/members/:userId', { schema: { params: userParams, body: memberRoleSchema } }, async (req) => {
-    assertOwner(req.access);
-    const member = await changeMemberRole(app.db, req.access, req.params.userId, req.body.role);
-    await audit(app.db, { ...requestContext(req), action: 'member.role_changed', workspaceId: req.workspaceId, userId: req.userId, entity: 'user', entityId: req.params.userId, metadata: { role: req.body.role } });
+    assertPermission(req.access, 'members');
+    const { member, from, changes } = await changeMemberRole(app.db, req.access, req.params.userId, req.body.role);
+    await audit(app.db, {
+      ...requestContext(req),
+      action: 'member.role_changed',
+      workspaceId: req.workspaceId,
+      userId: req.userId,
+      entity: 'user',
+      entityId: req.params.userId,
+      metadata: { role: req.body.role, from, changes },
+    });
     return member;
   });
+
+  app.get('/current/members/:userId/permissions', { schema: { params: userParams } }, async (req) => {
+    assertPermission(req.access, 'members');
+    return getMemberPermissions(app.db, req.access, req.params.userId);
+  });
+
+  app.put(
+    '/current/members/:userId/permissions',
+    { schema: { params: userParams, body: memberPermissionsInputSchema } },
+    async (req) => {
+      assertPermission(req.access, 'members');
+      assertSubscriptionAllowsWrite(req.access);
+      const { result, from, changes } = await setMemberPermissions(app.db, req.access, req.params.userId, req.body);
+      // Who (the audit row's user), when, and from/to of every effective key that changed — never names.
+      await audit(app.db, {
+        ...requestContext(req),
+        action: 'member.permissions_changed',
+        workspaceId: req.workspaceId,
+        userId: req.userId,
+        entity: 'user',
+        entityId: req.params.userId,
+        metadata: { role: { from: from.role, to: result.role }, overrides: result.overrides, changes },
+      });
+      return result;
+    },
+  );
 
   app.delete('/current/members/:userId', { schema: { params: userParams } }, async (req, reply) => {
     const result = await removeMember(app.db, req.access, req.params.userId);
@@ -111,13 +150,13 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
   // ------------------------------------------------------------------ invites
 
   app.get('/current/invites', async (req) => {
-    assertOwner(req.access);
+    assertPermission(req.access, 'members');
     return listInvites(app.db, req.access);
   });
 
   app.post('/current/invites', { schema: { body: inviteInputSchema }, config: rateLimited(app.platform, 30, '1 hour') }, async (req, reply) => {
-    assertOwner(req.access);
-    assertCanWrite(req.access);
+    assertPermission(req.access, 'members');
+    assertSubscriptionAllowsWrite(req.access);
     const { invite, token } = await createInvite(app.db, req.access, req.body);
     const url = inviteUrl(app.platform.appUrl, token);
     const kind = WORKSPACE_KIND_LABELS[req.access.workspaceKind].toLowerCase();
@@ -132,7 +171,7 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
   });
 
   app.delete('/current/invites/:id', { schema: { params: z.object({ id: idSchema }) } }, async (req, reply) => {
-    assertOwner(req.access);
+    assertPermission(req.access, 'members');
     await revokeInvite(app.db, req.access, req.params.id);
     await audit(app.db, { ...requestContext(req), action: 'invite.revoked', workspaceId: req.workspaceId, userId: req.userId, entity: 'invite', entityId: req.params.id });
     return reply.code(204).send();
@@ -143,7 +182,8 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/current/export', { config: rateLimited(app.platform, 5, '1 minute') }, async (req, reply) => {
     assertOwner(req.access);
     const data = await exportWorkspace(app.db, req.access);
-    await audit(app.db, { ...requestContext(req), action: 'data.exported', workspaceId: req.workspaceId, userId: req.userId, entity: 'workspace', entityId: req.workspaceId });
+    // The export carries the clients' accesses decrypted (owner only): the audit record says so.
+    await audit(app.db, { ...requestContext(req), action: 'data.exported', workspaceId: req.workspaceId, userId: req.userId, entity: 'workspace', entityId: req.workspaceId, metadata: { includesCredentials: true } });
     reply.header('content-disposition', `attachment; filename="efficio-${data.exportedAt.slice(0, 10)}.json"`);
     reply.header('cache-control', 'no-store');
     return data;

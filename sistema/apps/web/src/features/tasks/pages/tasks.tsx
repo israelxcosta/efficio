@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useSearchParams } from 'react-router';
-import { ChevronLeft, ChevronRight, CircleCheck, ListChecks, Plus, SearchX } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router';
+import { ChevronLeft, ChevronRight, CircleCheck, Ellipsis, ListChecks, Plus, SearchX, Workflow } from 'lucide-react';
 import { TASK_DUE_BUCKET_LABELS, todayISO } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -8,25 +8,31 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
 import { SkeletonRows } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/auth-context';
-import { WriteGate } from '@/features/auth/permissions';
+import { usePermissions, WriteGate } from '@/features/auth/permissions';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { useTaskOptions, useTasks } from '../api';
+import { useTaskCalendar, useTaskOptions, useTasks } from '../api';
 import { TaskBoard } from '../components/task-board';
+import { TaskCalendar } from '../components/task-calendar';
+import { RecurringOccurrenceRow } from '../components/occurrence-row';
+import { groupListItems, itemCount } from '../occurrence';
+import { useTaskActions } from '../task-actions';
 import { TaskFiltersBar } from '../components/task-filters';
 import { TaskGroup } from '../components/task-group';
 import { TaskRow } from '../components/task-row';
 import { TasksSummary } from '../components/tasks-summary';
-import { groupByDue } from '../due';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
 import {
   activeFilterCount,
+  calendarMonth,
   CLEARED_FILTERS,
   isGroupedSituation,
   parseTaskFilters,
   readTaskView,
   TASK_PAGE_SIZE,
   taskViewKey,
+  toCalendarQuery,
   toTaskQuery,
   writeTaskFilters,
   writeTaskView,
@@ -45,13 +51,19 @@ export default function TasksPage() {
   const filters = options.data && !options.data.me.department && parsed.scope === 'department' ? { ...parsed, scope: 'mine' as const } : parsed;
   const query = toTaskQuery(filters, today);
   const list = useTasks(query);
+  const calendar = useTaskCalendar(toCalendarQuery(filters, today), { enabled: filters.view === 'calendar' });
   const { openTask, newTask } = useTaskSheetLinks();
+  const actions = useTaskActions();
+  const navigate = useNavigate();
+  const { isAdmin } = usePermissions();
   const data = list.data;
   const filterCount = activeFilterCount(filters);
-  const empty = data !== undefined && data.items.length === 0;
-  // Only when the list is empty: does the workspace have any task at all?
-  const anyTask = useTasks({ scope: 'all', situation: 'all', page: 1, pageSize: 1, occurrences: 'false' }, { enabled: empty });
-  const workspaceEmpty = empty && anyTask.data?.total === 0;
+  // Occurrences are listed aggregated (not paginated): they come on the first page of a flat list.
+  const flatOccurrences = data && filters.page === 1 ? data.occurrences.filter((o) => o.total > 0) : [];
+  const empty = data !== undefined && data.items.length === 0 && (isGroupedSituation(filters.situation) ? data.occurrences.every((o) => o.pending === 0) : flatOccurrences.length === 0);
+  // Only when the list is empty: does the workspace have any task (or recurring task) at all?
+  const anyTask = useTasks({ scope: 'all', situation: 'all', page: 1, pageSize: 1 }, { enabled: empty });
+  const workspaceEmpty = empty && anyTask.data?.total === 0 && anyTask.data.occurrences.length === 0;
 
   function update(patch: TaskFilterPatch) {
     setParams(writeTaskFilters(params, patch), { replace: true });
@@ -73,13 +85,20 @@ export default function TasksPage() {
           className="m-3"
           icon={<ListChecks />}
           title="Nenhuma tarefa ainda"
-          description="Crie tarefas para o escritório, atribua responsáveis e acompanhe os prazos de cada cliente."
+          description="Crie tarefas para o escritório, atribua responsáveis e acompanhe os prazos de cada cliente. As tarefas recorrentes do mês também aparecem aqui."
           action={
-            <WriteGate scope="tasks">
-              <Button variant="outline" onClick={() => newTask()}>
-                Nova tarefa
-              </Button>
-            </WriteGate>
+            <div className="flex flex-col items-center gap-2">
+              <WriteGate scope="tasks">
+                <Button variant="outline" onClick={() => newTask()}>
+                  Nova tarefa
+                </Button>
+              </WriteGate>
+              {isAdmin ? (
+                <Button variant="link" size="sm" onClick={() => navigate('/tarefas/recorrentes?recorrente=nova')}>
+                  Cadastrar tarefas recorrentes
+                </Button>
+              ) : null}
+            </div>
           }
         />
       );
@@ -123,11 +142,30 @@ export default function TasksPage() {
         title="Tarefas"
         description={`${longDay(today)} · ${scopeText}`}
         actions={
-          <WriteGate scope="tasks">
-            <Button onClick={() => newTask()}>
-              <Plus /> Nova tarefa
-            </Button>
-          </WriteGate>
+          <>
+            <WriteGate scope="tasks">
+              <Button variant="outline" className="max-sm:hidden" onClick={actions.openTemplatePicker}>
+                <Workflow /> Aplicar modelo de processo
+              </Button>
+            </WriteGate>
+            <WriteGate scope="tasks">
+              <Button onClick={() => newTask()}>
+                <Plus /> Nova tarefa
+              </Button>
+            </WriteGate>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="sm:hidden" aria-label="Mais ações">
+                  <Ellipsis />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem icon={<Workflow />} onSelect={actions.openTemplatePicker}>
+                  Aplicar modelo de processo
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         }
       />
 
@@ -135,7 +173,7 @@ export default function TasksPage() {
         <TasksSummary
           summary={data?.summary}
           scope={filters.scope}
-          situation={filters.view === 'board' ? 'all' : filters.situation}
+          situation={filters.view === 'list' ? filters.situation : 'all'}
           assignee={filters.assignee}
           client={filters.client}
           onSituation={(situation) => update({ situation, view: 'list' })}
@@ -153,9 +191,27 @@ export default function TasksPage() {
         resultCount={data ? data.total : null}
       />
 
-      {filters.view === 'board' ? (
+      {filters.view === 'calendar' ? (
+        <TaskCalendar
+          month={calendarMonth(filters, today)}
+          data={calendar.data}
+          loading={calendar.isPending}
+          error={calendar.error}
+          onRetry={() => calendar.refetch()}
+          today={today}
+          situation={filters.situation}
+          search={filters.search}
+          priority={filters.priority}
+          mine={filters.scope === 'mine'}
+          onMonth={(month) => update({ month: month === today.slice(0, 7) ? '' : month })}
+          onNoDueDate={() => update({ view: 'list', situation: 'open', month: '' })}
+          onSeeList={() => update({ view: 'list', situation: 'all', month: calendarMonth(filters, today) })}
+        />
+      ) : filters.view === 'board' ? (
         <TaskBoard
           tasks={data?.items}
+          occurrences={data?.occurrences}
+          mine={filters.scope === 'mine'}
           byStatus={data?.byStatus}
           today={today}
           loading={list.isPending}
@@ -171,7 +227,7 @@ export default function TasksPage() {
             <span className="hidden w-44 @3xl:block">Cliente</span>
             {filters.scope !== 'mine' ? <span className="hidden w-36 @2xl:block">Responsável</span> : null}
             <span className="hidden w-36 @4xl:block">Situação</span>
-            <span className="w-36 text-right">Vencimento</span>
+            <span className="w-48 text-right">Vencimento</span>
             <span className="w-8" aria-hidden />
           </div>
           <div className="p-1.5">
@@ -188,29 +244,46 @@ export default function TasksPage() {
             ) : (
               <div className={cn(list.isPlaceholderData && 'opacity-60 transition-opacity')}>
                 {grouped
-                  ? groupByDue(data!.items, today).map((g) => (
+                  ? groupListItems(data!.items, data!.occurrences, today).map((g) => (
                       <TaskGroup
                         key={g.bucket}
                         id={g.bucket}
                         title={TASK_DUE_BUCKET_LABELS[g.bucket]}
-                        count={data!.groups[g.bucket]}
-                        tone={g.bucket === 'overdue' ? 'danger' : undefined}
+                        count={Math.max(data!.groups[g.bucket] ?? 0, itemCount(g.items))}
+                        tone={g.bucket === 'overdue' ? 'danger' : g.bucket === 'targetMissed' ? 'warning' : undefined}
                       >
-                        {g.tasks.map((t) => (
-                          <TaskRow
-                            key={t.id}
-                            task={t}
-                            today={today}
-                            hideAssignee={filters.scope === 'mine'}
-                            showDepartment={filters.scope === 'all'}
-                            muted={t.status === 'done' || t.status === 'canceled'}
-                          />
-                        ))}
+                        {g.items.map((item) =>
+                          item.type === 'task' ? (
+                            <TaskRow
+                              key={item.key}
+                              task={item.task}
+                              today={today}
+                              hideAssignee={filters.scope === 'mine'}
+                              showDepartment={filters.scope === 'all'}
+                              muted={item.task.status === 'done' || item.task.status === 'canceled'}
+                            />
+                          ) : (
+                            <RecurringOccurrenceRow
+                              key={item.key}
+                              occurrence={item.occurrence}
+                              today={today}
+                              mine={filters.scope === 'mine'}
+                              showDepartment={filters.scope !== 'department'}
+                            />
+                          ),
+                        )}
                       </TaskGroup>
                     ))
-                  : data!.items.map((t) => (
-                      <TaskRow key={t.id} task={t} today={today} hideAssignee={filters.scope === 'mine'} showDepartment={filters.scope === 'all'} />
-                    ))}
+                  : (
+                      <>
+                        {flatOccurrences.map((o) => (
+                          <RecurringOccurrenceRow key={`${o.recurringTaskId}:${o.periodKey}`} occurrence={o} today={today} mine={filters.scope === 'mine'} showDepartment={filters.scope !== 'department'} />
+                        ))}
+                        {data!.items.map((t) => (
+                          <TaskRow key={t.id} task={t} today={today} hideAssignee={filters.scope === 'mine'} showDepartment={filters.scope === 'all'} />
+                        ))}
+                      </>
+                    )}
               </div>
             )}
           </div>

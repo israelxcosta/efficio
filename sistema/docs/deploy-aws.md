@@ -259,6 +259,9 @@ GRANT USAGE ON SCHEMA public TO effinance_api;
 GRANT SELECT, INSERT, UPDATE, DELETE ON
   users, workspaces, workspace_members, workspace_invites, password_resets
 TO effinance_api;
+-- Foto do perfil (migração 0015): dado da pessoa, fora do RLS (uma foto em todos os espaços), cifrada
+-- com uma chave de plataforma; sai em cascata com a conta.
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_photos TO effinance_api;
 -- Nunca apagados pela API (cascatas rodam como dono da tabela).
 GRANT SELECT, INSERT, UPDATE ON subscriptions, billing_events, sessions TO effinance_api;
 -- Trilha de auditoria: só acrescenta.
@@ -284,7 +287,7 @@ SELECT table_name FROM information_schema.role_table_grants
  WHERE grantee = 'effinance_api' AND table_name NOT IN
   ('users','workspaces','workspace_members','workspace_invites','subscriptions',
    'billing_events','sessions','password_resets','audit_logs',
-   'platform_keys','open_finance_items','open_finance_events');
+   'platform_keys','open_finance_items','open_finance_events','user_photos');
 ```
 
 ### 4. Segredos (Secrets Manager)

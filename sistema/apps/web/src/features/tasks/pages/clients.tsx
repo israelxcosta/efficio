@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Building2, ChevronLeft, ChevronRight, Ellipsis, ExternalLink, ListChecks, Search, Wallet } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, ClipboardCheck, Ellipsis, ExternalLink, ListChecks, Search, Wallet } from 'lucide-react';
 import {
   formatCNPJ,
   formatDateBR,
@@ -493,6 +493,9 @@ function ClientRow({ client: c, columns, perDepartment, items, isAdmin, members,
           </DropdownMenuItem>
           <DropdownMenuItem icon={<ListChecks />} onSelect={() => navigate(tasksHref({ scope: 'all', client: c.id }))}>
             Ver tarefas do cliente
+          </DropdownMenuItem>
+          <DropdownMenuItem icon={<ClipboardCheck />} onSelect={() => navigate(`/tarefas/auditoria?busca=${encodeURIComponent(name)}`)}>
+            Ver na auditoria
           </DropdownMenuItem>
           {isAdmin ? (
             <>

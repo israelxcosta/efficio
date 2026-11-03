@@ -1,7 +1,9 @@
 import {
   ArrowLeftRight,
   Building2,
+  ChartColumn,
   ChartLine,
+  ClipboardCheck,
   CreditCard,
   FolderCog,
   HandCoins,
@@ -10,11 +12,13 @@ import {
   LayoutGrid,
   ListChecks,
   Receipt,
+  Repeat,
   ScrollText,
   Settings,
   Tags,
   Target,
   Truck,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -37,7 +41,10 @@ export interface NavItem {
  */
 export type Area = 'gestao' | 'financeiro';
 
-/** Gestão de tarefas, phase 1: Início, Tarefas, Clientes and Cadastros (in order of use). */
+/**
+ * Gestão de tarefas, the final rail (spec §2.2), in order of use so the "more" menu takes the least
+ * used first: Início, Tarefas, Auditoria, Recorrentes, Processos, Clientes, Relatórios, Cadastros.
+ */
 export const GESTAO_NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Início', icon: House, mobile: true, end: true, keywords: 'painel resumo departamento hoje minhas' },
   {
@@ -46,9 +53,31 @@ export const GESTAO_NAV_ITEMS: NavItem[] = [
     icon: ListChecks,
     mobile: true,
     end: true,
-    keywords: 'solicitacoes pedidos afazeres prazos kanban quadro agenda compromissos',
+    keywords: 'solicitacoes pedidos afazeres prazos kanban quadro agenda compromissos calendario',
   },
+  {
+    to: '/tarefas/auditoria',
+    label: 'Auditoria mensal',
+    short: 'Auditoria',
+    icon: ClipboardCheck,
+    keywords: 'competencia matriz obrigacoes entregas conclusao acompanhamento encerramento',
+  },
+  {
+    to: '/tarefas/recorrentes',
+    label: 'Tarefas recorrentes',
+    short: 'Recorrentes',
+    icon: Repeat,
+    keywords: 'obrigacoes prazo legal meta das dctfweb folha periodicidade calendario feriados',
+  },
+  { to: '/tarefas/processos', label: 'Processos', icon: Workflow, keywords: 'fluxos modelos etapas roteiro abertura alteracao' },
   { to: '/tarefas/clientes', label: 'Clientes', icon: Building2, mobile: true, keywords: 'empresas cnpj regime contatos responsaveis carteira' },
+  {
+    to: '/tarefas/relatorios',
+    label: 'Relatórios de tarefas',
+    short: 'Relatórios',
+    icon: ChartColumn,
+    keywords: 'produtividade pontualidade entregas atrasos exportar csv pdf',
+  },
   { to: '/tarefas/cadastros', label: 'Cadastros', icon: FolderCog, keywords: 'departamentos categorias equipe usuarios membros' },
 ];
 

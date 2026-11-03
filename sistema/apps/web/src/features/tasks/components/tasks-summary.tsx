@@ -160,6 +160,7 @@ export function TasksSummary({ summary, scope, situation, assignee, client, onSi
                   </button>
                 </>
               ) : null}
+              {summary.targetMissed > 0 ? <span className="text-warning"> · {summary.targetMissed} fora da meta</span> : null}
             </p>
           ) : (
             <span className="mt-1 flex h-5 items-center">

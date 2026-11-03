@@ -217,6 +217,53 @@ describe('tasks security: who may call each route', () => {
   });
 });
 
+/** Permission key of each administrator route (spec §13.10): registries, their deletion, deleting tasks. */
+const ROUTE_KEYS: Record<string, 'registry' | 'deleteRegistry' | 'deleteTasks'> = {
+  'PUT /api/tasks/members/:userId/department': 'registry',
+  'POST /api/tasks/departments': 'registry',
+  'PUT /api/tasks/departments/:id': 'registry',
+  'DELETE /api/tasks/departments/:id': 'deleteRegistry',
+  'POST /api/tasks/categories': 'registry',
+  'PUT /api/tasks/categories/:id': 'registry',
+  'DELETE /api/tasks/categories/:id': 'deleteRegistry',
+  'PUT /api/tasks/client-responsibles': 'registry',
+  'DELETE /api/tasks/:id': 'deleteTasks',
+  'PUT /api/tasks/client-responsibles/batch': 'registry',
+  'POST /api/tasks/recurring': 'registry',
+  'POST /api/tasks/recurring/generate': 'registry',
+  'PUT /api/tasks/recurring/:id': 'registry',
+  'DELETE /api/tasks/recurring/:id': 'deleteRegistry',
+  'DELETE /api/tasks/flows/:id': 'deleteTasks',
+  'POST /api/tasks/flow-templates': 'registry',
+  'PUT /api/tasks/flow-templates/:id': 'registry',
+  'DELETE /api/tasks/flow-templates/:id': 'deleteRegistry',
+};
+
+describe('tasks security: permission keys (phase 3)', () => {
+  it('each administrator route needs exactly its key: a collaborator with only that key passes', async () => {
+    expect(Object.keys(ROUTE_KEYS).sort()).toEqual([...ADMIN_ROUTES].sort());
+    const { ana, carla, bruno } = await office();
+    for (const key of ['registry', 'deleteRegistry', 'deleteTasks'] as const) {
+      const set = await ana.put(`/workspaces/current/members/${carla.userId}/permissions`, { overrides: { [key]: true } });
+      expect(set.status).toBe(200);
+      for (const [route, needed] of Object.entries(ROUTE_KEYS)) {
+        const [method, path] = route.split(' ') as [string, string];
+        const res = await call(carla, method, concrete(path));
+        if (needed === key) expect(res.status, `${route} with ${key}`).not.toBe(403);
+        else expect(res.status, `${route} with ${key}`).toBe(403);
+      }
+    }
+    // And an administrator without a key is refused on its routes only.
+    expect((await ana.put(`/workspaces/current/members/${bruno.userId}/permissions`, { overrides: { deleteTasks: false } })).status).toBe(200);
+    for (const [route, needed] of Object.entries(ROUTE_KEYS)) {
+      const [method, path] = route.split(' ') as [string, string];
+      const res = await call(bruno, method, concrete(path));
+      if (needed === 'deleteTasks') expect(res.status, route).toBe(403);
+      else expect(res.status, route).not.toBe(403);
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Ids of other workspaces and of other tasks
 // ---------------------------------------------------------------------------

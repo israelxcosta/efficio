@@ -7,20 +7,33 @@ import {
   BANK_CODES,
   CARD_BRANDS,
   CATEGORY_TYPES,
+  CLIENT_CREDENTIAL_FIELDS,
+  CLIENT_DOCUMENT_KINDS,
+  CLIENT_DOCUMENT_NOTE_MAX,
   CLIENT_STATUSES,
   CONTACT_KINDS,
+  CONTRACT_BLOCK_RULES,
+  CONTRACT_BLOCK_TYPES,
   DEFAULT_COLOR,
   FREQUENCIES,
   GRANULARITIES,
   ICON_NAMES,
   INACTIVATION_REASONS,
   MAX_ATTACHMENT_BYTES,
+  MAX_CLIENT_DOCUMENTS,
+  MAX_CONTRACT_BLOCK_CHARS,
+  MAX_CONTRACT_BLOCKS,
+  MAX_CONTRACT_TOTAL_CHARS,
+  MAX_OFFICE_IMAGE_BYTES,
   MAX_REFERENCE_OFFSET,
+  MAX_UNION_CYCLES,
   NON_BUSINESS_DAY_RULES,
   PAYMENT_METHODS,
+  PIX_KEY_TYPES,
   RECURRENCE_KINDS,
   RECURRENCE_PERIODS,
   SERIES_SCOPES,
+  SIMPLES_ACCESS_REGIMES,
   SIMPLES_ANNEXES,
   TASK_ATTACHMENT_CONTENT_TYPES,
   TASK_DUE_BUCKETS,
@@ -31,10 +44,13 @@ import {
   TASK_STATUSES,
   TAX_REGIMES,
   TRANSACTION_STATUSES,
+  UNION_CYCLE_MAX_YEAR,
+  UNION_CYCLE_MIN_YEAR,
+  UNION_SITUATIONS,
 } from './constants';
 import { isISODate } from './utils/dates';
 import { OCCURRENCE_PERIOD_RE, sanitizeFileName, TASK_TIME_RE } from './utils/tasks';
-import { isValidCNPJ, isValidDocument, isValidPhone, onlyDigits } from './utils/documents';
+import { isValidCNPJ, isValidCPF, isValidDocument, isValidPhone, onlyDigits } from './utils/documents';
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -306,6 +322,71 @@ export const cnpjSchema = z
     else if (!isValidCNPJ(v)) ctx.addIssue({ code: 'custom', message: 'CNPJ inválido' });
   });
 
+/** Optional text that, when absent (`undefined`), means "keep what is stored"; empty becomes null. */
+const keepableText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, { message: `Máximo de ${max} caracteres` })
+    .nullable()
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v ? v : null));
+
+/** State/municipal registration: digits, letters and the usual separators. */
+const keepableRegistration = () =>
+  keepableText(40).refine((v) => !v || /^[0-9A-Za-z./ -]+$/.test(v), { message: 'Inscrição inválida' });
+
+/** CPF (digits only), absent = keep, empty = remove. */
+const keepableCpf = () =>
+  z
+    .string()
+    .nullable()
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v ? onlyDigits(v) : null))
+    .refine((v) => !v || isValidCPF(v), { message: 'CPF inválido' });
+
+/**
+ * An encrypted access in three states, so the form never needs to read the stored value: `keep` (or
+ * the field absent), `set` with the new value, `clear`.
+ */
+export const credentialUpdateSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('keep') }),
+  z.object({
+    action: z.literal('set'),
+    value: z
+      .string()
+      .max(200, { message: 'Máximo de 200 caracteres' })
+      .refine((v) => v.trim().length > 0, { message: 'Informe o acesso' }),
+  }),
+  z.object({ action: z.literal('clear') }),
+]);
+export type CredentialUpdateInput = z.infer<typeof credentialUpdateSchema>;
+
+/** A document of the client (the list in the client form). `id` keeps an existing one. */
+export const clientDocumentInputSchema = z
+  .object({
+    id: idSchema.optional(),
+    kind: z.enum(CLIENT_DOCUMENT_KINDS, { message: 'Escolha o tipo do documento.' }),
+    /** Name of an "Outro…" document. */
+    customName: optionalText(80),
+    expiresAt: optionalDate(),
+    /** "Ex.: A1, emitido pela Certisign". */
+    note: optionalText(CLIENT_DOCUMENT_NOTE_MAX),
+  })
+  .superRefine((v, ctx) => {
+    if (v.kind === 'other' && !v.customName) {
+      ctx.addIssue({ code: 'custom', path: ['customName'], message: 'Informe o nome do documento.' });
+    }
+  })
+  .transform((v) => ({ ...v, customName: v.kind === 'other' ? v.customName : null }));
+export type ClientDocumentInput = z.input<typeof clientDocumentInputSchema>;
+
+/** Reveals one access of a client (POST, never cached; audited). */
+export const clientCredentialRevealSchema = z.object({
+  field: z.enum(CLIENT_CREDENTIAL_FIELDS, { message: 'Acesso inválido' }),
+});
+export type ClientCredentialRevealInput = z.infer<typeof clientCredentialRevealSchema>;
+
 export const clientInputSchema = z
   .object({
     /** Razão social. */
@@ -336,13 +417,48 @@ export const clientInputSchema = z
     /** Day of the month the fee is due (in the month after the competence); clamped to short months. */
     feeDueDay: dayOfMonth.default(10),
     ...addressFields,
+    // Phase 3 (spec §13.8): every field below is optional and, when absent from a PUT, keeps what is
+    // stored (forms of earlier versions do not know them and must not wipe them).
+    /** Inscrição estadual; cleared when `stateRegistrationExempt` is true. */
+    stateRegistration: keepableRegistration(),
+    /** "Isenta de inscrição estadual". */
+    stateRegistrationExempt: z.boolean().optional(),
+    /** Inscrição municipal. */
+    municipalRegistration: keepableRegistration(),
+    /** CPF of the responsible person (the contract needs it): personal data, stored encrypted. */
+    responsibleDocument: keepableCpf(),
+    /** Access code of the Simples Nacional portal (Simples Nacional and MEI only): keep, set or clear. */
+    simplesAccessCode: credentialUpdateSchema.optional(),
+    /** The office's password in this client's portals: keep, set or clear. */
+    accountantPassword: credentialUpdateSchema.optional(),
+    /** Documents with expiry date: the full list (replaces the stored one); absent = keep. */
+    documents: z
+      .array(clientDocumentInputSchema)
+      .max(MAX_CLIENT_DOCUMENTS, { message: `Máximo de ${MAX_CLIENT_DOCUMENTS} documentos por cliente` })
+      .optional(),
   })
   .superRefine((v, ctx) => {
     if (v.taxRegime === 'simples_nacional' && !v.simplesAnnex) {
       ctx.addIssue({ code: 'custom', path: ['simplesAnnex'], message: 'Selecione o anexo do Simples Nacional' });
     }
+    if (v.simplesAccessCode?.action === 'set' && !(SIMPLES_ACCESS_REGIMES as readonly string[]).includes(v.taxRegime)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['simplesAccessCode'],
+        message: 'O código de acesso do Simples Nacional só vale para clientes do Simples Nacional ou MEI',
+      });
+    }
+    const ids = (v.documents ?? []).map((d) => d.id).filter(Boolean);
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: 'custom', path: ['documents'], message: 'Documento repetido na lista' });
+    }
   })
-  .transform((v) => ({ ...v, simplesAnnex: v.taxRegime === 'simples_nacional' ? v.simplesAnnex : null }));
+  .transform((v) => ({
+    ...v,
+    simplesAnnex: v.taxRegime === 'simples_nacional' ? v.simplesAnnex : null,
+    // Exempt: no registration number.
+    stateRegistration: v.stateRegistrationExempt === true ? null : v.stateRegistration,
+  }));
 export type ClientInput = z.input<typeof clientInputSchema>;
 
 export const clientQuerySchema = paginationQuerySchema.extend({
@@ -1178,3 +1294,210 @@ export const taskAttachmentInputSchema = z.object({
     .regex(/^[A-Za-z0-9+/]+={0,2}$/, { message: 'Conteúdo do arquivo inválido' }),
 });
 export type TaskAttachmentInput = z.input<typeof taskAttachmentInputSchema>;
+
+// ---------------------------------------------------------------------------
+// Phase 3: unions (sindicatos) and collective agreements, deadlines, office and contract template
+// ---------------------------------------------------------------------------
+
+const unionDocumentSchema = z
+  .string({ message: 'Informe o CNPJ do sindicato.' })
+  .transform((v) => onlyDigits(v))
+  .superRefine((v, ctx) => {
+    if (!v) ctx.addIssue({ code: 'custom', message: 'Informe o CNPJ do sindicato.' });
+    else if (!isValidCNPJ(v)) ctx.addIssue({ code: 'custom', message: 'CNPJ inválido.' });
+  });
+
+const { notes: _addressNotes, ...addressOnly } = addressFields;
+
+/**
+ * Registry of a union (spec §13.7). PUT replaces the registry fields; `active` and `clientIds`, when
+ * absent, keep what is stored. The collective agreement cycles are NOT here: they have their own
+ * request (`PUT /unions/:id/conventions`), so saving the registry can never erase them.
+ */
+export const unionInputSchema = z.object({
+  /** Razão social. */
+  name: z.string().trim().min(1, { message: 'Informe o nome do sindicato.' }).max(200, { message: 'Máximo de 200 caracteres' }),
+  document: unionDocumentSchema,
+  /** Sigla ("SINDCOM"). */
+  acronym: optionalText(30),
+  /** Categoria representada ("Comerciários"). */
+  category: optionalText(120),
+  /** Base territorial ("Mogi Guaçu e região"). */
+  territory: optionalText(300),
+  ...addressOnly,
+  phone: optionalPhone(),
+  email: optionalEmail(),
+  website: optionalText(300),
+  responsibleName: optionalText(200),
+  /** Cargo ("Presidente"). */
+  responsibleRole: optionalText(120),
+  responsibleEmail: optionalEmail(),
+  responsiblePhone: optionalPhone(),
+  /** Month (1–12) the agreement renews every year; the due date is day 1 of it. null = not set. */
+  baseMonth: z
+    .int({ message: 'Mês inválido' })
+    .min(1, { message: 'Mês inválido (1 a 12)' })
+    .max(12, { message: 'Mês inválido (1 a 12)' })
+    .nullish()
+    .transform((v) => v ?? null),
+  notes: optionalText(5000),
+  /** Absent: true on create, unchanged on update. */
+  active: z.boolean().optional(),
+  /** Clients whose employees follow this agreement (the full list); absent = keep. */
+  clientIds: z
+    .array(idSchema)
+    .max(5000, { message: 'Máximo de 5000 clientes' })
+    .optional()
+    .transform((v) => (v ? [...new Set(v)] : v)),
+});
+export type UnionInput = z.input<typeof unionInputSchema>;
+
+export const unionQuerySchema = paginationQuerySchema.extend({
+  /** Name, acronym, category or CNPJ (partial). */
+  search: z.string().trim().max(80).optional(),
+  status: z.enum(['active', 'inactive', 'all']).default('active'),
+  situation: z.enum(UNION_SITUATIONS).optional(),
+});
+export type UnionQuery = z.input<typeof unionQuerySchema>;
+
+const cycleYearSchema = z
+  .int({ message: 'Ano inválido' })
+  .min(UNION_CYCLE_MIN_YEAR, { message: 'Ano inválido' })
+  .max(UNION_CYCLE_MAX_YEAR, { message: 'Ano inválido' });
+
+/**
+ * The agreement cycles of a union (substitutive: cycles not sent are removed). `year` 2026 =
+ * "Convenção Coletiva 2026/2027". Who marked it published and when are recorded by the server.
+ */
+export const unionConventionsInputSchema = z.object({
+  cycles: z
+    .array(z.object({ year: cycleYearSchema, published: z.boolean(), note: optionalText(500) }))
+    .max(MAX_UNION_CYCLES, { message: `Máximo de ${MAX_UNION_CYCLES} convenções` })
+    .refine((list) => new Set(list.map((c) => c.year)).size === list.length, { message: 'Ano repetido na lista' }),
+});
+export type UnionConventionsInput = z.input<typeof unionConventionsInputSchema>;
+
+/** Marks (or unmarks) one cycle as published: the optimistic toggle with "Desfazer". */
+export const unionConventionPublishSchema = z.object({ published: z.boolean() });
+export const unionConventionParamsSchema = z.object({ id: idSchema, year: z.coerce.number().pipe(cycleYearSchema) });
+
+/** Documents and/or collective agreements. */
+export const deadlinesQuerySchema = z.object({
+  kind: z.enum(['documents', 'conventions']).optional(),
+});
+export type DeadlinesQuery = z.input<typeof deadlinesQuerySchema>;
+
+// --- office -----------------------------------------------------------------------------------------
+
+const MAX_OFFICE_IMAGE_DATA_URI = Math.ceil(MAX_OFFICE_IMAGE_BYTES / 3) * 4 + 64;
+
+/**
+ * `data:image/(png|jpeg|webp);base64,…` up to 500 KB (never SVG). The API also checks that the bytes
+ * carry the signature of the declared type.
+ */
+export const officeImageSchema = z
+  .string()
+  .max(MAX_OFFICE_IMAGE_DATA_URI, { message: 'A imagem passa de 500 KB.' })
+  .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/, { message: 'Use PNG, JPG ou WebP.' });
+
+export const officeLogoInputSchema = z.object({ logo: officeImageSchema });
+export type OfficeLogoInput = z.infer<typeof officeLogoInputSchema>;
+
+const PIX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PIX_RANDOM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The Pix key normalized for its type, or null when it is not valid for it. */
+export function normalizePixKey(type: (typeof PIX_KEY_TYPES)[number], key: string): string | null {
+  const value = key.trim();
+  switch (type) {
+    case 'cnpj':
+      return isValidCNPJ(onlyDigits(value)) ? onlyDigits(value) : null;
+    case 'cpf':
+      return isValidCPF(onlyDigits(value)) ? onlyDigits(value) : null;
+    case 'email':
+      return value.length <= 77 && PIX_EMAIL.test(value) ? value.toLowerCase() : null;
+    case 'phone': {
+      // +55 DD 9XXXX-XXXX (the key format of the Pix directory).
+      const digits = onlyDigits(value).replace(/^55(?=\d{10,11}$)/, '');
+      return /^\d{10,11}$/.test(digits) ? `+55${digits}` : null;
+    }
+    case 'random':
+      return PIX_RANDOM.test(value) ? value.toLowerCase() : null;
+  }
+}
+
+/** Office registry (spec §13.9): one per workspace. Logo and contract template have their own requests. */
+export const officeInputSchema = z
+  .object({
+    document: z
+      .string({ message: 'Informe o CNPJ do escritório.' })
+      .transform((v) => onlyDigits(v))
+      .superRefine((v, ctx) => {
+        if (!v) ctx.addIssue({ code: 'custom', message: 'Informe o CNPJ do escritório.' });
+        else if (!isValidCNPJ(v)) ctx.addIssue({ code: 'custom', message: 'CNPJ inválido.' });
+      }),
+    legalName: z.string().trim().min(1, { message: 'Informe a razão social.' }).max(200, { message: 'Máximo de 200 caracteres' }),
+    tradeName: optionalText(200),
+    stateRegistration: optionalText(40),
+    municipalRegistration: optionalText(40),
+    ...addressOnly,
+    phone: optionalPhone(),
+    email: optionalEmail(),
+    website: optionalText(300),
+    responsibleName: optionalText(200),
+    /** Signs the contract for the office: personal data, stored encrypted. */
+    responsibleDocument: z
+      .string()
+      .nullish()
+      .transform((v) => (v ? onlyDigits(v) : null))
+      .refine((v) => v === null || isValidCPF(v), { message: 'CPF inválido.' }),
+    responsibleEmail: optionalEmail(),
+    responsiblePhone: optionalPhone(),
+    pixKeyType: z.enum(PIX_KEY_TYPES).nullish().transform((v) => v ?? null),
+    pixKey: optionalText(77),
+  })
+  .superRefine((v, ctx) => {
+    if (v.pixKey && !v.pixKeyType) ctx.addIssue({ code: 'custom', path: ['pixKeyType'], message: 'Escolha o tipo da chave Pix.' });
+    if (v.pixKey && v.pixKeyType && normalizePixKey(v.pixKeyType, v.pixKey) === null) {
+      ctx.addIssue({ code: 'custom', path: ['pixKey'], message: 'Chave Pix inválida para o tipo escolhido.' });
+    }
+  })
+  .transform((v) => ({
+    ...v,
+    pixKeyType: v.pixKey ? v.pixKeyType : null,
+    pixKey: v.pixKey && v.pixKeyType ? normalizePixKey(v.pixKeyType, v.pixKey) : null,
+  }));
+export type OfficeInput = z.input<typeof officeInputSchema>;
+
+// --- contract template ------------------------------------------------------------------------------
+
+export const contractBlockSchema = z.object({
+  type: z.enum(CONTRACT_BLOCK_TYPES, { message: 'Tipo de bloco desconhecido.' }),
+  text: z
+    .string()
+    .max(MAX_CONTRACT_BLOCK_CHARS, { message: `O bloco passa de ${MAX_CONTRACT_BLOCK_CHARS.toLocaleString('pt-BR')} caracteres.` })
+    .optional(),
+  rule: z.enum(CONTRACT_BLOCK_RULES).optional(),
+});
+
+/**
+ * Saves the contract template. Absent = keep; `blocks: null` = the factory template; `watermark: null`
+ * = the factory watermark. "Voltar ao modelo de fábrica" has its own request, saved right away.
+ */
+export const contractTemplateInputSchema = z
+  .object({
+    blocks: z
+      .array(contractBlockSchema)
+      .max(MAX_CONTRACT_BLOCKS, { message: `O contrato pode ter no máximo ${MAX_CONTRACT_BLOCKS} blocos.` })
+      .refine((list) => list.reduce((n, b) => n + (b.text?.length ?? 0), 0) <= MAX_CONTRACT_TOTAL_CHARS, {
+        message: `O contrato passa de ${MAX_CONTRACT_TOTAL_CHARS.toLocaleString('pt-BR')} caracteres.`,
+      })
+      .nullable()
+      .optional(),
+    watermark: officeImageSchema.nullable().optional(),
+    watermarkEnabled: z.boolean().optional(),
+  })
+  .refine((v) => v.blocks !== undefined || v.watermark !== undefined || v.watermarkEnabled !== undefined, {
+    message: 'Nada para salvar',
+  });
+export type ContractTemplateInput = z.input<typeof contractTemplateInputSchema>;

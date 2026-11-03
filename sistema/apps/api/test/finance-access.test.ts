@@ -37,9 +37,25 @@ const FINANCE_MODULES = new Set([
   'open-finance',
 ]);
 /** Visible to every member (each with its own write/owner checks). `tasks`: module in development. */
-const OPEN_MODULES = new Set(['health', 'auth', 'workspaces', 'invites', 'billing', 'contacts', 'clients', 'cnpj', 'search', 'tasks']);
-/** Financial routes inside open modules. */
-const FINANCE_ROUTES_IN_OPEN_MODULES = [/^\/api\/clients\/:id\/fees(\/|$)/];
+const OPEN_MODULES = new Set([
+  'health',
+  'auth',
+  'workspaces',
+  'invites',
+  'billing',
+  'contacts',
+  'clients',
+  'cnpj',
+  'search',
+  'tasks',
+  // Phase 3: each route checks its own permission key (registry, office, clientCredentials…).
+  'unions',
+  'deadlines',
+  'office',
+  'profile',
+]);
+/** Financial routes inside open modules (the fee periods, the contract of a client and its issues). */
+const FINANCE_ROUTES_IN_OPEN_MODULES = [/^\/api\/clients\/:id\/fees(\/|$)/, /^\/api\/clients\/:id\/contract(\/|$)/];
 /** Public, authenticated by the secret in the path (never by a session). */
 const PUBLIC_ROUTES = [/^\/api\/open-finance\/webhooks\//];
 
@@ -288,9 +304,10 @@ describe('finance restricted to administrators', () => {
       accounts: [],
       categories: [],
       contacts: [expect.objectContaining({ name: 'Padaria Aurora Ltda', kind: 'client' })],
-      // Tasks are open to every member (none match here).
+      // Tasks and unions are open to every member (none match here).
       tasks: [],
       recurringTasks: [],
+      unions: [],
     });
     expect(JSON.stringify(limited.body)).not.toMatch(/123456|honorários|Conta Aurora/);
   });

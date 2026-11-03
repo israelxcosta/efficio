@@ -1,7 +1,8 @@
-// Finance is restricted to the workspace administrators. Provisional mapping (no role migration):
-// administrator = `owner` or `editor`; `viewer` (shown as "Colaborador" in the app) uses the other
-// modules (clients, suppliers, tasks, profile, workspace) but gets 403 on every financial route,
-// reads included, and sees clients without fees (honorários) and the search without financial hits.
+// Finance is restricted to whoever has the `finance` permission (spec §13.10; by default the workspace
+// administrators, owner and editor — the mapping of phases 1 and 2). Without it a member (by default
+// the `viewer`, "Colaborador") uses the other modules (clients, suppliers, tasks, profile, workspace)
+// but gets 403 on every financial route, reads included, and sees clients without fees (honorários)
+// and the search without financial hits.
 //
 // Usage: call `financeOnly(app)` first thing in a financial route plugin (after `tenantGuards(app)`
 // in plugins mounted outside lib/tenant-routes). The hook covers every route of the plugin, so a
@@ -9,21 +10,21 @@
 // (plain `addHook('onRequest')`; no Node-only imports).
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import type { MemberRole } from '@effinance/shared';
+import type { PermissionMap } from '@effinance/shared';
 import type { Access } from '../modules/workspaces/access';
 import { ForbiddenError } from './errors';
+import { can, FINANCE_FORBIDDEN_MESSAGE } from './permissions';
 
-/** Roles that see and manage the finances. An allowlist: a role added later starts without access. */
-const FINANCE_ROLES: ReadonlySet<MemberRole> = new Set<MemberRole>(['owner', 'editor']);
+export { FINANCE_FORBIDDEN_MESSAGE };
 
-export const FINANCE_FORBIDDEN_MESSAGE = 'O financeiro é restrito aos administradores do espaço.';
+type AccessLike = (Pick<Access, 'role'> & { permissions?: PermissionMap }) | null | undefined;
 
 /** False without an authenticated access (a guard registered before authentication fails closed). */
-export function canAccessFinance(access: Pick<Access, 'role'> | null | undefined): boolean {
-  return access != null && FINANCE_ROLES.has(access.role);
+export function canAccessFinance(access: AccessLike): boolean {
+  return can(access, 'finance');
 }
 
-export function assertFinanceAccess(access: Pick<Access, 'role'> | null | undefined): void {
+export function assertFinanceAccess(access: AccessLike): void {
   if (!canAccessFinance(access)) throw new ForbiddenError(FINANCE_FORBIDDEN_MESSAGE);
 }
 
@@ -32,7 +33,7 @@ export async function requireFinanceAccess(req: FastifyRequest): Promise<void> {
   assertFinanceAccess(req.access);
 }
 
-/** Restricts every route of the calling plugin (and of the plugins it registers) to finance roles. */
+/** Restricts every route of the calling plugin (and of the plugins it registers) to the finance key. */
 export function financeOnly(app: Pick<FastifyInstance, 'addHook'>): void {
   app.addHook('onRequest', requireFinanceAccess);
 }

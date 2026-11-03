@@ -26,10 +26,23 @@ describe('visibleSearchHits (⌘K)', () => {
   it('never shows transactions, accounts (balances), categories or suppliers to a collaborator (security regression)', () => {
     // The palette used to render whatever `/search` returned: only the API kept amounts away.
     const hits = visibleSearchHits(answer, false);
-    expect(hits).toEqual({ transactions: [], accounts: [], categories: [], contacts: [answer.contacts[0]] });
+    expect(hits).toEqual({ transactions: [], accounts: [], categories: [], contacts: [answer.contacts[0]], tasks: [], recurringTasks: [] });
+  });
+
+  it('shows tasks and recurring tasks to every member', () => {
+    const withTasks = {
+      ...answer,
+      tasks: [{ id: 'x1', title: 'Balancete', kind: 'standalone', status: 'todo', dueDate: null, overdue: false, client: null }],
+      recurringTasks: [{ id: 'r1', name: 'DCTFWeb', period: 'monthly' }],
+    } as unknown as SearchResponse;
+    for (const admin of [true, false]) {
+      const hits = visibleSearchHits(withTasks, admin);
+      expect(hits.tasks.map((t) => t.id)).toEqual(['x1']);
+      expect(hits.recurringTasks.map((t) => t.id)).toEqual(['r1']);
+    }
   });
 
   it('handles no answer yet', () => {
-    expect(visibleSearchHits(undefined, false)).toEqual({ transactions: [], accounts: [], categories: [], contacts: [] });
+    expect(visibleSearchHits(undefined, false)).toEqual({ transactions: [], accounts: [], categories: [], contacts: [], tasks: [], recurringTasks: [] });
   });
 });

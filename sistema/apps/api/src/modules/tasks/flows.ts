@@ -97,7 +97,7 @@ async function createdResponse(ctx: TaskContext, flowId: string, taskId: string 
  * (administrators) the steps are also saved as a template. Step 1 is activated now, counting from today.
  */
 export async function createFlow(ctx: TaskContext, input: FlowInput): Promise<TaskFlowCreatedResponse> {
-  if (input.saveAsTemplate && !ctx.isAdmin) throw new ForbiddenError(TASK_ADMIN_MESSAGE);
+  if (input.saveAsTemplate && !ctx.permissions.registry) throw new ForbiddenError(TASK_ADMIN_MESSAGE);
   if (input.clientId) await getTaskClientOrThrow(ctx.db, ctx.workspaceId, input.clientId);
   await validateSteps(ctx, input.steps);
   const [flow] = await ctx.db

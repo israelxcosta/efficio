@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Popover } from 'radix-ui';
-import { List, ListFilter, Search, SlidersHorizontal, SquareKanban, X } from 'lucide-react';
+import { CalendarDays, List, ListFilter, Search, SlidersHorizontal, SquareKanban, X } from 'lucide-react';
 import {
   formatMonthKey,
+  TASK_KIND_LABELS,
+  TASK_KINDS,
   TASK_PRIORITY_LABELS,
   TASK_SITUATION_LABELS,
   TASK_SITUATIONS,
   type MonthKey,
+  type TaskKind,
   type TaskOptionsResponse,
   type TaskPriority,
   type TaskScope,
@@ -67,7 +70,8 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
   const categories = options?.categories ?? [];
   const departments = options?.departments ?? [];
   const board = filters.view === 'board';
-  const extraCount = [filters.department, filters.month].filter(Boolean).length;
+  const calendar = filters.view === 'calendar';
+  const extraCount = [filters.department, calendar ? '' : filters.month, filters.kind].filter(Boolean).length;
   const count = activeFilterCount(filters);
   const mobileCount = count - (filters.search ? 1 : 0) + (!board && filters.situation !== 'open' ? 1 : 0);
 
@@ -85,6 +89,7 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
       options={[
         { value: 'list', label: <span className="sr-only">Lista</span>, icon: <List aria-hidden />, title: 'Lista' },
         { value: 'board', label: <span className="sr-only">Quadro</span>, icon: <SquareKanban aria-hidden />, title: 'Quadro' },
+        { value: 'calendar', label: <span className="sr-only">Calendário</span>, icon: <CalendarDays aria-hidden />, title: 'Calendário' },
       ]}
     />
   );
@@ -110,6 +115,16 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
       {monthOptions.map((m) => (
         <option key={m} value={m}>
           {formatMonthKey(m)}
+        </option>
+      ))}
+    </Select>
+  );
+  const kindSelect = (sm: boolean) => (
+    <Select size_={sm ? 'sm' : 'md'} value={filters.kind} onChange={(e) => onChange({ kind: e.target.value as TaskKind | '' })} aria-label="Tipo">
+      <option value="">Todas</option>
+      {TASK_KINDS.map((k) => (
+        <option key={k} value={k}>
+          {TASK_KIND_LABELS[k]}
         </option>
       ))}
     </Select>
@@ -219,7 +234,8 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
               className="z-50 flex w-72 flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-lg data-[state=open]:animate-fade-in"
             >
               {filters.scope !== 'department' ? <Field label="Departamento">{departmentSelect(true)}</Field> : null}
-              <Field label="Mês de vencimento">{monthSelect(true)}</Field>
+              {!calendar ? <Field label="Mês de vencimento">{monthSelect(true)}</Field> : null}
+              <Field label="Tipo">{kindSelect(true)}</Field>
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
@@ -303,7 +319,8 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
           {filters.scope !== 'department' ? <Field label="Departamento">{departmentSelect(false)}</Field> : null}
           <Field label="Categoria">{categorySelect(false)}</Field>
           <Field label="Prioridade">{prioritySelect(false)}</Field>
-          <Field label="Mês de vencimento">{monthSelect(false)}</Field>
+          {!calendar ? <Field label="Mês de vencimento">{monthSelect(false)}</Field> : null}
+          <Field label="Tipo">{kindSelect(false)}</Field>
         </div>
       </Sheet>
     </Card>

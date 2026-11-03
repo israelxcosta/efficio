@@ -5,6 +5,7 @@ import type { DbExecutor } from '../../db/client';
 import {
   accounts,
   categories,
+  clientDocuments,
   clientFees,
   contacts,
   creditCards,
@@ -28,8 +29,16 @@ import {
   taskSubtasks,
   tasks,
   transactions,
+  offices,
+  unionClients,
+  unionConventions,
+  unions,
+  userPhotos,
   workspaces,
 } from '../../db/schema';
+import { platformDecryptBytes } from '../../lib/crypto/platform-keys';
+import { toDataUri } from '../../lib/images';
+import { PHOTO_KEY } from '../profile/service';
 import { getCipher } from '../../lib/crypto/keyring';
 import { withTenant } from '../../lib/tenant';
 import { CONTACT_ALL_ENCRYPTED_FIELDS } from '../contacts/service';
@@ -51,8 +60,27 @@ import { getSubscriptionRow, listMembers } from './service';
 import { summarizeSubscription } from '../billing/entitlements';
 import type { Access } from './access';
 
+/**
+ * Encrypted columns of `contacts` added in phase 3: the responsible's CPF and the clients' accesses.
+ * Decision (spec §13.8, documented in docs/api.md): the owner's export carries them decrypted — it is
+ * the portability of the workspace's own data, owner-only, rate-limited and audited (`data.exported`
+ * with `includesCredentials`); leaving them out would make the export useless to migrate the office.
+ */
+const CONTACT_PHASE3_ENCRYPTED = ['responsibleDocument', 'simplesAccessCode', 'accountantPassword'] as const;
+const UNION_ENCRYPTED = ['responsibleName', 'responsibleEmail', 'responsiblePhone', 'notes'] as const;
+const OFFICE_ENCRYPTED = ['responsibleDocument', 'responsibleEmail', 'responsiblePhone', 'pixKey'] as const;
+
 export async function exportWorkspace(db: DbExecutor, access: Access) {
   const cipher = await getCipher(access.workspaceId);
+  // The requester's own profile photo (others' photos are theirs: never in someone else's export).
+  const [photo] = await db.select().from(userPhotos).where(eq(userPhotos.userId, access.userId));
+  const profilePhoto = photo
+    ? {
+        contentType: photo.contentType,
+        updatedAt: photo.updatedAt,
+        dataUri: toDataUri(photo.contentType, await platformDecryptBytes(db, PHOTO_KEY, access.userId, photo.content)),
+      }
+    : null;
   const [[workspace], members, subscription] = await Promise.all([
     db
       .select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, createdAt: workspaces.createdAt })
@@ -89,6 +117,33 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
         tx.select().from(taskComments).orderBy(asc(taskComments.createdAt), asc(taskComments.id)),
         tx.select().from(taskClientResponsibles).orderBy(asc(taskClientResponsibles.clientId)),
       ]);
+    // Phase 3 (migration 0015): clients' documents, unions with their agreements and clients, the office
+    // (images as data URIs, the template blocks as stored; null = factory).
+    const [documentRows, unionRows, cycleRows, unionClientRows, [officeRow]] = await Promise.all([
+      tx.select().from(clientDocuments).orderBy(asc(clientDocuments.clientId), asc(clientDocuments.createdAt)),
+      tx.select().from(unions).orderBy(asc(unions.name)),
+      tx.select().from(unionConventions).orderBy(asc(unionConventions.unionId), asc(unionConventions.year)),
+      tx.select().from(unionClients).orderBy(asc(unionClients.unionId), asc(unionClients.clientId)),
+      tx.select().from(offices),
+    ]);
+    const phase3 = {
+      clientDocuments: await Promise.all(
+        documentRows.map(async (r) => ({ ...r, note: await decrypt('client_documents', 'note', r.note) })),
+      ),
+      unions: await Promise.all(unionRows.map((r) => cipher.decryptFields('unions', r, UNION_ENCRYPTED))),
+      unionConventions: await Promise.all(cycleRows.map(async (r) => ({ ...r, note: await decrypt('union_conventions', 'note', r.note) }))),
+      unionClients: unionClientRows,
+      office: officeRow
+        ? await (async () => {
+            const { logo, contractWatermark, ...rest } = await cipher.decryptFields('offices', officeRow, OFFICE_ENCRYPTED);
+            return {
+              ...rest,
+              logo: logo && officeRow.logoType ? toDataUri(officeRow.logoType, logo) : null,
+              contractWatermark: contractWatermark && officeRow.contractWatermarkType ? toDataUri(officeRow.contractWatermarkType, contractWatermark) : null,
+            };
+          })()
+        : null,
+    };
     // Phase 2 (migration 0014): recurring tasks, processes and templates, the history of each task,
     // attachment metadata (the files are downloaded one by one: a JSON with every file in base64 could
     // reach gigabytes) and the requester's own notes (notes are private: never someone else's).
@@ -129,7 +184,9 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
         contributionRows.map(async (c) => ({ ...c, note: await decrypt('goal_contributions', 'note', c.note) })),
       ),
       contacts: await Promise.all(
-        contactRows.map(async ({ documentHash: _hash, ...c }) => cipher.decryptFields('contacts', c, CONTACT_ALL_ENCRYPTED_FIELDS)),
+        contactRows.map(async ({ documentHash: _hash, ...c }) =>
+          cipher.decryptFields('contacts', c, [...CONTACT_ALL_ENCRYPTED_FIELDS, ...CONTACT_PHASE3_ENCRYPTED]),
+        ),
       ),
       // Fee periods (honorários): dates derive from the client's contract start + period index.
       clientFees: feeRows,
@@ -173,6 +230,7 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
       taskAttachments: await Promise.all(
         attachmentRows.map(async (r) => ({ ...r, fileName: await decryptTaskText(cipher, ATTACHMENT_NAME, r.fileName) })),
       ),
+      ...phase3,
       taskNotes: await Promise.all(
         noteRows.map(async (r) => ({
           ...r,
@@ -189,6 +247,7 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
     workspace,
     subscription: summarizeSubscription(subscription),
     members: members.map(({ isYou: _you, ...m }) => m),
+    profilePhoto,
     ...data,
   };
 }

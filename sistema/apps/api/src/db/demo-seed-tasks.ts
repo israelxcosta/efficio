@@ -26,6 +26,7 @@ import {
   type MemberRole,
   type RecurringTaskInput,
   type TaskInput,
+  rolePermissions,
 } from '@effinance/shared';
 import type { DbExecutor } from './client';
 import { contacts, tasks, users, workspaceMembers } from './schema';
@@ -96,6 +97,8 @@ export async function seedTasks(
       userId: ids[who],
       role: members.get(ids[who])!.role,
       isAdmin: true,
+      // The seed writes as an administrator for everyone (it builds the scenario).
+      permissions: rolePermissions('owner'),
       canWrite: true,
       members,
       today,

@@ -182,6 +182,7 @@ function DepartmentsTab({
         <span className="flex-1">Departamento</span>
         <span className="hidden w-32 @2xl:block">Membros</span>
         <span className="w-28 text-right">Em aberto</span>
+        <span className="hidden w-28 text-right @3xl:block">Recorrentes</span>
         <span className="hidden w-36 text-right whitespace-nowrap @4xl:block">Com responsável</span>
         <span className="w-8" aria-hidden />
       </div>
@@ -224,6 +225,9 @@ function DepartmentsTab({
                   {d.overdueCount ? (
                     <span className="tabular block text-mini text-danger">{pluralize(d.overdueCount, 'atrasada', 'atrasadas')}</span>
                   ) : null}
+                </Link>
+                <Link to={`/tarefas/recorrentes?departamento=${d.id}`} className="tabular hidden w-28 rounded-md text-right text-body-sm text-fg hover:underline @3xl:block" aria-label={`${d.name}: ${d.recurringCount} tarefas recorrentes ativas.`}>
+                  {d.recurringCount}
                 </Link>
                 <span className={cn('tabular hidden w-36 text-right text-body-sm @4xl:block', covered < active.length ? 'text-warning' : 'text-fg')}>
                   {covered}/{active.length}

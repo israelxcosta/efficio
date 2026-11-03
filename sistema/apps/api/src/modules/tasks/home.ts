@@ -72,11 +72,13 @@ async function resolveView(ctx: TaskContext, requested: HomeQuery['departmentId'
     departmentNames(ctx.db, ctx.workspaceId),
   ]);
   if (requested === 'all') {
-    if (!ctx.isAdmin) throw new ForbiddenError(TASK_ADMIN_MESSAGE);
+    // The department picker of the home page is for whoever manages the task registries (`registry`;
+    // by default the administrators, as in phases 1 and 2).
+    if (!ctx.permissions.registry) throw new ForbiddenError(TASK_ADMIN_MESSAGE);
     return { view: 'all' as const, department: null };
   }
   if (requested && requested !== own) {
-    if (!ctx.isAdmin) throw new ForbiddenError('Você só pode ver o resumo do seu departamento');
+    if (!ctx.permissions.registry) throw new ForbiddenError('Você só pode ver o resumo do seu departamento');
     if (!names.has(requested)) throw new NotFoundError('Departamento não encontrado');
   }
   const id = requested ?? own;

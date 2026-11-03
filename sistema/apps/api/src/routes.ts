@@ -1,5 +1,10 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { accountRoutes } from './modules/accounts/routes';
+import { clientRecordRoutes } from './modules/client-records/routes';
+import { deadlineRoutes } from './modules/deadlines/routes';
+import { officeRoutes } from './modules/office/routes';
+import { profileRoutes } from './modules/profile/routes';
+import { unionRoutes } from './modules/unions/routes';
 import { categoryRoutes } from './modules/categories/routes';
 import { clientRoutes, cnpjRoutes } from './modules/clients/routes';
 import { contactRoutes } from './modules/contacts/routes';
@@ -40,10 +45,18 @@ export const domainRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] =
  * Modules whose requests run several tenant transactions (lib/tenant-scope.ts: same authentication
  * and write checks, explicit RLS phases): mounted under `/api` next to `tenantRoutes`, not inside it.
  * Tasks bring their own guards (modules/tasks/access.ts): every member writes there, `viewer` included.
+ * Phase 3 modules check a permission key per route (lib/permissions.ts, lib/scoped-context.ts):
+ * unions, deadlines, the office, the clients' accesses and contract issues (`/clients`, next to the
+ * financial client routes), and the profile photo.
  */
 export const scopedRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] = [
   { prefix: '/imports', plugin: importRoutes },
   { prefix: '/open-finance', plugin: openFinanceRoutes },
   { prefix: '/cnpj', plugin: cnpjRoutes },
   { prefix: '/tasks', plugin: taskRoutes },
+  { prefix: '/unions', plugin: unionRoutes },
+  { prefix: '/deadlines', plugin: deadlineRoutes },
+  { prefix: '/office', plugin: officeRoutes },
+  { prefix: '/clients', plugin: clientRecordRoutes },
+  { prefix: '/profile', plugin: profileRoutes },
 ];

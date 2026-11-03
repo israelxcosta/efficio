@@ -8,13 +8,20 @@ import { MemberAvatar } from '@/components/ui/member-avatar';
 import { Select } from '@/components/ui/select';
 import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
-import { useSetClientResponsible } from '../api';
+import { useSetClientResponsible, useSetClientResponsibles } from '../api';
 import { firstName, shortName } from '../due';
 import { MemberPicker, NONE } from './pickers';
 
 /** Responsible of a client in a department, from the grid of the API. */
 export function responsibleOf(items: ClientResponsible[], clientId: string, departmentId: string): TaskMemberRef | null {
   return items.find((i) => i.clientId === clientId && i.departmentId === departmentId)?.user ?? null;
+}
+
+/** "… 5 tarefas em aberto passaram para ela." (the open recurring tasks that changed hands). */
+export function reassignedText(reassigned: number, to: TaskMemberRef | null): string {
+  if (reassigned <= 0) return '';
+  const tasks = reassigned === 1 ? '1 tarefa em aberto passou' : `${reassigned} tarefas em aberto passaram`;
+  return to ? ` ${tasks} para ${firstName(to.name)}.` : ` ${tasks} para o responsável padrão.`;
 }
 
 /** Saves a responsible at once (optimistic) and offers "Desfazer" (spec §17). */
@@ -28,9 +35,9 @@ export function useResponsibleChange() {
     undo = false,
   ): Promise<boolean> => {
     try {
-      await set.mutateAsync({ clientId: client.id, departmentId: department.id, userId: next?.id ?? null });
+      const res = await set.mutateAsync({ clientId: client.id, departmentId: department.id, userId: next?.id ?? null });
       if (!undo) {
-        toast(`${department.name} de ${client.name}: ${next ? `agora com ${firstName(next.name)}` : 'sem responsável'}.`, {
+        toast(`${department.name} de ${client.name}: ${next ? `agora com ${firstName(next.name)}` : 'sem responsável'}.${reassignedText(res?.reassigned ?? 0, next)}`, {
           duration: 6000,
           action: { label: 'Desfazer', onClick: () => void change(client, department, previous, next, true) },
         });
@@ -121,11 +128,11 @@ interface AssignResponsibleDialogProps {
 }
 
 /**
- * Responsible in batch (spec §13.3). The API saves one client × department at a time, so the dialog
- * sends one request per client; "Desfazer" puts the previous responsibles back.
+ * Responsible in batch (spec §13.3): one request for every client (`PUT /tasks/client-responsibles/batch`),
+ * the toast says how many open recurring tasks changed hands, and "Desfazer" sends the previous ones back.
  */
 export function AssignResponsibleDialog({ open, onOpenChange, clients, departments, members, items, defaultDepartment, onDone }: AssignResponsibleDialogProps) {
-  const set = useSetClientResponsible();
+  const set = useSetClientResponsibles();
   const [departmentId, setDepartmentId] = useState(defaultDepartment ?? departments[0]?.id ?? '');
   const [userId, setUserId] = useState('');
   const [saving, setSaving] = useState(false);
@@ -133,9 +140,8 @@ export function AssignResponsibleDialog({ open, onOpenChange, clients, departmen
   const member = members.find((m) => m.id === userId);
   const n = clients.length;
 
-  async function apply(targets: { clientId: string; userId: string | null }[]) {
-    for (const t of targets) await set.mutateAsync({ clientId: t.clientId, departmentId, userId: t.userId });
-  }
+  const apply = (targets: { clientId: string; userId: string | null }[], dept = departmentId) =>
+    set.mutateAsync(targets.map((t) => ({ clientId: t.clientId, departmentId: dept, userId: t.userId })));
 
   async function submit() {
     if (!department || !userId) return;
@@ -143,12 +149,14 @@ export function AssignResponsibleDialog({ open, onOpenChange, clients, departmen
     const next = userId === NONE ? null : userId;
     setSaving(true);
     try {
-      await apply(clients.map((c) => ({ clientId: c.id, userId: next })));
+      const res = await apply(clients.map((c) => ({ clientId: c.id, userId: next })));
       onOpenChange(false);
       onDone();
-      toast(next ? `Responsável definido para ${n === 1 ? '1 cliente' : `${n} clientes`}.` : `Responsável removido de ${n === 1 ? '1 cliente' : `${n} clientes`}.`, {
+      const dept = departmentId;
+      const head = next ? `Responsável definido para ${n === 1 ? '1 cliente' : `${n} clientes`}.` : `Responsável removido de ${n === 1 ? '1 cliente' : `${n} clientes`}.`;
+      toast(`${head}${reassignedText(res.reassigned, member ? { id: member.id, name: member.name } : null)}`, {
         duration: 6000,
-        action: { label: 'Desfazer', onClick: () => void apply(previous).catch(toastError) },
+        action: { label: 'Desfazer', onClick: () => void apply(previous, dept).catch(toastError) },
       });
     } catch (error) {
       toastError(error);

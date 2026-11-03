@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Info, Plus } from 'lucide-react';
+import { Info, Plus, Repeat } from 'lucide-react';
 import {
   addDays,
+  diffInDays,
   monthKey,
+  RECURRENCE_PERIOD_LABELS,
   todayISO,
+  type RecurringOccurrence,
+  type Task,
   type TaskHomeResponse,
   type TaskOptionsResponse,
-  type TaskQuery,
 } from '@effinance/shared';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MemberAvatar } from '@/components/ui/member-avatar';
@@ -18,16 +23,18 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/auth-context';
-import { WriteGate } from '@/features/auth/permissions';
+import { usePermissions, WriteGate } from '@/features/auth/permissions';
 import { BodyEmpty, ListSkeleton } from '@/features/dashboard/widgets/shared';
 import { FitList, WidgetCard } from '@/features/dashboard/layout/widget-card';
 import { cn, pluralize } from '@/lib/utils';
-import { useTaskHome, useTaskOptions, useTasks } from '../api';
+import { useRecurringTasks, useTaskHome, useTaskOptions, useTasks } from '../api';
 import { BreakdownItem, type BreakdownRow } from '../components/breakdown-list';
 import { TaskRow } from '../components/task-row';
 import { TaskStatusGlyph } from '../components/task-status';
+import { RecurringOccurrenceRow, useOccurrenceSheetLinks } from '../components/occurrence-row';
+import { competenceName, groupDeadlineInfo, occurrenceBucket, periodLabel, taskBucket } from '../occurrence';
 import { monthName, SummaryLabel } from '../components/tasks-summary';
-import { daysText, shortDate, shortName } from '../due';
+import { daysText, DUE_TONE_CLASS, shortDate, shortName } from '../due';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
 import { resolveHomeDepartment } from '../home-view';
@@ -111,14 +118,18 @@ export default function TaskHomePage() {
 
       {o?.me.isAdmin ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
 
+      {/* Row A: what I do and how the competence goes; row B: who carries the work and where it piles up. */}
       <div className="grid gap-5 lg:grid-cols-12">
-        <div className="min-h-[18rem] lg:col-span-7 lg:row-span-2 lg:h-[calc(42rem+1.25rem)]">
+        <div className="min-h-[18rem] lg:col-span-7 lg:h-[26rem]">
           <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
         </div>
-        <div className="lg:col-span-5 lg:h-[21rem]">
+        <div className="min-h-[18rem] lg:col-span-5 lg:h-[26rem]">
+          <Obligations home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
+        </div>
+        <div className="lg:col-span-6 lg:h-[22rem]">
           <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
         </div>
-        <div className="lg:col-span-5 lg:h-[21rem]">
+        <div className="lg:col-span-6 lg:h-[22rem]">
           <ByClient home={h} options={o} where={where} loading={home.isPending} />
         </div>
       </div>
@@ -169,7 +180,7 @@ function Cell({
   info?: string;
   value: number;
   big?: boolean;
-  tone?: 'danger';
+  tone?: 'danger' | 'warning';
   href: string;
   aria: string;
   footer?: ReactNode;
@@ -192,7 +203,7 @@ function Cell({
             className={cn(
               'tabular mt-1 block leading-10 font-semibold tracking-tight',
               big ? 'text-[32px] lg:text-[28px] xl:text-[32px]' : 'text-kpi',
-              tone === 'danger' && value > 0 ? 'text-danger' : 'text-fg',
+              tone === 'danger' && value > 0 ? 'text-danger' : tone === 'warning' && value > 0 ? 'text-warning' : 'text-fg',
             )}
           >
             {value}
@@ -214,20 +225,13 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
   const { openTask } = useTaskSheetLinks();
   const base = home ? listBase(home) : {};
   const where = home?.view === 'department' && home.department ? ` no ${home.department.name}` : '';
-  // The oldest overdue task of the same view (the list sorts by due date).
-  const oldestQuery: TaskQuery = {
-    scope: home?.view === 'mine' ? 'mine' : 'all',
-    departmentId: home?.view === 'department' ? home.department?.id : undefined,
-    situation: 'overdue',
-    page: 1,
-    pageSize: 1,
-    occurrences: 'false',
-  };
-  const oldest = useTasks(oldestQuery, { enabled: Boolean(home && home.totals.overdue > 0) }).data?.items[0];
+  const oldest = home?.oldestOverdue ?? null;
   const t = home?.totals;
   const done = t ? t.doneOnTime + t.doneLate : 0;
   const month = monthName(home?.month ?? monthKey(today));
   const loading = !home;
+  const noRecurring = home ? home.obligations.total === 0 && t!.recurring === 0 : false;
+  const legalIn = t?.targetMissedNextLegalDate ? diffInDays(t.targetMissedNextLegalDate, today) : null;
 
   return (
     <section aria-label="Resumo do departamento" aria-busy={loading || undefined} className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -237,7 +241,7 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
           big
           tone="danger"
           label="Atrasadas"
-          info="Abertas depois do vencimento."
+          info="Abertas depois do prazo: o vencimento, nas avulsas, ou o prazo legal, nas recorrentes."
           value={t?.overdue ?? 0}
           loading={loading}
           href={tasksHref({ ...base, situation: 'overdue' })}
@@ -253,6 +257,7 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
                 >
                   {oldest.title}
                 </button>
+                {oldest.kind === 'recurring' && oldest.client ? ` · ${oldest.client.name}` : ''}
                 {oldest.assignee ? ` · com ${shortName(oldest.assignee.name)}` : ' · sem responsável'}
               </>
             ) : t && t.overdue === 0 ? (
@@ -262,16 +267,39 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
         />
         <Cell
           className="border-t md:border-t-0 md:border-l"
+          label="Fora da meta"
+          info="Recorrentes abertas depois da meta interna, ainda dentro do prazo legal."
+          value={t?.targetMissed ?? 0}
+          tone="warning"
+          loading={loading}
+          href={tasksHref({ ...base, kind: 'recurring' })}
+          aria={`Fora da meta${where}: ${t?.targetMissed ?? 0}. Ver na lista de tarefas.`}
+          footer={
+            t
+              ? noRecurring
+                ? `nenhuma recorrente${where}`
+                : t.targetMissed > 0
+                  ? legalIn !== null
+                    ? legalIn <= 0
+                      ? 'prazo legal hoje'
+                      : `prazo legal em até ${daysText(legalIn)}`
+                    : 'dentro do prazo legal'
+                  : 'nada fora da meta'
+              : null
+          }
+        />
+        <Cell
+          className="border-t border-l md:border-t-0"
           label="Vencem hoje"
-          info="Tarefas abertas com vencimento hoje."
+          info="Avulsas com vencimento hoje e recorrentes com meta hoje."
           value={t?.dueToday ?? 0}
           loading={loading}
           href={tasksHref({ ...base, dueDate: today as never })}
           aria={`Vencem hoje${where}: ${t?.dueToday ?? 0}. Ver na lista de tarefas.`}
-          footer={t ? (t.dueToday ? 'até o fim do dia' : 'nada para hoje') : null}
+          footer={t ? (t.appointmentsToday ? `${t.appointmentsToday} ${t.appointmentsToday === 1 ? 'compromisso' : 'compromissos'}` : t.dueToday ? 'até o fim do dia' : 'nada para hoje') : null}
         />
         <Cell
-          className="border-t border-l md:border-t-0"
+          className="border-t md:border-l-0 lg:border-t-0 lg:border-l"
           label="Próximos 7 dias"
           value={t?.dueNext7Days ?? 0}
           loading={loading}
@@ -280,27 +308,35 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
           footer={`até ${shortDate(addDays(today, 7), today)}`}
         />
         <Cell
-          className="border-t md:border-l-0 lg:border-t-0 lg:border-l"
+          className="border-t border-l lg:border-t-0"
           label="Em aberto"
           value={t?.open ?? 0}
           loading={loading}
           href={tasksHref({ ...base })}
           aria={`Em aberto${where}: ${t?.open ?? 0}. Ver na lista de tarefas.`}
-          footer={t ? `${t.byStatus.in_progress} em andamento` : null}
-        />
-        <Cell
-          className="border-t border-l lg:border-t-0"
-          label="Aguardando cliente"
-          value={t?.byStatus.waiting_client ?? 0}
-          loading={loading}
-          href={tasksHref({ ...base, situation: 'waiting' })}
-          aria={`Aguardando cliente${where}: ${t?.byStatus.waiting_client ?? 0}. Ver na lista de tarefas.`}
-          footer={t ? (t.byStatus.waiting_client ? 'à espera de retorno' : 'nada parado') : null}
+          footer={
+            t ? (
+              <>
+                {t.byStatus.in_progress} em andamento
+                {t.waitingClient > 0 ? (
+                  <>
+                    {' · '}
+                    <Link
+                      to={tasksHref({ ...base, situation: 'waiting' })}
+                      className="font-medium text-brand-text underline decoration-border-strong underline-offset-4 hover:decoration-current"
+                    >
+                      {t.waitingClient} aguardando cliente
+                    </Link>
+                  </>
+                ) : null}
+              </>
+            ) : null
+          }
         />
         <Cell
           className="col-span-2 border-t md:col-span-1 md:border-l lg:border-t-0"
           label={`Concluídas em ${month}`}
-          info="No prazo: concluídas até o vencimento (sem vencimento contam no prazo). Canceladas não entram."
+          info="No prazo: concluídas até o prazo legal (ou o vencimento, nas avulsas; sem vencimento contam no prazo). Canceladas não entram."
           value={done}
           loading={loading}
           href={tasksHref({ ...base, situation: 'done', month: (home?.month ?? '') as never })}
@@ -332,12 +368,34 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
 
 type MineTab = 'open' | 'today' | 'overdue';
 
+type MineItem = { key: string; task: Task; occurrence?: undefined; work: string } | { key: string; occurrence: RecurringOccurrence; task?: undefined; work: string };
+
+const BUCKET_ORDER = ['overdue', 'targetMissed', 'today', 'next7Days', 'later', 'noDueDate'] as const;
+
+/**
+ * "Minhas tarefas" (§6.4): your open tasks and your recurring tasks grouped by your clients, overdue
+ * first, then past the target, then by work date; no due date last. The tab narrows to today or overdue.
+ */
+export function mineItems(tasks: Task[], occurrences: RecurringOccurrence[], today: string, tab: MineTab): MineItem[] {
+  const items: (MineItem & { bucket: number })[] = [
+    ...tasks.map((t) => ({ key: t.id, task: t, work: t.occurrence?.targetDate ?? t.dueDate ?? '9999-12-31', bucket: BUCKET_ORDER.indexOf(taskBucket(t, today)) })),
+    ...occurrences
+      .filter((o) => o.pending > 0)
+      .map((o) => ({ key: `${o.recurringTaskId}:${o.periodKey}`, occurrence: o, work: o.targetDate, bucket: BUCKET_ORDER.indexOf(occurrenceBucket(o, today)) })),
+  ];
+  return items
+    .filter((i) => (tab === 'today' ? i.work === today && i.bucket === BUCKET_ORDER.indexOf('today') : tab === 'overdue' ? i.bucket === 0 : true))
+    .sort((a, b) => a.bucket - b.bucket || a.work.localeCompare(b.work))
+    .map(({ bucket: _b, ...rest }) => rest as MineItem);
+}
+
 function MyTasks({ home, loading, error, today, onRetry }: { home: TaskHomeResponse | undefined; loading: boolean; error: unknown; today: string; onRetry: () => void }) {
   const [tab, setTab] = useState<MineTab>('open');
   const { newTask } = useTaskSheetLinks();
   const mine = home?.mine;
-  const tasks = (mine?.tasks ?? []).filter((t) => (tab === 'today' ? t.dueDate === today : tab === 'overdue' ? t.overdue : true));
-  const total = tab === 'today' ? (mine?.dueToday ?? 0) : tab === 'overdue' ? (mine?.overdue ?? 0) : (mine?.open ?? 0);
+  const items = mineItems(mine?.tasks ?? [], mine?.occurrences ?? [], today, tab);
+  const total = Math.max(items.length, tab === 'today' ? (mine?.dueToday ?? 0) : tab === 'overdue' ? (mine?.overdue ?? 0) : (mine?.open ?? 0));
+  const hasOpen = Boolean(mine && (mine.open > 0 || mine.occurrences.some((o) => o.pending > 0)));
   // Nothing open: the ones concluded in the last 7 days, faded.
   const recent = useTasks(
     { scope: 'mine', situation: 'done', closedFrom: addDays(today, -7), page: 1, pageSize: 5, occurrences: 'false' },
@@ -373,7 +431,7 @@ function MyTasks({ home, loading, error, today, onRetry }: { home: TaskHomeRespo
         <ListSkeleton rowClassName="h-12" />
       ) : error && !home ? (
         <ErrorState error={error} onRetry={onRetry} className="p-4" />
-      ) : mine && mine.open === 0 ? (
+      ) : mine && !hasOpen ? (
         recent && recent.length ? (
           <div className="flex min-h-0 flex-1 flex-col">
             <p className="px-2 text-body-sm font-medium text-fg">Nada em aberto com você.</p>
@@ -398,20 +456,127 @@ function MyTasks({ home, loading, error, today, onRetry }: { home: TaskHomeRespo
             }
           />
         )
-      ) : tasks.length === 0 ? (
+      ) : items.length === 0 ? (
         <BodyEmpty title={tab === 'today' ? 'Nada vence hoje.' : 'Nada atrasado.'} />
       ) : (
         <FitList
-          items={tasks}
+          items={items}
           total={total}
-          getKey={(t) => t.id}
-          moreLabel={total - tasks.length === 1 ? 'tarefa' : 'tarefas'}
+          getKey={(i) => i.key}
+          moreLabel={total - items.length === 1 ? 'tarefa' : 'tarefas'}
           moreHref={tasksHref({ scope: 'mine', ...(tab === 'overdue' ? { situation: 'overdue' } : {}), ...(tab === 'today' ? { dueDate: today as never } : {}) })}
           contentKey={tab}
-          renderItem={(t) => <TaskRow task={t} today={today} density="compact" hideAssignee muted={t.status === 'done' || t.status === 'canceled'} />}
+          renderItem={(i) =>
+            i.task ? (
+              <TaskRow task={i.task} today={today} density="compact" hideAssignee muted={i.task.status === 'done' || i.task.status === 'canceled'} />
+            ) : (
+              <RecurringOccurrenceRow occurrence={i.occurrence!} today={today} density="compact" mine showDepartment={false} />
+            )
+          }
         />
       )}
     </WidgetCard>
+  );
+}
+
+/** "Obrigações de outubro" (§6.5): the recurring tasks of the department in the competence. */
+function Obligations({ home, loading, error, today, onRetry }: { home: TaskHomeResponse | undefined; loading: boolean; error: unknown; today: string; onRetry: () => void }) {
+  const { isAdmin } = usePermissions();
+  const ob = home?.obligations;
+  const competence = ob?.competence ?? home?.month ?? today.slice(0, 7);
+  const monthName = competenceName(competence).split(' ')[0]!;
+  const dept = home?.view === 'department' ? home.department : null;
+  const live = ob ? ob.total - ob.canceled : 0;
+  const auditHref = `/tarefas/auditoria?competencia=${competence}${dept ? `&departamento=${dept.id}` : ''}`;
+  const subtitle = ob && live > 0 ? (
+    <>
+      {ob.done} de {live} concluídas ({Math.round((ob.done / live) * 100)}%)
+      {ob.overdue ? <span className="text-danger"> · {ob.overdue} {ob.overdue === 1 ? 'atrasada' : 'atrasadas'}</span> : ' · nada atrasado'}
+      {ob.canceled ? ` · ${ob.canceled} ${ob.canceled === 1 ? 'cancelada' : 'canceladas'}` : ''}
+    </>
+  ) : null;
+  return (
+    <WidgetCard
+      title={`Obrigações de ${monthName}`}
+      subtitle={subtitle}
+      action={
+        <Button variant="ghost" size="sm" asChild>
+          <Link to={auditHref}>Abrir auditoria</Link>
+        </Button>
+      }
+    >
+      {loading ? (
+        <ListSkeleton rowClassName="h-[52px]" />
+      ) : error && !home ? (
+        <ErrorState error={error} onRetry={onRetry} className="p-4" />
+      ) : !ob || ob.items.length === 0 ? (
+        <EmptyState
+          compact
+          className="min-h-0 flex-1 overflow-hidden py-3"
+          icon={<Repeat />}
+          title={`Nenhuma tarefa recorrente ${dept ? `no ${dept.name}` : 'no escritório'}`}
+          description="As obrigações do departamento (DAS, DCTFWeb, folha) aparecem aqui com o progresso da competência."
+          action={
+            isAdmin ? (
+              <WriteGate scope="admin">
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/tarefas/recorrentes?recorrente=nova">Cadastrar tarefas recorrentes</Link>
+                </Button>
+              </WriteGate>
+            ) : undefined
+          }
+        />
+      ) : (
+        <FitList
+          items={ob.items}
+          getKey={(o) => `${o.recurringTaskId}:${o.periodKey}`}
+          moreLabel="obrigações"
+          moreHref={`/tarefas/auditoria?visao=tarefa&competencia=${competence}${dept ? `&departamento=${dept.id}` : ''}`}
+          renderItem={(o) => <ObligationProgressRow occurrence={o} today={today} showDepartment={home?.view === 'all'} />}
+        />
+      )}
+    </WidgetCard>
+  );
+}
+
+/** One obligation of the competence: name, deadline of the worst pending case, "18/23" and the bar. */
+function ObligationProgressRow({ occurrence: o, today, showDepartment }: { occurrence: RecurringOccurrence; today: string; showDepartment: boolean }) {
+  const { openOccurrence } = useOccurrenceSheetLinks();
+  const live = o.total - o.canceled;
+  const complete = o.pending === 0;
+  const dl = groupDeadlineInfo(o, today);
+  return (
+    <button
+      type="button"
+      onClick={() => openOccurrence(o, complete ? 'all' : 'pending')}
+      className="flex min-h-[52px] w-full items-center gap-3 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-surface-muted"
+      aria-label={`${o.name}: ${o.done} de ${live} concluídas. ${dl.text}.`}
+    >
+      {complete ? (
+        <span className="flex size-6 shrink-0 items-center justify-center text-success" aria-hidden>
+          <TaskStatusGlyph status="done" />
+        </span>
+      ) : null}
+      <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className={cn('truncate text-sm font-semibold', complete ? 'text-muted' : 'text-fg')}>{o.name}</span>
+          {o.period !== 'monthly' ? <Badge tone="neutral">{RECURRENCE_PERIOD_LABELS[o.period]}</Badge> : null}
+          {o.period === 'weekly' ? <span className="shrink-0 text-xs text-muted">{periodLabel(o, today)}</span> : null}
+        </span>
+        <span className={cn('block truncate text-xs', complete ? 'text-muted' : DUE_TONE_CLASS[dl.tone])}>
+          {showDepartment && o.department ? <span className="text-muted">{o.department.name} · </span> : null}
+          {dl.text}
+        </span>
+      </span>
+      <span className="flex w-24 shrink-0 flex-col items-end gap-1 sm:w-28">
+        <span className="tabular text-[13px] font-medium text-fg">
+          {o.done}/{live}
+        </span>
+        <span className="block h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
+          <span className="block h-full rounded-full bg-data" style={{ width: `${(o.done / Math.max(1, live)) * 100}%` }} />
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -531,6 +696,7 @@ function SetupChecklist({ options, storeKey }: { options: TaskOptionsResponse; s
     }
   }, [storeKey]);
   const activeClients = options.clients.filter((c) => c.status === 'active');
+  const recurring = useRecurringTasks({ status: 'active' }, { enabled: !hidden });
   const steps = [
     { label: 'Departamentos', done: options.departments.length > 0, href: '/tarefas/cadastros?aba=departamentos' },
     { label: 'Equipe nos departamentos', done: options.members.length > 0 && options.members.every((m) => m.department), href: '/tarefas/cadastros?aba=equipe' },
@@ -541,9 +707,10 @@ function SetupChecklist({ options, storeKey }: { options: TaskOptionsResponse; s
         activeClients.every((c) => options.departments.every((d) => options.clientResponsibles.some((r) => r.clientId === c.id && r.departmentId === d.id))),
       href: '/tarefas/clientes?sem-responsavel=1',
     },
+    { label: 'Tarefas recorrentes', done: (recurring.data?.summary.active ?? 0) > 0, href: '/tarefas/recorrentes' },
   ];
   const doneCount = steps.filter((s) => s.done).length;
-  if (hidden || doneCount === steps.length) return null;
+  if (hidden || doneCount === steps.length || !recurring.data) return null;
   return (
     <Card className="p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -568,7 +735,7 @@ function SetupChecklist({ options, storeKey }: { options: TaskOptionsResponse; s
           Ocultar
         </Button>
       </div>
-      <ul className="mt-3 grid gap-2 md:grid-cols-3">
+      <ul className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         {steps.map((s) => (
           <li key={s.label}>
             <Link to={s.href} className="flex items-center gap-2.5 rounded-md px-2 py-2 text-body-sm transition-colors hover:bg-surface-muted">

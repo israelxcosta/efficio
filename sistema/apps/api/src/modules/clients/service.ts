@@ -8,8 +8,10 @@ import {
   feePeriodIndexAt,
   formatDateBR,
   onlyDigits,
+  TASK_TIME_ZONE,
   TAX_REGIMES,
   type Client,
+  type ClientDocument,
   type ClientFee,
   type ClientFeesResponse,
   type ClientListResponse,
@@ -17,18 +19,28 @@ import {
   type clientInactivationSchema,
   type clientInputSchema,
   type clientQuerySchema,
+  type ClientUnionRef,
   type TaxRegime,
 } from '@effinance/shared';
 import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
 import { clientFees, contacts, recurrences, tasks, transactions, type ClientFeeRow, type ContactRow } from '../../db/schema';
-import { today } from '../../lib/clock';
+import { today, todayIn } from '../../lib/clock';
 import { getCipher } from '../../lib/crypto/keyring';
 import type { FieldCipher } from '../../lib/crypto/field-cipher';
 import { ConflictError, NotFoundError, ValidationError } from '../../lib/errors';
 import { countAll, inChunks, likePattern } from '../../lib/sql';
 import { getClientOrThrow } from '../common/ownership';
 import { CONTACT_ALL_ENCRYPTED_FIELDS, CONTACT_ENCRYPTED_FIELDS, documentIndex } from '../contacts/service';
+import {
+  credentialFlags,
+  fiscalColumns,
+  loadClientUnions,
+  loadDocuments,
+  replaceDocuments,
+  SYSTEM_ACTOR,
+  type Actor,
+} from './fiscal';
 
 type ClientInput = z.output<typeof clientInputSchema>;
 type ClientQuery = z.output<typeof clientQuerySchema>;
@@ -49,9 +61,12 @@ export interface ClientView {
 /** Inside the service (writes, then re-read): the route decides what leaves (`withoutFees`). */
 const FULL_VIEW: ClientView = { fees: true };
 
-/** A client as seen by a member without access to the finances: no fees, fee due day or notes. */
+/**
+ * A client as seen by a member without access to the finances: no fees, fee due day, notes or the
+ * responsible's CPF (personal data shown only in the finance area, spec §13.8.1).
+ */
 export function withoutFees(client: Client): Client {
-  return { ...client, currentFee: null, latestFee: null, feeDueDay: null, notes: null };
+  return { ...client, currentFee: null, latestFee: null, feeDueDay: null, notes: null, responsibleDocument: null };
 }
 
 /** Due day of a client saved before migration 0010 set one (the column is filled for them). */
@@ -95,7 +110,9 @@ async function toClient(
   feeRows: ClientFeeRow[],
   transactionCount: number,
   view: ClientView,
+  extra: { documents: ClientDocument[]; unions: ClientUnionRef[] } = { documents: [], unions: [] },
 ): Promise<Client> {
+  // The accesses are never decrypted here (only their presence leaves): see fiscal.ts.
   const plain = await cipher.decryptFields(TABLE, row, CONTACT_ALL_ENCRYPTED_FIELDS);
   const contractStart = plain.contractStartDate!;
   const fees = view.fees ? feeRows.map((f) => toFee(f, contractStart)) : [];
@@ -132,6 +149,13 @@ async function toClient(
     currentFee: current,
     latestFee: latest,
     transactionCount,
+    stateRegistration: plain.stateRegistration,
+    stateRegistrationExempt: plain.stateRegistrationExempt,
+    municipalRegistration: plain.municipalRegistration,
+    responsibleDocument: view.fees ? await cipher.decrypt(TABLE, 'responsibleDocument', row.responsibleDocument) : null,
+    credentials: credentialFlags(row),
+    documents: extra.documents,
+    unions: extra.unions,
     createdAt: plain.createdAt.toISOString(),
   };
   return view.fees ? client : withoutFees(client);
@@ -155,6 +179,11 @@ async function hydrate(db: DbExecutor, workspaceId: string, rows: ContactRow[], 
       .groupBy(transactions.contactId),
   ]);
   const cipher = await getCipher(workspaceId);
+  const day = todayIn(TASK_TIME_ZONE);
+  const [documents, unionRefs] = await Promise.all([
+    loadDocuments(db, cipher, workspaceId, ids, day),
+    loadClientUnions(db, workspaceId, ids, day),
+  ]);
   return Promise.all(
     rows.map((row) =>
       toClient(
@@ -163,6 +192,7 @@ async function hydrate(db: DbExecutor, workspaceId: string, rows: ContactRow[], 
         fees.filter((f) => f.clientId === row.id),
         counts.find((c) => c.contactId === row.id)?.total ?? 0,
         view,
+        { documents: documents.get(row.id) ?? [], unions: unionRefs.get(row.id) ?? [] },
       ),
     ),
   );
@@ -208,8 +238,27 @@ export async function getClientContacts(db: DbExecutor, workspaceId: string, ids
 }
 
 async function encryptClientInput(cipher: FieldCipher, input: ClientInput) {
-  const encrypted = await cipher.encryptFields(TABLE, input, CLIENT_INPUT_ENCRYPTED_FIELDS);
-  return { ...encrypted, documentHash: await documentIndex(cipher, input.document) };
+  // Phase 3 fields have their own rules (absent = keep; accesses in three states; documents in a table).
+  const {
+    stateRegistration,
+    stateRegistrationExempt,
+    municipalRegistration,
+    responsibleDocument,
+    simplesAccessCode,
+    accountantPassword,
+    documents: _documents,
+    ...base
+  } = input;
+  const encrypted = await cipher.encryptFields(TABLE, base, CLIENT_INPUT_ENCRYPTED_FIELDS);
+  const fiscal = await fiscalColumns(cipher, {
+    stateRegistration,
+    stateRegistrationExempt,
+    municipalRegistration,
+    responsibleDocument,
+    simplesAccessCode,
+    accountantPassword,
+  });
+  return { ...encrypted, ...fiscal, documentHash: await documentIndex(cipher, input.document) };
 }
 
 async function assertUniqueDocument(db: DbExecutor, workspaceId: string, documentHash: string, exceptId?: string) {
@@ -314,7 +363,12 @@ export async function getClient(db: DbExecutor, workspaceId: string, id: string,
   return client!;
 }
 
-export async function createClient(db: DbExecutor, workspaceId: string, input: ClientInput): Promise<Client> {
+export async function createClient(
+  db: DbExecutor,
+  workspaceId: string,
+  input: ClientInput,
+  actor: Actor = SYSTEM_ACTOR,
+): Promise<Client> {
   const cipher = await getCipher(workspaceId);
   const values = await encryptClientInput(cipher, input);
   await assertUniqueDocument(db, workspaceId, values.documentHash);
@@ -322,10 +376,20 @@ export async function createClient(db: DbExecutor, workspaceId: string, input: C
     .insert(contacts)
     .values({ workspaceId, kind: 'client', status: 'active', ...values })
     .returning();
+  if (input.documents?.length) {
+    await replaceDocuments(db, cipher, workspaceId, row!.id, input.documents, actor);
+    return getClient(db, workspaceId, row!.id, FULL_VIEW);
+  }
   return toClient(cipher, row!, [], 0, FULL_VIEW);
 }
 
-export async function updateClient(db: DbExecutor, workspaceId: string, id: string, input: ClientInput): Promise<Client> {
+export async function updateClient(
+  db: DbExecutor,
+  workspaceId: string,
+  id: string,
+  input: ClientInput,
+  actor: Actor = SYSTEM_ACTOR,
+): Promise<Client> {
   const current = await getClientOrThrow(db, workspaceId, id);
   if (current.status === 'inactive' && current.inactivatedAt && input.contractStartDate > current.inactivatedAt) {
     throw new ValidationError(
@@ -335,7 +399,9 @@ export async function updateClient(db: DbExecutor, workspaceId: string, id: stri
   const cipher = await getCipher(workspaceId);
   const values = await encryptClientInput(cipher, input);
   await assertUniqueDocument(db, workspaceId, values.documentHash, id);
-  await db.update(contacts).set(values).where(eq(contacts.id, id));
+  await db.update(contacts).set(values).where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.id, id)));
+  // Documents: the list replaces the stored one; absent keeps it (forms of earlier versions).
+  if (input.documents) await replaceDocuments(db, cipher, workspaceId, id, input.documents, actor);
   return getClient(db, workspaceId, id, FULL_VIEW);
 }
 

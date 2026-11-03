@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { BriefcaseBusiness, ChevronDown, LogOut, Moon, Settings, Sun, UserRound, Wallet } from 'lucide-react';
+import { BriefcaseBusiness, ChevronDown, LogOut, Moon, NotebookPen, Settings, Sun, UserRound, Wallet } from 'lucide-react';
 import { WORKSPACE_KIND_LABELS } from '@effinance/shared';
 import { cn, initials } from '@/lib/utils';
 import { useTheme } from '@/lib/theme';
@@ -18,6 +18,7 @@ import {
 import { WorkspaceMenuItems, WorkspaceSheet } from '@/features/workspaces/workspace-switcher';
 import { WORKSPACE_KIND_ICONS } from '@/features/workspaces/kind-icon';
 import { usePermissions } from '@/features/auth/permissions';
+import { useTaskActions } from '@/features/tasks/task-actions';
 import { lastPathOf, type AreaMemory } from './area-memory';
 import { AREA_HOME, AREA_SHORT_LABELS, isActivePath, navItemsFor, SETTINGS_ITEM, splitRail, type Area, type NavItem } from './nav';
 
@@ -39,6 +40,7 @@ export function Sidebar({ area, memory }: SidebarProps) {
   const { visible, hidden } = splitRail(navItemsFor(area), rail.height);
   // Only members with both areas see the area label and the switch button.
   const { canAccessFinance } = usePermissions();
+  const { openNotes } = useTaskActions();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col items-center border-r border-border bg-bg-subtle py-5 lg:flex print:hidden">
@@ -100,6 +102,9 @@ export function Sidebar({ area, memory }: SidebarProps) {
             <DropdownMenuSeparator />
             <DropdownMenuItem icon={<UserRound />} onSelect={() => navigate('/configuracoes')}>
               Perfil
+            </DropdownMenuItem>
+            <DropdownMenuItem icon={<NotebookPen />} onSelect={openNotes}>
+              Minhas anotações
             </DropdownMenuItem>
             <DropdownMenuItem icon={resolved === 'dark' ? <Sun /> : <Moon />} onSelect={toggle}>
               {resolved === 'dark' ? 'Tema claro' : 'Tema escuro'}

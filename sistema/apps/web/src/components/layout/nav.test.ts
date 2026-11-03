@@ -55,8 +55,21 @@ describe('areas', () => {
     expect(areaOf('/tarefasx')).toBe('common');
   });
 
-  it('has the phase 1 rail of the Gestão only (no audit, recurring, processes or reports yet)', () => {
-    expect(GESTAO_NAV_ITEMS.map((i) => i.to)).toEqual(['/', '/tarefas', '/tarefas/clientes', '/tarefas/cadastros']);
+  it('has the final rail of the Gestão, in order of use (spec §2.2)', () => {
+    expect(GESTAO_NAV_ITEMS.map((i) => i.to)).toEqual([
+      '/',
+      '/tarefas',
+      '/tarefas/auditoria',
+      '/tarefas/recorrentes',
+      '/tarefas/processos',
+      '/tarefas/clientes',
+      '/tarefas/relatorios',
+      '/tarefas/cadastros',
+    ]);
+    expect(GESTAO_NAV_ITEMS.map((i) => i.short ?? i.label)).toEqual(['Início', 'Tarefas', 'Auditoria', 'Recorrentes', 'Processos', 'Clientes', 'Relatórios', 'Cadastros']);
+    // Tarefas is active only on its own path: the other pages live under /tarefas/.
+    expect(isActivePath('/tarefas/auditoria', GESTAO_NAV_ITEMS[1]!)).toBe(false);
+    expect(isActivePath('/tarefas/auditoria', GESTAO_NAV_ITEMS[2]!)).toBe(true);
     expect(GESTAO_NAV_ITEMS.filter((i) => i.mobile).map((i) => i.label)).toEqual(['Início', 'Tarefas', 'Clientes']);
     expect(navItemsFor('gestao')).toBe(GESTAO_NAV_ITEMS);
   });
@@ -73,7 +86,7 @@ describe('isActivePath', () => {
     const tarefas = GESTAO_NAV_ITEMS[1]!;
     expect(isActivePath('/tarefas', tarefas)).toBe(true);
     expect(isActivePath('/tarefas/clientes', tarefas)).toBe(false);
-    expect(isActivePath('/tarefas/clientes', GESTAO_NAV_ITEMS[2]!)).toBe(true);
+    expect(isActivePath('/tarefas/clientes', GESTAO_NAV_ITEMS.find((i) => i.to === '/tarefas/clientes')!)).toBe(true);
   });
 
   it('marks the start page only on /', () => {

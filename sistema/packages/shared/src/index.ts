@@ -12,3 +12,8 @@ export * from './integrations';
 export * from './utils/late-fees';
 export * from './utils/delinquency';
 export * from './utils/tasks';
+export * from './permissions';
+export * from './utils/deadlines';
+export * from './utils/contract';
+export * from './contract-template';
+export * from './contract-watermark';

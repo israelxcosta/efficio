@@ -23,6 +23,7 @@ import {
   createWorkspace,
   deleteWorkspaceRow,
   getUserRow,
+  photoUpdatedAtOf,
   toMeUser,
 } from '../workspaces/service';
 import { revokeUserSessions } from './sessions';
@@ -96,7 +97,7 @@ export async function checkPassword(db: DbExecutor, input: LoginInput): Promise<
 
 export async function updateProfile(db: DbExecutor, userId: string, input: UpdateProfileInput): Promise<MeUser> {
   const [row] = await db.update(users).set({ name: input.name }).where(eq(users.id, userId)).returning();
-  return toMeUser(row ?? (await getUserRow(db, userId)));
+  return toMeUser(row ?? (await getUserRow(db, userId)), await photoUpdatedAtOf(db, userId));
 }
 
 /** Changes the password and signs out every other session. */

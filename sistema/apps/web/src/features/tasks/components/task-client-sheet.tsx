@@ -11,7 +11,8 @@ import { SkeletonRows } from '@/components/ui/skeleton';
 import { ClientProfile } from '@/features/clients/client-profile';
 import { copyText } from '@/lib/clipboard';
 import { pluralize } from '@/lib/utils';
-import { useTasks } from '../api';
+import { useTaskAudit, useTasks } from '../api';
+import { competenceName } from '../occurrence';
 import { tasksHref } from '../url-state';
 import { ClientResponsibleCell, responsibleOf } from './client-responsible';
 import { TaskRow } from './task-row';
@@ -68,6 +69,10 @@ export function TaskClientSheet({ client: c, loading, notFound, error, onClose, 
     { enabled: Boolean(c) },
   );
   const summary = tasks.data?.summary;
+  // "Obrigações de outubro: 7 de 9 concluídas · mês concluído em 28/10" (the audit row of the client).
+  const competence = (options?.today ?? new Date().toISOString().slice(0, 10)).slice(0, 7);
+  const audit = useTaskAudit({ competence }, { enabled: Boolean(c) });
+  const auditRow = c ? audit.data?.clients.find((r) => r.id === c.id) : undefined;
   const departments = grid?.departments ?? [];
 
   const description = c
@@ -175,7 +180,7 @@ export function TaskClientSheet({ client: c, loading, notFound, error, onClose, 
                 ))}
               </ul>
             )}
-            <p className="text-caption text-subtle">Quem cuida deste cliente em cada departamento: a sugestão de responsável ao criar uma tarefa para ele.</p>
+            <p className="text-caption text-subtle">Quem cuida deste cliente em cada departamento: a sugestão de responsável ao criar uma tarefa para ele e quem recebe as tarefas recorrentes dele. Sem responsável, vale o responsável padrão de cada recorrente.</p>
           </section>
 
           <section className="flex flex-col gap-2" aria-labelledby="client-tasks">
@@ -209,6 +214,17 @@ export function TaskClientSheet({ client: c, loading, notFound, error, onClose, 
             ) : (
               <p className="text-body-sm text-subtle">Nenhuma tarefa em aberto.</p>
             )}
+            {auditRow ? (
+              <p className="flex flex-wrap items-center gap-x-2 text-body-sm text-muted">
+                <span>
+                  Obrigações de {competenceName(competence).split(' ')[0]}: {auditRow.done} de {auditRow.total - auditRow.canceled} concluídas
+                  {auditRow.monthConcludedAt ? ` · mês concluído em ${formatDateBR(auditRow.monthConcludedAt.slice(0, 10)).slice(0, 5)}` : ''}
+                </span>
+                <Link to={`/tarefas/auditoria?competencia=${competence}&busca=${encodeURIComponent(c!.tradeName || c!.name)}`} className="text-caption font-medium text-brand-text hover:underline">
+                  Ver na auditoria
+                </Link>
+              </p>
+            ) : null}
           </section>
 
           <section className="flex flex-col gap-3" aria-label="Dados cadastrais">

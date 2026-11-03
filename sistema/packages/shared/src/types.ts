@@ -5,7 +5,12 @@ import type {
   BankCode,
   CardBrand,
   CategoryType,
+  ClientCredentialField,
+  ClientDocumentKind,
   ClientStatus,
+  DeadlineBucket,
+  PixKeyType,
+  UnionSituation,
   ContactKind,
   DelinquencyRisk,
   FeeEntryKind,
@@ -36,7 +41,9 @@ import type {
   TransferKind,
 } from './constants';
 import type { TransactionOrigin } from './integrations';
+import type { PermissionMap, PermissionOverrides } from './permissions';
 import type { MemberRole } from './saas';
+import type { ContractBlock } from './utils/contract';
 import type { ISODate, MonthKey } from './utils/dates';
 import type { FeePeriod } from './utils/fees';
 
@@ -265,6 +272,82 @@ export interface Client {
   latestFee: ClientFee | null;
   /** Transactions (lançamentos) linked to the client. While > 0 the client cannot be deleted. */
   transactionCount: number;
+  // Phase 3 (spec §13.8): fiscal data, accesses, documents and unions.
+  /** Inscrição estadual (null when exempt or not informed). */
+  stateRegistration: string | null;
+  /** "Isenta de inscrição estadual". */
+  stateRegistrationExempt: boolean;
+  /** Inscrição municipal. */
+  municipalRegistration: string | null;
+  /** CPF of the responsible person (digits). `null` for members without access to the finances. */
+  responsibleDocument: string | null;
+  /** Whether each encrypted access is stored: the values never leave the server here (reveal one by one). */
+  credentials: ClientCredentialFlags;
+  /** Documents with expiry date (every member reads them), most urgent first. */
+  documents: ClientDocument[];
+  /** Unions linked to the client, with the agreement being tracked. */
+  unions: ClientUnionRef[];
+  createdAt: string;
+}
+
+export type ClientCredentialFlags = Record<ClientCredentialField, boolean>;
+
+/** Expiry of a document or agreement, computed by the API in the office time zone. */
+export interface DeadlineInfo {
+  bucket: DeadlineBucket;
+  /** Days from today (negative = overdue, 0 = today); null without date. */
+  days: number | null;
+}
+
+/** A document of a client (certificate, certificate of debt, license, report). */
+export interface ClientDocument {
+  id: string;
+  kind: ClientDocumentKind;
+  /** The catalog label, or the name typed for "Outro…". */
+  name: string;
+  /** Only for `other`. */
+  customName: string | null;
+  expiresAt: ISODate | null;
+  /** Up to 200 characters ("A1, emitido pela Certisign"). */
+  note: string | null;
+  deadline: DeadlineInfo;
+  /** Who changed it last (the name recorded at the time). */
+  updatedBy: TaskPersonRef | null;
+  updatedAt: string;
+}
+
+/** The collective agreement cycle a union is tracked by (null without base month). */
+export interface UnionTrackedCycle {
+  /** 2026 = "Convenção Coletiva 2026/2027". */
+  year: number;
+  /** "2026/2027". */
+  label: string;
+  /** Day 1 of the base month in the tracked year. */
+  dueDate: ISODate;
+  bucket: Exclude<DeadlineBucket, 'noDate'>;
+  days: number;
+}
+
+/** A union linked to a client (the client's sheet). */
+export interface ClientUnionRef {
+  id: string;
+  /** Acronym, else the legal name. */
+  name: string;
+  category: string | null;
+  active: boolean;
+  tracked: UnionTrackedCycle | null;
+}
+
+/** POST /clients/:id/credentials/reveal (never cached; the reveal is audited without the value). */
+export interface ClientCredentialReveal {
+  field: ClientCredentialField;
+  value: string;
+}
+
+/** GET /clients/:id/credentials/views: who saw which access and when (never the value). */
+export interface ClientCredentialView {
+  field: ClientCredentialField;
+  userName: string | null;
   createdAt: string;
 }
 
@@ -789,6 +872,8 @@ export interface SearchResponse {
   tasks: SearchTaskHit[];
   /** Recurring tasks by name. */
   recurringTasks: { id: string; name: string; period: RecurrencePeriod }[];
+  /** Unions by name, acronym or category (every member; phase 3). */
+  unions: { id: string; name: string; acronym: string | null; category: string | null; active: boolean }[];
 }
 
 export interface SearchTaskHit {
@@ -848,6 +933,10 @@ export interface TaskMember {
   isAdmin: boolean;
   department: TaskRef | null;
   isYou: boolean;
+  /** Adjustments of the person over the role's defaults (phase 3; `{}` without adjustments). */
+  permissionOverrides: PermissionOverrides;
+  /** When the profile photo was last changed (null without photo): `GET /profile/photos/:userId?v=`. */
+  photoUpdatedAt: string | null;
 }
 
 export interface TaskDepartment {
@@ -912,6 +1001,8 @@ export interface TaskOptionsResponse {
     isAdmin: boolean;
     /** The subscription allows writing (any member writes tasks; 402 otherwise). */
     canWrite: boolean;
+    /** Effective permissions (phase 3, spec §13.10): role defaults plus the person's adjustments. */
+    permissions: PermissionMap;
   };
   members: TaskMember[];
   departments: TaskRef[];
@@ -1626,4 +1717,245 @@ export interface ClientResponsibleChangeResponse {
   items: ClientResponsible[];
   removed: number;
   reassigned: number;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: unions (sindicatos), deadlines, office and the client's contract
+// ---------------------------------------------------------------------------
+
+/** A collective agreement cycle as stored ("Convenção Coletiva 2026/2027"). */
+export interface UnionConvention {
+  year: number;
+  label: string;
+  published: boolean;
+  /** When it was marked as published (set by the server). */
+  publishedAt: string | null;
+  publishedBy: TaskPersonRef | null;
+  note: string | null;
+}
+
+/** A union as listed (urgency first): the registry, the tracked cycle and the linked clients count. */
+export interface UnionListItem {
+  id: string;
+  /** Razão social. */
+  name: string;
+  document: string;
+  acronym: string | null;
+  category: string | null;
+  territory: string | null;
+  /** 1–12; null = no base month (out of the alerts). */
+  baseMonth: number | null;
+  active: boolean;
+  tracked: UnionTrackedCycle | null;
+  situation: UnionSituation;
+  /** Linked clients (all) and the active ones (the "afeta N clientes" counts these). */
+  clientCount: number;
+  activeClientCount: number;
+}
+
+/** GET /unions/:id (and the result of every write). */
+export interface UnionDetail extends UnionListItem {
+  zipCode: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  district: string | null;
+  city: string | null;
+  state: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  responsibleName: string | null;
+  responsibleRole: string | null;
+  responsibleEmail: string | null;
+  responsiblePhone: string | null;
+  notes: string | null;
+  /** Stored cycles, oldest first (the tracked one may not be stored yet). */
+  conventions: UnionConvention[];
+  /** Linked clients, by display name. */
+  clients: (TaskClientRef & { legalName: string; taxRegime: TaxRegime; status: ClientStatus })[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UnionListSummary {
+  active: number;
+  inactive: number;
+  /** Active unions per situation of the tracked agreement. */
+  overdue: number;
+  within30: number;
+  within60: number;
+  ok: number;
+  noBaseMonth: number;
+  /** Active clients linked to an active union whose agreement is overdue ("afeta 9 clientes"). */
+  overdueClients: number;
+}
+
+/** GET /unions: page of the urgency order (filters applied) + summary of the whole workspace. */
+export interface UnionListResponse extends Paginated<UnionListItem> {
+  today: ISODate;
+  summary: UnionListSummary;
+}
+
+export interface DeadlineCounts {
+  overdue: number;
+  within30: number;
+  within60: number;
+}
+
+/** A document in the deadlines sheet (active clients only). */
+export interface DocumentDeadline {
+  id: string;
+  client: TaskClientRef;
+  kind: ClientDocumentKind;
+  name: string;
+  note: string | null;
+  expiresAt: ISODate | null;
+  deadline: DeadlineInfo;
+}
+
+/** A collective agreement in the alerts (active unions with active linked clients). */
+export interface ConventionDeadline {
+  unionId: string;
+  /** Acronym, else the legal name. */
+  name: string;
+  legalName: string;
+  category: string | null;
+  cycle: UnionTrackedCycle;
+  /** Active linked clients. */
+  clientCount: number;
+}
+
+/** GET /deadlines (spec §6.10): what expired or expires in up to 60 days, for every member. */
+export interface DeadlinesResponse {
+  today: ISODate;
+  documents: {
+    counts: DeadlineCounts & { noDate: number };
+    /** Overdue (oldest first), then up to 60 days, then without date; capped (`truncated`). */
+    items: DocumentDeadline[];
+    truncated: boolean;
+    /** Whether the office has any document registered ("Nenhum documento cadastrado"). */
+    hasAny: boolean;
+  };
+  conventions: {
+    counts: DeadlineCounts;
+    /** Overdue, then up to 60 days. */
+    items: ConventionDeadline[];
+    /** Whether the office has any union registered ("Nenhum sindicato cadastrado"). */
+    hasUnions: boolean;
+  };
+}
+
+/**
+ * GET /deadlines/summary: the counts of the strip of the home page and of the bell. The bell adds
+ * `overdueTotal` (documents + agreements already overdue) to what it already shows.
+ */
+export interface DeadlinesSummary {
+  today: ISODate;
+  documents: DeadlineCounts;
+  conventions: DeadlineCounts;
+  overdueTotal: number;
+  /** The single overdue agreement by name ("convenção do SINDCOM vencida há 12 dias"); null otherwise. */
+  overdueConvention: { unionId: string; name: string; days: number } | null;
+}
+
+/** Documents of one client in the Gestão client list (filter and the most urgent in the subtitle). */
+export interface ClientDocumentAlert {
+  clientId: string;
+  overdue: number;
+  within30: number;
+  within60: number;
+  total: number;
+  /** The most urgent dated document. */
+  mostUrgent: { documentId: string; kind: ClientDocumentKind; name: string; expiresAt: ISODate; deadline: DeadlineInfo } | null;
+}
+
+/** GET /deadlines/clients: per active client with documents, and the "Documentos" cell of the summary. */
+export interface ClientDocumentAlertsResponse {
+  today: ISODate;
+  items: ClientDocumentAlert[];
+  totals: DeadlineCounts & { clientsOverdue: number; clientsWithin30: number };
+}
+
+/** Name and logo of the office: every member reads them (header of the PDFs). */
+export interface OfficeBranding {
+  /** Trade name, else the legal name; null before the office is registered. */
+  name: string | null;
+  legalName: string | null;
+  /** `data:image/...;base64,…` or null. */
+  logo: string | null;
+}
+
+export interface OfficeContractSummary {
+  source: 'factory' | 'custom';
+  /** Version of the factory template the API ships. */
+  factoryVersion: string;
+  updatedAt: string | null;
+  updatedBy: TaskPersonRef | null;
+  watermark: { enabled: boolean; source: 'factory' | 'custom' };
+}
+
+/** GET /office (permission `office`): the whole registry, decrypted. */
+export interface Office {
+  /** False before the first save (every field null). */
+  registered: boolean;
+  document: string | null;
+  legalName: string | null;
+  tradeName: string | null;
+  stateRegistration: string | null;
+  municipalRegistration: string | null;
+  zipCode: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  district: string | null;
+  city: string | null;
+  state: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  responsibleName: string | null;
+  responsibleDocument: string | null;
+  responsibleEmail: string | null;
+  responsiblePhone: string | null;
+  pixKeyType: PixKeyType | null;
+  pixKey: string | null;
+  logo: string | null;
+  /** Office fields the contract needs and are blank ("CPF do responsável", "CEP"…). */
+  missingForContract: string[];
+  contract: OfficeContractSummary;
+  updatedAt: string | null;
+  updatedBy: TaskPersonRef | null;
+}
+
+/** GET /office/contract-template (permission `office`): the template in use for the editor. */
+export interface ContractTemplateResponse extends OfficeContractSummary {
+  /** The stored template, or the factory one when `source = 'factory'`. */
+  blocks: ContractBlock[];
+  /** Image in use (`data:` URI): the custom one or the factory one. */
+  watermarkImage: string;
+}
+
+/** What is missing to generate the contract of a client, by origin (spec §13.9). */
+export interface ContractRequirements {
+  client: string[];
+  fee: string[];
+  office: string[];
+}
+
+/** GET /clients/:id/contract (permission `finance`): everything to print the contract of a client. */
+export interface ClientContractResponse {
+  /** True when nothing is missing. */
+  ready: boolean;
+  missing: ContractRequirements;
+  client: TaskClientRef & { legalName: string };
+  /** The fee period in force today (null when none covers today). */
+  fee: { amount: number; employeeFee: number; dueDay: number; discountBps: number; startDate: ISODate; endDate: ISODate } | null;
+  template: { source: 'factory' | 'custom'; factoryVersion: string; updatedAt: string | null };
+  /** Blocks already filled (the discount clause only with discount). */
+  blocks: ContractBlock[];
+  /** Value of each field (empty when missing). */
+  values: Record<string, string>;
+  watermark: { enabled: boolean; image: string | null };
+  office: OfficeBranding;
 }

@@ -8,13 +8,19 @@ import {
   clientQuerySchema,
   cnpjParamsSchema,
   idSchema,
+  TASK_TIME_ZONE,
   type Client,
 } from '@effinance/shared';
+import { todayIn } from '../../lib/clock';
+import { getCipher } from '../../lib/crypto/keyring';
+import { requireAnyPermission } from '../../lib/permissions';
+import { clientContract } from '../office/service';
 import { AppError, NotFoundError } from '../../lib/errors';
 import { canAccessFinance, financeOnly } from '../../lib/finance-access';
 import { rateLimited } from '../../lib/platform';
 import { tenantGuards } from '../../lib/tenant-scope';
 import { idParams } from '../common/params';
+import type { Actor } from './fiscal';
 import { CnpjProviderError } from './providers/types';
 import {
   addFee,
@@ -37,6 +43,7 @@ const feeParams = z.object({ id: idSchema, feeId: idSchema });
 /** Fee periods and fee totals are financial: only members with access to the finances see them. */
 const viewOf = (req: FastifyRequest): ClientView => ({ fees: canAccessFinance(req.access) });
 const present = (req: FastifyRequest, client: Client): Client => (viewOf(req).fees ? client : withoutFees(client));
+const actorOf = (req: FastifyRequest): Actor => ({ userId: req.userId, name: req.access.userName });
 
 /**
  * Fee periods (honorários) of a client: financial, reads included. The guard covers every route of
@@ -73,11 +80,11 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/:id', { schema: { params: idParams } }, async (req) => getClient(req.db, req.workspaceId, req.params.id, viewOf(req)));
 
   app.post('/', { schema: { body: clientInputSchema } }, async (req, reply) =>
-    reply.code(201).send(present(req, await createClient(req.db, req.workspaceId, req.body))),
+    reply.code(201).send(present(req, await createClient(req.db, req.workspaceId, req.body, actorOf(req)))),
   );
 
   app.put('/:id', { schema: { params: idParams, body: clientInputSchema } }, async (req) =>
-    present(req, await updateClient(req.db, req.workspaceId, req.params.id, req.body)),
+    present(req, await updateClient(req.db, req.workspaceId, req.params.id, req.body, actorOf(req))),
   );
 
   app.delete('/:id', { schema: { params: idParams } }, async (req, reply) => {
@@ -95,14 +102,34 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
 
   // Fee periods (honorários): financial, reads included (child plugin: same prefix and boundary).
   await app.register(clientFeeRoutes);
+  // The contract of a client (spec §13.9): financial too (it carries the fee).
+  await app.register(clientContractRoutes);
 };
 
 /**
- * Company data from the Receita Federal by CNPJ (client form). Outside the tenant transaction: the
- * registry call never holds a database connection, and nothing is stored.
+ * Data to print the service contract of a client and what is missing (permission `finance`, reads
+ * included; the office's own permission is not needed to generate it).
+ */
+const clientContractRoutes: FastifyPluginAsyncZod = async (app) => {
+  financeOnly(app);
+
+  app.get('/:id/contract', { schema: { params: idParams } }, async (req) =>
+    clientContract(
+      { db: req.db, workspaceId: req.workspaceId, cipher: await getCipher(req.workspaceId), today: todayIn(TASK_TIME_ZONE) },
+      req.params.id,
+    ),
+  );
+};
+
+/**
+ * Company data from the Receita Federal by CNPJ (client, union and office forms). Outside the tenant
+ * transaction: the registry call never holds a database connection, and nothing is stored.
  */
 export const cnpjRoutes: FastifyPluginAsyncZod = async (app) => {
   tenantGuards(app);
+  // Whoever registers something with a CNPJ: clients (`finance`), unions (`registry`) or the office
+  // (`office`). By default the administrators, the same people as before.
+  app.addHook('onRequest', requireAnyPermission(['finance', 'registry', 'office']));
 
   app.get('/:cnpj', { schema: { params: cnpjParamsSchema }, config: rateLimited(app.platform, 30, '1 minute') }, async (req) => {
     const provider = app.platform.cnpj;

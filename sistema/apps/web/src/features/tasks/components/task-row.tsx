@@ -169,7 +169,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
             </span>
           </div>
         ) : null}
-        <div className={cn('hidden w-36 text-right', compact ? '@2xl:block' : '@xl:block')}>
+        <div className={cn('hidden min-w-0 text-right', compact ? 'w-44 @2xl:block' : 'w-48 @xl:block')}>
           {/* An occurrence is worked by its target (the legal deadline goes in the text below). */}
           <p className="tabular text-[13px] font-medium text-fg">
             {task.occurrence ? formatDateBR(task.occurrence.targetDate) : task.dueDate ? formatDateBR(task.dueDate) : '—'}

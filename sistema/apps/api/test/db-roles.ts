@@ -25,6 +25,9 @@ export const IDENTITY_GRANTS = {
   platform_keys: ['select', 'insert'],
   open_finance_items: ['select', 'insert'],
   open_finance_events: ['select', 'insert', 'update'],
+  // Profile photos (migration 0015): the person's data, one photo across workspaces, encrypted with a
+  // platform key; replaced and removed by the person (and in cascade with the account).
+  user_photos: ['select', 'insert', 'update', 'delete'],
 } as const satisfies Record<string, readonly ('select' | 'insert' | 'update' | 'delete')[]>;
 
 /** Tables outside RLS that the API reads/writes with its own login role. */
@@ -63,4 +66,10 @@ export const TENANT_TABLES = [
   'task_events',
   'task_attachments',
   'task_notes',
+  // Phase 3 (migration 0015): clients' documents, unions, agreements and their clients, the office.
+  'client_documents',
+  'unions',
+  'union_conventions',
+  'union_clients',
+  'offices',
 ] as const;

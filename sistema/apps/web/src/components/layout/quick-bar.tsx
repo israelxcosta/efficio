@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router';
-import { ArrowLeftRight, CalendarClock, CreditCard, Plus, Search } from 'lucide-react';
+import { ArrowLeftRight, CalendarClock, CreditCard, Plus, Search, Workflow } from 'lucide-react';
 import { useTransactionActions } from '@/features/transactions/transaction-actions';
 import { useTaskSheetLinks } from '@/features/tasks/task-links';
+import { useTaskActions } from '@/features/tasks/task-actions';
 import { cn } from '@/lib/utils';
 import { WriteGate } from '@/features/auth/permissions';
 import { Notifications } from './notifications';
@@ -32,6 +33,7 @@ export function QuickBar({ area, onSearch }: { area: Area; onSearch: () => void 
 
 function TaskActions() {
   const { newTask } = useTaskSheetLinks();
+  const { openTemplatePicker } = useTaskActions();
   return (
     <>
       <WriteGate scope="tasks">
@@ -42,6 +44,11 @@ function TaskActions() {
       <WriteGate scope="tasks">
         <button type="button" className={cn(btn, 'text-muted hover:text-fg')} onClick={() => newTask({ appointment: true })}>
           <CalendarClock /> Compromisso
+        </button>
+      </WriteGate>
+      <WriteGate scope="tasks">
+        <button type="button" className={cn(btn, 'text-muted hover:text-fg')} onClick={openTemplatePicker}>
+          <Workflow /> Processo
         </button>
       </WriteGate>
     </>
