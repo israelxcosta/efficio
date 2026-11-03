@@ -120,16 +120,16 @@ export default function TaskHomePage() {
 
       {/* Row A: what I do and how the competence goes; row B: who carries the work and where it piles up. */}
       <div className="grid gap-5 lg:grid-cols-12">
-        <div className="min-h-[18rem] lg:col-span-7 lg:h-[26rem]">
+        <div className="h-[29rem] lg:col-span-7 lg:h-[26rem]">
           <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
         </div>
-        <div className="min-h-[18rem] lg:col-span-5 lg:h-[26rem]">
+        <div className="h-[24rem] lg:col-span-5 lg:h-[26rem]">
           <Obligations home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
         </div>
-        <div className="lg:col-span-6 lg:h-[22rem]">
+        <div className="h-[22rem] lg:col-span-6">
           <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
         </div>
-        <div className="lg:col-span-6 lg:h-[22rem]">
+        <div className="h-[22rem] lg:col-span-6">
           <ByClient home={h} options={o} where={where} loading={home.isPending} />
         </div>
       </div>

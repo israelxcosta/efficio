@@ -73,7 +73,7 @@ export function TasksSummary({ summary, scope, situation, assignee, client, onSi
 
   return (
     <section aria-label="Resumo das tarefas" aria-busy={summary ? undefined : true} className="overflow-hidden rounded-xl border border-border bg-surface">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[minmax(0,1.15fr)_12.5rem_13rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[minmax(0,1.15fr)_12.5rem_15rem_minmax(0,1fr)]">
         {/* 1. Overdue (principal) */}
         <div className="col-span-2 min-w-0 p-4 sm:p-5 md:col-span-1">
           <button

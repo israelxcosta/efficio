@@ -3,13 +3,15 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { ClipboardCheck, Ellipsis, ExternalLink, Repeat } from 'lucide-react';
 import { formatDateBR, type ISODate, type RecurringOccurrence } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
+import { CategoryIcon } from '@/components/ui/category-icon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AvatarStack, MemberAvatar } from '@/components/ui/member-avatar';
 import { Tooltip } from '@/components/ui/tooltip';
 import { areaOf } from '@/components/layout/nav';
 import { cn, pluralize } from '@/lib/utils';
-import { DUE_TONE_CLASS } from '../due';
+import { DUE_TONE_CLASS, shortName } from '../due';
 import { assigneesTip, auditHref, deadlineTip, doneFraction, groupDeadlineInfo, occurrenceParams, pendingText, periodLabel } from '../occurrence';
+import { NeutralIcon } from './neutral-icon';
 import { TaskStatusGlyph } from './task-status';
 
 /** Which clients the occurrence sheet starts with (`ocorrencias=` in the URL). */
@@ -110,6 +112,10 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
       <div className={cn('group flex items-center gap-3 rounded-lg transition-colors hover:bg-surface-muted', compact ? 'px-2 py-2' : 'px-3 py-3 @lg:px-4')}>
         <ProgressRing value={fraction} size={compact ? 32 : 36} label={ringLabel} />
         <button type="button" onClick={open} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left" aria-label={`${o.name}: ${pendingText(o, Boolean(mine))}. Abrir.`}>
+          {/* Same column as the category icon of a task row (from 384px). */}
+          <span className="hidden @sm:contents">
+            {o.category ? <CategoryIcon icon={o.category.icon} color={o.category.color} size={compact ? 'sm' : 'md'} /> : <NeutralIcon icon={Repeat} size={compact ? 'sm' : 'md'} />}
+          </span>
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className={cn('min-w-[4.5rem] truncate text-sm font-semibold', o.pending === 0 ? 'text-muted' : 'text-fg')}>{o.name}</span>
@@ -134,7 +140,16 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
         {!mine ? (
           <Tooltip content={assigneesTip(o) || 'Sem responsável'}>
             <div className={cn('hidden min-w-0 items-center gap-2', compact ? '@sm:flex' : 'w-36 @2xl:flex')} tabIndex={-1}>
-              {names.length ? <AvatarStack names={names} max={3} /> : <MemberAvatar unassigned />}
+              {names.length === 1 ? (
+                <>
+                  <MemberAvatar name={names[0]} />
+                  {!compact ? <span className="truncate text-[13px] text-fg">{shortName(names[0]!)}</span> : null}
+                </>
+              ) : names.length ? (
+                <AvatarStack names={names} max={3} />
+              ) : (
+                <MemberAvatar unassigned />
+              )}
               <span className="sr-only">{assigneesTip(o)}</span>
             </div>
           </Tooltip>

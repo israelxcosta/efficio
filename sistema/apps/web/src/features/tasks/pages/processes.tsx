@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { useDeleteFlow, useDeleteFlowTemplate, useFlowTemplates, useTaskFlows, useTaskOptions } from '../api';
 import { daysText, DUE_TONE_CLASS, shortName, taskDueInfo } from '../due';
 import { templateDepartments } from '../flow-logic';
+import { flowActions, templateActions } from '../actions';
 import { FlowDots } from '../components/flow-stepper';
 import { NeutralIcon } from '../components/neutral-icon';
 import { FlowStepsSheet, FlowTemplateSheet } from '../components/flow-sheets';
@@ -146,10 +147,8 @@ export default function ProcessesPage() {
       </Card>
 
       <Card className="@container overflow-hidden">
-        <CardHeader
-          title="Processos"
-          className="px-5 pt-5"
-          action={
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5">
+          <h2 className="text-[15px] font-semibold tracking-tight text-fg">Processos</h2>
             <SegmentedControl<FlowStatus>
               size="sm"
               ariaLabel="Processos"
@@ -160,8 +159,7 @@ export default function ProcessesPage() {
                 { value: 'done', label: 'Concluídos' },
               ]}
             />
-          }
-        />
+        </div>
         <div className="p-1.5 pt-3">
           {flows.isPending ? (
             <SkeletonRows rows={3} className="p-3" />
@@ -258,6 +256,7 @@ function TemplateRow({
   onDelete: () => void;
 }) {
   const steps = `${t.stepCount} ${t.stepCount === 1 ? 'etapa' : 'etapas'}`;
+  const actions = templateActions({ canEdit, canDelete });
   const usage = t.usageCount === 0 ? 'Nunca aplicado' : `Aplicado ${t.usageCount} ${t.usageCount === 1 ? 'vez' : 'vezes'}`;
   return (
     <div className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-surface-muted @lg:px-4">
@@ -268,7 +267,9 @@ function TemplateRow({
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-sm font-semibold text-fg">{t.title}</span>
-            <Badge tone="neutral">{steps}</Badge>
+            <Badge tone="neutral" className="hidden @md:inline-flex">
+              {steps}
+            </Badge>
           </span>
           <span className="mt-0.5 block truncate text-xs text-muted @2xl:hidden">
             {steps} · até {daysText(t.totalDays)} · {usage.toLowerCase()}
@@ -302,21 +303,22 @@ function TemplateRow({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          {canEdit ? (
-            <>
-              <DropdownMenuItem icon={<Pencil />} onSelect={onOpen}>
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem icon={<Copy />} onSelect={onDuplicate}>
-                Duplicar
-              </DropdownMenuItem>
-            </>
-          ) : (
+          {actions.includes('edit') ? (
+            <DropdownMenuItem icon={<Pencil />} onSelect={onOpen}>
+              Editar
+            </DropdownMenuItem>
+          ) : null}
+          {actions.includes('duplicate') ? (
+            <DropdownMenuItem icon={<Copy />} onSelect={onDuplicate}>
+              Duplicar
+            </DropdownMenuItem>
+          ) : null}
+          {actions.includes('view') ? (
             <DropdownMenuItem icon={<Eye />} onSelect={onOpen}>
               Ver etapas
             </DropdownMenuItem>
-          )}
-          {canDelete ? (
+          ) : null}
+          {actions.includes('delete') ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={onDelete}>
@@ -353,6 +355,7 @@ function FlowRow({
     : `Etapa ${step!.position} de ${f.stepCount} · ${step!.title}`;
   const span = f.completedAt ? diffInDays(dateInTimeZone(new Date(f.completedAt)), dateInTimeZone(new Date(f.createdAt))) : 0;
   const open = () => (step?.task ? onOpenTask(step.task.id) : onSteps());
+  const actions = flowActions(f, { canDelete });
   return (
     <div className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-surface-muted @lg:px-4">
       <button type="button" onClick={open} className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-md text-left @sm:flex-row @sm:items-center @sm:gap-3">
@@ -398,7 +401,7 @@ function FlowRow({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          {step?.task ? (
+          {actions.includes('open-step') && step?.task ? (
             <DropdownMenuItem icon={<Eye />} onSelect={() => onOpenTask(step.task!.id)}>
               Abrir etapa atual
             </DropdownMenuItem>
@@ -406,7 +409,7 @@ function FlowRow({
           <DropdownMenuItem icon={<ListOrdered />} onSelect={onSteps}>
             Ver etapas
           </DropdownMenuItem>
-          {canDelete ? (
+          {actions.includes('delete') ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={onDelete}>

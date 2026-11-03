@@ -71,3 +71,57 @@ export function makeOptions(patch: Partial<TaskOptionsResponse> = {}): TaskOptio
     ...patch,
   };
 }
+
+export function makeOccurrence(patch: Partial<import('@effinance/shared').RecurringOccurrence> = {}): import('@effinance/shared').RecurringOccurrence {
+  return {
+    recurringTaskId: 'r1',
+    name: 'DCTFWeb',
+    period: 'monthly',
+    periodKey: '2026-10',
+    competence: '2026-10',
+    referenceMonth: '2026-09',
+    legalDueDate: '2026-10-30',
+    targetDate: '2026-10-28',
+    department: FISCAL,
+    category: null,
+    defaultAssignee: { id: 'ana', name: 'Ana Paula Ribeiro' },
+    assignees: [
+      { assignee: { id: 'me', name: 'Marina Costa' }, count: 3 },
+      { assignee: { id: 'ana', name: 'Ana Paula Ribeiro' }, count: 2 },
+    ],
+    total: 5,
+    done: 1,
+    doneLate: 0,
+    canceled: 0,
+    inProgress: 1,
+    pending: 4,
+    overdue: false,
+    daysOverdue: 0,
+    targetMissed: false,
+    status: 'in_progress',
+    ...patch,
+  };
+}
+
+export function makeCell(patch: Partial<import('@effinance/shared').OccurrenceCell> = {}): import('@effinance/shared').OccurrenceCell {
+  return {
+    taskId: 'cell',
+    recurringTaskId: 'r1',
+    clientId: 'c1',
+    periodKey: '2026-10',
+    competence: '2026-10',
+    status: 'todo',
+    situation: 'not_started',
+    assignee: { id: 'ana', name: 'Ana Paula Ribeiro' },
+    assigneeSource: 'client',
+    legalDueDate: '2026-10-30',
+    targetDate: '2026-10-28',
+    overdue: false,
+    targetMissed: false,
+    concludedBy: null,
+    concludedAt: null,
+    concludedOnTime: null,
+    canReopen: false,
+    ...patch,
+  };
+}

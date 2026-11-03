@@ -65,6 +65,7 @@ import { commentTime, dateTimeBR } from '../format';
 import { SHEET_PARAMS, statusFromParam, withSheetParams } from '../task-links';
 import { useTaskStatusChange } from '../use-task-status';
 import { competenceName, referenceLabel } from '../occurrence';
+import { detailActions, primaryAction } from '../actions';
 import { AttachmentList } from './attachments';
 import { FlowStepper } from './flow-stepper';
 import { INTERNAL, NONE, ClientPicker, MemberPicker } from './pickers';
@@ -882,10 +883,11 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
   const [confirming, setConfirming] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [params, setParams] = useSearchParams();
-  const closed = task.status === 'done' || task.status === 'canceled';
   const occurrence = Boolean(task.occurrence);
   // Reopening a concluded occurrence asks the reason, and only who concluded it or an administrator may.
   const auditRecord = occurrence && task.status === 'done';
+  const menu = detailActions(task, { isAdmin });
+  const primary = primaryAction(task);
 
   if (readOnly) {
     return (
@@ -902,7 +904,7 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="end">
-          {!occurrence ? (
+          {menu.includes('duplicate') ? (
             <DropdownMenuItem icon={<Copy />} onSelect={() => setParams(withSheetParams(params, { nova: '1', duplicar: task.id }))}>
               Duplicar
             </DropdownMenuItem>
@@ -917,12 +919,12 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
           >
             Copiar link
           </DropdownMenuItem>
-          {task.status !== 'canceled' ? (
+          {menu.includes('cancel') ? (
             <DropdownMenuItem icon={<CircleX />} onSelect={() => void status.change(task, 'canceled', 'menu')}>
               Cancelar tarefa
             </DropdownMenuItem>
           ) : null}
-          {isAdmin && !occurrence ? (
+          {menu.includes('delete') ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => setConfirming(true)}>
@@ -932,13 +934,11 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      {auditRecord ? (
-        task.canReopen ? (
-          <Button variant="outline" onClick={() => setReopening(true)}>
-            <RotateCcw /> Reabrir
-          </Button>
-        ) : null
-      ) : closed ? (
+      {primary === 'none' ? null : primary === 'reopen-with-reason' ? (
+        <Button variant="outline" onClick={() => setReopening(true)}>
+          <RotateCcw /> Reabrir
+        </Button>
+      ) : primary === 'reopen' ? (
         <Button variant="outline" loading={status.savingId === task.id} onClick={() => void status.change(task, task.reopenStatus, 'toggle')}>
           <RotateCcw /> Reabrir
         </Button>

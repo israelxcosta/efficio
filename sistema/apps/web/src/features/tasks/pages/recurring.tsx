@@ -39,6 +39,7 @@ import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { recurringInputOf, useDeleteRecurring, useRecurringTask, useRecurringTasks, useSaveRecurring, useTaskOptions } from '../api';
 import { shortName } from '../due';
+import { recurringActions } from '../actions';
 import { competenceName } from '../occurrence';
 import {
   appliesToText,
@@ -138,7 +139,7 @@ export default function RecurringTasksPage() {
             <span className="hidden w-32 @3xl:block">Departamento</span>
             <span className="hidden w-44 @4xl:block">Aplica-se a</span>
             <span className="hidden w-36 @2xl:block">Responsáveis</span>
-            <span className="w-36">{monthName!.charAt(0).toUpperCase() + monthName!.slice(1)}</span>
+            <span className="w-40">{monthName!.charAt(0).toUpperCase() + monthName!.slice(1)}</span>
             <span className="w-52 text-right">Prazo legal e meta</span>
             <span className="w-8" aria-hidden />
           </div>
@@ -415,6 +416,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
     r.active && r.endCompetence ? `Encerra em ${competenceName(r.endCompetence)}` : null,
   ].filter(Boolean);
   const head = [r.department?.name, r.category?.name].filter(Boolean).join(' · ');
+  const actions = recurringActions(r, { canEdit, canDelete });
 
   return (
     <div className="@container">
@@ -465,7 +467,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
             <span className="text-body-sm text-subtle">Sem responsável</span>
           )}
         </div>
-        <div className="hidden w-36 @xl:block">
+        <div className="hidden w-40 @xl:block">
           {m.occurs && live > 0 ? (
             <>
               <span className="tabular text-[13px] font-medium text-fg">
@@ -482,7 +484,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
         </div>
         <div className="hidden w-52 text-right @xl:block">
           <p className="tabular text-[13px] font-medium text-fg">{dueRuleText(r)}</p>
-          <p className="truncate text-xs text-muted">{targetRuleText(r)}</p>
+          <p className="line-clamp-2 text-xs text-muted">{targetRuleText(r)}</p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -495,8 +497,8 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem icon={canEdit ? <Pencil /> : <Eye />} onSelect={onOpen}>
-              {canEdit ? 'Editar' : 'Ver'}
+            <DropdownMenuItem icon={actions.includes('edit') ? <Pencil /> : <Eye />} onSelect={onOpen}>
+              {actions.includes('edit') ? 'Editar' : 'Ver'}
             </DropdownMenuItem>
             <DropdownMenuItem icon={<ClipboardCheck />} onSelect={() => navigate(`/tarefas/auditoria?visao=tarefa&recorrente=${r.id}`)}>
               Ver na auditoria
@@ -504,27 +506,28 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
             <DropdownMenuItem icon={<CalendarDays />} onSelect={() => navigate(CALENDAR_HREF)}>
               Ver no calendário
             </DropdownMenuItem>
-            {canEdit ? (
+            {actions.includes('duplicate') ? (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem icon={<Copy />} onSelect={onDuplicate}>
                   Duplicar
                 </DropdownMenuItem>
-                {r.active ? (
-                  <DropdownMenuItem icon={<Power />} onSelect={onEnd}>
-                    Encerrar…
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem icon={<Repeat />} onSelect={onReactivate}>
-                    Reativar
-                  </DropdownMenuItem>
-                )}
-                {canDelete && r.occurrenceCount === 0 ? (
-                  <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={onDelete}>
-                    Excluir
-                  </DropdownMenuItem>
-                ) : null}
               </>
+            ) : null}
+            {actions.includes('end') ? (
+              <DropdownMenuItem icon={<Power />} onSelect={onEnd}>
+                Encerrar…
+              </DropdownMenuItem>
+            ) : null}
+            {actions.includes('reactivate') ? (
+              <DropdownMenuItem icon={<Repeat />} onSelect={onReactivate}>
+                Reativar
+              </DropdownMenuItem>
+            ) : null}
+            {actions.includes('delete') ? (
+              <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={onDelete}>
+                Excluir
+              </DropdownMenuItem>
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
