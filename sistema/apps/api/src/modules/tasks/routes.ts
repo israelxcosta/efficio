@@ -1,28 +1,75 @@
-// Task module routes under /api/tasks (phase 1). Mounted next to the financial boundary, with its
-// own guards (access.ts): every member reads and writes tasks, subtasks and comments; registries and
-// deletions are for administrators (`onRequest: requireTaskAdmin`). Static paths are registered before
-// `/:id` (the browser demo's router takes the first match).
+// Task module routes under /api/tasks. Mounted next to the financial boundary, with its own guards
+// (access.ts): every member reads and writes tasks, occurrences, audit cells, processes, comments,
+// attachments and their own notes; registries (departments, categories, client responsibles,
+// recurring tasks, process templates) and deletions are for administrators (`onRequest:
+// requireTaskAdmin`); a few rules are checked by the services (removing someone else's comment or
+// attachment, reopening an occurrence someone else concluded, saving a process as a template). Static
+// paths are registered before `/:id` (the browser demo's router takes the first match).
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
+  applyFlowTemplateSchema,
+  clientResponsibleBatchSchema,
   clientResponsibleInputSchema,
+  flowTemplateInputSchema,
   idSchema,
+  MAX_ATTACHMENT_BYTES,
   memberDepartmentSchema,
+  monthKeySchema,
+  occurrencePeriodSchema,
+  recurringGenerateSchema,
+  recurringTaskInputSchema,
+  recurringTaskQuerySchema,
   subtaskInputSchema,
   subtaskUpdateSchema,
+  taskAttachmentInputSchema,
+  taskAuditQuerySchema,
+  taskCalendarQuerySchema,
   taskCategoryInputSchema,
   taskCommentInputSchema,
   taskDepartmentInputSchema,
+  taskFlowInputSchema,
+  taskFlowQuerySchema,
   taskHomeQuerySchema,
   taskInputSchema,
+  taskNoteInputSchema,
   taskQuerySchema,
+  taskReportExportQuerySchema,
+  taskReportQuerySchema,
   taskStatusInputSchema,
   taskUpdateSchema,
 } from '@effinance/shared';
+import { rateLimited } from '../../lib/platform';
 import { idParams } from '../common/params';
 import { requireTaskAdmin, runTasks, taskGuards } from './access';
+import { addAttachment, deleteAttachment, downloadAttachment, listAttachments } from './attachments';
+import { auditMatrix } from './audit';
+import { contentDisposition } from './file-check';
+import {
+  applyTemplate,
+  createFlow,
+  createTemplate,
+  deleteFlow,
+  deleteTemplate,
+  getFlow,
+  getTemplate,
+  listFlows,
+  listTemplates,
+  updateTemplate,
+} from './flows';
 import { taskHome } from './home';
+import { exportTaskReport, taskCalendar, taskReport } from './insights';
+import { createNote, deleteNote, listNotes, updateNote } from './notes';
+import {
+  createRecurring,
+  deleteRecurring,
+  generateOccurrences,
+  getRecurring,
+  listRecurring,
+  occurrenceDetail,
+  updateRecurring,
+} from './recurring';
 import {
   clientOptions,
   createCategory,
@@ -34,6 +81,7 @@ import {
   listDepartments,
   listMembers,
   setClientResponsible,
+  setClientResponsibles,
   setMemberDepartment,
   taskOptions,
   updateCategory,
@@ -44,18 +92,27 @@ import {
   addSubtask,
   changeTaskStatus,
   createTask,
+  deleteComment,
   deleteSubtask,
   deleteTask,
   getTaskDetail,
   listTasks,
   recentActivity,
+  taskHistory,
   updateSubtask,
   updateTask,
 } from './service';
 
 const memberParams = z.object({ userId: idSchema });
 const subtaskParams = z.object({ id: idSchema, subtaskId: idSchema });
+const commentParams = z.object({ id: idSchema, commentId: idSchema });
+const attachmentParams = z.object({ id: idSchema, attachmentId: idSchema });
+const occurrenceParams = z.object({ id: idSchema, period: occurrencePeriodSchema });
+const monthQuery = z.object({ month: monthKeySchema.optional() });
 const admin = { onRequest: requireTaskAdmin };
+
+/** The file in base64 (4/3 of the bytes) plus the rest of the JSON. */
+export const ATTACHMENT_BODY_LIMIT = Math.ceil(MAX_ATTACHMENT_BYTES / 3) * 4 + 64 * 1024;
 
 export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   taskGuards(app);
@@ -110,17 +167,121 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   app.put(
     '/client-responsibles',
     { ...admin, schema: { body: clientResponsibleInputSchema } },
-    async (req, reply) => {
-      const result = await run(req, (ctx) => setClientResponsible(ctx, req.body));
-      return result ? result : reply.code(204).send();
-    },
+    async (req) => run(req, (ctx) => setClientResponsible(ctx, req.body)),
+  );
+  app.put(
+    '/client-responsibles/batch',
+    { ...admin, schema: { body: clientResponsibleBatchSchema } },
+    async (req) => run(req, (ctx) => setClientResponsibles(ctx, req.body)),
   );
 
-  // --- summaries ---------------------------------------------------------------------------------------
+  // --- summaries, calendar, reports ------------------------------------------------------------------
   app.get('/home', { schema: { querystring: taskHomeQuerySchema } }, async (req) =>
     run(req, (ctx) => taskHome(ctx, req.query)),
   );
   app.get('/activity', async (req) => run(req, (ctx) => recentActivity(ctx)));
+  app.get('/calendar', { schema: { querystring: taskCalendarQuerySchema } }, async (req) =>
+    run(req, (ctx) => taskCalendar(ctx, req.query)),
+  );
+  app.get('/reports', { schema: { querystring: taskReportQuerySchema } }, async (req) =>
+    run(req, (ctx) => taskReport(ctx, req.query)),
+  );
+  app.get(
+    '/reports/export.csv',
+    { schema: { querystring: taskReportExportQuerySchema }, config: rateLimited(app.platform, 30, '1 minute') },
+    async (req, reply) => {
+      const { fileName, csv } = await runTasks(app.db, req, (ctx) => exportTaskReport(ctx, req.query));
+      return reply
+        .header('content-type', 'text/csv; charset=utf-8')
+        .header('content-disposition', contentDisposition(fileName))
+        .header('x-content-type-options', 'nosniff')
+        .send(csv);
+    },
+  );
+
+  // --- monthly audit -----------------------------------------------------------------------------------
+  app.get('/audit', { schema: { querystring: taskAuditQuerySchema } }, async (req) =>
+    run(req, (ctx) => auditMatrix(ctx, req.query)),
+  );
+
+  // --- recurring tasks ---------------------------------------------------------------------------------
+  app.get('/recurring', { schema: { querystring: recurringTaskQuerySchema } }, async (req) =>
+    run(req, (ctx) => listRecurring(ctx, req.query)),
+  );
+  app.post(
+    '/recurring',
+    { ...admin, schema: { body: recurringTaskInputSchema } },
+    async (req, reply) => reply.code(201).send(await run(req, (ctx) => createRecurring(ctx, req.body))),
+  );
+  app.post(
+    '/recurring/generate',
+    { ...admin, schema: { body: recurringGenerateSchema } },
+    async (req) => run(req, (ctx) => generateOccurrences(ctx, req.body.competence)),
+  );
+  app.get('/recurring/:id', { schema: { params: idParams, querystring: monthQuery } }, async (req) =>
+    run(req, (ctx) => getRecurring(ctx, req.params.id, req.query.month)),
+  );
+  app.put(
+    '/recurring/:id',
+    { ...admin, schema: { params: idParams, body: recurringTaskInputSchema } },
+    async (req) => run(req, (ctx) => updateRecurring(ctx, req.params.id, req.body)),
+  );
+  app.delete('/recurring/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
+    await run(req, (ctx) => deleteRecurring(ctx, req.params.id));
+    return reply.code(204).send();
+  });
+  app.get('/recurring/:id/occurrences/:period', { schema: { params: occurrenceParams } }, async (req) =>
+    run(req, (ctx) => occurrenceDetail(ctx, req.params.id, req.params.period)),
+  );
+
+  // --- processes and templates -------------------------------------------------------------------------
+  app.get('/flows', { schema: { querystring: taskFlowQuerySchema } }, async (req) =>
+    run(req, (ctx) => listFlows(ctx, req.query)),
+  );
+  app.post('/flows', { schema: { body: taskFlowInputSchema } }, async (req, reply) =>
+    reply.code(201).send(await run(req, (ctx) => createFlow(ctx, req.body))),
+  );
+  app.get('/flows/:id', { schema: { params: idParams } }, async (req) => run(req, (ctx) => getFlow(ctx, req.params.id)));
+  app.delete('/flows/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
+    await run(req, (ctx) => deleteFlow(ctx, req.params.id));
+    return reply.code(204).send();
+  });
+  app.get('/flow-templates', async (req) => run(req, (ctx) => listTemplates(ctx)));
+  app.post(
+    '/flow-templates',
+    { ...admin, schema: { body: flowTemplateInputSchema } },
+    async (req, reply) => reply.code(201).send(await run(req, (ctx) => createTemplate(ctx, req.body))),
+  );
+  app.get('/flow-templates/:id', { schema: { params: idParams } }, async (req) =>
+    run(req, (ctx) => getTemplate(ctx, req.params.id)),
+  );
+  app.put(
+    '/flow-templates/:id',
+    { ...admin, schema: { params: idParams, body: flowTemplateInputSchema } },
+    async (req) => run(req, (ctx) => updateTemplate(ctx, req.params.id, req.body)),
+  );
+  app.delete('/flow-templates/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
+    await run(req, (ctx) => deleteTemplate(ctx, req.params.id));
+    return reply.code(204).send();
+  });
+  app.post(
+    '/flow-templates/:id/apply',
+    { schema: { params: idParams, body: applyFlowTemplateSchema } },
+    async (req, reply) => reply.code(201).send(await run(req, (ctx) => applyTemplate(ctx, req.params.id, req.body))),
+  );
+
+  // --- personal notes (each member, their own) ---------------------------------------------------------
+  app.get('/notes', async (req) => run(req, (ctx) => listNotes(ctx)));
+  app.post('/notes', { schema: { body: taskNoteInputSchema } }, async (req, reply) =>
+    reply.code(201).send(await run(req, (ctx) => createNote(ctx, req.body))),
+  );
+  app.put('/notes/:id', { schema: { params: idParams, body: taskNoteInputSchema } }, async (req) =>
+    run(req, (ctx) => updateNote(ctx, req.params.id, req.body)),
+  );
+  app.delete('/notes/:id', { schema: { params: idParams } }, async (req, reply) => {
+    await run(req, (ctx) => deleteNote(ctx, req.params.id));
+    return reply.code(204).send();
+  });
 
   // --- tasks -------------------------------------------------------------------------------------------
   app.get('/', { schema: { querystring: taskQuerySchema } }, async (req) =>
@@ -138,12 +299,15 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   app.patch(
     '/:id/status',
     { schema: { params: idParams, body: taskStatusInputSchema } },
-    async (req) => run(req, (ctx) => changeTaskStatus(ctx, req.params.id, req.body.status)),
+    async (req) => run(req, (ctx) => changeTaskStatus(ctx, req.params.id, req.body.status, req.body.reason)),
   );
   app.delete('/:id', { ...admin, schema: { params: idParams } }, async (req, reply) => {
     await run(req, (ctx) => deleteTask(ctx, req.params.id));
     return reply.code(204).send();
   });
+  app.get('/:id/history', { schema: { params: idParams } }, async (req) =>
+    run(req, (ctx) => taskHistory(ctx, req.params.id)),
+  );
 
   app.post(
     '/:id/subtasks',
@@ -172,4 +336,37 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req, reply) =>
       reply.code(201).send(await run(req, (ctx) => addComment(ctx, req.params.id, req.body))),
   );
+  app.delete('/:id/comments/:commentId', { schema: { params: commentParams } }, async (req, reply) => {
+    await run(req, (ctx) => deleteComment(ctx, req.params.id, req.params.commentId));
+    return reply.code(204).send();
+  });
+
+  app.get('/:id/attachments', { schema: { params: idParams } }, async (req) =>
+    run(req, (ctx) => listAttachments(ctx, req.params.id)),
+  );
+  app.post(
+    '/:id/attachments',
+    {
+      bodyLimit: ATTACHMENT_BODY_LIMIT,
+      schema: { params: idParams, body: taskAttachmentInputSchema },
+      config: rateLimited(app.platform, 60, '1 minute'),
+    },
+    async (req, reply) => reply.code(201).send(await run(req, (ctx) => addAttachment(ctx, req.params.id, req.body))),
+  );
+  app.get('/:id/attachments/:attachmentId/download', { schema: { params: attachmentParams } }, async (req, reply) => {
+    const file = await runTasks(app.db, req, (ctx) => downloadAttachment(ctx, req.params.id, req.params.attachmentId));
+    // Never rendered by the browser: a download, the stored type (from the allowlist; never HTML or
+    // SVG), no sniffing, and a CSP that sandboxes it if someone opens it anyway.
+    return reply
+      .header('content-type', file.contentType)
+      .header('content-disposition', contentDisposition(file.fileName))
+      .header('x-content-type-options', 'nosniff')
+      .header('content-security-policy', "default-src 'none'; sandbox")
+      .header('cache-control', 'private, no-store')
+      .send(file.content);
+  });
+  app.delete('/:id/attachments/:attachmentId', { schema: { params: attachmentParams } }, async (req, reply) => {
+    await run(req, (ctx) => deleteAttachment(ctx, req.params.id, req.params.attachmentId));
+    return reply.code(204).send();
+  });
 };

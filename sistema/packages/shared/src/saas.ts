@@ -25,16 +25,21 @@ export const WORKSPACE_KIND_LABELS: Record<WorkspaceKind, string> = {
 export const MEMBER_ROLES = ['owner', 'editor', 'viewer'] as const;
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 
+/**
+ * Names of the roles on screen (spec §2.6). The roles stay `owner`, `editor` and `viewer` in the
+ * database and the API; administrators are owner and editor (finances and the task registries), the
+ * collaborator (`viewer`) uses the whole task area. Same texts as `apps/web/src/features/auth/roles.ts`.
+ */
 export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
   owner: 'Proprietário',
-  editor: 'Editor',
-  viewer: 'Leitor',
+  editor: 'Administrador',
+  viewer: 'Colaborador',
 };
 
 export const MEMBER_ROLE_HINTS: Record<MemberRole, string> = {
-  owner: 'Controle total, incluindo assinatura, membros e exclusão',
-  editor: 'Cria e edita lançamentos, contas e cadastros',
-  viewer: 'Apenas visualiza dados e relatórios',
+  owner: 'Administrador com controle da assinatura, dos membros e do espaço',
+  editor: 'Acessa o financeiro e mantém clientes e cadastros da gestão',
+  viewer: 'Usa toda a gestão de tarefas; não vê o financeiro nem honorários',
 };
 
 export const SUBSCRIPTION_STATUSES = [

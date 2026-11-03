@@ -1,6 +1,6 @@
 // LGPD data portability: every record of the workspace, decrypted, as JSON.
 
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { DbExecutor } from '../../db/client';
 import {
   accounts,
@@ -11,11 +11,20 @@ import {
   goalContributions,
   goals,
   recurrences,
+  recurringTaskClients,
+  recurringTasks,
+  taskAttachments,
   taskCategories,
   taskClientResponsibles,
   taskComments,
   taskDepartmentMembers,
   taskDepartments,
+  taskEvents,
+  taskFlowSteps,
+  taskFlowTemplateSteps,
+  taskFlowTemplates,
+  taskFlows,
+  taskNotes,
   taskSubtasks,
   tasks,
   transactions,
@@ -25,7 +34,19 @@ import { getCipher } from '../../lib/crypto/keyring';
 import { withTenant } from '../../lib/tenant';
 import { CONTACT_ALL_ENCRYPTED_FIELDS } from '../contacts/service';
 import { exportOpenFinance } from '../open-finance/service';
-import { decryptTaskText, TASK_COMMENT_TEXT, TASK_DESCRIPTION } from '../tasks/encrypted-text';
+import {
+  ATTACHMENT_NAME,
+  decryptTaskText,
+  EVENT_NOTE,
+  FLOW_STEP_DESCRIPTION,
+  NOTE_CONTENT,
+  NOTE_TITLE,
+  RECURRING_DESCRIPTION,
+  TASK_COMMENT_TEXT,
+  TASK_DESCRIPTION,
+  TEMPLATE_DESCRIPTION,
+  TEMPLATE_STEP_DESCRIPTION,
+} from '../tasks/encrypted-text';
 import { getSubscriptionRow, listMembers } from './service';
 import { summarizeSubscription } from '../billing/entitlements';
 import type { Access } from './access';
@@ -68,6 +89,37 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
         tx.select().from(taskComments).orderBy(asc(taskComments.createdAt), asc(taskComments.id)),
         tx.select().from(taskClientResponsibles).orderBy(asc(taskClientResponsibles.clientId)),
       ]);
+    // Phase 2 (migration 0014): recurring tasks, processes and templates, the history of each task,
+    // attachment metadata (the files are downloaded one by one: a JSON with every file in base64 could
+    // reach gigabytes) and the requester's own notes (notes are private: never someone else's).
+    const [recurringRows, recurringClientRows, templateRows, templateStepRows, flowRows, flowStepRows, eventRows, attachmentRows, noteRows] =
+      await Promise.all([
+        tx.select().from(recurringTasks).orderBy(asc(recurringTasks.createdAt)),
+        tx.select().from(recurringTaskClients).orderBy(asc(recurringTaskClients.recurringTaskId), asc(recurringTaskClients.clientId)),
+        tx.select().from(taskFlowTemplates).orderBy(asc(taskFlowTemplates.createdAt)),
+        tx.select().from(taskFlowTemplateSteps).orderBy(asc(taskFlowTemplateSteps.templateId), asc(taskFlowTemplateSteps.position)),
+        tx.select().from(taskFlows).orderBy(asc(taskFlows.createdAt)),
+        tx.select().from(taskFlowSteps).orderBy(asc(taskFlowSteps.flowId), asc(taskFlowSteps.position)),
+        tx.select().from(taskEvents).orderBy(asc(taskEvents.seq)),
+        tx
+          .select({
+            id: taskAttachments.id,
+            taskId: taskAttachments.taskId,
+            fileName: taskAttachments.fileName,
+            contentType: taskAttachments.contentType,
+            sizeBytes: taskAttachments.sizeBytes,
+            uploadedBy: taskAttachments.uploadedBy,
+            uploadedByName: taskAttachments.uploadedByName,
+            createdAt: taskAttachments.createdAt,
+          })
+          .from(taskAttachments)
+          .orderBy(asc(taskAttachments.createdAt)),
+        tx
+          .select()
+          .from(taskNotes)
+          .where(and(eq(taskNotes.workspaceId, access.workspaceId), eq(taskNotes.userId, access.userId)))
+          .orderBy(asc(taskNotes.createdAt)),
+      ]);
     return {
       categories: cats,
       accounts: accs,
@@ -103,6 +155,31 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
         commentRows.map(async (c) => ({ ...c, text: await decryptTaskText(cipher, TASK_COMMENT_TEXT, c.text) })),
       ),
       taskClientResponsibles: responsibleRows,
+      recurringTasks: await Promise.all(
+        recurringRows.map(async (r) => ({ ...r, description: await decryptTaskText(cipher, RECURRING_DESCRIPTION, r.description) })),
+      ),
+      recurringTaskClients: recurringClientRows,
+      taskFlowTemplates: await Promise.all(
+        templateRows.map(async (r) => ({ ...r, description: await decryptTaskText(cipher, TEMPLATE_DESCRIPTION, r.description) })),
+      ),
+      taskFlowTemplateSteps: await Promise.all(
+        templateStepRows.map(async (r) => ({ ...r, description: await decryptTaskText(cipher, TEMPLATE_STEP_DESCRIPTION, r.description) })),
+      ),
+      taskFlows: flowRows,
+      taskFlowSteps: await Promise.all(
+        flowStepRows.map(async (r) => ({ ...r, description: await decryptTaskText(cipher, FLOW_STEP_DESCRIPTION, r.description) })),
+      ),
+      taskEvents: await Promise.all(eventRows.map(async (r) => ({ ...r, note: await decryptTaskText(cipher, EVENT_NOTE, r.note) }))),
+      taskAttachments: await Promise.all(
+        attachmentRows.map(async (r) => ({ ...r, fileName: await decryptTaskText(cipher, ATTACHMENT_NAME, r.fileName) })),
+      ),
+      taskNotes: await Promise.all(
+        noteRows.map(async (r) => ({
+          ...r,
+          title: await decryptTaskText(cipher, NOTE_TITLE, r.title),
+          content: await decryptTaskText(cipher, NOTE_CONTENT, r.content),
+        })),
+      ),
     };
   });
 

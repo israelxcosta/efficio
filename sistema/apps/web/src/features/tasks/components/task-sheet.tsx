@@ -664,7 +664,7 @@ function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptio
     const value = text.trim();
     if (!value) return;
     // The comment shows at once; a failure puts the text back in the field.
-    setPending({ id: 'pending', author: { id: me.id, name: me.name }, text: value, isYours: true, createdAt: new Date().toISOString() });
+    setPending({ id: 'pending', author: { id: me.id, name: me.name }, text: value, isYours: true, canDelete: true, createdAt: new Date().toISOString() });
     setText('');
     try {
       await add.mutateAsync(value);

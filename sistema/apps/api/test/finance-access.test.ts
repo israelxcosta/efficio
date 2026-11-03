@@ -288,6 +288,9 @@ describe('finance restricted to administrators', () => {
       accounts: [],
       categories: [],
       contacts: [expect.objectContaining({ name: 'Padaria Aurora Ltda', kind: 'client' })],
+      // Tasks are open to every member (none match here).
+      tasks: [],
+      recurringTasks: [],
     });
     expect(JSON.stringify(limited.body)).not.toMatch(/123456|honorários|Conta Aurora/);
   });

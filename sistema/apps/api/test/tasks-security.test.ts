@@ -109,6 +109,16 @@ const ADMIN_ROUTES = new Set([
   'DELETE /api/tasks/categories/:id',
   'PUT /api/tasks/client-responsibles',
   'DELETE /api/tasks/:id',
+  // Phase 2: registries (recurring tasks, process templates, responsibles in batch) and deletions.
+  'PUT /api/tasks/client-responsibles/batch',
+  'POST /api/tasks/recurring',
+  'POST /api/tasks/recurring/generate',
+  'PUT /api/tasks/recurring/:id',
+  'DELETE /api/tasks/recurring/:id',
+  'DELETE /api/tasks/flows/:id',
+  'POST /api/tasks/flow-templates',
+  'PUT /api/tasks/flow-templates/:id',
+  'DELETE /api/tasks/flow-templates/:id',
 ]);
 
 /** Every member, `viewer` included (tasks, subtasks, comments and the reads). */
@@ -130,6 +140,31 @@ const MEMBER_ROUTES = new Set([
   'PATCH /api/tasks/:id/subtasks/:subtaskId',
   'DELETE /api/tasks/:id/subtasks/:subtaskId',
   'POST /api/tasks/:id/comments',
+  // Phase 2 (the services still refuse someone else's comment/attachment, reopening an occurrence
+  // concluded by someone else and saving a process as a template, for a collaborator).
+  'GET /api/tasks/calendar',
+  'GET /api/tasks/reports',
+  'GET /api/tasks/reports/export.csv',
+  'GET /api/tasks/audit',
+  'GET /api/tasks/recurring',
+  'GET /api/tasks/recurring/:id',
+  'GET /api/tasks/recurring/:id/occurrences/:period',
+  'GET /api/tasks/flows',
+  'POST /api/tasks/flows',
+  'GET /api/tasks/flows/:id',
+  'GET /api/tasks/flow-templates',
+  'GET /api/tasks/flow-templates/:id',
+  'POST /api/tasks/flow-templates/:id/apply',
+  'GET /api/tasks/notes',
+  'POST /api/tasks/notes',
+  'PUT /api/tasks/notes/:id',
+  'DELETE /api/tasks/notes/:id',
+  'GET /api/tasks/:id/history',
+  'DELETE /api/tasks/:id/comments/:commentId',
+  'GET /api/tasks/:id/attachments',
+  'POST /api/tasks/:id/attachments',
+  'GET /api/tasks/:id/attachments/:attachmentId/download',
+  'DELETE /api/tasks/:id/attachments/:attachmentId',
 ]);
 
 const concrete = (path: string) => path.replace(/:[A-Za-z]+/g, () => randomUUID());

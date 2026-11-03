@@ -70,6 +70,38 @@ export class FieldCipher {
     }
   }
 
+  /**
+   * Encrypts binary content (a task attachment): `iv (12 bytes) || ciphertext || tag (16 bytes)`, with
+   * the AAD bound to the workspace, the table, the column and `context` (the row id), so a content
+   * copied to another row, table or workspace does not decrypt.
+   */
+  async encryptBytes(table: string, column: string, context: string, data: Uint8Array): Promise<Uint8Array> {
+    const iv = randomBytes(12);
+    const ct = await globalThis.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData: utf8(`${this.workspaceId}:${table}:${column}:${context}`) },
+      this.key,
+      data as Bytes,
+    );
+    const out = new Uint8Array(12 + ct.byteLength);
+    out.set(iv, 0);
+    out.set(new Uint8Array(ct), 12);
+    return out;
+  }
+
+  async decryptBytes(table: string, column: string, context: string, data: Uint8Array): Promise<Uint8Array> {
+    if (data.byteLength < 12 + 16) throw new DecryptionError('Dado protegido em formato desconhecido');
+    try {
+      const plain = await globalThis.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: data.slice(0, 12), additionalData: utf8(`${this.workspaceId}:${table}:${column}:${context}`) },
+        this.key,
+        data.slice(12),
+      );
+      return new Uint8Array(plain);
+    } catch {
+      throw new DecryptionError();
+    }
+  }
+
   /** Encrypts the given columns of a row-like object (other keys are copied as is). */
   async encryptFields<T extends Record<string, unknown>>(table: string, row: T, columns: readonly (keyof T & string)[]) {
     const out: Record<string, unknown> = { ...row };

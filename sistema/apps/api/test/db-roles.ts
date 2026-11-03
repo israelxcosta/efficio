@@ -53,4 +53,14 @@ export const TENANT_TABLES = [
   'task_subtasks',
   'task_comments',
   'task_client_responsibles',
+  // Task module, phase 2 (migration 0014).
+  'recurring_tasks',
+  'recurring_task_clients',
+  'task_flow_templates',
+  'task_flow_template_steps',
+  'task_flows',
+  'task_flow_steps',
+  'task_events',
+  'task_attachments',
+  'task_notes',
 ] as const;

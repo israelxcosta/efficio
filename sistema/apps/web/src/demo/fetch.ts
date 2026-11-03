@@ -11,6 +11,10 @@ export async function demoFetch(input: string, init: RequestInit = {}): Promise<
   const result = await router.handle(method, input, body, headers);
   const responseHeaders = { ...result.headers };
   if (result.status === 204 || result.body === undefined) return new Response(null, { status: result.status, headers: responseHeaders });
+  // A download or a CSV export: the bytes/text as the route typed them.
+  if (result.body instanceof Uint8Array || (typeof result.body === 'string' && !(responseHeaders['content-type'] ?? 'json').includes('json'))) {
+    return new Response(result.body as BodyInit, { status: result.status, headers: responseHeaders });
+  }
   return new Response(JSON.stringify(result.body), {
     status: result.status,
     headers: { ...responseHeaders, 'Content-Type': 'application/json' },

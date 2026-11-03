@@ -1,7 +1,7 @@
 // Minimal Fastify look-alike that runs the API route plugins in the browser.
 // Supports exactly what the API route plugins use: register(prefix, opts), addHook('onRequest' |
 // 'onRoute'), get/post/put/patch/delete with zod `schema` (params/querystring/body) and
-// reply.code().header().send().
+// reply.code().header().send() — JSON, or bytes/text with their own content type (downloads, CSV).
 
 import { ZodError, type ZodType } from 'zod';
 import type { ApiError } from '@effinance/shared';
@@ -239,6 +239,11 @@ export class DemoRouter {
 
       const result = await route.handler(req, reply);
       const payload = reply.sent ? reply.payload : result;
+      // Files and text the route typed itself (an attachment download, a CSV export) go as they are.
+      const type = reply.headers['content-type'];
+      if (type && !type.includes('json') && (payload instanceof Uint8Array || typeof payload === 'string')) {
+        return { status: reply.statusCode, body: payload, headers: reply.headers };
+      }
       // JSON round-trip mirrors what goes over the wire (Dates → ISO strings).
       return {
         status: reply.statusCode,

@@ -48,7 +48,16 @@ beforeEach(async () => {
   await resetDb(app);
 });
 
-const TASK_TABLES = TENANT_TABLES.filter((t) => t.startsWith('task'));
+/** Phase 1 tables (each seeded with one row by `seedOffice`); phase 2 has its own suite (tasks-phase2-db). */
+const TASK_TABLES = [
+  'task_departments',
+  'task_department_members',
+  'task_categories',
+  'tasks',
+  'task_subtasks',
+  'task_comments',
+  'task_client_responsibles',
+] as const satisfies readonly (typeof TENANT_TABLES)[number][];
 const DELETED_USER = 'Usuário excluído';
 /**
  * Something shaped like a field ciphertext (`v1.<16>.<23+>`, the CHECKs of 0013), for writes meant to

@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  customType,
   date,
   foreignKey,
   index,
@@ -31,16 +32,21 @@ import type {
   IconName,
   ImportFormat,
   InactivationReason,
+  AssigneeSource,
   LateFeeKind,
   MemberRole,
   MonthKey,
   OpenFinanceProvider,
   OpenTaskStatus,
   PaymentMethod,
+  NonBusinessDayRule,
   PlanCode,
   RecurrenceKind,
+  RecurrencePeriod,
   SimplesAnnex,
   SubscriptionStatus,
+  TaskAttachmentType,
+  TaskEventKind,
   TaskPriority,
   TaskStatus,
   TaxRegime,
@@ -1140,6 +1146,87 @@ const ENCRYPTED_TEXT_PATTERN = '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$';
  */
 const ENCRYPTED_TEXT_MAX = 28000;
 
+/** CHECK of an encrypted text column: the `v1.<iv>.<ct>` format (never clear text) and a ceiling. */
+const encryptedCheck = (name: string, column: AnyPgColumn, max: number) =>
+  check(name, sql`${column} ~ ${sql.raw(`'${ENCRYPTED_TEXT_PATTERN}'`)} and length(${column}) <= ${sql.raw(String(max))}`);
+
+const MONTH_KEY_PATTERN = `'^[0-9]{4}-(0[1-9]|1[0-2])$'`;
+
+// ---------------------------------------------------------------------------
+// Tasks, phase 2 (migration 0014): recurring tasks and their occurrences (rows of `tasks`), processes
+// and templates, the history of each task, attachments and personal notes. Same tenant pattern.
+// ---------------------------------------------------------------------------
+
+/**
+ * Recurring task ("tarefa recorrente", Effy's ObligationDef). Its occurrences are rows of `tasks`
+ * (one per client and period), generated idempotently (modules/tasks/generation.ts).
+ */
+export const recurringTasks = pgTable(
+  'recurring_tasks',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    name: text().notNull(),
+    /** Encrypted with the workspace key (`v1.<iv>.<ct>`, modules/tasks/encrypted-text.ts). */
+    description: text(),
+    departmentId: uuid(),
+    categoryId: uuid(),
+    /** Default responsible (clients without a responsible in the department). */
+    defaultAssigneeId: uuid(),
+    period: text().$type<RecurrencePeriod>().notNull().default('monthly'),
+    /** Day of the month (1–31) or, weekly, the ISO weekday (1 = Monday). */
+    dueDay: integer().notNull(),
+    dueMonth: integer(),
+    targetDaysBefore: integer().notNull().default(0),
+    nonBusinessDayRule: text().$type<NonBusinessDayRule>().notNull().default('anticipate'),
+    referenceOffset: integer().notNull().default(1),
+    regimes: text().array().$type<TaxRegime[]>().notNull().default(sql`'{}'::text[]`),
+    startCompetence: text().$type<MonthKey>().notNull(),
+    endCompetence: text().$type<MonthKey>(),
+    createdBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    createdByName: text().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('recurring_tasks', t),
+    index('recurring_tasks_department_idx').on(t.workspaceId, t.departmentId),
+    index('recurring_tasks_category_idx').on(t.workspaceId, t.categoryId),
+    index('recurring_tasks_assignee_idx').on(t.workspaceId, t.defaultAssigneeId),
+    index('recurring_tasks_created_by_idx').on(t.createdBy).where(sql`${t.createdBy} is not null`),
+    check('recurring_tasks_name_chk', sql`length(${t.name}) between 1 and 200`),
+    check('recurring_tasks_created_by_name_chk', sql`length(${t.createdByName}) between 1 and 120`),
+    encryptedCheck('recurring_tasks_description_chk', t.description, ENCRYPTED_TEXT_MAX),
+    check('recurring_tasks_period_chk', sql`${t.period} in ('weekly', 'monthly', 'bimonthly', 'quarterly', 'semiannual', 'annual')`),
+    check('recurring_tasks_rule_chk', sql`${t.nonBusinessDayRule} in ('anticipate', 'postpone', 'keep')`),
+    check(
+      'recurring_tasks_schedule_chk',
+      sql`(${t.period} = 'weekly' and ${t.dueDay} between 1 and 7 and ${t.dueMonth} is null and ${t.targetDaysBefore} between 0 and 6 and ${t.referenceOffset} = 0) or (${t.period} = 'monthly' and ${t.dueDay} between 1 and 31 and ${t.dueMonth} is null) or (${t.period} in ('bimonthly', 'quarterly', 'semiannual', 'annual') and ${t.dueDay} between 1 and 31 and ${t.dueMonth} is not null and ${t.dueMonth} between 1 and 12)`,
+    ),
+    check('recurring_tasks_target_chk', sql`${t.targetDaysBefore} between 0 and 30`),
+    check('recurring_tasks_reference_chk', sql`${t.referenceOffset} between 0 and 12`),
+    check(
+      'recurring_tasks_regimes_chk',
+      sql`${t.regimes} <@ array['simples_nacional', 'mei', 'presumed_profit', 'real_profit', 'exempt', 'other']::text[] and cardinality(${t.regimes}) <= 6`,
+    ),
+    check(
+      'recurring_tasks_competence_chk',
+      sql`${t.startCompetence} ~ ${sql.raw(MONTH_KEY_PATTERN)} and (${t.endCompetence} is null or (${t.endCompetence} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.endCompetence} >= ${t.startCompetence}))`,
+    ),
+    foreignKey({
+      name: 'recurring_tasks_department_fk',
+      columns: [t.workspaceId, t.departmentId],
+      foreignColumns: [taskDepartments.workspaceId, taskDepartments.id],
+    }),
+    foreignKey({
+      name: 'recurring_tasks_category_fk',
+      columns: [t.workspaceId, t.categoryId],
+      foreignColumns: [taskCategories.workspaceId, taskCategories.id],
+    }).onDelete('set null'),
+    memberFk('recurring_tasks_assignee_fk', [t.workspaceId, t.defaultAssigneeId]).onDelete('set null'),
+  ],
+);
+
 export const tasks = pgTable(
   'tasks',
   {
@@ -1176,11 +1263,31 @@ export const tasks = pgTable(
     completedAt: timestamptz(),
     completedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
     completedByName: text(),
+    /** Recurring occurrence (migration 0014): the recurring task, its period and deadlines. */
+    recurringTaskId: uuid(),
+    /** Month the (nominal) legal deadline falls in: the audit column. */
+    competence: text().$type<MonthKey>(),
+    /** The competence, or the Monday (`YYYY-MM-DD`) of a weekly occurrence: identity with the client. */
+    periodKey: text(),
+    referenceMonth: text().$type<MonthKey>(),
+    /** Internal target ("meta"); the legal deadline is `due_date`. */
+    targetDate: calendarDate(),
+    /** Where the responsible of an occurrence came from ('manual' = only this competence). */
+    assigneeSource: text().$type<AssigneeSource>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     tenantUnique('tasks', t),
+    // Migration 0014: one occurrence per recurring task, client and period (the generation's ON
+    // CONFLICT target; standalone tasks have nulls there and never conflict).
+    unique('tasks_occurrence_uq').on(t.workspaceId, t.recurringTaskId, t.clientId, t.periodKey),
+    index('tasks_recurring_idx').on(t.workspaceId, t.recurringTaskId, t.competence),
+    index('tasks_competence_idx').on(t.workspaceId, t.competence).where(sql`${t.recurringTaskId} is not null`),
+    check(
+      'tasks_occurrence_chk',
+      sql`(${t.recurringTaskId} is null and ${t.competence} is null and ${t.periodKey} is null and ${t.referenceMonth} is null and ${t.targetDate} is null and ${t.assigneeSource} is null) or (${t.recurringTaskId} is not null and ${t.clientId} is not null and ${t.dueDate} is not null and ${t.targetDate} is not null and ${t.targetDate} <= ${t.dueDate} and ${t.competence} is not null and ${t.competence} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.referenceMonth} is not null and ${t.referenceMonth} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.periodKey} is not null and ${t.periodKey} ~ '^[0-9]{4}-(0[1-9]|1[0-2])(-[0-9]{2})?$' and (${t.assigneeSource} is null or ${t.assigneeSource} in ('manual', 'client', 'default')))`,
+    ),
     index('tasks_due_idx').on(t.workspaceId, t.dueDate),
     index('tasks_assignee_idx').on(t.workspaceId, t.assigneeId),
     index('tasks_department_idx').on(t.workspaceId, t.departmentId),
@@ -1237,6 +1344,11 @@ export const tasks = pgTable(
       foreignColumns: [taskCategories.workspaceId, taskCategories.id],
     }).onDelete('set null'),
     memberFk('tasks_assignee_fk', [t.workspaceId, t.assigneeId]).onDelete('set null'),
+    foreignKey({
+      name: 'tasks_recurring_fk',
+      columns: [t.workspaceId, t.recurringTaskId],
+      foreignColumns: [recurringTasks.workspaceId, recurringTasks.id],
+    }),
   ],
 );
 
@@ -1325,6 +1437,321 @@ export const taskClientResponsibles = pgTable(
   ],
 );
 
+/** Clients chosen by hand for a recurring task (`include`) and the exceptions of its regimes (`exclude`). */
+export const recurringTaskClients = pgTable(
+  'recurring_task_clients',
+  {
+    workspaceId: workspaceRef().notNull(),
+    recurringTaskId: uuid().notNull(),
+    clientId: uuid().notNull(),
+    /** Always 'client' (generated): the foreign key only accepts clients. */
+    clientKind: text()
+      .$type<'client'>()
+      .generatedAlwaysAs(sql`'client'`),
+    mode: text().$type<'include' | 'exclude'>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'recurring_task_clients_pk', columns: [t.workspaceId, t.recurringTaskId, t.clientId] }),
+    index('recurring_task_clients_client_idx').on(t.workspaceId, t.clientId),
+    check('recurring_task_clients_mode_chk', sql`${t.mode} in ('include', 'exclude')`),
+    foreignKey({
+      name: 'recurring_task_clients_task_fk',
+      columns: [t.workspaceId, t.recurringTaskId],
+      foreignColumns: [recurringTasks.workspaceId, recurringTasks.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'recurring_task_clients_client_fk',
+      columns: [t.workspaceId, t.clientId, t.clientKind],
+      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
+    }).onDelete('cascade'),
+  ],
+);
+
+/** Template of a process ("modelo de processo"): relative deadlines, no client. */
+export const taskFlowTemplates = pgTable(
+  'task_flow_templates',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    title: text().notNull(),
+    /** Encrypted with the workspace key. */
+    description: text(),
+    createdBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    createdByName: text().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('task_flow_templates', t),
+    index('task_flow_templates_created_by_idx').on(t.createdBy).where(sql`${t.createdBy} is not null`),
+    check('task_flow_templates_title_chk', sql`length(${t.title}) between 1 and 200`),
+    check('task_flow_templates_created_by_name_chk', sql`length(${t.createdByName}) between 1 and 120`),
+    encryptedCheck('task_flow_templates_description_chk', t.description, ENCRYPTED_TEXT_MAX),
+  ],
+);
+
+export const taskFlowTemplateSteps = pgTable(
+  'task_flow_template_steps',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    templateId: uuid().notNull(),
+    position: integer().notNull(),
+    title: text().notNull(),
+    /** Encrypted with the workspace key. */
+    description: text(),
+    departmentId: uuid(),
+    categoryId: uuid(),
+    assigneeId: uuid(),
+    priority: text().$type<TaskPriority>().notNull().default('medium'),
+    relativeDays: integer().notNull().default(0),
+  },
+  (t) => [
+    tenantUnique('task_flow_template_steps', t),
+    unique('task_flow_template_steps_position_uq').on(t.workspaceId, t.templateId, t.position),
+    index('task_flow_template_steps_department_idx').on(t.workspaceId, t.departmentId),
+    index('task_flow_template_steps_category_idx').on(t.workspaceId, t.categoryId),
+    index('task_flow_template_steps_assignee_idx').on(t.workspaceId, t.assigneeId),
+    check('task_flow_template_steps_title_chk', sql`length(${t.title}) between 1 and 200`),
+    check('task_flow_template_steps_position_chk', sql`${t.position} between 1 and 30`),
+    check('task_flow_template_steps_days_chk', sql`${t.relativeDays} between 0 and 365`),
+    check('task_flow_template_steps_priority_chk', sql`${t.priority} in ('low', 'medium', 'high', 'urgent')`),
+    encryptedCheck('task_flow_template_steps_description_chk', t.description, ENCRYPTED_TEXT_MAX),
+    foreignKey({
+      name: 'task_flow_template_steps_template_fk',
+      columns: [t.workspaceId, t.templateId],
+      foreignColumns: [taskFlowTemplates.workspaceId, taskFlowTemplates.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'task_flow_template_steps_department_fk',
+      columns: [t.workspaceId, t.departmentId],
+      foreignColumns: [taskDepartments.workspaceId, taskDepartments.id],
+    }).onDelete('set null'),
+    foreignKey({
+      name: 'task_flow_template_steps_category_fk',
+      columns: [t.workspaceId, t.categoryId],
+      foreignColumns: [taskCategories.workspaceId, taskCategories.id],
+    }).onDelete('set null'),
+    memberFk('task_flow_template_steps_assignee_fk', [t.workspaceId, t.assigneeId]).onDelete('set null'),
+  ],
+);
+
+/** A process ("processo", Effy's TaskFlow): only the active step is a real task. */
+export const taskFlows = pgTable(
+  'task_flows',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    title: text().notNull(),
+    clientId: uuid(),
+    /** Always 'client' (generated): the foreign key only accepts clients. */
+    clientKind: text()
+      .$type<'client'>()
+      .generatedAlwaysAs(sql`'client'`),
+    templateId: uuid(),
+    createdBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    createdByName: text().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('task_flows', t),
+    index('task_flows_client_idx').on(t.workspaceId, t.clientId),
+    index('task_flows_template_idx').on(t.workspaceId, t.templateId),
+    index('task_flows_created_by_idx').on(t.createdBy).where(sql`${t.createdBy} is not null`),
+    check('task_flows_title_chk', sql`length(${t.title}) between 1 and 200`),
+    check('task_flows_created_by_name_chk', sql`length(${t.createdByName}) between 1 and 120`),
+    foreignKey({
+      name: 'task_flows_client_fk',
+      columns: [t.workspaceId, t.clientId, t.clientKind],
+      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
+    }),
+    foreignKey({
+      name: 'task_flows_template_fk',
+      columns: [t.workspaceId, t.templateId],
+      foreignColumns: [taskFlowTemplates.workspaceId, taskFlowTemplates.id],
+    }).onDelete('set null'),
+  ],
+);
+
+export const taskFlowSteps = pgTable(
+  'task_flow_steps',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    flowId: uuid().notNull(),
+    position: integer().notNull(),
+    title: text().notNull(),
+    /** Encrypted with the workspace key. */
+    description: text(),
+    clientId: uuid(),
+    clientKind: text()
+      .$type<'client'>()
+      .generatedAlwaysAs(sql`'client'`),
+    departmentId: uuid(),
+    categoryId: uuid(),
+    assigneeId: uuid(),
+    priority: text().$type<TaskPriority>().notNull().default('medium'),
+    /** Absolute deadline (built by hand) or, once activated, the computed one. */
+    dueDate: calendarDate(),
+    relativeDays: integer(),
+    /** The task created when the step was activated (once). */
+    taskId: uuid(),
+    activatedAt: timestamptz(),
+    /** When its task was first concluded: recorded once (the base of the next step's deadline). */
+    completedAt: timestamptz(),
+  },
+  (t) => [
+    tenantUnique('task_flow_steps', t),
+    unique('task_flow_steps_position_uq').on(t.workspaceId, t.flowId, t.position),
+    unique('task_flow_steps_task_uq').on(t.workspaceId, t.taskId),
+    index('task_flow_steps_client_idx').on(t.workspaceId, t.clientId),
+    index('task_flow_steps_department_idx').on(t.workspaceId, t.departmentId),
+    index('task_flow_steps_category_idx').on(t.workspaceId, t.categoryId),
+    index('task_flow_steps_assignee_idx').on(t.workspaceId, t.assigneeId),
+    check('task_flow_steps_title_chk', sql`length(${t.title}) between 1 and 200`),
+    check('task_flow_steps_position_chk', sql`${t.position} between 1 and 30`),
+    check('task_flow_steps_days_chk', sql`${t.relativeDays} is null or ${t.relativeDays} between 0 and 365`),
+    check('task_flow_steps_priority_chk', sql`${t.priority} in ('low', 'medium', 'high', 'urgent')`),
+    check('task_flow_steps_activation_chk', sql`(${t.taskId} is null or ${t.activatedAt} is not null) and (${t.completedAt} is null or ${t.activatedAt} is not null)`),
+    encryptedCheck('task_flow_steps_description_chk', t.description, ENCRYPTED_TEXT_MAX),
+    foreignKey({
+      name: 'task_flow_steps_flow_fk',
+      columns: [t.workspaceId, t.flowId],
+      foreignColumns: [taskFlows.workspaceId, taskFlows.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'task_flow_steps_client_fk',
+      columns: [t.workspaceId, t.clientId, t.clientKind],
+      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
+    }),
+    foreignKey({
+      name: 'task_flow_steps_department_fk',
+      columns: [t.workspaceId, t.departmentId],
+      foreignColumns: [taskDepartments.workspaceId, taskDepartments.id],
+    }).onDelete('set null'),
+    foreignKey({
+      name: 'task_flow_steps_category_fk',
+      columns: [t.workspaceId, t.categoryId],
+      foreignColumns: [taskCategories.workspaceId, taskCategories.id],
+    }).onDelete('set null'),
+    memberFk('task_flow_steps_assignee_fk', [t.workspaceId, t.assigneeId]).onDelete('set null'),
+    foreignKey({
+      name: 'task_flow_steps_task_fk',
+      columns: [t.workspaceId, t.taskId],
+      foreignColumns: [tasks.workspaceId, tasks.id],
+    }).onDelete('set null'),
+  ],
+);
+
+/**
+ * History of a task ("linha do tempo"), written by the services. `data` holds only structured,
+ * non-sensitive facts (field names, statuses, member ids and names as recorded); free text (a reopening
+ * reason, a file name) goes encrypted in `note`.
+ */
+export const taskEvents = pgTable(
+  'task_events',
+  {
+    id: id(),
+    /** Order of the entries (several are written in the same instant, e.g. "created" + "flow_step"). */
+    seq: bigint({ mode: 'number' }).notNull().generatedAlwaysAsIdentity(),
+    workspaceId: workspaceRef().notNull(),
+    taskId: uuid().notNull(),
+    kind: text().$type<TaskEventKind>().notNull(),
+    actorId: uuid().references(() => users.id, { onDelete: 'set null' }),
+    /** Name of the actor at the time; null = the system. */
+    actorName: text(),
+    data: jsonb().$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    /** Encrypted with the workspace key. */
+    note: text(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    tenantUnique('task_events', t),
+    index('task_events_task_idx').on(t.workspaceId, t.taskId, t.seq),
+    index('task_events_actor_idx').on(t.actorId).where(sql`${t.actorId} is not null`),
+    check(
+      'task_events_kind_chk',
+      sql`${t.kind} in ('created', 'updated', 'assigned', 'status', 'reopened', 'commented', 'comment_removed', 'attachment_added', 'attachment_removed', 'flow_step')`,
+    ),
+    check('task_events_actor_name_chk', sql`length(${t.actorName}) between 1 and 120`),
+    check('task_events_data_chk', sql`jsonb_typeof(${t.data}) = 'object' and length(${t.data}::text) <= 4000`),
+    encryptedCheck('task_events_note_chk', t.note, ENCRYPTED_TEXT_MAX),
+    foreignKey({
+      name: 'task_events_task_fk',
+      columns: [t.workspaceId, t.taskId],
+      foreignColumns: [tasks.workspaceId, tasks.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+/** Binary column (bytea): postgres-js returns a Buffer, PGlite a Uint8Array — both are Uint8Array. */
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({ dataType: () => 'bytea' });
+
+/**
+ * Attachment of a task, stored in the database (no file storage to run): the content encrypted with
+ * the workspace key (AES-256-GCM: 12-byte IV + ciphertext + 16-byte tag, AAD bound to the workspace,
+ * the table and the attachment id), the name encrypted like any free text.
+ */
+export const taskAttachments = pgTable(
+  'task_attachments',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: workspaceRef().notNull(),
+    taskId: uuid().notNull(),
+    /** Encrypted with the workspace key. */
+    fileName: text().notNull(),
+    contentType: text().$type<TaskAttachmentType>().notNull(),
+    sizeBytes: integer().notNull(),
+    content: bytea().notNull(),
+    uploadedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    uploadedByName: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    tenantUnique('task_attachments', t),
+    index('task_attachments_task_idx').on(t.workspaceId, t.taskId, t.createdAt),
+    index('task_attachments_uploaded_by_idx').on(t.uploadedBy).where(sql`${t.uploadedBy} is not null`),
+    encryptedCheck('task_attachments_file_name_chk', t.fileName, 2000),
+    check(
+      'task_attachments_type_chk',
+      sql`${t.contentType} in ('application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/xml', 'text/plain', 'text/csv', 'application/zip')`,
+    ),
+    check('task_attachments_size_chk', sql`${t.sizeBytes} between 1 and 10485760 and octet_length(${t.content}) = ${t.sizeBytes} + 28`),
+    check('task_attachments_uploaded_by_name_chk', sql`length(${t.uploadedByName}) between 1 and 120`),
+    foreignKey({
+      name: 'task_attachments_task_fk',
+      columns: [t.workspaceId, t.taskId],
+      foreignColumns: [tasks.workspaceId, tasks.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+/** Personal note ("Minhas anotações", Effy's UserNote): private to its author, title and text encrypted. */
+export const taskNotes = pgTable(
+  'task_notes',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    userId: uuid().notNull(),
+    /** Encrypted with the workspace key. */
+    title: text().notNull(),
+    /** Encrypted with the workspace key. */
+    content: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('task_notes', t),
+    index('task_notes_user_idx').on(t.workspaceId, t.userId, t.updatedAt),
+    encryptedCheck('task_notes_title_chk', t.title, 2000),
+    // 20000 UTF-16 units are at most 60000 UTF-8 bytes: ~80 thousand characters of ciphertext.
+    encryptedCheck('task_notes_content_chk', t.content, 81000),
+    memberFk('task_notes_member_fk', [t.workspaceId, t.userId]).onDelete('cascade'),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type CategoryRow = typeof categories.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
@@ -1342,3 +1769,10 @@ export type BankConnectionAccountRow = typeof bankConnectionAccounts.$inferSelec
 export type TaskDepartmentRow = typeof taskDepartments.$inferSelect;
 export type TaskCategoryRow = typeof taskCategories.$inferSelect;
 export type TaskRow = typeof tasks.$inferSelect;
+export type RecurringTaskRow = typeof recurringTasks.$inferSelect;
+export type TaskFlowRow = typeof taskFlows.$inferSelect;
+export type TaskFlowStepRow = typeof taskFlowSteps.$inferSelect;
+export type TaskFlowTemplateRow = typeof taskFlowTemplates.$inferSelect;
+export type TaskFlowTemplateStepRow = typeof taskFlowTemplateSteps.$inferSelect;
+export type TaskEventRow = typeof taskEvents.$inferSelect;
+export type TaskNoteRow = typeof taskNotes.$inferSelect;

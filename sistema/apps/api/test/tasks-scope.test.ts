@@ -18,13 +18,26 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
+  applyFlowTemplateSchema,
+  clientResponsibleBatchSchema,
   clientResponsibleInputSchema,
+  flowTemplateInputSchema,
+  recurringTaskInputSchema,
+  recurringTaskQuerySchema,
   TASK_TIME_ZONE,
+  taskAttachmentInputSchema,
+  taskAuditQuerySchema,
+  taskCalendarQuerySchema,
   taskCategoryInputSchema,
   taskDepartmentInputSchema,
+  taskFlowInputSchema,
+  taskFlowQuerySchema,
   taskHomeQuerySchema,
   taskInputSchema,
+  taskNoteInputSchema,
   taskQuerySchema,
+  taskReportExportQuerySchema,
+  taskReportQuerySchema,
   taskUpdateSchema,
 } from '@effinance/shared';
 import type { App } from '../src/app';
@@ -33,7 +46,13 @@ import * as schema from '../src/db/schema';
 import { todayIn } from '../src/lib/clock';
 import { getCipher } from '../src/lib/crypto/keyring';
 import { isTaskAdmin, loadMembers, type TaskContext } from '../src/modules/tasks/access';
+import * as attachmentsModule from '../src/modules/tasks/attachments';
+import * as auditModule from '../src/modules/tasks/audit';
+import * as flowsModule from '../src/modules/tasks/flows';
 import * as homeModule from '../src/modules/tasks/home';
+import * as insightsModule from '../src/modules/tasks/insights';
+import * as notesModule from '../src/modules/tasks/notes';
+import * as recurringModule from '../src/modules/tasks/recurring';
 import * as registryModule from '../src/modules/tasks/registry';
 import * as serviceModule from '../src/modules/tasks/service';
 import { ADMIN_URL, TENANT_TABLES } from './db-roles';
@@ -242,7 +261,7 @@ const clientInput = (name: string, document: string) => ({
 /** Rows of the other office, in a stable order, to compare before and after. */
 async function snapshot(workspaceId: string): Promise<Record<string, unknown[]>> {
   const out: Record<string, unknown[]> = {};
-  for (const table of [...TENANT_TABLES.filter((t) => t.startsWith('task')), 'contacts']) {
+  for (const table of [...TENANT_TABLES.filter((t) => t.startsWith('task') || t.startsWith('recurring')), 'contacts']) {
     const rows = await admin().execute<{ row: unknown }>(
       sql`select to_jsonb(t) as row from ${sql.identifier(table)} t where t.workspace_id = ${workspaceId} order by to_jsonb(t)::text`,
     );
@@ -265,6 +284,9 @@ function tracked<T extends Record<string, unknown>>(mod: T, called: Set<string>)
   }
   return out as T;
 }
+
+/** A tiny but real PDF (the signature check needs `%PDF-`). */
+const PDF_BASE64 = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n').toString('base64');
 
 const exportedFunctions = (...mods: Record<string, unknown>[]) =>
   mods
@@ -387,6 +409,30 @@ describe('tasks: every query filters by the workspace', () => {
     expect(bTask.status).toBe(201);
     await bruno.post(`/tasks/${bTask.body.id}/subtasks`, { title: 'Subtarefa do Bruno' });
     await bruno.post(`/tasks/${bTask.body.id}/comments`, { text: 'Comentário do Bruno' });
+    // Phase 2 rows in B: a recurring task with its occurrences, a process from a template, a note and
+    // an attachment.
+    const bRecurring = await bruno.post('/tasks/recurring', {
+      name: 'DAS do Bruno',
+      description: 'Guia mensal',
+      departmentId: bDepartment.body.id,
+      assigneeId: bruno.userId,
+      dueDay: 20,
+      regimes: ['simples_nacional'],
+    });
+    expect(bRecurring.status).toBe(201);
+    const bTemplate = await bruno.post('/tasks/flow-templates', {
+      title: 'Abertura do Bruno',
+      steps: [{ title: 'Etapa 1', relativeDays: 1 }, { title: 'Etapa 2', relativeDays: 2 }],
+    });
+    expect(bTemplate.status).toBe(201);
+    expect((await bruno.post(`/tasks/flow-templates/${bTemplate.body.id}/apply`, { clientId: bClient.body.id })).status).toBe(201);
+    expect((await bruno.post('/tasks/notes', { title: 'Nota do Bruno', content: 'Só dele' })).status).toBe(201);
+    expect(
+      (await bruno.post(`/tasks/${bTask.body.id}/attachments`, { fileName: 'b.pdf', contentType: 'application/pdf', content: PDF_BASE64 }))
+        .status,
+    ).toBe(201);
+    // Generated up to two competences ahead; the list (no date filter) goes up to the next one.
+    expect((await bruno.get('/tasks?pageSize=5')).body.occurrences.map((o: any) => o.competence)).toEqual(['2026-10', '2026-11']);
     const bWorkspace = await workspaceOf(bruno);
     const before = await snapshot(bWorkspace);
 
@@ -427,6 +473,12 @@ describe('tasks: every query filters by the workspace', () => {
     const registry = tracked(registryModule, called);
     const service = tracked(serviceModule, called);
     const home = tracked(homeModule, called);
+    const recurring = tracked(recurringModule, called);
+    const audit = tracked(auditModule, called);
+    const flows = tracked(flowsModule, called);
+    const insights = tracked(insightsModule, called);
+    const attachments = tracked(attachmentsModule, called);
+    const notes = tracked(notesModule, called);
     statements.length = 0;
 
     // Registries.
@@ -548,6 +600,133 @@ describe('tasks: every query filters by the workspace', () => {
     await run(carlaCtx, (c) => home.taskHome(c, taskHomeQuerySchema.parse({})));
     await run(anaCtx, (c) => home.taskHome(c, taskHomeQuerySchema.parse({ departmentId: 'all' })));
 
+    // Responsibles in batch, the history and removing a comment.
+    await run(anaCtx, (c) =>
+      registry.setClientResponsibles(
+        c,
+        clientResponsibleBatchSchema.parse({ items: [{ ...responsible, userId: carla.userId }] }),
+      ),
+    );
+    const comment = await run(anaCtx, (c) => service.addComment(c, task.id, { text: 'Comentário da Ana' }));
+    await run(anaCtx, (c) => service.deleteComment(c, task.id, comment.id));
+    await run(carlaCtx, (c) => service.taskHistory(c, task.id));
+
+    // Recurring tasks: registry, generation, the occurrence view, the audit, reopening with a reason.
+    const das = await run(anaCtx, (c) =>
+      recurring.createRecurring(
+        c,
+        recurringTaskInputSchema.parse({
+          name: 'DAS',
+          description: 'Guia do Simples',
+          departmentId: fiscal.id,
+          categoryId: category.id,
+          assigneeId: ana.userId,
+          dueDay: 20,
+          targetDaysBefore: 3,
+          regimes: ['simples_nacional'],
+          excludedClientIds: [],
+        }),
+      ),
+    );
+    const weekly = await run(anaCtx, (c) =>
+      recurring.createRecurring(
+        c,
+        recurringTaskInputSchema.parse({ name: 'Conferência semanal', departmentId: fiscal.id, period: 'weekly', dueDay: 5, clientIds: [aClient.body.id] }),
+      ),
+    );
+    await run(anaCtx, (c) =>
+      recurring.updateRecurring(
+        c,
+        das.id,
+        recurringTaskInputSchema.parse({ name: 'DAS mensal', departmentId: fiscal.id, assigneeId: carla.userId, dueDay: 19, regimes: ['simples_nacional'] }),
+      ),
+    );
+    await run(anaCtx, (c) => recurring.generateOccurrences(c, '2026-11'));
+    for (const query of [{}, { month: '2026-11', search: 'das', period: 'monthly', departmentId: fiscal.id, assigneeId: carla.userId, regime: 'simples_nacional', status: 'all' }]) {
+      await run(carlaCtx, (c) => recurring.listRecurring(c, recurringTaskQuerySchema.parse(query)));
+    }
+    await run(carlaCtx, (c) => recurring.getRecurring(c, das.id, '2026-10'));
+    const detail = await run(carlaCtx, (c) => recurring.occurrenceDetail(c, das.id, '2026-10'));
+    expect(detail.cells).toHaveLength(1);
+    const occurrence = detail.cells[0]!.taskId;
+    await run(carlaCtx, (c) => service.updateTask(c, occurrence, taskUpdateSchema.parse({ assigneeId: ana.userId })));
+    await run(carlaCtx, (c) => service.changeTaskStatus(c, occurrence, 'done'));
+    await run(anaCtx, (c) => service.changeTaskStatus(c, occurrence, 'todo', 'Guia emitida com valor errado'));
+    for (const query of [
+      { competence: '2026-10' },
+      { competence: '2026-10', taxRegime: 'simples_nacional', departmentId: fiscal.id, assigneeId: ana.userId, recurringTaskId: das.id },
+    ]) {
+      await run(carlaCtx, (c) => audit.auditMatrix(c, taskAuditQuerySchema.parse(query)));
+    }
+    await run(carlaCtx, (c) => service.listTasks(c, taskQuerySchema.parse({ kind: 'recurring', dueBucket: 'targetMissed' })));
+    await run(anaCtx, (c) => recurring.deleteRecurring(c, weekly.id));
+
+    // Processes and templates.
+    const template = await run(anaCtx, (c) =>
+      flows.createTemplate(
+        c,
+        flowTemplateInputSchema.parse({
+          title: 'Abertura de empresa',
+          description: 'Roteiro',
+          steps: [
+            { title: 'Documentos', departmentId: fiscal.id, assigneeId: carla.userId, relativeDays: 1, description: 'RG e CPF' },
+            { title: 'Contrato social', categoryId: category.id, relativeDays: 2 },
+          ],
+        }),
+      ),
+    );
+    await run(anaCtx, (c) =>
+      flows.updateTemplate(
+        c,
+        template.id,
+        flowTemplateInputSchema.parse({ title: 'Abertura', steps: [{ title: 'Documentos', relativeDays: 1 }, { title: 'Junta', relativeDays: 3 }] }),
+      ),
+    );
+    await run(carlaCtx, (c) => flows.listTemplates(c));
+    await run(carlaCtx, (c) => flows.getTemplate(c, template.id));
+    const applied = await run(carlaCtx, (c) =>
+      flows.applyTemplate(c, template.id, applyFlowTemplateSchema.parse({ clientId: aClient.body.id })),
+    );
+    const handmade = await run(anaCtx, (c) =>
+      flows.createFlow(
+        c,
+        taskFlowInputSchema.parse({
+          title: 'Alteração contratual',
+          clientId: aClient.body.id,
+          saveAsTemplate: true,
+          steps: [{ title: 'Minuta', relativeDays: 0 }, { title: 'Registro', relativeDays: 2 }],
+        }),
+      ),
+    );
+    await run(carlaCtx, (c) => service.changeTaskStatus(c, applied.task.id, 'done'));
+    await run(carlaCtx, (c) => flows.listFlows(c, taskFlowQuerySchema.parse({ status: 'all', clientId: aClient.body.id })));
+    await run(carlaCtx, (c) => flows.getFlow(c, applied.flow.id));
+    await run(carlaCtx, (c) => service.getTaskDetail(c, applied.task.id));
+    await run(anaCtx, (c) => flows.deleteFlow(c, handmade.flow.id));
+    await run(anaCtx, (c) => flows.deleteTemplate(c, handmade.template!.id));
+
+    // Reports, export, calendar.
+    const period = { from: '2026-10-01', to: '2026-10-31' };
+    for (const query of [period, { ...period, kind: 'recurring', situation: 'open', departmentId: fiscal.id }, { ...period, kind: 'flow', clientId: 'internal', assigneeId: 'none' }]) {
+      await run(carlaCtx, (c) => insights.taskReport(c, taskReportQuerySchema.parse(query)));
+    }
+    await run(carlaCtx, (c) => insights.exportTaskReport(c, taskReportExportQuerySchema.parse({ ...period, kind: 'standalone', status: 'done' })));
+    for (const query of [period, { ...period, scope: 'department', kind: 'recurring' }, { ...period, scope: 'mine', kind: 'standalone', categoryId: category.id }]) {
+      await run(carlaCtx, (c) => insights.taskCalendar(c, taskCalendarQuerySchema.parse(query)));
+    }
+
+    // Attachments and notes.
+    const file = await run(carlaCtx, (c) =>
+      attachments.addAttachment(c, task.id, taskAttachmentInputSchema.parse({ fileName: 'guia.pdf', contentType: 'application/pdf', content: PDF_BASE64 })),
+    );
+    await run(carlaCtx, (c) => attachments.listAttachments(c, task.id));
+    await run(anaCtx, (c) => attachments.downloadAttachment(c, task.id, file.id));
+    await run(anaCtx, (c) => attachments.deleteAttachment(c, task.id, file.id));
+    const note = await run(carlaCtx, (c) => notes.createNote(c, taskNoteInputSchema.parse({ title: 'Portal da prefeitura', content: 'Endereço' })));
+    await run(carlaCtx, (c) => notes.updateNote(c, note.id, taskNoteInputSchema.parse({ title: 'Portal', content: null })));
+    await run(carlaCtx, (c) => notes.listNotes(c));
+    await run(carlaCtx, (c) => notes.deleteNote(c, note.id));
+
     // Deletions (a department in use is refused first).
     await expect(run(anaCtx, (c) => registry.deleteDepartment(c, fiscal.id))).rejects.toThrow(
       /neste departamento/,
@@ -561,11 +740,21 @@ describe('tasks: every query filters by the workspace', () => {
 
     // 2. Every service entry point ran.
     expect([...called].sort()).toEqual(
-      exportedFunctions(registryModule, serviceModule, homeModule),
+      exportedFunctions(
+        registryModule,
+        serviceModule,
+        homeModule,
+        recurringModule,
+        auditModule,
+        flowsModule,
+        insightsModule,
+        attachmentsModule,
+        notesModule,
+      ),
     );
 
     // 1. Every statement is scoped to A.
-    expect(statements.length).toBeGreaterThan(80);
+    expect(statements.length).toBeGreaterThan(300);
     const unscoped = statements
       .map((s) => ({ sql: s.sql, tables: unscopedReferences(s, ws) }))
       .filter((s) => s.tables.length > 0);

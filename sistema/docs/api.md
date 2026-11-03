@@ -680,53 +680,71 @@ provider_unavailable` (agregador não respondeu; detalhes só no log do servidor
 # Tarefas (módulo Tarefas)
 
 Gestão de tarefas do escritório (porte das regras do Effy). Especificação de UI:
-`docs/tarefas-ui.md`. Contrato em `packages/shared`: constantes e rótulos em `constants.ts`
-(`TASK_STATUSES`/`TASK_STATUS_LABELS`, `TASK_PRIORITIES`/`TASK_PRIORITY_LABELS`, `TASK_SCOPES`,
-`TASK_SITUATIONS`, `TASK_KINDS`, `TASK_DUE_BUCKETS`, `RECURRENCE_PERIODS`/`RECURRENCE_PERIOD_LABELS`,
-`NON_BUSINESS_DAY_RULES`, `OCCURRENCE_STATUSES`, `FLOW_STEP_STATES`, `TASK_TIME_ZONE`), schemas em
-`schemas.ts` (seção "Tasks"), tipos em `types.ts` (seção "Tasks") e regras puras em
-`utils/tasks.ts` (atrasada, grupos de prazo, fuso do escritório, dias úteis, agenda das recorrentes).
+`docs/tarefas-ui.md` (rev. 3). Contrato em `packages/shared`: constantes e rótulos em `constants.ts`
+(`TASK_STATUSES`, `TASK_PRIORITIES`, `TASK_SCOPES`, `TASK_SITUATIONS`, `TASK_KINDS`,
+`TASK_DUE_BUCKETS` — com `targetMissed`, "Fora da meta" —, `RECURRENCE_PERIODS` (6),
+`RECURRENCE_PERIOD_MONTHS`, `WEEKDAY_LABELS`, `NON_BUSINESS_DAY_RULES`, `MAX_REFERENCE_OFFSET`,
+`OCCURRENCE_STATUSES`, `OCCURRENCE_SITUATIONS`, `ASSIGNEE_SOURCES`, `FLOW_STEP_STATES`,
+`TASK_EVENT_KINDS`, `TASK_ATTACHMENT_TYPES`/`TASK_ATTACHMENT_CONTENT_TYPES`, `MAX_ATTACHMENT_BYTES`,
+`MAX_TASK_ATTACHMENT_BYTES`, `MAX_ATTACHMENTS_PER_TASK`, `TASK_TIME_ZONE`, cada um com os rótulos
+pt-BR), schemas em `schemas.ts` e tipos em `types.ts` (seção "Tasks") e regras puras em
+`utils/tasks.ts` (atrasada, fora da meta, grupos de prazo, fuso do escritório, **feriados nacionais**,
+dias úteis, agenda das recorrentes, situação da ocorrência, nome de arquivo seguro).
 
-**Fases.** A **fase 1** (núcleo) está implementada: departamentos, departamento do membro, categorias,
-tarefas avulsas, subtarefas, comentários, responsável por cliente em cada departamento, listagem com
-filtros e resumo, PATCH de estado e a página de início. As fases 2–4 (tarefas recorrentes e auditoria
-mensal, fluxos e modelos, relatórios/widgets e anotações) têm **contrato rascunhado** em
-`packages/shared` (`RecurringTask`, `AuditMatrixResponse`, `TaskFlow`, `FlowTemplate`,
-`TaskReportResponse`, `TasksDashboardResponse`, `TaskNote` e seus schemas), mas **nem banco nem API**:
-o modelo de recorrência deve mudar para o de "Processos" do Domínio/Onvio (processo com atividades
-dependentes, vínculo processo↔empresa por competência, situações no prazo/fora do prazo, conclusão
-e reabertura com histórico) e será redesenhado antes. Até lá, `GET /tasks` devolve
-`occurrences: []`, `Task.flow` é sempre `null`, `TaskDetail.flowProgress` é `null`,
-`PATCH /tasks/:id/status` devolve `activated: null` e a página de início tem `totals.recurring = 0`.
+**Fases.** A **fase 1** (núcleo: departamentos, categorias, tarefas avulsas, subtarefas, comentários,
+responsável por cliente, lista, início) e a **fase 2** estão implementadas: tarefas recorrentes com
+ocorrências geradas por cliente e competência, auditoria mensal, processos e modelos, relatórios e
+exportação CSV, calendário, anotações pessoais, anexos, histórico (linha do tempo) da tarefa, busca
+global com tarefas e responsáveis em lote. A fase 3 da spec (sindicatos, dados fiscais e documentos do
+cliente, escritório e contrato, permissões por pessoa, foto do perfil) não tem banco nem API.
 
 ## Permissões
 
-- **Todos os membros** do espaço usam o módulo, inclusive `viewer` ("Colaborador"): criar, editar
-  (autosave), concluir/reabrir/mover, subtarefas (criar, marcar, remover) e comentar.
-- **Administradores** (`owner`/`editor`, os mesmos do financeiro): cadastros do módulo
-  (departamentos, departamento do membro, categorias de tarefa, responsável por cliente) e **excluir
-  tarefa**. Violação → `403` "Somente os administradores do espaço podem fazer isso.". Na página de
-  início, só administradores pedem outro departamento ou todos (`403` para os demais).
-- Gravações exigem assinatura com escrita (`402`), como no resto da API; leituras continuam.
-- Implementação: o plugin `/tasks` é montado em `scopedRoutes` com guardas próprios
+- **Todos os membros** do espaço usam o módulo, inclusive `viewer` ("Colaborador"); cadastros e
+  exclusões são dos **administradores** (`owner`/`editor`, os mesmos do financeiro). Violação → `403`
+  "Somente os administradores do espaço podem fazer isso." (`TASK_ADMIN_MESSAGE`). Gravações exigem
+  assinatura com escrita (`402`), como no resto da API; leituras continuam.
+- **Matriz** (rota → quem; as linhas "serviço" são conferidas dentro do serviço, com a mensagem própria):
+
+  | Ação | Colaborador | Administrador |
+  | --- | --- | --- |
+  | Ler tudo do módulo (lista, início, auditoria, recorrentes, processos, modelos, relatórios, CSV, calendário, histórico, anexos) | sim | sim |
+  | Criar/editar/concluir/reabrir/cancelar tarefa avulsa e etapa de processo; subtarefas; comentar; anexar | sim | sim |
+  | Mudar o estado de uma ocorrência (lista, sheet, matriz) e atribuí-la a alguém só naquela competência | sim | sim |
+  | Reabrir ocorrência **concluída** (serviço) | só a que ele concluiu, com motivo | todas, com motivo |
+  | Remover comentário / anexo (serviço) | os próprios | todos |
+  | Aplicar modelo de processo; criar processo avulso | sim | sim |
+  | Salvar processo avulso como modelo (`saveAsTemplate`, serviço) | não (403) | sim |
+  | Anotações pessoais | as próprias | as próprias (nunca as de outro) |
+  | Departamentos, departamento do membro, categorias, responsável por cliente (um e em lote) | não | sim |
+  | Tarefas recorrentes (criar, editar, excluir, gerar competência) | não | sim |
+  | Modelos de processo (criar, editar, excluir) | não | sim |
+  | Excluir tarefa avulsa; excluir processo | não | sim |
+  | Página de início de outro departamento ou de todos | não | sim |
+
+- Implementação: o plugin `/tasks` fica em `scopedRoutes` com guardas próprios
   (`modules/tasks/access.ts`: `taskGuards` = autenticação + assinatura; `requireTaskAdmin` por rota) —
   independente do `financeOnly` e do `assertCanWrite` dos módulos financeiros. Cada requisição lê os
   membros (nomes e papéis) na conexão do sistema e trabalha numa transação de tenant (RLS); a resposta
-  sai depois do COMMIT. O RLS continua sendo só por espaço (uma política por tabela, como as demais);
-  o papel é checado na API.
+  sai depois do COMMIT. O RLS continua só por espaço (uma política por tabela); o papel é checado na
+  API. `test/tasks-security.test.ts` percorre a árvore real de rotas: toda rota nova precisa estar
+  classificada (administrador ou membro).
 - **Filtro por espaço em toda consulta**: todo SELECT/UPDATE/DELETE do módulo filtra por
-  `workspace_id` do pedido — inclusive os UPDATE/DELETE por id que vêm depois da checagem de posse
-  (`taskKey`/`subtaskKey` em `service.ts`); o RLS é a segunda barreira. `test/tasks-scope.test.ts`
-  roda todos os serviços exportados numa conexão de superusuário (sem RLS), captura cada SQL pelo
-  logger do Drizzle e exige `workspace_id = <espaço>` (ou igualdade com uma tabela já filtrada, em
-  joins e subconsultas) para toda tabela de tenant; também confere que outro escritório fica intacto.
-- **Permissão por módulo** (pendência §17.1 da spec): resolvida de forma provisória pelo mapeamento de
-  papéis (financeiro = `owner`/`editor`; tarefas = todos). Uma permissão "Tarefas: editar" separada do
-  papel continua sendo decisão de produto.
+  `workspace_id` do pedido — inclusive os UPDATE/DELETE por id depois da checagem de posse; o RLS é a
+  segunda barreira. `test/tasks-scope.test.ts` roda **todos** os serviços exportados (registros,
+  tarefas, início, recorrentes, auditoria, processos, relatórios/calendário, anexos, anotações) numa
+  conexão de superusuário (sem RLS), captura cada SQL pelo logger do Drizzle e exige
+  `workspace_id = <espaço>` (ou igualdade com uma tabela já filtrada, em joins e subconsultas) para
+  toda tabela de tenant; também confere que outro escritório fica intacto, byte a byte.
+- **Permissão por pessoa** (spec §13.10 e §18, item 11, fase 3): até lá, o mapeamento de papéis acima
+  (financeiro = `owner`/`editor`; tarefas = todos; cadastros e exclusões = administradores). Rótulos
+  dos papéis no contrato (`MEMBER_ROLE_LABELS`/`MEMBER_ROLE_HINTS`, `saas.ts`): **Proprietário**,
+  **Administrador** e **Colaborador** (os mesmos de `apps/web/src/features/auth/roles.ts`).
 - O web sabe quem é administrador por `GET /auth/me` (`workspace.role`) e por `GET /tasks/options`
-  (`me.isAdmin`, `me.canWrite`).
+  (`me.isAdmin`, `me.canWrite`); por registro, `TaskDetail.canReopen`, `TaskComment.canDelete`,
+  `TaskAttachment.canDelete` e `OccurrenceCell.canReopen`.
 
-## Endpoints (fase 1)
+## Endpoints
 
 | Método | Rota | Entrada | Resposta | Quem |
 | --- | --- | --- | --- | --- |
@@ -734,28 +752,60 @@ e reabertura com histórico) e será redesenhado antes. Até lá, `GET /tasks` d
 | GET | `/api/tasks/clients` | — | `TaskClientOption[]` (clientes em leitura, sem honorários) | todos |
 | GET | `/api/tasks/members` | — | `TaskMember[]` | todos |
 | PUT | `/api/tasks/members/:userId/department` | `memberDepartmentSchema` | `TaskMember` | admin |
-| GET | `/api/tasks/departments` | — | `TaskDepartment[]` (membros, em aberto, atrasadas, total) | todos |
+| GET | `/api/tasks/departments` | — | `TaskDepartment[]` (membros, em aberto, atrasadas, recorrentes ativas, total) | todos |
 | POST | `/api/tasks/departments` | `taskDepartmentInputSchema` | `TaskDepartment` (201) | admin |
 | PUT | `/api/tasks/departments/:id` | `taskDepartmentInputSchema` | `TaskDepartment` | admin |
-| DELETE | `/api/tasks/departments/:id` | — | 204; 409 com membros ou tarefas (`details`) | admin |
+| DELETE | `/api/tasks/departments/:id` | — | 204; 409 com membros, recorrentes ou tarefas (`details`) | admin |
 | GET | `/api/tasks/categories` | — | `TaskCategory[]` (com `taskCount`) | todos |
 | POST | `/api/tasks/categories` | `taskCategoryInputSchema` | `TaskCategory` (201) | admin |
 | PUT | `/api/tasks/categories/:id` | `taskCategoryInputSchema` | `TaskCategory` | admin |
-| DELETE | `/api/tasks/categories/:id` | — | 204 (tarefas ficam sem categoria) | admin |
+| DELETE | `/api/tasks/categories/:id` | — | 204 (tarefas, recorrentes e etapas ficam sem categoria) | admin |
 | GET | `/api/tasks/client-responsibles` | — | `ClientResponsiblesResponse` (grade cliente × departamento) | todos |
-| PUT | `/api/tasks/client-responsibles` | `clientResponsibleInputSchema` | `ClientResponsible`; 204 com `userId: null` (remove) | admin |
+| PUT | `/api/tasks/client-responsibles` | `clientResponsibleInputSchema` (`userId: null` remove) | `ClientResponsibleChangeResponse` | admin |
+| PUT | `/api/tasks/client-responsibles/batch` | `clientResponsibleBatchSchema` (até 500 pares) | `ClientResponsibleChangeResponse` | admin |
 | GET | `/api/tasks/home` | `taskHomeQuerySchema` (`departmentId` = id ou `all`, `month`) | `TaskHomeResponse` | todos (outro depto./`all`: admin) |
 | GET | `/api/tasks/activity` | — | `TaskActivityItem[]` | todos |
+| GET | `/api/tasks/calendar` | `taskCalendarQuerySchema` (`from`, `to` ≤ 62 dias, escopo e filtros) | `TaskCalendarResponse` | todos |
+| GET | `/api/tasks/reports` | `taskReportQuerySchema` (período ≤ 1 ano, filtros, página até 1000) | `TaskReportResponse` | todos |
+| GET | `/api/tasks/reports/export.csv` | `taskReportExportQuerySchema` | `text/csv` (download, até 10 000 linhas) | todos |
+| GET | `/api/tasks/audit` | `taskAuditQuerySchema` (`competence`, `taxRegime`, `departmentId`, `assigneeId`, `recurringTaskId`) | `AuditMatrixResponse` | todos |
+| GET | `/api/tasks/recurring` | `recurringTaskQuerySchema` | `RecurringTaskListResponse` | todos |
+| POST | `/api/tasks/recurring` | `recurringTaskInputSchema` | `RecurringTask` (201; gera as ocorrências da janela) | admin |
+| POST | `/api/tasks/recurring/generate` | `recurringGenerateSchema` (`competence`) | `RecurringGenerateResponse` | admin |
+| GET | `/api/tasks/recurring/:id` | `?month` | `RecurringTask` | todos |
+| PUT | `/api/tasks/recurring/:id` | `recurringTaskInputSchema` (substitui tudo) | `RecurringTask` (ressincroniza as não iniciadas) | admin |
+| DELETE | `/api/tasks/recurring/:id` | — | 204; 409 com histórico | admin |
+| GET | `/api/tasks/recurring/:id/occurrences/:period` | `period` = `AAAA-MM` ou a segunda-feira `AAAA-MM-DD` da semanal | `RecurringOccurrenceDetail` | todos |
+| GET | `/api/tasks/flows` | `taskFlowQuerySchema` (`status`, `clientId`) | `TaskFlow[]` (até 200, mais recentes) | todos |
+| POST | `/api/tasks/flows` | `taskFlowInputSchema` | `TaskFlowCreatedResponse` (201) | todos (`saveAsTemplate`: admin) |
+| GET | `/api/tasks/flows/:id` | — | `TaskFlow` | todos |
+| DELETE | `/api/tasks/flows/:id` | — | 204 (as tarefas ficam) | admin |
+| GET | `/api/tasks/flow-templates` | — | `FlowTemplate[]` | todos |
+| POST | `/api/tasks/flow-templates` | `flowTemplateInputSchema` | `FlowTemplate` (201) | admin |
+| GET | `/api/tasks/flow-templates/:id` | — | `FlowTemplate` | todos |
+| PUT | `/api/tasks/flow-templates/:id` | `flowTemplateInputSchema` (substitui as etapas) | `FlowTemplate` | admin |
+| DELETE | `/api/tasks/flow-templates/:id` | — | 204 (processos aplicados continuam) | admin |
+| POST | `/api/tasks/flow-templates/:id/apply` | `applyFlowTemplateSchema` | `TaskFlowCreatedResponse` (201) | todos |
+| GET | `/api/tasks/notes` | — | `TaskNote[]` (só as suas) | todos |
+| POST | `/api/tasks/notes` | `taskNoteInputSchema` | `TaskNote` (201) | todos |
+| PUT | `/api/tasks/notes/:id` | `taskNoteInputSchema` | `TaskNote` | dono |
+| DELETE | `/api/tasks/notes/:id` | — | 204 | dono |
 | GET | `/api/tasks` | `taskQuerySchema` | `TaskListResponse` | todos |
 | POST | `/api/tasks` | `taskInputSchema` | `TaskDetail` (201) | todos |
 | GET | `/api/tasks/:id` | — | `TaskDetail` | todos |
 | PATCH | `/api/tasks/:id` | `taskUpdateSchema` (só os campos enviados) | `TaskDetail` | todos |
-| PATCH | `/api/tasks/:id/status` | `taskStatusInputSchema` | `TaskStatusChangeResponse` | todos |
-| DELETE | `/api/tasks/:id` | — | 204 (subtarefas e comentários juntos) | admin |
+| PATCH | `/api/tasks/:id/status` | `taskStatusInputSchema` (`status`, `reason`) | `TaskStatusChangeResponse` | todos (regras de reabertura) |
+| DELETE | `/api/tasks/:id` | — | 204 (subtarefas, comentários, anexos e histórico juntos); 409 para ocorrência | admin |
+| GET | `/api/tasks/:id/history` | — | `TaskHistoryResponse` (até 500, mais recentes primeiro) | todos |
 | POST | `/api/tasks/:id/subtasks` | `subtaskInputSchema` | `TaskSubtask` (201) | todos |
 | PATCH | `/api/tasks/:id/subtasks/:subtaskId` | `subtaskUpdateSchema` (`title` e/ou `done`) | `TaskSubtask` | todos |
 | DELETE | `/api/tasks/:id/subtasks/:subtaskId` | — | 204 | todos |
 | POST | `/api/tasks/:id/comments` | `taskCommentInputSchema` | `TaskComment` (201) | todos |
+| DELETE | `/api/tasks/:id/comments/:commentId` | — | 204 | autor ou admin |
+| GET | `/api/tasks/:id/attachments` | — | `TaskAttachment[]` | todos |
+| POST | `/api/tasks/:id/attachments` | `taskAttachmentInputSchema` (JSON, arquivo em base64; corpo até ~13,4 MB) | `TaskAttachment` (201) | todos |
+| GET | `/api/tasks/:id/attachments/:attachmentId/download` | — | o arquivo (download) | todos |
+| DELETE | `/api/tasks/:id/attachments/:attachmentId` | — | 204 | quem anexou ou admin |
 
 Ids de outro espaço (tarefa, cliente, categoria, departamento) respondem 404; responsável que não é
 membro do espaço → 422.
@@ -775,8 +825,8 @@ membro do espaço → 422.
   estava. **Diferença deliberada**: quando um membro muda de departamento, as tarefas **abertas** dele
   vão junto (no Effy o departamento congelava ao salvar); as concluídas/canceladas ficam onde foram
   feitas.
-- **Um departamento por membro** (decisão mais simples que atende à spec §12.1: "marcar aqui tira o
-  membro do departamento atual"). `PUT /tasks/departments/:id` com `memberIds` é a lista completa.
+- **Um departamento por membro** (spec §1 e §13.4: "cada membro está em no máximo um departamento";
+  marcar um membro num departamento o tira do atual). `PUT /tasks/departments/:id` com `memberIds` é a lista completa.
 - **Conclusão** (`PATCH /tasks/:id/status`): na transição para `done` o servidor grava `completedAt`
   (instante) e `completedBy` (quem clicou — o usuário da sessão, não o responsável); repetir `done`
   não muda o registro; sair de `done` apaga os dois. **Reabrir**: `reopenStatus` diz para onde voltar

@@ -436,4 +436,66 @@ describe('demo api (PGlite)', () => {
     expect(found.contacts.length).toBeGreaterThan(0);
     expect((await call('POST', '/auth/logout')).status).toBe(204);
   });
+  it('runs the task module phase 2 in the browser: recurring obligations, audit, processes, notes, attachments and CSV', async () => {
+    expect((await call('POST', '/auth/login', { email: DEMO_EMAIL, password: DEMO_PASSWORD })).status).toBe(200);
+    const recurring = (await call('GET', '/tasks/recurring')).body;
+    expect(recurring.items.map((r: { name: string }) => r.name)).toEqual(
+      expect.arrayContaining(['DAS do Simples Nacional', 'DCTFWeb', 'EFD-Reinf', 'Folha de pagamento', 'FGTS Digital', 'ECD', 'ECF', 'DEFIS', 'DASN-SIMEI']),
+    );
+    expect(recurring.summary.occurrences.total).toBeGreaterThan(10);
+    expect(recurring.summary.occurrences.done).toBeGreaterThan(0);
+
+    const audit = (await call('GET', `/tasks/audit?competence=${month}`)).body;
+    expect(audit.columns.length).toBeGreaterThan(5);
+    expect(audit.cells.length).toBeGreaterThan(20);
+    expect(audit.clients[0].document).toMatch(/^\d{14}$/);
+    // Several situations in the current competence.
+    const situations = new Set(audit.cells.map((c: { situation: string }) => c.situation));
+    expect(situations.size).toBeGreaterThanOrEqual(3);
+
+    const home = (await call('GET', '/tasks/home?departmentId=all')).body;
+    expect(home.obligations.items.length).toBeGreaterThan(5);
+    expect(home.totals.recurring).toBeGreaterThan(0);
+    const list = (await call('GET', '/tasks?scope=all&situation=open')).body;
+    expect(list.occurrences.length).toBeGreaterThan(0);
+    expect(list.items.every((t: { kind: string }) => t.kind !== 'recurring')).toBe(true);
+
+    // Processes: two templates, one process in progress at step 2.
+    expect((await call('GET', '/tasks/flow-templates')).body.map((t: { title: string }) => t.title)).toEqual(['Abertura de empresa', 'Admissão de funcionário']);
+    const flows = (await call('GET', '/tasks/flows')).body;
+    expect(flows).toHaveLength(1);
+    expect(flows[0]).toMatchObject({ title: 'Admissão de motorista · Rota Sul', doneCount: 1, currentStep: { position: 2 } });
+
+    // Notes are Marina's; the calendar and the reports answer.
+    expect((await call('GET', '/tasks/notes')).body).toHaveLength(2);
+    const calendar = await call('GET', `/tasks/calendar?from=${from}&to=${to}`);
+    expect(calendar.status).toBe(200);
+    expect(calendar.body.occurrences.length).toBeGreaterThan(0);
+    expect((await call('GET', `/tasks/reports?from=${from}&to=${to}&situation=doneLate`)).status).toBe(200);
+
+    // The attachment: decrypted and downloaded as bytes, with the safe headers.
+    const icms = (await call('GET', '/tasks?search=ICMS&scope=all')).body.items[0];
+    const detail = (await call('GET', `/tasks/${icms.id}`)).body;
+    expect(detail.attachments).toEqual([expect.objectContaining({ fileName: 'Relação de notas de entrada.pdf', contentType: 'application/pdf' })]);
+    const download = await demoFetch(`/api/tasks/${icms.id}/attachments/${detail.attachments[0].id}/download`);
+    expect(download.status).toBe(200);
+    expect(download.headers.get('content-disposition')).toContain('attachment;');
+    expect(download.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(new TextDecoder().decode(new Uint8Array(await download.arrayBuffer())).startsWith('%PDF-')).toBe(true);
+    // Uploading in the browser: the signature is checked there too.
+    const fake = await call('POST', `/tasks/${icms.id}/attachments`, { fileName: 'guia.pdf', contentType: 'application/pdf', content: btoa('<html></html>') });
+    expect(fake.status).toBe(422);
+    const ok = await call('POST', `/tasks/${icms.id}/attachments`, { fileName: 'notas.txt', contentType: 'text/plain', content: btoa('Pedir as notas de devolução') });
+    expect(ok.status).toBe(201);
+
+    // The CSV export comes as text (BOM, `;`).
+    const csv = await demoFetch(`/api/tasks/reports/export.csv?from=${from}&to=${to}`);
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+    // `text()` drops the BOM while decoding; the bytes carry it (EF BB BF).
+    const raw = new Uint8Array(await csv.arrayBuffer());
+    expect([...raw.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    expect(new TextDecoder().decode(raw.slice(3)).startsWith('Tarefa;Tipo;')).toBe(true);
+    expect((await call('POST', '/auth/logout')).status).toBe(204);
+  });
 });

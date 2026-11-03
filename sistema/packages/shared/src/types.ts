@@ -15,15 +15,20 @@ import type {
   InactivationReason,
   InvoiceStatus,
   LateFeeKind,
+  AssigneeSource,
   FlowStepState,
   NonBusinessDayRule,
+  OccurrenceSituation,
   OccurrenceStatus,
   OpenTaskStatus,
   PaymentMethod,
   RecurrenceKind,
   RecurrencePeriod,
   SimplesAnnex,
+  TaskAttachmentType,
   TaskDueBucket,
+  TaskEventKind,
+  TaskKind,
   TaskPriority,
   TaskStatus,
   TaxRegime,
@@ -780,6 +785,20 @@ export interface SearchResponse {
   accounts: Account[];
   categories: Category[];
   contacts: Contact[];
+  /** Tasks (standalone and process steps) by title, for every member. */
+  tasks: SearchTaskHit[];
+  /** Recurring tasks by name. */
+  recurringTasks: { id: string; name: string; period: RecurrencePeriod }[];
+}
+
+export interface SearchTaskHit {
+  id: string;
+  title: string;
+  kind: TaskKind;
+  status: TaskStatus;
+  dueDate: ISODate | null;
+  overdue: boolean;
+  client: TaskClientRef | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -910,26 +929,48 @@ export interface TaskFlowRef {
   stepCount: number;
 }
 
+/** What makes a task a recurring occurrence (one client × one period of a recurring task). */
+export interface TaskOccurrenceRef {
+  recurringTaskId: string;
+  period: RecurrencePeriod;
+  /** The competence, or the Monday of the week of a weekly occurrence. */
+  periodKey: string;
+  /** Month the legal deadline falls in (the audit column). */
+  competence: MonthKey;
+  /** Month the obligation refers to ("ref. 09/2026"). */
+  referenceMonth: MonthKey;
+  /** Internal target; the legal deadline is `Task.dueDate`. */
+  targetDate: ISODate;
+  /** Open, target passed, legal deadline today or later ("Fora da meta"). */
+  targetMissed: boolean;
+  /** Where the responsible comes from (null without one). */
+  assigneeSource: AssigneeSource | null;
+  situation: OccurrenceSituation;
+}
+
 /** A task as listed (row, card, widgets). */
 export interface Task {
   id: string;
   title: string;
+  /** standalone, recurring (occurrence) or flow (process step). */
+  kind: TaskKind;
   status: TaskStatus;
   /** Status to go back to when reopening a concluded/canceled task (the one before concluding, else `todo`). */
   reopenStatus: OpenTaskStatus;
   priority: TaskPriority;
   /** null = internal ("Interna"). */
   client: TaskClientRef | null;
-  /** The assignee's department (or the queue chosen for an unassigned task). */
+  /** The assignee's department (or the queue chosen for an unassigned task); for occurrences, the recurring task's. */
   department: TaskRef | null;
   category: TaskCategoryRef | null;
   assignee: TaskMemberRef | null;
   startDate: ISODate | null;
+  /** Due date; the legal deadline for occurrences. */
   dueDate: ISODate | null;
   /** Appointment on the due date ("HH:MM"). */
   startTime: string | null;
   endTime: string | null;
-  /** Open with a due date before today. */
+  /** Open with a due date (legal deadline) before today. */
   overdue: boolean;
   /** Days past the due date (0 when not overdue). */
   daysOverdue: number;
@@ -939,8 +980,11 @@ export interface Task {
   completedBy: TaskPersonRef | null;
   subtaskCount: { done: number; total: number };
   commentCount: number;
-  /** Set when the task is the step of a flow. */
+  attachmentCount: number;
+  /** Set when the task is the step of a process. */
   flow: TaskFlowRef | null;
+  /** Set when the task is a recurring occurrence. */
+  occurrence: TaskOccurrenceRef | null;
   createdBy: TaskPersonRef | null;
   createdAt: string;
   updatedAt: string;
@@ -959,71 +1003,159 @@ export interface TaskComment {
   /** Plain text (render with pre-wrap, never as HTML). */
   text: string;
   isYours: boolean;
+  /** The author or an administrator may remove it. */
+  canDelete: boolean;
   createdAt: string;
 }
+
+export interface TaskAttachment {
+  id: string;
+  /** Sanitized name (decrypted). */
+  fileName: string;
+  contentType: TaskAttachmentType;
+  sizeBytes: number;
+  uploadedBy: TaskPersonRef | null;
+  /** The uploader or an administrator may remove it. */
+  canDelete: boolean;
+  createdAt: string;
+}
+
+/** Fields an occurrence does not take in `PATCH /tasks/:id` (they come from the recurring task). */
+export type TaskLockedField = 'title' | 'clientId' | 'categoryId' | 'departmentId' | 'startDate' | 'dueDate' | 'startTime' | 'endTime';
 
 /** GET /tasks/:id (and the result of every task write). */
 export interface TaskDetail extends Task {
   description: string | null;
   subtasks: TaskSubtask[];
   comments: TaskComment[];
-  /** The whole flow when the task is one of its steps (FlowStepper). */
+  attachments: TaskAttachment[];
+  /** The whole process when the task is one of its steps (FlowStepper). */
   flowProgress: TaskFlow | null;
+  /** Fields locked for this task (occurrences); empty for the others. */
+  lockedFields: TaskLockedField[];
+  /** May the requester reopen it? (A concluded occurrence: who concluded it or an administrator.) */
+  canReopen: boolean;
 }
 
-/** PATCH /tasks/:id/status: the task and, when it concluded a flow step, the task of the next step. */
+/** PATCH /tasks/:id/status: the task and, when it concluded a process step, the task of the next step. */
 export interface TaskStatusChangeResponse {
   task: TaskDetail;
   activated: Task | null;
 }
 
 /**
- * A recurring task in one competence, aggregated over the client cells in view (the list row
- * "DCTFWeb · 12 de 30 clientes pendentes", the board card and the audit column). Counts follow the
- * request's scope and filters (e.g. "Minhas" counts only the cells whose responsible is you).
+ * A field changed by an `updated` entry, with the values before and after: dates `YYYY-MM-DD`, times
+ * `HH:MM`, the priority code, the title, and the client/category by name (as they were then). The
+ * description never carries values (it is encrypted): it only appears in `fields`.
+ */
+export interface TaskFieldChange {
+  field: 'title' | 'clientId' | 'categoryId' | 'priority' | 'startDate' | 'dueDate' | 'startTime' | 'endTime';
+  from: string | null;
+  to: string | null;
+}
+
+/** One entry of a task's history ("linha do tempo"). */
+export interface TaskHistoryItem {
+  id: string;
+  kind: TaskEventKind;
+  /** Who did it (null = the system: a generated occurrence, an automatic reassignment). */
+  actor: TaskPersonRef | null;
+  createdAt: string;
+  /** `updated`: names of the fields changed (TaskUpdateInput keys), the description included. */
+  fields: string[];
+  /** `updated`: before/after of the fields that have displayable values (not the description). */
+  changes: TaskFieldChange[];
+  /** `status` / `reopened`. */
+  fromStatus: TaskStatus | null;
+  toStatus: TaskStatus | null;
+  /** `assigned` (names as recorded then). */
+  fromAssignee: TaskPersonRef | null;
+  toAssignee: TaskPersonRef | null;
+  /** `reopened`: the reason; `attachment_*`: the file name; automatic changes: why. Decrypted. */
+  note: string | null;
+  /** `created`: where it came from, and the name of the recurring task or the process (as it was then). */
+  origin: 'manual' | 'recurring' | 'flow' | null;
+  originName: string | null;
+  /**
+   * `flow_step`: the process step that changed — it began (`activated`), was concluded (`completed`),
+   * or went back to waiting because the previous step was reopened (`deactivated`, on that step's task).
+   */
+  flow: { id: string; title: string; position: number; event: 'activated' | 'completed' | 'deactivated' } | null;
+}
+
+/** GET /tasks/:id/history: newest first, up to 500. */
+export interface TaskHistoryResponse {
+  items: TaskHistoryItem[];
+  total: number;
+}
+
+/** Responsible of the occurrences in a group, with how many each one has. */
+export interface OccurrenceAssigneeCount {
+  assignee: TaskMemberRef | null;
+  count: number;
+}
+
+/**
+ * A recurring task in one period, aggregated over the client occurrences in view (the list row
+ * "DCTFWeb · 12 de 30 clientes pendentes", the board card, the calendar item, the audit column and
+ * the home's obligations). Counts follow the request's scope and filters (e.g. "Minhas" counts only
+ * the occurrences whose responsible is you). done + canceled + pending = total.
  */
 export interface RecurringOccurrence {
   recurringTaskId: string;
   name: string;
   period: RecurrencePeriod;
+  periodKey: string;
   competence: MonthKey;
-  /** Legal deadline ("prazo legal"); null for a recurring task without due day (audit only). */
-  legalDueDate: ISODate | null;
-  /** Internal target ("meta interna"), on or before the legal deadline. */
-  targetDate: ISODate | null;
+  referenceMonth: MonthKey;
+  legalDueDate: ISODate;
+  /** Internal target (on or before the legal deadline): the work date. */
+  targetDate: ISODate;
   department: TaskRef | null;
-  /** Default responsible of the recurring task (each client may have its own, see the cells). */
-  assignee: TaskMemberRef | null;
+  category: TaskCategoryRef | null;
+  /** Default responsible of the recurring task. */
+  defaultAssignee: TaskMemberRef | null;
+  /** Effective responsibles in the group (desc). */
+  assignees: OccurrenceAssigneeCount[];
   total: number;
   done: number;
+  /** Concluded after the legal deadline (part of `done`). */
+  doneLate: number;
+  canceled: number;
   inProgress: number;
-  /** total − done. */
+  /** Open (todo, in progress, waiting for the client). */
   pending: number;
-  /** Legal deadline before today with pending cells. */
+  /** Legal deadline before today with pending occurrences. */
   overdue: boolean;
   daysOverdue: number;
-  /** Target before today with pending cells. */
+  /** Target before today, legal deadline today or later, with pending occurrences. */
   targetMissed: boolean;
-  /** Derived: none done → todo; some → in_progress; all → done. */
+  /** Derived: none done → todo; some → in_progress; all (but the canceled) → done. */
   status: OccurrenceStatus;
 }
 
-/** One cell: client × recurring task × competence. */
+/** One cell: an occurrence (client × recurring task × period). */
 export interface OccurrenceCell {
+  taskId: string;
   recurringTaskId: string;
   clientId: string;
+  periodKey: string;
   competence: MonthKey;
-  status: OccurrenceStatus;
-  /** The client's responsible in the recurring task's department, else the default responsible. */
+  status: TaskStatus;
+  situation: OccurrenceSituation;
   assignee: TaskMemberRef | null;
-  legalDueDate: ISODate | null;
-  targetDate: ISODate | null;
+  assigneeSource: AssigneeSource | null;
+  legalDueDate: ISODate;
+  targetDate: ISODate;
   overdue: boolean;
-  /** Conclusion record (server-side, immutable while concluded; erased when reopened). */
+  targetMissed: boolean;
+  /** Conclusion record (server-side; erased when reopened). */
   concludedBy: TaskPersonRef | null;
   concludedAt: string | null;
-  /** Concluded on or before the legal deadline (office time zone); null while open or without deadline. */
+  /** Concluded on or before the legal deadline (office time zone); null while not concluded. */
   concludedOnTime: boolean | null;
+  /** May the requester reopen it (who concluded it or an administrator)? */
+  canReopen: boolean;
 }
 
 export interface OccurrenceClient {
@@ -1031,12 +1163,12 @@ export interface OccurrenceClient {
   /** Trade name, else the legal name. */
   name: string;
   legalName: string;
-  /** CNPJ, digits only. */
+  /** CNPJ, digits only (decrypted). */
   document: string;
   taxRegime: TaxRegime;
 }
 
-/** GET /tasks/recurring/:id/occurrences/:competence (RecurringOccurrenceSheet). */
+/** GET /tasks/recurring/:id/occurrences/:period (RecurringOccurrenceSheet). */
 export interface RecurringOccurrenceDetail extends RecurringOccurrence {
   description: string | null;
   cells: (OccurrenceCell & { client: OccurrenceClient })[];
@@ -1047,22 +1179,35 @@ export interface RecurringTask {
   name: string;
   description: string | null;
   period: RecurrencePeriod;
-  dueDay: number | null;
+  /** Day of the month (1–31) or, weekly, the ISO weekday (1 = Monday). */
+  dueDay: number;
+  /** Anchor month of bimonthly…annual tasks. */
   dueMonth: number | null;
-  /** Months (1–12) it occurs in (all 12 for monthly or without due day). */
+  /** Months (1–12) it occurs in (all 12 for weekly and monthly). */
   months: number[];
   targetDaysBefore: number;
   nonBusinessDayRule: NonBusinessDayRule;
+  /** Reference month = competence − this many months. */
+  referenceOffset: number;
   department: TaskRef | null;
+  category: TaskCategoryRef | null;
+  /** Default responsible. */
   assignee: TaskMemberRef | null;
   regimes: TaxRegime[];
   clientIds: string[];
-  /** Active clients it applies to today. */
+  excludedClientIds: string[];
+  startCompetence: MonthKey;
+  endCompetence: MonthKey | null;
+  /** Not ended before the current competence. */
+  active: boolean;
+  /** Active clients it applies to in the current competence. */
   clientCount: number;
-  /** Archived: leaves the next competences; recorded history stays. */
-  archivedAt: string | null;
-  /** Competences with recorded states (deleting is refused while > 0: archive instead). */
-  historyCount: number;
+  /** Of them, without a responsible in the department (their occurrences go to the default responsible). */
+  withoutResponsible: number;
+  /** Who receives the occurrences of the current competence: "Ana 12 · Bruno 8 · padrão 3 · sem responsável 2". */
+  distribution: { assignee: TaskMemberRef | null; source: AssigneeSource | null; count: number }[];
+  /** Occurrences already generated (any competence). */
+  occurrenceCount: number;
   /** Progress in the requested month. */
   month: {
     competence: MonthKey;
@@ -1071,8 +1216,11 @@ export interface RecurringTask {
     targetDate: ISODate | null;
     total: number;
     done: number;
+    canceled: number;
     inProgress: number;
+    overdue: number;
   };
+  createdBy: TaskPersonRef | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1082,21 +1230,32 @@ export interface RecurringTaskListResponse {
   items: RecurringTask[];
   summary: {
     active: number;
-    archived: number;
-    /** Cells of the month (active recurring tasks): "182 de 240 ocorrências concluídas". */
-    occurrences: { total: number; done: number };
+    ended: number;
+    /** Occurrences of the month (active recurring tasks): "182 de 240 concluídas". */
+    occurrences: { total: number; done: number; canceled: number };
   };
 }
 
-/** Audit column: the occurrence of a recurring task, counted over the clients in view. */
+/** POST /tasks/recurring/generate. */
+export interface RecurringGenerateResponse {
+  competence: MonthKey;
+  created: number;
+}
+
+/** Audit column: the occurrence of a recurring task in a period, counted over the clients in view. */
 export type AuditColumn = RecurringOccurrence;
 
 export interface AuditClientRow extends OccurrenceClient {
   total: number;
   done: number;
+  canceled: number;
   inProgress: number;
   /** Pending cells whose legal deadline has passed. */
   overduePending: number;
+  /** Pending cells past the target, legal deadline still ahead. */
+  targetMissedPending: number;
+  /** The client's month is concluded: every cell (but the canceled) done — when the last one was. */
+  monthConcludedAt: string | null;
 }
 
 /** Whole competence (filters of the request do not change it), like the clients summary. */
@@ -1104,13 +1263,18 @@ export interface AuditSummary {
   competence: MonthKey;
   total: number;
   done: number;
+  doneLate: number;
+  canceled: number;
   inProgress: number;
   pending: number;
   overduePending: number;
+  targetMissedPending: number;
   /** Clients with at least one overdue pending cell. */
   overdueClients: number;
   clientsWithPending: number;
   clientCount: number;
+  /** Clients whose month is concluded. */
+  clientsConcluded: number;
   byDepartment: {
     department: TaskRef | null;
     total: number;
@@ -1123,9 +1287,9 @@ export interface AuditSummary {
 export interface AuditMatrixResponse {
   today: ISODate;
   competence: MonthKey;
-  /** Ordered by legal deadline, then name. */
+  /** One per recurring task and period (weekly tasks: one per week), by target, then name. */
   columns: AuditColumn[];
-  /** Active clients in the competence, by name. */
+  /** Clients with occurrences in the competence (after the filters), by name. */
   clients: AuditClientRow[];
   cells: OccurrenceCell[];
   summary: AuditSummary;
@@ -1137,15 +1301,16 @@ export interface TaskFlowStep {
   title: string;
   description: string | null;
   client: TaskClientRef | null;
+  department: TaskRef | null;
   category: TaskCategoryRef | null;
   assignee: TaskMemberRef | null;
   priority: TaskPriority;
-  /** Absolute deadline set when building the flow (null when relative). */
+  /** Absolute deadline (built by hand) or, once activated, the computed one. */
   dueDate: ISODate | null;
-  /** Days after the previous step is concluded (step 1: after the flow was created). */
+  /** Days after the previous step is concluded (step 1: after the process was created). */
   relativeDays: number | null;
   state: FlowStepState;
-  /** The task created when the step was activated. */
+  /** The task created when the step was activated (null before, or if it was deleted). */
   task: { id: string; status: TaskStatus; dueDate: ISODate | null; overdue: boolean } | null;
   activatedAt: string | null;
   /** When its task was first concluded (recorded once: the base of the next step's deadline). */
@@ -1173,6 +1338,7 @@ export interface FlowTemplateStep {
   position: number;
   title: string;
   description: string | null;
+  department: TaskRef | null;
   category: TaskCategoryRef | null;
   assignee: TaskMemberRef | null;
   priority: TaskPriority;
@@ -1187,14 +1353,16 @@ export interface FlowTemplate {
   stepCount: number;
   /** Sum of the steps' deadlines ("até 16 dias"). */
   totalDays: number;
-  /** Flows created from it ("Aplicado 7 vezes"). */
+  /** Departments of the steps ("Societário e Fiscal"). */
+  departments: TaskRef[];
+  /** Processes created from it ("Aplicado 7 vezes"). */
   usageCount: number;
   createdBy: TaskPersonRef | null;
   createdAt: string;
   updatedAt: string;
 }
 
-/** POST /tasks/flows and POST /tasks/flow-templates/:id/apply: the flow and the task of step 1. */
+/** POST /tasks/flows and POST /tasks/flow-templates/:id/apply: the process and the task of step 1. */
 export interface TaskFlowCreatedResponse {
   flow: TaskFlow;
   task: Task;
@@ -1207,49 +1375,58 @@ export interface TaskStatusCount {
   overdue: number;
 }
 
+/** The oldest overdue item (task or occurrence), for the "A mais antiga venceu há N dias" line. */
+export interface TaskOverdueRef {
+  kind: TaskKind;
+  /** Task id (an occurrence is a task too). */
+  id: string;
+  recurringTaskId: string | null;
+  periodKey: string | null;
+  title: string;
+  dueDate: ISODate;
+  daysOverdue: number;
+  client: TaskClientRef | null;
+  assignee: TaskMemberRef | null;
+}
+
 /** Numbers of the TasksSummary panel: same filters as the list except the situation. */
 export interface TaskListSummary {
   /** Month of the "Concluídas em …" cell (the `month` filter, else the current one). */
   month: MonthKey;
-  /** Open overdue items (tasks + recurring occurrences, one per occurrence). */
+  /** Open overdue items (tasks + occurrences, one per client). */
   overdue: number;
-  oldestOverdue: {
-    kind: 'task' | 'recurring';
-    /** Task id, or the recurring task id (with `competence`). */
-    id: string;
-    competence: MonthKey | null;
-    title: string;
-    dueDate: ISODate;
-    daysOverdue: number;
-    client: TaskClientRef | null;
-  } | null;
+  oldestOverdue: TaskOverdueRef | null;
+  /** Open occurrences past the target with the legal deadline ahead. */
+  targetMissed: number;
   open: number;
+  /** Tasks due today and occurrences with target today. */
   dueToday: number;
   dueNext7Days: number;
   waitingClient: number;
   /** Items due in `month` and those of them concluded or canceled ("Concluídas em outubro · de 25 …"). */
   monthDue: number;
   monthDone: number;
-  /** Open tasks per assignee (desc), occurrences counted once for their default responsible. */
+  /** Open items per assignee (desc). */
   openByAssignee: { assignee: TaskMemberRef | null; open: number; overdue: number }[];
-  /** Open standalone/flow tasks per client (desc); recurring occurrences are not per client here. */
+  /** Open items per client (desc). */
   openByClient: { client: TaskClientRef | null; open: number; overdue: number }[];
 }
 
-/** GET /tasks: a page of tasks plus the recurring occurrences in view (not paginated) and the summary. */
+/** GET /tasks: a page of tasks plus the recurring occurrences in view (aggregated, not paginated) and the summary. */
 export interface TaskListResponse extends Paginated<Task> {
   today: ISODate;
+  /** Up to 200 groups; without a date filter, the open ones and those of the current competence ±. */
   occurrences: RecurringOccurrence[];
   summary: TaskListSummary;
   /** Open items per due-date group (with every filter but the group). */
   groups: Record<TaskDueBucket, number>;
-  /** Tasks per status with every filter but the situation/status (board column headers). */
+  /** Items per status with every filter but the situation/status (board column headers). */
   byStatus: Record<TaskStatus, TaskStatusCount>;
   /** Due months with tasks in the scope, plus the current one (the "Mês de vencimento" filter). */
   months: MonthKey[];
 }
 
-/** Ranking line per responsible ("quem concentra mais"). Units: tasks and recurring cells. */
+/** Ranking line per responsible ("quem concentra mais"). Units: tasks and occurrences (one per client). */
 export interface TaskAssigneeStats {
   assignee: TaskMemberRef | null;
   total: number;
@@ -1267,7 +1444,7 @@ export interface TaskAssigneeStats {
  * overdue, so done + canceled + open + overdue = total.
  */
 export interface TaskBreakdownRow {
-  /** Id of the department/member/category/client, the priority, or null ("Sem …"). */
+  /** Id of the department/member/category/client, the priority, the month, or null ("Sem …"). */
   key: string | null;
   label: string;
   total: number;
@@ -1279,9 +1456,23 @@ export interface TaskBreakdownRow {
   overdue: number;
 }
 
+/** The home's "Obrigações da competência" block. */
+export interface TaskObligations {
+  competence: MonthKey;
+  /** Occurrences of the competence in the department (one per client). */
+  total: number;
+  done: number;
+  canceled: number;
+  pending: number;
+  /** Pending occurrences past the legal deadline. */
+  overdue: number;
+  /** Per recurring task and period: overdue pending first, then by target; complete ones last. */
+  items: RecurringOccurrence[];
+}
+
 /**
- * GET /tasks/home: the start page. Units are tasks (standalone and flow steps: open ones plus those due
- * or closed in the month) and recurring cells of the competence, of one department (or all).
+ * GET /tasks/home: the start page. Units are tasks (open ones plus those due or closed in the month)
+ * and occurrences (one per client, same rule), of one department (or all).
  */
 export interface TaskHomeResponse {
   today: ISODate;
@@ -1294,8 +1485,16 @@ export interface TaskHomeResponse {
     byStatus: Record<TaskStatus, number>;
     open: number;
     overdue: number;
+    /** Open occurrences past the target, legal deadline ahead. */
+    targetMissed: number;
+    /** The nearest legal deadline among them ("prazo legal em até 3 dias"). */
+    targetMissedNextLegalDate: ISODate | null;
+    /** Tasks due today and occurrences with target today. */
     dueToday: number;
+    /** Of them, appointments (tasks with a time). */
+    appointmentsToday: number;
     dueNext7Days: number;
+    waitingClient: number;
     doneOnTime: number;
     doneLate: number;
     canceled: number;
@@ -1303,43 +1502,74 @@ export interface TaskHomeResponse {
     standalone: number;
     recurring: number;
   };
+  oldestOverdue: TaskOverdueRef | null;
   byAssignee: TaskAssigneeStats[];
   byClient: { client: TaskClientRef | null; total: number; open: number; overdue: number }[];
-  /** "Minhas tarefas": open items assigned to you (overdue first, then by due date). */
+  /** "Minhas tarefas": open items assigned to you, any department (overdue first, then by work date). */
   mine: {
     open: number;
     overdue: number;
     dueToday: number;
     tasks: Task[];
+    /** Your occurrences, aggregated per recurring task and period ("8 de 12 dos seus clientes"). */
     occurrences: RecurringOccurrence[];
   };
+  obligations: TaskObligations;
+}
+
+/** GET /tasks/calendar: items by work date in a range (tasks by due date, occurrences by target). */
+export interface TaskCalendarResponse {
+  from: ISODate;
+  to: ISODate;
+  today: ISODate;
+  /** Standalone tasks and process steps due in the range: appointments first within a day. */
+  tasks: Task[];
+  /** One item per recurring task and period, on its target ("DCTFWeb · 12/30"). */
+  occurrences: RecurringOccurrence[];
+  /** Open tasks without a due date in the scope ("3 sem vencimento"). */
+  noDueDate: number;
+  /** More than the ceiling of tasks in the range (only the first ones came). */
+  truncated: boolean;
 }
 
 export interface TaskReportRow {
-  /** Task id, or `<recurringTaskId>:<clientId>:<competence>` for a recurring cell. */
+  /** Task id (an occurrence is a task too). */
   id: string;
-  kind: 'standalone' | 'flow' | 'recurring';
-  taskId: string | null;
+  kind: TaskKind;
   recurringTaskId: string | null;
   competence: MonthKey | null;
+  referenceMonth: MonthKey | null;
   title: string;
   client: TaskClientRef | null;
   department: TaskRef | null;
   category: TaskCategoryRef | null;
   assignee: TaskMemberRef | null;
-  /** null for recurring cells. */
-  priority: TaskPriority | null;
+  priority: TaskPriority;
+  /** Due date; the legal deadline for occurrences. */
   dueDate: ISODate | null;
+  /** Occurrences only. */
+  targetDate: ISODate | null;
   status: TaskStatus;
   overdue: boolean;
+  targetMissed: boolean;
   completedAt: string | null;
   completedBy: TaskPersonRef | null;
   completedOnTime: boolean | null;
 }
 
+/** Productivity of a member in the period: what they concluded (by the day of the conclusion). */
+export interface TaskProductivityRow {
+  member: TaskPersonRef | null;
+  concluded: number;
+  onTime: number;
+  late: number;
+  /** Average calendar days from creation to conclusion. */
+  averageDays: number | null;
+}
+
 /**
- * GET /tasks/reports: tasks with due date in the period (without due date: created in it) and the
- * recurring cells whose legal deadline is in it.
+ * GET /tasks/reports: tasks (every kind; an occurrence per client) with due date in the period
+ * (without due date: created in it), with the filters. Everything aggregated in SQL.
  */
 export interface TaskReportResponse {
   from: ISODate;
@@ -1353,6 +1583,7 @@ export interface TaskReportResponse {
     canceled: number;
     open: number;
     overdue: number;
+    targetMissed: number;
   };
   byStatus: Record<TaskStatus, number>;
   byPriority: TaskBreakdownRow[];
@@ -1360,32 +1591,12 @@ export interface TaskReportResponse {
   byAssignee: TaskBreakdownRow[];
   byCategory: TaskBreakdownRow[];
   byClient: TaskBreakdownRow[];
+  byKind: TaskBreakdownRow[];
+  /** Per due month (key `YYYY-MM`). */
+  byMonth: TaskBreakdownRow[];
+  /** Conclusions in the period per member (who concluded). */
+  productivity: TaskProductivityRow[];
   items: Paginated<TaskReportRow>;
-}
-
-/** GET /tasks/dashboard: data of the task widgets (§14 of docs/tarefas-ui.md). */
-export interface TasksDashboardResponse {
-  today: ISODate;
-  month: MonthKey;
-  /** The member's department (subtitle of "Clientes com mais pendências"). */
-  department: TaskRef | null;
-  mine: { overdue: number; dueToday: number; tasks: Task[]; occurrences: RecurringOccurrence[] };
-  overdue: {
-    count: number;
-    oldestDaysOverdue: number | null;
-    tasks: Task[];
-    occurrences: RecurringOccurrence[];
-  };
-  /** Tasks due in the month and recurring cells of the competence. */
-  situation: { total: number; done: number; canceled: number; open: number; overdue: number };
-  /** Next 14 days from today: open tasks and pending recurring cells due each day. */
-  byDay: { date: ISODate; tasks: number; occurrences: number; total: number }[];
-  /** Recurring cells of the competence per department. */
-  departments: TaskBreakdownRow[];
-  /** From the 1st of the month to today + 14: tasks (appointments first within a day) and occurrences. */
-  agenda: { tasks: Task[]; occurrences: RecurringOccurrence[] };
-  /** Clients with most open items in the member's department (all departments without one). */
-  clientsWithPending: { client: TaskClientRef; open: number; overdue: number }[];
 }
 
 /** GET /tasks/activity: recent comments by others on tasks assigned to or created by you. */
@@ -1398,10 +1609,21 @@ export interface TaskActivityItem {
   createdAt: string;
 }
 
+/** Personal note: only its author reads it (not even an administrator). */
 export interface TaskNote {
   id: string;
   title: string;
   content: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * PUT /tasks/client-responsibles(/batch): the pairs as they are now (removed ones absent) and how many
+ * open occurrences (current competence on, not assigned by hand) changed hands.
+ */
+export interface ClientResponsibleChangeResponse {
+  items: ClientResponsible[];
+  removed: number;
+  reassigned: number;
 }

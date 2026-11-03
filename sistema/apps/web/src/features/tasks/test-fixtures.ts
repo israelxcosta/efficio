@@ -6,6 +6,7 @@ export function makeTask(patch: Partial<Task>): Task {
   return {
     id: patch.id ?? 't',
     title: 'Balancete',
+    kind: 'standalone',
     status: 'todo',
     reopenStatus: 'todo',
     priority: 'medium',
@@ -23,7 +24,9 @@ export function makeTask(patch: Partial<Task>): Task {
     completedBy: null,
     subtaskCount: { done: 0, total: 0 },
     commentCount: 0,
+    attachmentCount: 0,
     flow: null,
+    occurrence: null,
     createdBy: null,
     createdAt: '2026-10-01T12:00:00Z',
     updatedAt: '2026-10-01T12:00:00Z',
@@ -32,7 +35,17 @@ export function makeTask(patch: Partial<Task>): Task {
 }
 
 export function makeDetail(patch: Partial<TaskDetail> = {}): TaskDetail {
-  return { ...makeTask(patch), description: null, subtasks: [], comments: [], flowProgress: null, ...patch };
+  return {
+    ...makeTask(patch),
+    description: null,
+    subtasks: [],
+    comments: [],
+    attachments: [],
+    flowProgress: null,
+    lockedFields: [],
+    canReopen: false,
+    ...patch,
+  };
 }
 
 export const FISCAL = { id: '11111111-1111-4111-8111-111111111111', name: 'Fiscal' };

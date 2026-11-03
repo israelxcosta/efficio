@@ -1,10 +1,12 @@
 // Free text of the task module, encrypted per field like the other "observações" of the privacy
 // policy (§5): AES-256-GCM with the workspace data key, AAD `workspace:table:column`, stored as
 // `v1.<iv>.<ct>` (lib/crypto/field-cipher.ts). A ciphertext copied to another workspace, table or
-// column does not decrypt. Encrypted: the description of a task and the text of a comment. Titles
-// (tasks, subtasks) stay in clear text: they are what `GET /tasks?search=` searches and what every
-// list shows. The size limits live in the contract (5000 characters); the database only bounds the
-// ciphertext (migration 0013).
+// column does not decrypt. Encrypted: the description of a task, of a recurring task, of a process
+// step and of a template (and its steps); the text of a comment; the free text of a history entry
+// (a reopening reason, a file name); the name of an attachment; the title and text of a personal note.
+// Titles of tasks, subtasks, recurring tasks, processes and templates stay in clear text: they are
+// what the searches look for and what every list shows. The size limits live in the contract; the
+// database only bounds the ciphertext (migrations 0013 and 0014).
 
 import type { FieldCipher } from '../../lib/crypto/field-cipher';
 import { InvalidTextError } from '../../lib/errors';
@@ -12,8 +14,26 @@ import { InvalidTextError } from '../../lib/errors';
 /** Table and column of each encrypted field (the AAD). Shared with the backfill and the LGPD export. */
 export const TASK_DESCRIPTION = { table: 'tasks', column: 'description' } as const;
 export const TASK_COMMENT_TEXT = { table: 'task_comments', column: 'text' } as const;
+export const RECURRING_DESCRIPTION = { table: 'recurring_tasks', column: 'description' } as const;
+export const FLOW_STEP_DESCRIPTION = { table: 'task_flow_steps', column: 'description' } as const;
+export const TEMPLATE_DESCRIPTION = { table: 'task_flow_templates', column: 'description' } as const;
+export const TEMPLATE_STEP_DESCRIPTION = { table: 'task_flow_template_steps', column: 'description' } as const;
+export const EVENT_NOTE = { table: 'task_events', column: 'note' } as const;
+export const ATTACHMENT_NAME = { table: 'task_attachments', column: 'file_name' } as const;
+export const NOTE_TITLE = { table: 'task_notes', column: 'title' } as const;
+export const NOTE_CONTENT = { table: 'task_notes', column: 'content' } as const;
 
-type TaskTextField = typeof TASK_DESCRIPTION | typeof TASK_COMMENT_TEXT;
+type TaskTextField =
+  | typeof TASK_DESCRIPTION
+  | typeof TASK_COMMENT_TEXT
+  | typeof RECURRING_DESCRIPTION
+  | typeof FLOW_STEP_DESCRIPTION
+  | typeof TEMPLATE_DESCRIPTION
+  | typeof TEMPLATE_STEP_DESCRIPTION
+  | typeof EVENT_NOTE
+  | typeof ATTACHMENT_NAME
+  | typeof NOTE_TITLE
+  | typeof NOTE_CONTENT;
 type Cipher = Pick<FieldCipher, 'encrypt' | 'decrypt'>;
 
 export async function encryptTaskText(

@@ -421,22 +421,27 @@ export const TASK_SITUATION_LABELS: Record<TaskSituation, string> = {
   all: 'Todas',
 };
 
-/** "Tipo": standalone tasks, recurring occurrences or flow steps. */
+/** "Tipo": standalone tasks, recurring occurrences (one per client and competence) or process steps. */
 export const TASK_KINDS = ['standalone', 'recurring', 'flow'] as const;
 export type TaskKind = (typeof TASK_KINDS)[number];
 
 export const TASK_KIND_LABELS: Record<TaskKind, string> = {
   standalone: 'Avulsas',
   recurring: 'Recorrentes',
-  flow: 'Etapas de fluxo',
+  flow: 'Etapas de processo',
 };
 
-/** Due-date groups of the list (open tasks): Atrasadas, Hoje, Próximos 7 dias, Mais tarde, Sem vencimento. */
-export const TASK_DUE_BUCKETS = ['overdue', 'today', 'next7Days', 'later', 'noDueDate'] as const;
+/**
+ * Groups of the list (open items), by the work date (the due date of a task; the internal target of a
+ * recurring occurrence): Atrasadas (past the due date / legal deadline), Fora da meta (occurrence past
+ * its target, legal deadline still ahead), Hoje, Próximos 7 dias, Mais tarde, Sem vencimento.
+ */
+export const TASK_DUE_BUCKETS = ['overdue', 'targetMissed', 'today', 'next7Days', 'later', 'noDueDate'] as const;
 export type TaskDueBucket = (typeof TASK_DUE_BUCKETS)[number];
 
 export const TASK_DUE_BUCKET_LABELS: Record<TaskDueBucket, string> = {
   overdue: 'Atrasadas',
+  targetMissed: 'Fora da meta',
   today: 'Hoje',
   next7Days: 'Próximos 7 dias',
   later: 'Mais tarde',
@@ -444,19 +449,48 @@ export const TASK_DUE_BUCKET_LABELS: Record<TaskDueBucket, string> = {
 };
 
 /**
- * Periodicity of a recurring task. The competence (`YYYY-MM`) is the month the legal deadline falls
- * in (as in Effy); quarterly and annual ones occur in the months anchored on `dueMonth`.
+ * Periodicity of a recurring task. The competence (`YYYY-MM`) is the month the legal deadline falls in
+ * (Effy's rule); weekly tasks have one occurrence per week (Monday to Sunday) whose deadline weekday
+ * falls in the month. Bimonthly, quarterly, semiannual and annual ones occur every 2, 3, 6 and 12
+ * months from the anchor month (`dueMonth`).
  */
-export const RECURRENCE_PERIODS = ['monthly', 'quarterly', 'annual'] as const;
+export const RECURRENCE_PERIODS = ['weekly', 'monthly', 'bimonthly', 'quarterly', 'semiannual', 'annual'] as const;
 export type RecurrencePeriod = (typeof RECURRENCE_PERIODS)[number];
 
 export const RECURRENCE_PERIOD_LABELS: Record<RecurrencePeriod, string> = {
+  weekly: 'Semanal',
   monthly: 'Mensal',
+  bimonthly: 'Bimestral',
   quarterly: 'Trimestral',
+  semiannual: 'Semestral',
   annual: 'Anual',
 };
 
-/** What happens to a legal deadline that falls on a non-business day (weekends; holidays: see utils/tasks.ts). */
+/** Months between two occurrences (weekly: every month has occurrences). */
+export const RECURRENCE_PERIOD_MONTHS: Record<RecurrencePeriod, number> = {
+  weekly: 1,
+  monthly: 1,
+  bimonthly: 2,
+  quarterly: 3,
+  semiannual: 6,
+  annual: 12,
+};
+
+/** Weekdays of a weekly legal deadline (ISO: 1 = Monday … 7 = Sunday). */
+export const WEEKDAY_LABELS: Record<number, string> = {
+  1: 'Segunda-feira',
+  2: 'Terça-feira',
+  3: 'Quarta-feira',
+  4: 'Quinta-feira',
+  5: 'Sexta-feira',
+  6: 'Sábado',
+  7: 'Domingo',
+};
+
+/**
+ * What happens to a legal deadline that falls on a non-business day (weekends and the national
+ * holidays of `utils/tasks.ts`). The internal target always anticipates.
+ */
 export const NON_BUSINESS_DAY_RULES = ['anticipate', 'postpone', 'keep'] as const;
 export type NonBusinessDayRule = (typeof NON_BUSINESS_DAY_RULES)[number];
 
@@ -466,7 +500,14 @@ export const NON_BUSINESS_DAY_RULE_LABELS: Record<NonBusinessDayRule, string> = 
   keep: 'Manter a data',
 };
 
-/** State of one client × recurring task × competence cell of the monthly audit. */
+/**
+ * Reference month of an occurrence ("competência de referência"): the competence (month of the legal
+ * deadline) minus this many months. 0 = the same month, 1 = the previous one (DAS, DCTFWeb, FGTS), up
+ * to 12. Weekly tasks always use 0.
+ */
+export const MAX_REFERENCE_OFFSET = 12;
+
+/** State of an audit cell as the matrix cycles it (A fazer → Em andamento → Concluída). */
 export const OCCURRENCE_STATUSES = ['todo', 'in_progress', 'done'] as const;
 export type OccurrenceStatus = (typeof OCCURRENCE_STATUSES)[number];
 
@@ -476,7 +517,47 @@ export const OCCURRENCE_STATUS_LABELS: Record<OccurrenceStatus, string> = {
   done: 'Concluída',
 };
 
-/** Step of a flow: concluded, the one whose task is active now, or waiting for the previous one. */
+/**
+ * Derived situation of a recurring occurrence (never stored): not started, in progress (incl. waiting
+ * for the client), past the internal target with the legal deadline still ahead ("Fora da meta"), past
+ * the legal deadline ("Atrasada"), concluded on time / late (by the legal deadline, office time zone) or
+ * canceled (counted apart from the concluded ones).
+ */
+export const OCCURRENCE_SITUATIONS = [
+  'not_started',
+  'in_progress',
+  'target_missed',
+  'overdue',
+  'done_on_time',
+  'done_late',
+  'canceled',
+] as const;
+export type OccurrenceSituation = (typeof OCCURRENCE_SITUATIONS)[number];
+
+export const OCCURRENCE_SITUATION_LABELS: Record<OccurrenceSituation, string> = {
+  not_started: 'Não iniciada',
+  in_progress: 'Em andamento',
+  target_missed: 'Fora da meta',
+  overdue: 'Atrasada',
+  done_on_time: 'Concluída no prazo',
+  done_late: 'Concluída com atraso',
+  canceled: 'Cancelada',
+};
+
+/**
+ * Where the responsible of an occurrence comes from: assigned by hand for that competence only, the
+ * client's responsible in the recurring task's department, or the recurring task's default responsible.
+ */
+export const ASSIGNEE_SOURCES = ['manual', 'client', 'default'] as const;
+export type AssigneeSource = (typeof ASSIGNEE_SOURCES)[number];
+
+export const ASSIGNEE_SOURCE_LABELS: Record<AssigneeSource, string> = {
+  manual: 'Atribuída só nesta competência',
+  client: 'Responsável do cliente no departamento',
+  default: 'Responsável padrão',
+};
+
+/** Step of a process: concluded, the one whose task is active now, or waiting for the previous one. */
 export const FLOW_STEP_STATES = ['done', 'current', 'waiting'] as const;
 export type FlowStepState = (typeof FLOW_STEP_STATES)[number];
 
@@ -486,5 +567,60 @@ export const FLOW_STEP_STATE_LABELS: Record<FlowStepState, string> = {
   waiting: 'Aguardando a etapa anterior',
 };
 
-/** Office time zone: "today" and the day a flow step was concluded are taken here (deadlines are calendar dates). */
+/** Entries of a task's history ("linha do tempo"), written by the services. */
+export const TASK_EVENT_KINDS = [
+  'created',
+  'updated',
+  'assigned',
+  'status',
+  'reopened',
+  'commented',
+  'comment_removed',
+  'attachment_added',
+  'attachment_removed',
+  'flow_step',
+] as const;
+export type TaskEventKind = (typeof TASK_EVENT_KINDS)[number];
+
+export const TASK_EVENT_KIND_LABELS: Record<TaskEventKind, string> = {
+  created: 'Criada',
+  updated: 'Alterada',
+  assigned: 'Responsável alterado',
+  status: 'Situação alterada',
+  reopened: 'Reaberta',
+  commented: 'Comentário',
+  comment_removed: 'Comentário removido',
+  attachment_added: 'Anexo adicionado',
+  attachment_removed: 'Anexo removido',
+  flow_step: 'Etapa de processo',
+};
+
+/**
+ * File types accepted as task attachments. The content is checked against the type's signature
+ * (magic bytes) by the API; HTML, SVG, scripts and executables are never accepted, and every download
+ * is served as an attachment (never rendered inline).
+ */
+export const TASK_ATTACHMENT_TYPES = {
+  'application/pdf': { label: 'PDF', extensions: ['pdf'] },
+  'image/png': { label: 'Imagem PNG', extensions: ['png'] },
+  'image/jpeg': { label: 'Imagem JPEG', extensions: ['jpg', 'jpeg'] },
+  'image/webp': { label: 'Imagem WEBP', extensions: ['webp'] },
+  'application/msword': { label: 'Word (.doc)', extensions: ['doc'] },
+  'application/vnd.ms-excel': { label: 'Excel (.xls)', extensions: ['xls'] },
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { label: 'Word', extensions: ['docx'] },
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { label: 'Excel', extensions: ['xlsx'] },
+  'application/xml': { label: 'XML', extensions: ['xml'] },
+  'text/plain': { label: 'Texto', extensions: ['txt'] },
+  'text/csv': { label: 'CSV', extensions: ['csv'] },
+  'application/zip': { label: 'ZIP', extensions: ['zip'] },
+} as const satisfies Record<string, { label: string; extensions: readonly string[] }>;
+export type TaskAttachmentType = keyof typeof TASK_ATTACHMENT_TYPES;
+export const TASK_ATTACHMENT_CONTENT_TYPES = Object.keys(TASK_ATTACHMENT_TYPES) as [TaskAttachmentType, ...TaskAttachmentType[]];
+
+/** Limits of task attachments (stored in the database, encrypted): per file, per task, files per task. */
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_TASK_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+export const MAX_ATTACHMENTS_PER_TASK = 50;
+
+/** Office time zone: "today" and the day something was concluded are taken here (deadlines are calendar dates). */
 export const TASK_TIME_ZONE = 'America/Sao_Paulo';

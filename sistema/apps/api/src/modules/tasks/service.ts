@@ -1,35 +1,41 @@
 // Tasks (Effy's "solicitações"): CRUD, the list with its summary, the status change (conclude,
-// reopen, move on the board, undo), subtasks, comments and the recent activity.
+// reopen, move on the board, undo), subtasks, comments, the history and the recent activity.
 //
 // Rules ported from Effy's task.service:
 // - the department is derived from the assignee (an unassigned task may sit in a department's queue);
+//   a recurring occurrence belongs to its recurring task's department;
 // - concluding records who/when on the server, only on the transition to `done`; leaving `done`
 //   clears both; "Atrasada" is derived (open + due date before today), never stored;
+// - concluding a process step activates the next one (flow-engine.ts, idempotent);
 // - every member works on tasks; deleting one is for administrators.
+// Recurring occurrences are tasks too (one per client and period, generation.ts): the list shows them
+// aggregated (`occurrences`) and counts them one per client; their registry fields are locked (they come
+// from the recurring task), and reopening a concluded one is only for who concluded it or an
+// administrator, with a reason (the audit record). Every write leaves an entry in the history.
 // Every statement filters by the workspace, even after an ownership check (test/tasks-scope.test.ts);
-// descriptions and comments are encrypted per field (encrypted-text.ts).
-// Phase 1: recurring occurrences and flows come later (the list returns `occurrences: []` and
-// `flow: null` until then).
+// free text is encrypted per field (encrypted-text.ts).
 
-import { and, asc, desc, eq, gte, ilike, isNull, lt, lte, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, lte, sql, type SQL } from 'drizzle-orm';
 import {
   addDays,
-  daysOverdue,
+  addMonthKey,
+  isOpenTaskStatus,
   monthKey,
   monthRange,
-  TASK_DUE_BUCKETS,
   TASK_STATUSES,
   type ISODate,
   type MonthKey,
-  type Task,
   type TaskActivityItem,
   type TaskComment,
   type taskCommentInputSchema,
   type TaskDetail,
   type TaskDueBucket,
+  type TaskFieldChange,
+  type TaskHistoryResponse,
   type taskInputSchema,
   type TaskListResponse,
   type TaskListSummary,
+  type TaskLockedField,
   type TaskMemberRef,
   type taskQuerySchema,
   type TaskStatus,
@@ -41,17 +47,22 @@ import {
   type taskUpdateSchema,
 } from '@effinance/shared';
 import type { z } from 'zod';
-import { contacts, taskComments, taskSubtasks, tasks, type TaskRow } from '../../db/schema';
+import { contacts, taskCategories, taskComments, taskEvents, taskSubtasks, tasks, type TaskRow } from '../../db/schema';
 import { now } from '../../lib/clock';
-import { NotFoundError, ValidationError } from '../../lib/errors';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors';
 import { likePattern } from '../../lib/sql';
 import type { TaskContext } from './access';
+import { listAttachments } from './attachments';
 import {
   decryptTaskText,
   encryptTaskText,
   TASK_COMMENT_TEXT,
   TASK_DESCRIPTION,
 } from './encrypted-text';
+import { HISTORY_LIMIT, recordEvent, recordEvents, toHistoryItem, type EventInput } from './events';
+import { advanceOnCompletion, beforeStepReopens, flowOfTask } from './flow-engine';
+import { defaultWindow, ensureOccurrences } from './generation';
+import { aggregateOccurrences, canReopenOccurrence } from './occurrences';
 import {
   assertMember,
   clientRef,
@@ -64,12 +75,17 @@ import {
   resolveTaskDepartment,
 } from './shared';
 import {
+  bucketSql,
   CLOSED_SQL,
   defaultOrder,
+  NOT_OCCURRENCE_SQL,
+  OCCURRENCE_SQL,
   OPEN_SQL,
+  overdueRef,
   priorityRank,
   selectTask,
   selectTasks,
+  WORK_DATE,
 } from './task-rows';
 
 type TaskInput = z.output<typeof taskInputSchema>;
@@ -79,8 +95,11 @@ type SubtaskInput = z.output<typeof subtaskInputSchema>;
 type SubtaskPatch = z.output<typeof subtaskUpdateSchema>;
 type CommentInput = z.output<typeof taskCommentInputSchema>;
 
-const OPEN_STATUSES: readonly TaskStatus[] = ['todo', 'in_progress', 'waiting_client'];
-const isOpen = (s: TaskStatus) => OPEN_STATUSES.includes(s);
+/** Fields an occurrence takes from its recurring task (PATCH answers 422 for them). */
+const OCCURRENCE_LOCKED: TaskLockedField[] = ['title', 'clientId', 'categoryId', 'departmentId', 'startDate', 'dueDate', 'startTime', 'endTime'];
+
+/** The author of a conclusion may undo it without a reason within this window ("Desfazer"). */
+export const UNDO_WINDOW_MS = 15 * 60_000;
 
 // ---------------------------------------------------------------------------
 // Loading
@@ -100,14 +119,19 @@ export async function getTaskRowOrThrow(
   return row;
 }
 
+function canReopen(ctx: TaskContext, row: Pick<TaskRow, 'status' | 'completedBy' | 'recurringTaskId'>): boolean {
+  if (isOpenTaskStatus(row.status)) return false;
+  return row.recurringTaskId && row.status === 'done' ? canReopenOccurrence(ctx, row) : true;
+}
+
 export async function getTaskDetail(ctx: TaskContext, id: string): Promise<TaskDetail> {
   const task = await selectTask(ctx, id);
   if (!task) throw new NotFoundError('Tarefa não encontrada');
   const [row] = await ctx.db
-    .select({ description: tasks.description })
+    .select({ description: tasks.description, completedBy: tasks.completedBy })
     .from(tasks)
     .where(taskKey(ctx, id));
-  const [subtasks, comments] = await Promise.all([
+  const [subtasks, comments, attachments, flowProgress] = await Promise.all([
     ctx.db
       .select()
       .from(taskSubtasks)
@@ -118,6 +142,8 @@ export async function getTaskDetail(ctx: TaskContext, id: string): Promise<TaskD
       .from(taskComments)
       .where(and(eq(taskComments.workspaceId, ctx.workspaceId), eq(taskComments.taskId, id)))
       .orderBy(asc(taskComments.createdAt), asc(taskComments.id)),
+    listAttachments(ctx, id),
+    task.flow ? flowOfTask(ctx, id) : Promise.resolve(null),
   ]);
   const [description, texts] = await Promise.all([
     decryptTaskText(ctx.cipher, TASK_DESCRIPTION, row?.description ?? null),
@@ -128,7 +154,14 @@ export async function getTaskDetail(ctx: TaskContext, id: string): Promise<TaskD
     description,
     subtasks: subtasks.map(toSubtask),
     comments: comments.map((c, i) => toComment(ctx, c, texts[i]!)),
-    flowProgress: null,
+    attachments,
+    flowProgress,
+    lockedFields: task.occurrence ? OCCURRENCE_LOCKED : [],
+    canReopen: canReopen(ctx, {
+      status: task.status,
+      completedBy: row?.completedBy ?? null,
+      recurringTaskId: task.occurrence?.recurringTaskId ?? null,
+    }),
   };
 }
 
@@ -147,6 +180,7 @@ function toComment(
     author: personRef(ctx, row.authorId, row.authorName),
     text,
     isYours: row.authorId === ctx.userId,
+    canDelete: ctx.isAdmin || row.authorId === ctx.userId,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -163,23 +197,12 @@ interface Filters {
   situation: SQL | undefined;
   bucket: SQL | undefined;
   closed: SQL | undefined;
+  /** A date filter was given (month, due date or range). */
+  dated: boolean;
 }
 
-function bucketSql(bucket: TaskDueBucket, today: ISODate): SQL {
-  const week = addDays(today, 7);
-  switch (bucket) {
-    case 'overdue':
-      return lt(tasks.dueDate, today);
-    case 'today':
-      return eq(tasks.dueDate, today);
-    case 'next7Days':
-      return sql`${tasks.dueDate} > ${today} and ${tasks.dueDate} <= ${week}`;
-    case 'later':
-      return sql`${tasks.dueDate} > ${week}`;
-    case 'noDueDate':
-      return isNull(tasks.dueDate);
-  }
-}
+// Outer columns spelled out: Drizzle leaves them unqualified in a single-table select (pitfall #11).
+const IN_FLOW = sql`exists (select 1 from task_flow_steps fs where fs.workspace_id = tasks.workspace_id and fs.task_id = tasks.id)`;
 
 function buildFilters(ctx: TaskContext, q: TaskQuery, myDepartment: string | null): Filters {
   const scope =
@@ -191,6 +214,7 @@ function buildFilters(ctx: TaskContext, q: TaskQuery, myDepartment: string | nul
           : sql`false`
         : undefined;
   const base: SQL[] = [eq(tasks.workspaceId, ctx.workspaceId)];
+  if (!q.occurrences) base.push(NOT_OCCURRENCE_SQL);
   if (scope) base.push(scope);
   if (q.clientId)
     base.push(q.clientId === 'internal' ? isNull(tasks.clientId) : eq(tasks.clientId, q.clientId));
@@ -201,8 +225,9 @@ function buildFilters(ctx: TaskContext, q: TaskQuery, myDepartment: string | nul
   if (q.departmentId) base.push(eq(tasks.departmentId, q.departmentId));
   if (q.categoryId) base.push(eq(tasks.categoryId, q.categoryId));
   if (q.priority) base.push(eq(tasks.priority, q.priority));
-  // Every task is standalone until flows and recurring work exist (later phases).
-  if (q.kind === 'flow' || q.kind === 'recurring') base.push(sql`false`);
+  if (q.kind === 'recurring') base.push(OCCURRENCE_SQL);
+  if (q.kind === 'flow') base.push(NOT_OCCURRENCE_SQL, IN_FLOW);
+  if (q.kind === 'standalone') base.push(NOT_OCCURRENCE_SQL, sql`not ${IN_FLOW}`);
   if (q.month) {
     const { from, to } = monthRange(q.month);
     base.push(gte(tasks.dueDate, from), lte(tasks.dueDate, to));
@@ -227,16 +252,24 @@ function buildFilters(ctx: TaskContext, q: TaskQuery, myDepartment: string | nul
     closed: q.closedFrom
       ? sql`(not (${CLOSED_SQL}) or (coalesce(${tasks.completedAt}, ${tasks.updatedAt}) at time zone 'America/Sao_Paulo')::date >= ${q.closedFrom})`
       : undefined,
+    dated: Boolean(q.month || q.dueDate || q.dueFrom || q.dueTo),
   };
 }
 
 const count = (cond: SQL) => sql<number>`count(*) filter (where ${cond})`.mapWith(Number);
 
 export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskListResponse> {
+  if (q.occurrences) await ensureOccurrences(ctx, q.month ? [q.month] : defaultWindow(ctx.today));
   const myDepartment =
     q.scope === 'department' ? await departmentOfMember(ctx.db, ctx.workspaceId, ctx.userId) : null;
   const f = buildFilters(ctx, q, myDepartment);
-  const pageWhere = and(...f.base, f.situation, f.bucket, f.closed);
+  const current = monthKey(ctx.today);
+  // Occurrences are generated ahead (generation.ts); without a date filter the list goes up to the next
+  // competence only, so obligations two months away do not swell "Em aberto" and "Mais tarde".
+  if (q.occurrences && !f.dated)
+    f.base.push(sql`(${tasks.recurringTaskId} is null or ${tasks.competence} <= ${addMonthKey(current, 1)})`);
+  // Occurrences are listed aggregated (`occurrences`), never as rows of the page.
+  const pageWhere = and(...f.base, NOT_OCCURRENCE_SQL, f.situation, f.bucket, f.closed);
   const order =
     q.situation === 'done'
       ? [sql`coalesce(${tasks.completedAt}, ${tasks.updatedAt}) desc`, sql`${tasks.id}`]
@@ -247,8 +280,11 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
   const t = ctx.today;
   const grouped = and(OPEN_SQL, f.situation ?? sql`true`);
   const closedOk = f.closed ?? sql`true`;
+  const notOverdue = sql`${tasks.dueDate} >= ${t}`;
+  // Without a date filter, the aggregated occurrences are the open ones and those of the recent window.
+  const occurrenceWindow = f.dated ? undefined : sql`(${OPEN_SQL} or ${tasks.competence} >= ${addMonthKey(current, -2)})`;
 
-  const [items, [totals], [agg], byAssigneeRows, byClientRows, [oldest], monthRows] =
+  const [items, [totals], [agg], byAssigneeRows, byClientRows, [oldest], monthRows, occurrences] =
     await Promise.all([
       selectTasks(ctx, {
         where: pageWhere,
@@ -264,22 +300,20 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
         .select({
           open: count(OPEN_SQL),
           overdue: count(sql`${OPEN_SQL} and ${tasks.dueDate} < ${t}`),
-          dueToday: count(sql`${OPEN_SQL} and ${tasks.dueDate} = ${t}`),
-          dueNext7: count(
-            sql`${OPEN_SQL} and ${tasks.dueDate} > ${t} and ${tasks.dueDate} <= ${week}`,
-          ),
+          targetMissed: count(sql`${OPEN_SQL} and ${bucketSql('targetMissed', t)}`),
+          dueToday: count(sql`${OPEN_SQL} and ${WORK_DATE} = ${t} and ${notOverdue}`),
+          dueNext7: count(sql`${OPEN_SQL} and ${WORK_DATE} > ${t} and ${WORK_DATE} <= ${week}`),
           waiting: count(eq(tasks.status, 'waiting_client')),
           monthDue: count(sql`${tasks.dueDate} between ${monthFrom} and ${monthTo}`),
           monthDone: count(
             sql`${tasks.dueDate} between ${monthFrom} and ${monthTo} and ${CLOSED_SQL}`,
           ),
-          gOverdue: count(sql`${grouped} and ${tasks.dueDate} < ${t}`),
-          gToday: count(sql`${grouped} and ${tasks.dueDate} = ${t}`),
-          gNext7: count(
-            sql`${grouped} and ${tasks.dueDate} > ${t} and ${tasks.dueDate} <= ${week}`,
-          ),
-          gLater: count(sql`${grouped} and ${tasks.dueDate} > ${week}`),
-          gNone: count(sql`${grouped} and ${tasks.dueDate} is null`),
+          gOverdue: count(sql`${grouped} and ${bucketSql('overdue', t)}`),
+          gTargetMissed: count(sql`${grouped} and ${bucketSql('targetMissed', t)}`),
+          gToday: count(sql`${grouped} and ${bucketSql('today', t)}`),
+          gNext7: count(sql`${grouped} and ${bucketSql('next7Days', t)}`),
+          gLater: count(sql`${grouped} and ${bucketSql('later', t)}`),
+          gNone: count(sql`${grouped} and ${bucketSql('noDueDate', t)}`),
           sTodo: count(sql`${tasks.status} = 'todo' and ${closedOk}`),
           sInProgress: count(sql`${tasks.status} = 'in_progress' and ${closedOk}`),
           sWaiting: count(sql`${tasks.status} = 'waiting_client' and ${closedOk}`),
@@ -324,25 +358,19 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
         .selectDistinct({ month: sql<string>`to_char(${tasks.dueDate}, 'YYYY-MM')` })
         .from(tasks)
         .where(
-          and(eq(tasks.workspaceId, ctx.workspaceId), sql`${tasks.dueDate} is not null`, f.scope),
+          and(eq(tasks.workspaceId, ctx.workspaceId), sql`${tasks.dueDate} is not null`, f.scope, q.occurrences ? undefined : NOT_OCCURRENCE_SQL),
         ),
+      q.occurrences && q.kind !== 'standalone' && q.kind !== 'flow'
+        ? aggregateOccurrences(ctx, and(...f.base, f.situation, f.bucket, f.closed, occurrenceWindow))
+        : Promise.resolve([]),
     ]);
   const a = agg!;
 
   const summary: TaskListSummary = {
     month: summaryMonth,
     overdue: a.overdue,
-    oldestOverdue: oldest
-      ? {
-          kind: 'task',
-          id: oldest.id,
-          competence: null,
-          title: oldest.title,
-          dueDate: oldest.dueDate!,
-          daysOverdue: daysOverdue(oldest.dueDate, t),
-          client: oldest.client,
-        }
-      : null,
+    oldestOverdue: oldest ? overdueRef(oldest, t) : null,
+    targetMissed: a.targetMissed,
     open: a.open,
     dueToday: a.dueToday,
     dueNext7Days: a.dueNext7,
@@ -366,6 +394,7 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
   };
   const groups: Record<TaskDueBucket, number> = {
     overdue: a.gOverdue,
+    targetMissed: a.gTargetMissed,
     today: a.gToday,
     next7Days: a.gNext7,
     later: a.gLater,
@@ -388,7 +417,7 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
     page: q.page,
     pageSize: q.pageSize,
     today: t,
-    occurrences: [],
+    occurrences,
     summary,
     groups,
     byStatus,
@@ -445,11 +474,53 @@ function statusFields(
     fields.completedBy = null;
     fields.completedByName = null;
   }
-  if (isOpen(next)) fields.reopenStatus = null;
-  else if (prev && isOpen(prev))
-    fields.reopenStatus = prev as 'todo' | 'in_progress' | 'waiting_client';
+  if (isOpenTaskStatus(next)) fields.reopenStatus = null;
+  else if (prev && isOpenTaskStatus(prev)) fields.reopenStatus = prev;
   else if (!prev || !previous?.reopenStatus) fields.reopenStatus = 'todo';
   return fields;
+}
+
+const personOf = (ctx: TaskContext, id: string | null) => {
+  const m = id ? ctx.members.get(id) : undefined;
+  return m ? { id: m.id, name: m.name } : null;
+};
+
+const PLAIN_FIELDS = ['title', 'priority', 'startDate', 'dueDate', 'startTime', 'endTime'] as const;
+
+/** Before/after of the changed fields for the history (client and category by name; never the description). */
+async function fieldChanges(ctx: TaskContext, current: TaskRow, patch: TaskPatch): Promise<TaskFieldChange[]> {
+  const out: TaskFieldChange[] = [];
+  for (const field of PLAIN_FIELDS) {
+    const to = patch[field];
+    if (to === undefined || to === current[field]) continue;
+    out.push({ field, from: current[field] ?? null, to: to ?? null });
+  }
+  if (patch.clientId !== undefined && patch.clientId !== current.clientId) {
+    const ids = [current.clientId, patch.clientId].filter((v): v is string => v !== null);
+    const rows = ids.length
+      ? await ctx.db
+          .select({ id: contacts.id, name: contacts.name, tradeName: contacts.tradeName })
+          .from(contacts)
+          .where(and(eq(contacts.workspaceId, ctx.workspaceId), inArray(contacts.id, ids)))
+      : [];
+    const name = (id: string | null) => {
+      const r = rows.find((x) => x.id === id);
+      return r ? (r.tradeName?.trim() ? r.tradeName : r.name) : null;
+    };
+    out.push({ field: 'clientId', from: name(current.clientId), to: name(patch.clientId) });
+  }
+  if (patch.categoryId !== undefined && patch.categoryId !== current.categoryId) {
+    const ids = [current.categoryId, patch.categoryId].filter((v): v is string => v !== null);
+    const rows = ids.length
+      ? await ctx.db
+          .select({ id: taskCategories.id, name: taskCategories.name })
+          .from(taskCategories)
+          .where(and(eq(taskCategories.workspaceId, ctx.workspaceId), inArray(taskCategories.id, ids)))
+      : [];
+    const name = (id: string | null) => rows.find((x) => x.id === id)?.name ?? null;
+    out.push({ field: 'categoryId', from: name(current.categoryId), to: name(patch.categoryId) });
+  }
+  return out;
 }
 
 export async function createTask(ctx: TaskContext, input: TaskInput): Promise<TaskDetail> {
@@ -472,19 +543,31 @@ export async function createTask(ctx: TaskContext, input: TaskInput): Promise<Ta
       endTime: input.endTime,
       createdBy: ctx.userId,
       createdByName: myName(ctx),
+      createdAt: now(),
       ...statusFields(ctx, null, input.status),
     })
     .returning({ id: tasks.id });
+  await recordEvent(ctx, { taskId: row!.id, kind: 'created', data: { origin: 'manual', status: input.status } });
   return getTaskDetail(ctx, row!.id);
 }
 
-/** Field-by-field autosave. The department follows the assignee (or the queue sent for an unassigned task). */
+/**
+ * Field-by-field autosave. The department follows the assignee (or the queue sent for an unassigned
+ * task). An occurrence takes only the description, the priority and the assignee (for that competence
+ * only: `assignee_source = 'manual'`); the rest comes from its recurring task.
+ */
 export async function updateTask(
   ctx: TaskContext,
   id: string,
   patch: TaskPatch,
 ): Promise<TaskDetail> {
   const current = await getTaskRowOrThrow(ctx, id);
+  const sent = Object.keys(patch) as (keyof TaskPatch)[];
+  if (current.recurringTaskId) {
+    const locked = sent.filter((k) => (OCCURRENCE_LOCKED as string[]).includes(k));
+    if (locked.length > 0)
+      throw new ValidationError('Este campo vem da tarefa recorrente; altere o cadastro da recorrente.', { fields: locked });
+  }
   const merged = { ...current, ...patch };
   assertDates(merged);
   await assertRefs(ctx, {
@@ -496,7 +579,9 @@ export async function updateTask(
   delete set.departmentId;
   if (patch.description !== undefined)
     set.description = await encryptTaskText(ctx.cipher, TASK_DESCRIPTION, patch.description);
-  if (patch.assigneeId !== undefined || patch.departmentId !== undefined) {
+  if (current.recurringTaskId) {
+    if (patch.assigneeId !== undefined) set.assigneeSource = patch.assigneeId ? 'manual' : null;
+  } else if (patch.assigneeId !== undefined || patch.departmentId !== undefined) {
     set.departmentId = await resolveTaskDepartment(
       ctx,
       merged.assigneeId,
@@ -504,32 +589,92 @@ export async function updateTask(
     );
   }
   if (Object.keys(set).length > 0) await ctx.db.update(tasks).set(set).where(taskKey(ctx, id));
+
+  const events: EventInput[] = [];
+  if (patch.assigneeId !== undefined && patch.assigneeId !== current.assigneeId) {
+    events.push({
+      taskId: id,
+      kind: 'assigned',
+      data: { fromAssignee: personOf(ctx, current.assigneeId), toAssignee: personOf(ctx, patch.assigneeId) },
+      note: current.recurringTaskId ? 'Atribuída só nesta competência' : null,
+    });
+  }
+  const fields = sent.filter((k) => k !== 'assigneeId' && k !== 'departmentId');
+  if (fields.length > 0) events.push({ taskId: id, kind: 'updated', data: { fields, changes: await fieldChanges(ctx, current, patch) } });
+  for (const e of events) await recordEvent(ctx, e);
   return getTaskDetail(ctx, id);
 }
 
 /**
  * Concludes, reopens, moves or undoes. Repeating the current status changes nothing (the conclusion
- * keeps its original who/when). `activated` will carry the next flow step's task once flows exist.
+ * keeps its original who/when). Concluding a process step activates the next one (`activated`);
+ * reopening one puts the next back to waiting if it has not started, and is refused (409) otherwise.
+ * Reopening a concluded occurrence (an audit record) is for who concluded it or an administrator, with
+ * a reason — except its author undoing it within the undo window.
  */
 export async function changeTaskStatus(
   ctx: TaskContext,
   id: string,
   status: TaskStatus,
+  reason: string | null = null,
 ): Promise<TaskStatusChangeResponse> {
   const current = await getTaskRowOrThrow(ctx, id);
+  let activated: string | null = null;
   if (current.status !== status) {
+    const leavingConclusion = current.status === 'done';
+    if (leavingConclusion && current.recurringTaskId) {
+      if (!canReopenOccurrence(ctx, current))
+        throw new ForbiddenError('Só quem concluiu ou um administrador pode reabrir esta tarefa.');
+      const undo =
+        current.completedBy === ctx.userId &&
+        current.completedAt !== null &&
+        now().getTime() - current.completedAt.getTime() <= UNDO_WINDOW_MS;
+      if (!reason && !undo) throw new ValidationError('Informe o motivo da reabertura.');
+    }
     await ctx.db
       .update(tasks)
       .set(statusFields(ctx, current, status))
       .where(taskKey(ctx, id));
+    const reopened = !isOpenTaskStatus(current.status) && isOpenTaskStatus(status);
+    await recordEvent(ctx, {
+      taskId: id,
+      kind: reopened ? 'reopened' : 'status',
+      data: { from: current.status, to: status },
+      note: reason,
+    });
+    // A process step leaving `done`: the next step goes back to waiting, or the change is refused (409;
+    // the whole request is one transaction, so nothing above stays).
+    if (leavingConclusion) await beforeStepReopens(ctx, id);
+    if (status === 'done') activated = await advanceOnCompletion(ctx, id);
   }
-  return { task: await getTaskDetail(ctx, id), activated: null };
+  return {
+    task: await getTaskDetail(ctx, id),
+    activated: activated ? await selectTask(ctx, activated) : null,
+  };
 }
 
-/** Administrators. Subtasks and comments go with it. */
+/**
+ * Administrators. Subtasks, comments, attachments and history go with it. Occurrences are not deleted
+ * (the generation would bring them back): cancel them, or change the recurring task.
+ */
 export async function deleteTask(ctx: TaskContext, id: string): Promise<void> {
-  await getTaskRowOrThrow(ctx, id);
+  const row = await getTaskRowOrThrow(ctx, id);
+  if (row.recurringTaskId)
+    throw new ConflictError(
+      'Ocorrências de tarefas recorrentes não são excluídas: cancele a ocorrência ou ajuste o cadastro da recorrente (exceções, encerramento).',
+    );
   await ctx.db.delete(tasks).where(taskKey(ctx, id));
+}
+
+/** The history of a task, newest first (up to HISTORY_LIMIT entries). */
+export async function taskHistory(ctx: TaskContext, id: string): Promise<TaskHistoryResponse> {
+  await getTaskRowOrThrow(ctx, id);
+  const where = and(eq(taskEvents.workspaceId, ctx.workspaceId), eq(taskEvents.taskId, id));
+  const [rows, [total]] = await Promise.all([
+    ctx.db.select().from(taskEvents).where(where).orderBy(desc(taskEvents.seq)).limit(HISTORY_LIMIT),
+    ctx.db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(taskEvents).where(where),
+  ]);
+  return { items: await Promise.all(rows.map((r) => toHistoryItem(ctx, r))), total: total?.n ?? 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -640,14 +785,30 @@ export async function addComment(
       text: await encryptTaskText(ctx.cipher, TASK_COMMENT_TEXT, input.text),
     })
     .returning();
+  await recordEvent(ctx, { taskId, kind: 'commented', data: { commentId: row!.id } });
   return toComment(ctx, row!, input.text);
+}
+
+/** The author, or an administrator. The history keeps that a comment was removed (not its text). */
+export async function deleteComment(ctx: TaskContext, taskId: string, commentId: string): Promise<void> {
+  const key = and(
+    eq(taskComments.workspaceId, ctx.workspaceId),
+    eq(taskComments.taskId, taskId),
+    eq(taskComments.id, commentId),
+  );
+  const [row] = await ctx.db.select({ authorId: taskComments.authorId }).from(taskComments).where(key);
+  if (!row) throw new NotFoundError('Comentário não encontrado');
+  if (!ctx.isAdmin && row.authorId !== ctx.userId)
+    throw new ForbiddenError('Só quem escreveu ou um administrador pode remover este comentário.');
+  await ctx.db.delete(taskComments).where(key);
+  await recordEvents(ctx, [{ taskId, kind: 'comment_removed', data: { commentId } }]);
 }
 
 const ACTIVITY_DAYS = 5;
 
 /**
  * What others did on my tasks (assigned to or created by me) in the last 5 days: comments, newest
- * first, with an 80-character excerpt (Effy's `atividadeRecente`; attachments are not ported).
+ * first, with an 80-character excerpt (Effy's `atividadeRecente`).
  */
 export async function recentActivity(ctx: TaskContext): Promise<TaskActivityItem[]> {
   const since = new Date(now().getTime() - ACTIVITY_DAYS * 86_400_000);

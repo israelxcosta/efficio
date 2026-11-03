@@ -495,10 +495,11 @@ describe('tasks: registries', () => {
           userId: carla.userId,
         })
       ).body,
-    ).toMatchObject({
-      clientId: client,
-      departmentId: fiscal,
-      user: { id: carla.userId, name: 'Carla Souza' },
+    ).toEqual({
+      items: [{ clientId: client, departmentId: fiscal, user: { id: carla.userId, name: 'Carla Souza' } }],
+      removed: 0,
+      // No recurring task yet: no occurrence changed hands.
+      reassigned: 0,
     });
     await ana.put('/tasks/client-responsibles', {
       clientId: client,
@@ -524,8 +525,8 @@ describe('tasks: registries', () => {
           departmentId: fiscal,
           userId: null,
         })
-      ).status,
-    ).toBe(204);
+      ).body,
+    ).toEqual({ items: [], removed: 1, reassigned: 0 });
     const options = (await carla.get('/tasks/options')).body;
     expect(options.clientResponsibles).toEqual([
       {
@@ -615,15 +616,17 @@ describe('tasks: list, summary and start page', () => {
       waitingClient: 1,
       monthDue: 7,
       monthDone: 3,
+      targetMissed: 0,
       oldestOverdue: {
-        kind: 'task',
+        kind: 'standalone',
+        recurringTaskId: null,
         title: 'Atrasada antiga',
         dueDate: '2026-10-08',
         daysOverdue: 12,
         client: { id: client, name: 'Pão Dourado' },
       },
     });
-    expect(all.groups).toEqual({ overdue: 2, today: 1, next7Days: 1, later: 1, noDueDate: 1 });
+    expect(all.groups).toEqual({ overdue: 2, targetMissed: 0, today: 1, next7Days: 1, later: 1, noDueDate: 1 });
     expect(all.byStatus).toMatchObject({
       todo: { count: 5, overdue: 2 },
       waiting_client: { count: 1 },
@@ -641,7 +644,7 @@ describe('tasks: list, summary and start page', () => {
     const overdue = (await ana.get('/tasks?situation=overdue')).body;
     expect(overdue.items.map((x: any) => x.title)).toEqual(['Atrasada antiga', 'Atrasada recente']);
     expect(overdue.summary.open).toBe(6); // the summary ignores the situation
-    expect(overdue.groups).toEqual({ overdue: 2, today: 0, next7Days: 0, later: 0, noDueDate: 0 });
+    expect(overdue.groups).toEqual({ overdue: 2, targetMissed: 0, today: 0, next7Days: 0, later: 0, noDueDate: 0 });
 
     const done = (await ana.get('/tasks?situation=done')).body;
     expect(done.items.map((x: any) => x.title)).toEqual([
