@@ -6,6 +6,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { completedByText, DUE_TONE_CLASS, taskDueInfo } from '../due';
+import { deadlineTip, occurrenceTaskDueInfo } from '../occurrence';
 
 /** One shape per status (spec §3.1); only "Em andamento" and "Concluída" get a colour. */
 export function TaskStatusGlyph({ status, className }: { status: TaskStatus; className?: string }) {
@@ -140,10 +141,15 @@ export function PriorityBadge({ priority, show = 'row', className }: { priority:
   return null;
 }
 
-/** Due status text (§3.5): "Venceu há 3 dias", "Vence hoje", "Concluída em 14/10"… */
+/**
+ * Due status text (§3.5): "Venceu há 3 dias", "Vence hoje", "Concluída em 14/10"… A recurring
+ * occurrence speaks of its target and legal deadline ("Meta em 2 dias · legal 20/10").
+ */
 export function TaskDueLabel({ task, today, beside = false, className }: { task: Task; today: ISODate; beside?: boolean; className?: string }) {
-  const info = taskDueInfo(task, today, beside);
-  const tip = completedByText(task, formatDateTime);
+  const info = task.occurrence ? occurrenceTaskDueInfo(task, today, beside) : taskDueInfo(task, today, beside);
+  const tip =
+    completedByText(task, formatDateTime) ??
+    (task.occurrence && task.dueDate ? deadlineTip({ legalDueDate: task.dueDate, targetDate: task.occurrence.targetDate }, today) : null);
   const label = <span className={cn('text-xs', DUE_TONE_CLASS[info.tone], className)}>{info.text}</span>;
   return tip ? (
     <Tooltip content={tip}>

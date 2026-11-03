@@ -47,6 +47,18 @@ export const qk = {
   taskMembers: ['tasks', 'members'] as const,
   clientResponsibles: ['tasks', 'client-responsibles'] as const,
   taskActivity: ['tasks', 'activity'] as const,
+  taskHistory: (id: string) => ['tasks', 'history', id] as const,
+  taskCalendar: (params?: Params) => ['tasks', 'calendar', params ?? {}] as const,
+  taskReport: (params?: Params) => ['tasks', 'report', params ?? {}] as const,
+  taskAudit: (params?: Params) => ['tasks', 'audit', params ?? {}] as const,
+  recurringTasks: (params?: Params) => ['tasks', 'recurring', 'list', params ?? {}] as const,
+  recurringTask: (id: string, month?: string) => ['tasks', 'recurring', 'detail', id, month ?? ''] as const,
+  recurringOccurrence: (id: string, period: string) => ['tasks', 'recurring', 'occurrence', id, period] as const,
+  taskFlows: (params?: Params) => ['tasks', 'flows', 'list', params ?? {}] as const,
+  taskFlow: (id: string) => ['tasks', 'flows', 'detail', id] as const,
+  flowTemplates: ['tasks', 'flow-templates'] as const,
+  /** Personal notes: not under `tasks` (a task change never touches them). */
+  taskNotes: ['task-notes'] as const,
   /** Every client (all pages of /clients) for the read-only clients screen of the Gestão. */
   allClients: ['clients', 'all'] as const,
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Ellipsis, ExternalLink, Hourglass, ListChecks, Trash2, UserRoundCheck } from 'lucide-react';
+import { Copy, Ellipsis, ExternalLink, Hourglass, ListChecks, Repeat, Trash2, UserRoundCheck, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDateBR, TASK_STATUS_LABELS, TASK_STATUSES, todayISO, type ISODate, type Task, type TaskStatus } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
@@ -83,6 +83,20 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
               <span className={cn('min-w-[4.5rem] truncate text-sm font-semibold', closed ? 'text-muted' : 'text-fg')}>{task.title}</span>
               {task.priority === 'urgent' ? <PriorityBadge priority="urgent" /> : null}
               {task.priority === 'high' && !compact ? <PriorityBadge priority="high" className="hidden @md:inline-flex" /> : null}
+              {task.flow ? (
+                <Badge tone="neutral" className={cn('shrink-0', compact ? 'px-1.5' : 'px-1.5 @md:px-2')} title={task.flow.title}>
+                  <Workflow aria-hidden />
+                  <span className={compact ? 'sr-only' : 'sr-only @md:not-sr-only'}>
+                    Etapa {task.flow.position}/{task.flow.stepCount}
+                  </span>
+                </Badge>
+              ) : null}
+              {task.occurrence && !compact ? (
+                <Badge tone="neutral" className="shrink-0 px-1.5 @md:px-2" title="Recorrente">
+                  <Repeat aria-hidden />
+                  <span className="sr-only @md:not-sr-only">Recorrente</span>
+                </Badge>
+              ) : null}
               {task.status === 'waiting_client' ? (
                 <Badge tone="neutral" className={cn('shrink-0 px-1.5 @md:px-2', !compact && '@4xl:hidden')} title="Aguardando cliente">
                   <Hourglass aria-hidden />
@@ -156,7 +170,10 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
           </div>
         ) : null}
         <div className={cn('hidden w-36 text-right', compact ? '@2xl:block' : '@xl:block')}>
-          <p className="tabular text-[13px] font-medium text-fg">{task.dueDate ? formatDateBR(task.dueDate) : '—'}</p>
+          {/* An occurrence is worked by its target (the legal deadline goes in the text below). */}
+          <p className="tabular text-[13px] font-medium text-fg">
+            {task.occurrence ? formatDateBR(task.occurrence.targetDate) : task.dueDate ? formatDateBR(task.dueDate) : '—'}
+          </p>
           <TaskDueLabel task={task} today={today} beside />
         </div>
         <TaskRowMenu task={task} />
@@ -227,10 +244,13 @@ export function TaskRowMenu({ task, moveLabel = 'Mudar situação', className }:
                   Atribuir a mim
                 </DropdownMenuItem>
               ) : null}
-              <DropdownMenuItem icon={<Copy />} onSelect={() => newTask({ duplicateOf: task.id })}>
-                Duplicar
-              </DropdownMenuItem>
-              {isAdmin ? (
+              {/* An occurrence comes from its recurring task: it is canceled, never copied or deleted. */}
+              {!task.occurrence ? (
+                <DropdownMenuItem icon={<Copy />} onSelect={() => newTask({ duplicateOf: task.id })}>
+                  Duplicar
+                </DropdownMenuItem>
+              ) : null}
+              {isAdmin && !task.occurrence ? (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => setConfirming(true)}>
@@ -247,7 +267,7 @@ export function TaskRowMenu({ task, moveLabel = 'Mudar situação', className }:
           open={confirming}
           onOpenChange={setConfirming}
           title={`Excluir “${task.title}”?`}
-          description="Subtarefas e comentários também serão excluídos. Esta ação não pode ser desfeita."
+          description="Subtarefas, comentários e anexos também serão excluídos. Esta ação não pode ser desfeita."
           confirmLabel="Excluir tarefa"
           loading={remove.isPending}
           onConfirm={async () => {

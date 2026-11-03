@@ -7,6 +7,7 @@
 // with a per-workspace data key (envelope encryption, AWS KMS in production).
 
 import { z } from 'zod';
+import type { PermissionMap, PermissionOverrides } from './permissions';
 import type { User } from './types';
 
 // ---------------------------------------------------------------------------
@@ -160,11 +161,18 @@ export interface WorkspaceSummary {
   kind: WorkspaceKind;
   /** Role of the current user in this workspace. */
   role: MemberRole;
+  /**
+   * Effective permissions of the current user in this workspace (phase 3, spec §13.10): the role's
+   * defaults plus the adjustments of the person. The web's `can(key)` reads this map.
+   */
+  permissions: PermissionMap;
   subscription: SubscriptionSummary;
 }
 
 export interface MeUser extends User {
   mfaEnabled: boolean;
+  /** When the profile photo was last changed (null without photo): `GET /profile/photos/:userId?v=`. */
+  photoUpdatedAt: string | null;
 }
 
 /** GET /auth/me — the signed-in user and the active workspace. */
@@ -208,6 +216,10 @@ export interface Member {
   name: string;
   email: string;
   role: MemberRole;
+  /** Adjustments of the person over the role's defaults ("Colaborador · 2 ajustes"); `{}` for the owner. */
+  permissionOverrides: PermissionOverrides;
+  /** When the profile photo was last changed (null without photo): `GET /profile/photos/:userId?v=`. */
+  photoUpdatedAt: string | null;
   joinedAt: string;
   isYou: boolean;
 }
@@ -340,3 +352,29 @@ export const auditQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
+
+// ---------------------------------------------------------------------------
+// Profile photo (phase 3, spec §15.3)
+// ---------------------------------------------------------------------------
+
+/** Image types accepted for the profile photo (never SVG). */
+export const PROFILE_PHOTO_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export type ProfilePhotoContentType = (typeof PROFILE_PHOTO_CONTENT_TYPES)[number];
+/** The browser resizes to 256×256 (WebP) before sending: 100 KB is plenty. */
+export const MAX_PROFILE_PHOTO_BYTES = 100 * 1024;
+
+/**
+ * `data:image/(png|jpeg|webp);base64,…` — the API decodes it, checks the size and that the bytes
+ * carry the signature of the declared type.
+ */
+export const profilePhotoInputSchema = z.object({
+  photo: z
+    .string()
+    .max(Math.ceil(MAX_PROFILE_PHOTO_BYTES / 3) * 4 + 64, { message: 'A imagem passa de 100 KB.' })
+    .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/, { message: 'Use PNG, JPG ou WebP.' }),
+});
+export type ProfilePhotoInput = z.infer<typeof profilePhotoInputSchema>;
+
+export interface ProfilePhotoResponse {
+  photoUpdatedAt: string;
+}

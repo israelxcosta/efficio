@@ -19,6 +19,8 @@ import { api } from '@/lib/api';
 import { toastError } from '@/lib/notify';
 import { qk } from '@/lib/query-keys';
 import { invalidateTasks } from './api';
+import { firstName, shortDate } from './due';
+import { useTaskSheetLinks } from './task-links';
 
 export type StatusChangeKind = 'toggle' | 'move' | 'menu' | 'undo';
 
@@ -30,6 +32,16 @@ export function statusMessage(from: TaskStatus, to: TaskStatus, kind: StatusChan
   if ((from === 'done' || from === 'canceled') && isOpenTaskStatus(to)) return 'Tarefa reaberta.';
   if (to === 'canceled') return 'Tarefa cancelada.';
   return `Situação: ${TASK_STATUS_LABELS[to]}.`;
+}
+
+/**
+ * Toast of a concluded process step whose next step became a task (spec §17): "Tarefa concluída.
+ * Próxima etapa criada para Rafael: Contrato social (vence 04/11)."
+ */
+export function nextStepMessage(next: Pick<Task, 'title' | 'assignee' | 'dueDate'>, today: string): string {
+  const who = next.assignee ? ` para ${firstName(next.assignee.name)}` : '';
+  const due = next.dueDate ? ` (vence ${shortDate(next.dueDate, today)})` : '';
+  return `Tarefa concluída. Próxima etapa criada${who}: ${next.title}${due}.`;
 }
 
 /** The task as it looks right after the change, before the server answers. */
@@ -72,9 +84,10 @@ function patchCaches(qc: QueryClient, id: string, fn: <T extends Task>(t: T) => 
 export function useTaskStatusChange() {
   const qc = useQueryClient();
   const [savingId, setSavingId] = useState<string | null>(null);
+  const { openTask } = useTaskSheetLinks();
 
   const change = useCallback(
-    async (task: Task, status: TaskStatus, kind: StatusChangeKind = 'menu'): Promise<boolean> => {
+    async (task: Task, status: TaskStatus, kind: StatusChangeKind = 'menu', reason?: string): Promise<boolean> => {
       if (task.status === status) return true;
       const from = task.status;
       const options = qc.getQueryData<TaskOptionsResponse>(qk.taskOptions);
@@ -84,10 +97,26 @@ export function useTaskStatusChange() {
       patchCaches(qc, task.id, (t) => optimisticTask(t, status, today, options?.me ?? null, new Date().toISOString()));
       setSavingId(task.id);
       try {
-        const res = await api<TaskStatusChangeResponse>(`/tasks/${task.id}/status`, { method: 'PATCH', body: { status } });
+        const res = await api<TaskStatusChangeResponse>(`/tasks/${task.id}/status`, {
+          method: 'PATCH',
+          body: reason ? { status, reason } : { status },
+        });
         qc.setQueryData(qk.task(task.id), res.task);
         patchCaches(qc, task.id, (t) => ({ ...t, ...pickTask(res.task) }));
-        const message = statusMessage(from, status, kind);
+        // A concluded process step started the next one: no undo (§18, item 8), a link to the new step.
+        if (res.activated && kind !== 'undo') {
+          const next = res.activated;
+          void invalidateTasks(qc, { keepDetail: task.id });
+          toast(nextStepMessage(next, today), { duration: 8000, action: { label: 'Ver etapa', onClick: () => openTask(next.id) } });
+          return true;
+        }
+        // Reopening with a reason is a recorded decision: no undo (§11.6).
+        const message = reason ? 'Tarefa reaberta.' : statusMessage(from, status, kind);
+        if (reason && message) {
+          void invalidateTasks(qc, { keepDetail: task.id });
+          toast(message);
+          return true;
+        }
         if (!message) {
           void invalidateTasks(qc, { keepDetail: task.id });
           return true;
@@ -121,7 +150,7 @@ export function useTaskStatusChange() {
         setSavingId(null);
       }
     },
-    [qc],
+    [qc, openTask],
   );
 
   /** The status button of a row: conclude an open task, reopen a concluded one where it was. */

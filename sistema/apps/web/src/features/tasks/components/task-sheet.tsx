@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
 import { CircleCheck, Copy, Ellipsis, Link2, ListChecks, Pencil, Plus, RotateCcw, Send, Trash2, X, CircleX } from 'lucide-react';
+import { ASSIGNEE_SOURCE_LABELS, formatDateBR, type OpenTaskStatus, type TaskLockedField } from '@effinance/shared';
 import { toast } from 'sonner';
 import {
   daysOverdue,
@@ -51,6 +52,7 @@ import {
   useAddComment,
   useAddSubtask,
   useCreateTask,
+  useDeleteComment,
   useDeleteSubtask,
   useDeleteTask,
   useTask,
@@ -62,7 +64,13 @@ import { daysText } from '../due';
 import { commentTime, dateTimeBR } from '../format';
 import { SHEET_PARAMS, statusFromParam, withSheetParams } from '../task-links';
 import { useTaskStatusChange } from '../use-task-status';
+import { competenceName, referenceLabel } from '../occurrence';
+import { AttachmentList } from './attachments';
+import { FlowStepper } from './flow-stepper';
 import { INTERNAL, NONE, ClientPicker, MemberPicker } from './pickers';
+import { ReopenDialog } from './reopen';
+import { TaskDueLabel } from './task-status';
+import { TaskTimeline } from './task-timeline';
 
 type Stamp = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -164,12 +172,30 @@ function TaskSheet({ open, taskId, isNew, params, onClose, onCreated }: TaskShee
     footer = <DetailFooter task={task} stamp={stamp} readOnly={readOnly} onClose={onClose} />;
   }
 
-  const description = task ? `${task.client?.name ?? 'Interna'}${task.department ? ` · ${task.department.name}` : ''}` : undefined;
+  const description = task ? taskSheetDescription(task) : undefined;
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()} title={title} description={description} footer={footer} width="lg">
       {body}
     </Sheet>
   );
+}
+
+/**
+ * "Pão Quente · Contábil", "Interna · Fiscal" or, for an occurrence, "Padaria Pão Dourado · Fiscal ·
+ * DCTFWeb de outubro de 2026 (ref. 09/2026)".
+ */
+export function taskSheetDescription(task: Pick<TaskDetail, 'client' | 'department' | 'title' | 'occurrence'>): string {
+  const head = `${task.client?.name ?? 'Interna'}${task.department ? ` · ${task.department.name}` : ''}`;
+  if (!task.occurrence) return head;
+  return `${head} · ${task.title} de ${competenceName(task.occurrence.competence)} (${referenceLabel(task.occurrence.referenceMonth)})`;
+}
+
+/** Where the responsible of an occurrence comes from, in the words of the screen. */
+export function assigneeSourceHint(task: Pick<TaskDetail, 'occurrence' | 'department'>): string | undefined {
+  const source = task.occurrence?.assigneeSource;
+  if (!source) return undefined;
+  if (source === 'client') return task.department ? `Responsável do cliente no ${task.department.name}.` : `${ASSIGNEE_SOURCE_LABELS.client}.`;
+  return `${ASSIGNEE_SOURCE_LABELS[source]}.`;
 }
 
 function DetailSkeleton() {
@@ -260,7 +286,7 @@ function TaskTitle({ task, readOnly, onStamp }: { task: TaskDetail; readOnly: bo
   const save = useAutosave(task, options.data!, onStamp);
   useEffect(() => setValue(task.title), [task.title]);
 
-  if (readOnly) return <span>{task.title}</span>;
+  if (readOnly || task.lockedFields.includes('title')) return <span>{task.title}</span>;
   if (editing) {
     return (
       <Input
@@ -299,8 +325,14 @@ function TaskTitle({ task, readOnly, onStamp }: { task: TaskDetail; readOnly: bo
 function TaskDetailBody({ task, options, readOnly, onStamp }: { task: TaskDetail; options: TaskOptionsResponse; readOnly: boolean; onStamp: (s: Stamp) => void }) {
   const save = useAutosave(task, options, onStamp);
   const status = useTaskStatusChange();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [description, setDescription] = useState(task.description ?? '');
+  const [reopenTo, setReopenTo] = useState<OpenTaskStatus | null>(null);
   useEffect(() => setDescription(task.description ?? ''), [task.description]);
+  const locked = new Set(task.lockedFields);
+  // A concluded occurrence is an audit record: reopening asks the reason (who concluded it or an administrator).
+  const auditRecord = Boolean(task.occurrence) && task.status === 'done';
 
   return (
     <div className="flex flex-col gap-6">
@@ -319,9 +351,20 @@ function TaskDetailBody({ task, options, readOnly, onStamp }: { task: TaskDetail
         }}
         options={options}
         readOnly={readOnly}
-        onStatus={(s) => void status.change(task, s, 'menu')}
+        locked={locked}
+        occurrence={task.occurrence ? { targetDate: task.occurrence.targetDate, legalDueDate: task.dueDate, task } : undefined}
+        assigneeHint={assigneeSourceHint(task)}
+        statusLockedReason={auditRecord && !task.canReopen ? 'Só quem concluiu ou um administrador pode reabrir.' : undefined}
+        onOpenRecurring={task.occurrence ? () => navigate(`/tarefas/recorrentes?recorrente=${task.occurrence!.recurringTaskId}`) : undefined}
+        onStatus={(s) => {
+          if (auditRecord && s !== 'done' && s !== 'canceled') setReopenTo(s as OpenTaskStatus);
+          else void status.change(task, s, 'menu');
+        }}
         onChange={(patch) => void save(patch)}
       />
+      {task.flowProgress ? (
+        <FlowStepper flow={task.flowProgress} today={options.today} currentTaskId={task.id} onOpenTask={(id) => setParams(withSheetParams(params, { tarefa: id }))} />
+      ) : null}
       <Field label="Descrição">
         <Textarea
           value={description}
@@ -338,8 +381,19 @@ function TaskDetailBody({ task, options, readOnly, onStamp }: { task: TaskDetail
         />
       </Field>
       <SubtaskList task={task} readOnly={readOnly} />
+      <AttachmentList task={task} readOnly={readOnly} today={options.today} />
       <CommentThread task={task} me={options.me} readOnly={readOnly} />
-      <History task={task} />
+      <TaskTimeline task={task} />
+      <ReopenDialog
+        open={reopenTo !== null}
+        onOpenChange={(o) => !o && setReopenTo(null)}
+        title={task.title}
+        initialStatus={reopenTo ?? 'todo'}
+        busy={status.savingId === task.id}
+        onConfirm={async (reason, next) => {
+          if (await status.change(task, next, 'menu', reason)) setReopenTo(null);
+        }}
+      />
     </div>
   );
 }
@@ -364,15 +418,39 @@ interface TaskPropertiesProps {
   onStatus: (s: TaskStatus) => void;
   onChange: (patch: TaskUpdateInput) => void;
   errors?: Partial<Record<keyof PropertyValues, string>>;
+  /** Fields that come from the recurring task (occurrences). */
+  locked?: Set<TaskLockedField>;
+  /** An occurrence: the target and the legal deadline replace the due date. */
+  occurrence?: { targetDate: string; legalDueDate: string | null; task: TaskDetail };
+  /** Where the responsible comes from (occurrences). */
+  assigneeHint?: string;
+  /** The status cannot change (a concluded occurrence the member did not conclude). */
+  statusLockedReason?: string;
+  onOpenRecurring?: () => void;
 }
+
+const FROM_RECURRING = 'Vem da tarefa recorrente.';
 
 /**
  * Two-column grid of the task fields (§9.1). The department follows the assignee (the API places an
  * assigned task in the assignee's department), so it is only chosen for a task without assignee or
  * whose assignee has no department.
  */
-function TaskProperties({ values, options, readOnly, onStatus, onChange, errors = {} }: TaskPropertiesProps) {
+function TaskProperties({
+  values,
+  options,
+  readOnly,
+  onStatus,
+  onChange,
+  errors = {},
+  locked = new Set(),
+  occurrence,
+  assigneeHint,
+  statusLockedReason,
+  onOpenRecurring,
+}: TaskPropertiesProps) {
   const today = options.today;
+  const isLocked = (f: TaskLockedField) => locked.has(f);
   const assignee = options.members.find((m) => m.id === values.assigneeId);
   const derivedDepartment = assignee?.department ?? null;
   const [showTime, setShowTime] = useState(Boolean(values.startTime));
@@ -396,8 +474,8 @@ function TaskProperties({ values, options, readOnly, onStatus, onChange, errors 
 
   return (
     <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
-      <Field label="Situação">
-        <Select value={values.status} disabled={readOnly} onChange={(e) => onStatus(e.target.value as TaskStatus)}>
+      <Field label="Situação" hint={statusLockedReason}>
+        <Select value={values.status} disabled={readOnly || Boolean(statusLockedReason)} onChange={(e) => onStatus(e.target.value as TaskStatus)}>
           {TASK_STATUSES.map((s) => (
             <option key={s} value={s}>
               {TASK_STATUS_LABELS[s]}
@@ -414,7 +492,7 @@ function TaskProperties({ values, options, readOnly, onStatus, onChange, errors 
           ))}
         </Select>
       </Field>
-      <Field label="Responsável">
+      <Field label="Responsável" hint={assigneeHint}>
         <MemberPicker
           value={values.assigneeId || NONE}
           onChange={(v) => onChange({ assigneeId: v === NONE ? null : v })}
@@ -427,11 +505,19 @@ function TaskProperties({ values, options, readOnly, onStatus, onChange, errors 
       </Field>
       <Field
         label="Departamento"
-        hint={derivedDepartment ? `Vem do responsável: ${derivedDepartment.name}.` : options.departments.length ? 'Fila do departamento enquanto não houver responsável.' : undefined}
+        hint={
+          isLocked('departmentId')
+            ? FROM_RECURRING
+            : derivedDepartment
+              ? `Vem do responsável: ${derivedDepartment.name}.`
+              : options.departments.length
+                ? 'Fila do departamento enquanto não houver responsável.'
+                : undefined
+        }
       >
         <Select
-          value={derivedDepartment?.id ?? values.departmentId}
-          disabled={readOnly || Boolean(derivedDepartment) || options.departments.length === 0}
+          value={isLocked('departmentId') ? values.departmentId : (derivedDepartment?.id ?? values.departmentId)}
+          disabled={readOnly || isLocked('departmentId') || Boolean(derivedDepartment) || options.departments.length === 0}
           onChange={(e) => onChange({ departmentId: e.target.value || null })}
         >
           <option value="">{options.departments.length ? 'Sem departamento' : 'Nenhum departamento cadastrado'}</option>
@@ -442,16 +528,33 @@ function TaskProperties({ values, options, readOnly, onStatus, onChange, errors 
           ))}
         </Select>
       </Field>
-      <Field label="Cliente">
+      <Field label="Cliente" hint={isLocked('clientId') ? FROM_RECURRING : undefined}>
         <ClientPicker
           value={values.clientId || INTERNAL}
           onChange={(v) => onChange({ clientId: v === INTERNAL ? null : v })}
           clients={options.clients}
           allowInternal
-          disabled={readOnly}
+          disabled={readOnly || isLocked('clientId')}
         />
       </Field>
-      <Field
+      {occurrence ? (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-fg">Prazo</span>
+          <div className="flex min-h-10 flex-col justify-center rounded-md border border-border bg-bg-subtle px-3 py-1.5">
+            <span className="tabular text-sm text-fg">
+              Meta {formatDateBR(occurrence.targetDate).slice(0, 5)}
+              {occurrence.legalDueDate ? ` · prazo legal ${formatDateBR(occurrence.legalDueDate).slice(0, 5)}` : ''}
+            </span>
+            <TaskDueLabel task={occurrence.task} today={today} beside />
+          </div>
+          {onOpenRecurring ? (
+            <Button variant="link" size="sm" className="self-start text-xs" onClick={onOpenRecurring}>
+              Ver tarefa recorrente
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      {occurrence ? null : <Field
         label="Vencimento"
         error={errors.dueDate}
         hint={overdueDays ? <span className="font-medium text-danger">Venceu há {daysText(overdueDays)}</span> : undefined}
@@ -469,9 +572,9 @@ function TaskProperties({ values, options, readOnly, onStatus, onChange, errors 
             if (!v) setShowTime(false);
           }}
         />
-      </Field>
-      <Field label="Categoria">
-        <Select value={values.categoryId} disabled={readOnly} onChange={(e) => onChange({ categoryId: e.target.value || null })}>
+      </Field>}
+      <Field label="Categoria" hint={isLocked('categoryId') ? FROM_RECURRING : undefined}>
+        <Select value={values.categoryId} disabled={readOnly || isLocked('categoryId')} onChange={(e) => onChange({ categoryId: e.target.value || null })}>
           <option value="">Sem categoria</option>
           {options.categories.map((c) => (
             <option key={c.id} value={c.id}>
@@ -480,6 +583,7 @@ function TaskProperties({ values, options, readOnly, onStatus, onChange, errors 
           ))}
         </Select>
       </Field>
+      {occurrence ? null : (
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium text-fg">Horário</span>
         {showTime ? (
@@ -546,7 +650,8 @@ function TaskProperties({ values, options, readOnly, onStatus, onChange, errors 
           </Tooltip>
         )}
       </div>
-      {more ? (
+      )}
+      {occurrence ? null : more ? (
         <Field label="Início" error={errors.startDate}>
           <Input
             type="date"
@@ -656,9 +761,11 @@ function SubtaskList({ task, readOnly }: { task: TaskDetail; readOnly: boolean }
 
 function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptionsResponse['me']; readOnly: boolean }) {
   const add = useAddComment(task.id);
+  const remove = useDeleteComment(task.id);
   const qc = useQueryClient();
   const [text, setText] = useState('');
   const [pending, setPending] = useState<TaskComment | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   async function submit() {
     const value = text.trim();
@@ -686,14 +793,56 @@ function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptio
       {comments.length === 0 ? <p className="text-body-sm text-subtle">Nenhum comentário ainda.</p> : null}
       <ul className="flex flex-col gap-4">
         {comments.map((c) => (
-          <li key={c.id} className={cn('flex gap-3', c.id === 'pending' && 'opacity-70')}>
+          <li key={c.id} className={cn('group/comment flex gap-3', c.id === 'pending' && 'opacity-70')}>
             <MemberAvatar size="md" name={c.author?.name} unassigned={!c.author} />
             <div className="min-w-0 flex-1">
-              <p className="text-body-sm">
-                <span className="font-semibold text-fg">{c.author?.name ?? 'Pessoa removida'}</span>{' '}
-                <span className="text-caption text-muted">{c.id === 'pending' ? 'enviando…' : commentTime(c.createdAt)}</span>
-              </p>
-              <p className="mt-0.5 text-sm break-words whitespace-pre-wrap text-fg">{c.text}</p>
+              <div className="flex items-start gap-2">
+                <p className="min-w-0 flex-1 text-body-sm">
+                  <span className="font-semibold text-fg">{c.author?.name ?? 'Pessoa removida'}</span>{' '}
+                  <span className="text-caption text-muted">{c.id === 'pending' ? 'enviando…' : commentTime(c.createdAt)}</span>
+                </p>
+                {c.canDelete && !readOnly && c.id !== 'pending' && confirming !== c.id ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={`Ações do comentário de ${c.author?.name ?? 'pessoa removida'}`}
+                        className="-mt-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-bg-subtle hover:text-fg group-hover/comment:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100"
+                      >
+                        <Ellipsis className="size-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => setConfirming(c.id)}>
+                        Excluir comentário
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+              </div>
+              {confirming === c.id ? (
+                <div className="mt-1 flex flex-wrap items-center gap-2 rounded-md bg-surface-muted px-2 py-1.5">
+                  <span className="mr-auto text-body-sm text-fg">Excluir este comentário?</span>
+                  <Button
+                    variant="danger"
+                    size="xs"
+                    loading={remove.isPending}
+                    onClick={() =>
+                      remove.mutate(c.id, {
+                        onSuccess: () => setConfirming(null),
+                        onError: (e) => toastError(e),
+                      })
+                    }
+                  >
+                    Excluir
+                  </Button>
+                  <Button variant="ghost" size="xs" onClick={() => setConfirming(null)}>
+                    Cancelar
+                  </Button>
+                </div>
+              ) : (
+                <p className="mt-0.5 text-sm break-words whitespace-pre-wrap text-fg">{c.text}</p>
+              )}
             </div>
           </li>
         ))}
@@ -726,36 +875,17 @@ function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptio
   );
 }
 
-/** What the API records about the task: who created and concluded it, and the last change. */
-function History({ task }: { task: TaskDetail }) {
-  const lines = [
-    `Criada${task.createdBy ? ` por ${task.createdBy.name}` : ''} em ${dateTimeBR(task.createdAt)}`,
-    task.completedAt ? `Concluída${task.completedBy ? ` por ${task.completedBy.name}` : ''} em ${dateTimeBR(task.completedAt)}` : null,
-    task.updatedAt !== task.createdAt ? `Última alteração em ${dateTimeBR(task.updatedAt)}` : null,
-  ].filter(Boolean);
-  return (
-    <section className="flex flex-col gap-1.5 border-t border-border pt-4" aria-labelledby="task-history">
-      <h3 id="task-history" className="text-body-sm font-semibold text-fg">
-        Histórico
-      </h3>
-      <ul className="flex flex-col gap-1">
-        {lines.map((l) => (
-          <li key={l} className="text-caption text-subtle">
-            {l}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; stamp: Stamp; readOnly: boolean; onClose: () => void }) {
   const status = useTaskStatusChange();
   const remove = useDeleteTask();
   const { isAdmin } = usePermissions();
   const [confirming, setConfirming] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [params, setParams] = useSearchParams();
   const closed = task.status === 'done' || task.status === 'canceled';
+  const occurrence = Boolean(task.occurrence);
+  // Reopening a concluded occurrence asks the reason, and only who concluded it or an administrator may.
+  const auditRecord = occurrence && task.status === 'done';
 
   if (readOnly) {
     return (
@@ -772,9 +902,11 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="end">
-          <DropdownMenuItem icon={<Copy />} onSelect={() => setParams(withSheetParams(params, { nova: '1', duplicar: task.id }))}>
-            Duplicar
-          </DropdownMenuItem>
+          {!occurrence ? (
+            <DropdownMenuItem icon={<Copy />} onSelect={() => setParams(withSheetParams(params, { nova: '1', duplicar: task.id }))}>
+              Duplicar
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem
             icon={<Link2 />}
             onSelect={async () => {
@@ -790,7 +922,7 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
               Cancelar tarefa
             </DropdownMenuItem>
           ) : null}
-          {isAdmin ? (
+          {isAdmin && !occurrence ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => setConfirming(true)}>
@@ -800,7 +932,13 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      {closed ? (
+      {auditRecord ? (
+        task.canReopen ? (
+          <Button variant="outline" onClick={() => setReopening(true)}>
+            <RotateCcw /> Reabrir
+          </Button>
+        ) : null
+      ) : closed ? (
         <Button variant="outline" loading={status.savingId === task.id} onClick={() => void status.change(task, task.reopenStatus, 'toggle')}>
           <RotateCcw /> Reabrir
         </Button>
@@ -813,7 +951,7 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
         open={confirming}
         onOpenChange={setConfirming}
         title={`Excluir “${task.title}”?`}
-        description="Subtarefas e comentários também serão excluídos. Esta ação não pode ser desfeita."
+        description="Subtarefas, comentários e anexos também serão excluídos. Esta ação não pode ser desfeita."
         confirmLabel="Excluir tarefa"
         loading={remove.isPending}
         onConfirm={async () => {
@@ -827,6 +965,18 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
           }
         }}
       />
+      {auditRecord ? (
+        <ReopenDialog
+          open={reopening}
+          onOpenChange={setReopening}
+          title={task.title}
+          initialStatus={task.reopenStatus}
+          busy={status.savingId === task.id}
+          onConfirm={async (reason, next) => {
+            if (await status.change(task, next, 'menu', reason)) setReopening(false);
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -1003,7 +1153,7 @@ function NewTaskSheet({
               </Field>
             )}
           />
-          <p className="text-caption text-subtle">Subtarefas e comentários ficam disponíveis depois de criar.</p>
+          <p className="text-caption text-subtle">Subtarefas, anexos e comentários ficam disponíveis depois de criar.</p>
           {create.isError && !(create.error instanceof ApiRequestError) ? (
             <p role="alert" className="text-xs text-danger">
               {errorMessage(create.error)}

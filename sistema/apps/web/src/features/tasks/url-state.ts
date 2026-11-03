@@ -9,6 +9,8 @@ import {
   TASK_PRIORITIES,
   type ISODate,
   type MonthKey,
+  type TaskCalendarQuery,
+  type TaskKind,
   type TaskPriority,
   type TaskQuery,
   type TaskScope,
@@ -16,7 +18,7 @@ import {
 } from '@effinance/shared';
 import { isUuid } from '@/lib/safe-url';
 
-export type TaskView = 'list' | 'board';
+export type TaskView = 'list' | 'board' | 'calendar';
 
 export interface TaskFilters {
   scope: TaskScope;
@@ -32,13 +34,16 @@ export interface TaskFilters {
   priority: TaskPriority | '';
   month: MonthKey | '';
   dueDate: ISODate | '';
+  /** "Tipo": standalone tasks, recurring occurrences or process steps. */
+  kind: TaskKind | '';
   /** Board: only overdue cards. */
   onlyOverdue: boolean;
   page: number;
 }
 
 const SCOPE_PARAM: Record<TaskScope, string> = { mine: 'minhas', department: 'departamento', all: 'todas' };
-const VIEW_PARAM: Record<TaskView, string> = { list: 'lista', board: 'quadro' };
+const VIEW_PARAM: Record<TaskView, string> = { list: 'lista', board: 'quadro', calendar: 'calendario' };
+const KIND_PARAM: Record<TaskKind, string> = { standalone: 'avulsas', recurring: 'recorrentes', flow: 'processos' };
 const SITUATION_PARAM: Record<TaskSituation, string> = {
   open: 'abertas',
   overdue: 'atrasadas',
@@ -90,6 +95,7 @@ export function parseTaskFilters(params: URLSearchParams, defaults: TaskViewPref
     priority: fromParam(PRIORITY_PARAM, params.get('prioridade')) ?? '',
     month: monthKeySchema.safeParse(month).success ? (month as MonthKey) : '',
     dueDate: isoDateSchema.safeParse(dueDate).success ? (dueDate as ISODate) : '',
+    kind: fromParam(KIND_PARAM, params.get('tipo')) ?? '',
     onlyOverdue: params.get('atrasadas') === '1',
     page: Number.isInteger(page) && page > 0 && page <= MAX_TASK_PAGE ? page : 1,
   };
@@ -116,6 +122,7 @@ export function writeTaskFilters(params: URLSearchParams, patch: TaskFilterPatch
   if (patch.priority !== undefined) set('prioridade', patch.priority ? PRIORITY_PARAM[patch.priority] : null);
   if (patch.month !== undefined) set('mes', patch.month);
   if (patch.dueDate !== undefined) set('vencimento', patch.dueDate);
+  if (patch.kind !== undefined) set('tipo', patch.kind ? KIND_PARAM[patch.kind] : null);
   if (patch.onlyOverdue !== undefined) set('atrasadas', patch.onlyOverdue ? '1' : null);
   if (patch.page !== undefined) set('pagina', patch.page > 1 ? String(patch.page) : null);
   else next.delete('pagina');
@@ -124,7 +131,8 @@ export function writeTaskFilters(params: URLSearchParams, patch: TaskFilterPatch
 
 /** Filters that narrow the list beyond scope, view and situation (the "Limpar" button). */
 export function activeFilterCount(f: TaskFilters): number {
-  return [f.search, f.client, f.assignee, f.department, f.category, f.priority, f.month, f.dueDate].filter(Boolean).length;
+  return [f.search, f.client, f.assignee, f.department, f.category, f.priority, f.view === 'calendar' ? '' : f.month, f.dueDate, f.kind].filter(Boolean)
+    .length;
 }
 
 export const CLEARED_FILTERS: TaskFilterPatch = {
@@ -136,6 +144,7 @@ export const CLEARED_FILTERS: TaskFilterPatch = {
   priority: '',
   month: '',
   dueDate: '',
+  kind: '',
 };
 
 export const TASK_PAGE_SIZE = 50;
@@ -156,8 +165,9 @@ export function toTaskQuery(f: TaskFilters, today: ISODate): TaskQuery {
     priority: f.priority || undefined,
     month: f.month || undefined,
     dueDate: f.dueDate || undefined,
-    // Recurring occurrences come with phase 2.
-    occurrences: 'false',
+    kind: f.kind || undefined,
+    // Recurring occurrences come aggregated (one row per recurring task and period), counted per client.
+    occurrences: f.kind === 'standalone' || f.kind === 'flow' ? 'false' : undefined,
   };
   if (f.view === 'board') {
     return {
@@ -169,6 +179,35 @@ export function toTaskQuery(f: TaskFilters, today: ISODate): TaskQuery {
     };
   }
   return { ...base, situation: f.situation, page: f.page, pageSize: TASK_PAGE_SIZE };
+}
+
+/** Month shown by the calendar: the `mes` filter, else the current one. */
+export function calendarMonth(f: TaskFilters, today: ISODate): MonthKey {
+  return f.month || (today.slice(0, 7) as MonthKey);
+}
+
+/** Days of the month grid (weeks start on Sunday): from the Sunday before the 1st to the Saturday after the last day. */
+export function calendarRange(month: MonthKey): { from: ISODate; to: ISODate } {
+  const first = `${month}-01` as ISODate;
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  const last = `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}` as ISODate;
+  const dow = (d: ISODate) => new Date(`${d}T12:00:00Z`).getUTCDay();
+  return { from: addDays(first, -dow(first)), to: addDays(last, 6 - dow(last)) };
+}
+
+/** The API query of the calendar (same scope and filters as the list; the range is the month grid). */
+export function toCalendarQuery(f: TaskFilters, today: ISODate): TaskCalendarQuery {
+  const { from, to } = calendarRange(calendarMonth(f, today));
+  return {
+    from,
+    to,
+    scope: f.scope,
+    assigneeId: f.scope === 'mine' ? undefined : ((f.assignee || undefined) as TaskCalendarQuery['assigneeId']),
+    departmentId: f.department || undefined,
+    clientId: (f.client || undefined) as TaskCalendarQuery['clientId'],
+    categoryId: f.category || undefined,
+    kind: f.kind || undefined,
+  };
 }
 
 /** Situations whose list is grouped by due date (Atrasadas, Hoje, Próximos 7 dias…). */

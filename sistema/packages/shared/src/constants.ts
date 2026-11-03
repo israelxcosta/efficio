@@ -624,3 +624,183 @@ export const MAX_ATTACHMENTS_PER_TASK = 50;
 
 /** Office time zone: "today" and the day something was concluded are taken here (deadlines are calendar dates). */
 export const TASK_TIME_ZONE = 'America/Sao_Paulo';
+
+// ---------------------------------------------------------------------------
+// Phase 3: clients' documents and accesses, unions (sindicatos), office and contract
+// ---------------------------------------------------------------------------
+
+/**
+ * Documents with an expiry date of a client (Effy's CompanyReport, "laudo"), by group (spec §13.8.1).
+ * `other` takes a name typed by the user.
+ */
+export const CLIENT_DOCUMENT_KINDS = [
+  'digital_certificate',
+  'cnd_federal',
+  'cnd_state',
+  'cnd_municipal',
+  'crf_fgts',
+  'cndt',
+  'operating_license',
+  'sanitary_license',
+  'fire_certificate',
+  'environmental_license',
+  'pcmso',
+  'pgr',
+  'ltcat',
+  'professional_registration',
+  'other',
+] as const;
+export type ClientDocumentKind = (typeof CLIENT_DOCUMENT_KINDS)[number];
+
+export const CLIENT_DOCUMENT_KIND_LABELS: Record<ClientDocumentKind, string> = {
+  digital_certificate: 'Certificado digital (e-CNPJ A1/A3)',
+  cnd_federal: 'CND federal (Receita e PGFN)',
+  cnd_state: 'CND estadual',
+  cnd_municipal: 'CND municipal',
+  crf_fgts: 'CRF do FGTS',
+  cndt: 'CNDT trabalhista',
+  operating_license: 'Alvará de funcionamento',
+  sanitary_license: 'Licença sanitária',
+  fire_certificate: 'AVCB/CLCB (bombeiros)',
+  environmental_license: 'Licença ambiental',
+  pcmso: 'PCMSO',
+  pgr: 'PGR',
+  ltcat: 'LTCAT',
+  professional_registration: 'Registro em órgão de classe',
+  other: 'Outro',
+};
+
+/** Groups of the type picker; the icon of a row follows the group (spec §6.10). */
+export const CLIENT_DOCUMENT_GROUPS = ['certificates', 'certificates_of_debt', 'licenses', 'health_safety', 'others'] as const;
+export type ClientDocumentGroup = (typeof CLIENT_DOCUMENT_GROUPS)[number];
+
+export const CLIENT_DOCUMENT_GROUP_LABELS: Record<ClientDocumentGroup, string> = {
+  certificates: 'Certificados',
+  certificates_of_debt: 'Certidões',
+  licenses: 'Licenças e alvarás',
+  health_safety: 'Saúde e segurança do trabalho',
+  others: 'Outros',
+};
+
+export const CLIENT_DOCUMENT_KIND_GROUP: Record<ClientDocumentKind, ClientDocumentGroup> = {
+  digital_certificate: 'certificates',
+  cnd_federal: 'certificates_of_debt',
+  cnd_state: 'certificates_of_debt',
+  cnd_municipal: 'certificates_of_debt',
+  crf_fgts: 'certificates_of_debt',
+  cndt: 'certificates_of_debt',
+  operating_license: 'licenses',
+  sanitary_license: 'licenses',
+  fire_certificate: 'licenses',
+  environmental_license: 'licenses',
+  pcmso: 'health_safety',
+  pgr: 'health_safety',
+  ltcat: 'health_safety',
+  professional_registration: 'others',
+  other: 'others',
+};
+
+/** Up to 50 documents per client; the note up to 200 characters. */
+export const MAX_CLIENT_DOCUMENTS = 50;
+export const CLIENT_DOCUMENT_NOTE_MAX = 200;
+
+/**
+ * Deadline bands of documents and collective agreements (computed by the API in the office time
+ * zone): `overdue` before today; `within30` from today to today + 30 (inclusive); `within60` from
+ * today + 31 to today + 60; `later` after that; `noDate` without expiry (documents) or without the
+ * base month (unions).
+ */
+export const DEADLINE_BUCKETS = ['overdue', 'within30', 'within60', 'later', 'noDate'] as const;
+export type DeadlineBucket = (typeof DEADLINE_BUCKETS)[number];
+
+export const DEADLINE_BUCKET_LABELS: Record<DeadlineBucket, string> = {
+  overdue: 'Vencidos',
+  within30: 'Em até 30 dias',
+  within60: 'Em 31 a 60 dias',
+  later: 'Em dia',
+  noDate: 'Sem vencimento informado',
+};
+
+/** Encrypted accesses of a client (never in lists): revealed one at a time, with an audit record. */
+export const CLIENT_CREDENTIAL_FIELDS = ['simplesAccessCode', 'accountantPassword'] as const;
+export type ClientCredentialField = (typeof CLIENT_CREDENTIAL_FIELDS)[number];
+
+export const CLIENT_CREDENTIAL_FIELD_LABELS: Record<ClientCredentialField, string> = {
+  simplesAccessCode: 'Código de acesso do Simples Nacional',
+  accountantPassword: 'Senha do contador',
+};
+
+/** Regimes where the Simples Nacional access code applies. */
+export const SIMPLES_ACCESS_REGIMES = ['simples_nacional', 'mei'] as const satisfies readonly TaxRegime[];
+
+/** Reveals of a client's access per member per minute (on top of the per-IP limit). */
+export const MAX_CREDENTIAL_REVEALS_PER_MINUTE = 10;
+
+/** Situation of a union's collective agreement (the list filter, spec §13.7). `ok` = more than 60 days. */
+export const UNION_SITUATIONS = ['overdue', 'within30', 'within60', 'ok', 'noBaseMonth'] as const;
+export type UnionSituation = (typeof UNION_SITUATIONS)[number];
+
+export const UNION_SITUATION_LABELS: Record<UnionSituation, string> = {
+  overdue: 'Convenção vencida',
+  within30: 'Vence em até 30 dias',
+  within60: 'Vence em 31 a 60 dias',
+  ok: 'Em dia',
+  noBaseMonth: 'Sem data-base',
+};
+
+/** Unions of a workspace (a dozen in practice; the cap keeps the in-memory urgency order bounded). */
+export const MAX_UNIONS = 1000;
+/** Collective agreement cycles per union (one per year). */
+export const MAX_UNION_CYCLES = 60;
+export const UNION_CYCLE_MIN_YEAR = 2000;
+export const UNION_CYCLE_MAX_YEAR = 2100;
+
+/** Pix key types of the office (spec §13.9). */
+export const PIX_KEY_TYPES = ['cnpj', 'cpf', 'email', 'phone', 'random'] as const;
+export type PixKeyType = (typeof PIX_KEY_TYPES)[number];
+
+export const PIX_KEY_TYPE_LABELS: Record<PixKeyType, string> = {
+  cnpj: 'CNPJ',
+  cpf: 'CPF',
+  email: 'E-mail',
+  phone: 'Telefone',
+  random: 'Chave aleatória',
+};
+
+/** Logo and watermark of the office: PNG, JPG or WebP up to 500 KB (never SVG). */
+export const OFFICE_IMAGE_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export type OfficeImageContentType = (typeof OFFICE_IMAGE_CONTENT_TYPES)[number];
+export const MAX_OFFICE_IMAGE_BYTES = 500 * 1024;
+
+/** Block types of the contract template (the ones the PDF knows how to draw; Effy's TIPOS_DE_BLOCO). */
+export const CONTRACT_BLOCK_TYPES = [
+  'title',
+  'subtitle',
+  'heading1',
+  'heading2',
+  'label',
+  'paragraph',
+  'paragraph_center',
+  'spacer',
+] as const;
+export type ContractBlockType = (typeof CONTRACT_BLOCK_TYPES)[number];
+
+export const CONTRACT_BLOCK_TYPE_LABELS: Record<ContractBlockType, string> = {
+  title: 'Título do contrato',
+  subtitle: 'Subtítulo',
+  heading1: 'Título de cláusula',
+  heading2: 'Título de seção',
+  label: 'Rótulo em negrito',
+  paragraph: 'Parágrafo',
+  paragraph_center: 'Parágrafo centralizado',
+  spacer: 'Espaço em branco',
+};
+
+/** Rules a block may carry: `discount` enters the contract only when the fee period has a discount. */
+export const CONTRACT_BLOCK_RULES = ['discount'] as const;
+export type ContractBlockRule = (typeof CONTRACT_BLOCK_RULES)[number];
+
+/** Limits of the template (Effy's): blocks, characters per block and in total. */
+export const MAX_CONTRACT_BLOCKS = 500;
+export const MAX_CONTRACT_BLOCK_CHARS = 20_000;
+export const MAX_CONTRACT_TOTAL_CHARS = 400_000;

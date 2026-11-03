@@ -212,3 +212,58 @@ export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return 'Algo deu errado.';
 }
+
+/** Name of a download from `Content-Disposition` (`filename*=UTF-8''…` first, then `filename="…"`). */
+export function fileNameFromDisposition(header: string | null, fallback: string): string {
+  if (!header) return fallback;
+  const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      // fall through to the ASCII name
+    }
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() || fallback;
+}
+
+/**
+ * A file the API serves as a download (task attachments, CSV exports): the bytes and the name the
+ * server chose. Same session handling as `api` (renews an expired token once); errors are JSON.
+ */
+export async function apiDownload(path: string, options: RequestOptions = {}, fallbackName = 'arquivo'): Promise<{ blob: Blob; fileName: string }> {
+  if (!isSafeApiPath(path)) {
+    throw new ApiRequestError(400, { error: 'invalid_path', message: 'Endereço inválido.' });
+  }
+  let response = await send(path, options);
+  if (response.status === 401 && (await refreshSession())) {
+    void response.body?.cancel().catch(() => {});
+    response = await send(path, options);
+  }
+  if (!response.ok) {
+    let data: Partial<ApiError> | null = null;
+    try {
+      data = (await response.json()) as Partial<ApiError>;
+    } catch {
+      data = null;
+    }
+    const error = new ApiRequestError(response.status, data);
+    if (response.status === 403) accessErrorHandler?.('forbidden', error);
+    throw error;
+  }
+  return { blob: await response.blob(), fileName: fileNameFromDisposition(response.headers.get('content-disposition'), fallbackName) };
+}
+
+/** Hands a blob to the browser as a download (never opened inside the app). */
+export function saveBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
