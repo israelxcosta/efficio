@@ -304,7 +304,8 @@ Contrato em `packages/shared/src/saas.ts`.
   `ENCRYPTION_MASTER_KEY`). Campos sensíveis são gravados cifrados com AES-256-GCM (AAD =
   workspace + tabela + coluna): contatos (CPF/CNPJ, e-mail, telefone, endereço completo,
   observações), observações de lançamentos e metas, descrição e comentários de tarefas (0013),
-  segredo TOTP do usuário (chave mestra). CPF/CNPJ
+  descrições de recorrentes, etapas e modelos, motivos do histórico, anotações pessoais, nomes e
+  conteúdo dos anexos (0014), segredo TOTP do usuário (chave mestra). CPF/CNPJ
   tem índice cego (HMAC) para busca exata. Excluir o workspace apaga a chave (crypto-shredding).
 - **Em trânsito e em repouso**: TLS obrigatório (`DATABASE_SSL=verify-full` com o CA do RDS);
   RDS com armazenamento e snapshots criptografados pelo KMS e backups com PITR.
@@ -362,9 +363,10 @@ Contrato em `packages/shared/src/saas.ts`.
     `contacts`, só clientes (fornecedores são do financeiro e nem são consultados), com `notes`
     `null`. Fornecedores (`/contacts`) não expõem totais financeiros.
   - **Tarefas** (`/tasks/*`): todos os membros trabalham, `viewer` inclusive — criar, editar,
-    concluir/reabrir, comentar e mexer em subtarefas. Cadastros do módulo (departamentos, departamento
-    do membro, categorias de tarefa, responsável por cliente) e excluir tarefas ficam com `owner`/
-    `editor`. Ver "Tarefas → Permissões".
+    concluir/reabrir, comentar, anexar, mexer em subtarefas, marcar ocorrências e a auditoria, aplicar
+    modelos de processo e manter as próprias anotações. Cadastros do módulo (departamentos,
+    departamento do membro, categorias, responsável por cliente, tarefas recorrentes, modelos de
+    processo) e exclusões ficam com `owner`/`editor`. Ver "Tarefas → Permissões".
   - Mudança de papel vale na próxima requisição (o papel é relido a cada requisição).
 - Gravações exigem assinatura válida: `trialing` (14 dias, sem cartão), `active` ou `past_due` dentro
   da carência de 7 dias. Fora disso → `402 subscription_required` (leitura e exportação continuam).
@@ -420,8 +422,8 @@ Contrato em `packages/shared/src/saas.ts`.
   não ficam sob RLS: são acessados pelo login da API, com checagem explícita de papel.
 - **Busca com dados cifrados**: observações não são pesquisáveis (a busca de lançamentos usa só a
   descrição). Contatos: busca parcial por nome ou exata por CPF/CNPJ (índice cego); e-mail e
-  telefone não são pesquisáveis. Tarefas: a busca (`GET /tasks?search=`) é só pelo título; descrição
-  e comentários são cifrados.
+  telefone não são pesquisáveis. Tarefas: a busca (`GET /tasks?search=` e `GET /search`) é só pelo
+  título (e o nome das recorrentes); descrições, comentários, anotações e anexos são cifrados.
 - **Limite de membros**: plano pago → `maxMembers` do plano; em teste → 1 (pessoal), 5 (família),
   15 (empresa). Membros + convites pendentes acima do limite → `422`. Convites pedem assinatura
   com escrita liberada (`402`).
@@ -824,15 +826,19 @@ membro do espaço → 422.
   tarefa fica na fila do `departmentId` enviado; tirar o responsável mantém o departamento em que
   estava. **Diferença deliberada**: quando um membro muda de departamento, as tarefas **abertas** dele
   vão junto (no Effy o departamento congelava ao salvar); as concluídas/canceladas ficam onde foram
-  feitas.
+  feitas. A **ocorrência** de uma recorrente pertence sempre ao departamento da recorrente (não segue
+  o responsável nem a mudança de departamento do membro). Etapa de processo segue a regra da tarefa
+  (departamento do responsável; sem responsável, o da etapa).
 - **Um departamento por membro** (spec §1 e §13.4: "cada membro está em no máximo um departamento";
   marcar um membro num departamento o tira do atual). `PUT /tasks/departments/:id` com `memberIds` é a lista completa.
 - **Conclusão** (`PATCH /tasks/:id/status`): na transição para `done` o servidor grava `completedAt`
   (instante) e `completedBy` (quem clicou — o usuário da sessão, não o responsável); repetir `done`
   não muda o registro; sair de `done` apaga os dois. **Reabrir**: `reopenStatus` diz para onde voltar
   (o estado aberto anterior à conclusão/cancelamento; `todo` sem histórico) — o web envia
-  `{ status: task.reopenStatus }`. Qualquer transição é aceita (desfazer, mover no quadro). Criar já
-  concluída também grava quem/quando. O banco garante `done` ⇔ `completed_at` (CHECK).
+  `{ status: task.reopenStatus }`. Qualquer transição é aceita (desfazer, mover no quadro), com
+  `reason` opcional (vai para o histórico). Criar já concluída também grava quem/quando. O banco
+  garante `done` ⇔ `completed_at` (CHECK). Exceções da fase 2: reabrir **ocorrência concluída**
+  (auditoria) e reabrir **etapa de processo** com a seguinte já iniciada (ver as seções abaixo).
 - **Horário** ("compromisso"): `startTime`/`endTime` `HH:MM` de parede (sem fuso), só com
   vencimento, término depois do início. Início ≤ vencimento. O PATCH confere de novo na tarefa
   resultante (422).
@@ -861,31 +867,50 @@ membro do espaço → 422.
 - **Membro removido do espaço**: as tarefas dele ficam sem responsável (`ON DELETE SET NULL
   (assignee_id)`, mantendo o departamento) e saem o departamento do membro e as responsabilidades por
   cliente (cascata).
-- **Exclusões**: tarefa (admin) leva subtarefas e comentários. Departamento só sem membros e sem
-  tarefas (409 com `details: { members, recurring, tasks }`, mensagem "2 membros e 12 tarefas ainda
-  estão neste departamento. Mova-os antes de excluir."). Categoria: exclusão simples, tarefas ficam
+- **Exclusões**: tarefa avulsa ou etapa (admin) leva subtarefas, comentários, anexos e histórico;
+  ocorrência de recorrente não se exclui (409: cancela-se, ou ajusta-se a recorrente). Departamento só
+  sem membros, recorrentes e tarefas (409 com `details: { members, recurring, tasks }`, mensagem "2
+  membros, 1 tarefa recorrente e 12 tarefas ainda estão neste departamento. Mova-os antes de excluir."). Categoria: exclusão simples, tarefas ficam
   sem categoria. Nomes de departamento e categoria são únicos no espaço (sem diferenciar maiúsculas;
   409). Cliente com tarefas não é excluído (409).
 - **Responsável por cliente em cada departamento** (`task_client_responsibles`, "carteira" como no
   Onvio/Tareffa): um membro por cliente × departamento, editável por administradores e legível por
   todos (`options.clientResponsibles`). Na tarefa avulsa, o web sugere o responsável do cliente no
-  departamento escolhido (o usuário pode trocar). Na fase 2, a ocorrência de uma recorrente vai para o
-  responsável do cliente no departamento da recorrente, senão o responsável padrão, senão ninguém.
+  departamento escolhido (o usuário pode trocar). A ocorrência de uma recorrente vai para o
+  responsável do cliente no departamento da recorrente, senão o responsável padrão, senão ninguém
+  (`occurrence.assigneeSource`: `client`, `default` ou `manual`). **Trocar ou remover** o responsável
+  (`PUT /tasks/client-responsibles` ou `/batch`, até 500 pares; o último par repetido vale) leva as
+  ocorrências **abertas** daquele cliente nas recorrentes do departamento, **da competência atual em
+  diante**, para a pessoa nova (ou de volta ao responsável padrão), menos as atribuídas à mão; as
+  concluídas não mudam. A resposta (`ClientResponsibleChangeResponse`) traz os pares como ficaram,
+  quantos foram removidos e `reassigned` (quantas ocorrências mudaram de mãos, para o toast); cada
+  ocorrência ganha no histórico "Responsável do cliente no departamento alterado". O "Desfazer" do web
+  reenvia os pares anteriores pelo lote. (Mudança de contrato: o PUT unitário devolvia o par ou 204.)
 
 ### Listagem (`GET /tasks`)
 
 - Filtros (`taskQuerySchema`): `scope` (`mine` = responsável sou eu; `department` = departamento do
   meu membro, vazio sem departamento; `all`), `situation` (`open`, `overdue`, `waiting`, `done` =
   concluídas + canceladas, `all`), `status` exato, `clientId` (id ou `internal`), `assigneeId` (id ou
-  `none`), `departmentId`, `categoryId`, `priority`, `kind` (`standalone`; `recurring`/`flow` vazios
-  na fase 1), `month` (mês de vencimento), `dueDate`, `dueFrom`/`dueTo`, `dueBucket` (um grupo de
-  prazo das abertas: `overdue | today | next7Days | later | noDueDate`), `closedFrom` (quadro:
+  `none`), `departmentId`, `categoryId`, `priority`, `kind` (`standalone`, `flow` = etapas de
+  processo, `recurring` = ocorrências), `month` (mês de vencimento; prazo legal nas ocorrências),
+  `dueDate`, `dueFrom`/`dueTo`, `dueBucket` (um grupo de prazo das abertas, pela **data de trabalho** —
+  o vencimento, ou a meta na ocorrência: `overdue | targetMissed | today | next7Days | later |
+  noDueDate`), `occurrences` (padrão `true`; `false` = só avulsas e etapas em tudo), `closedFrom` (quadro:
   concluídas/canceladas só a partir dessa data, pela conclusão), `search` (só o título: descrição e
   comentários são cifrados e não entram na busca), `page`/`pageSize` (até 200).
-- Ordem: vencimento (sem vencimento por último), prioridade (urgente primeiro), título; em
+- **Ocorrências nunca vêm como linhas** de `items`: vêm agregadas por recorrente e período em
+  `occurrences` (`RecurringOccurrence`: contagens no escopo e filtros pedidos — total, concluídas, com
+  atraso, canceladas, em andamento, pendentes —, prazo legal e meta das abertas, atrasada, fora da
+  meta, responsável padrão e os efetivos com quantas cada um tem; até 200 grupos) e **contam uma por
+  cliente** no `summary`, nos `groups` e no `byStatus`. Sem filtro de data, entram as ocorrências até a
+  **próxima** competência (as geradas com mais antecedência não incham "Em aberto"), e os grupos
+  agregados são os abertos e os das últimas duas competências.
+- Ordem: data de trabalho (sem vencimento por último), prioridade (urgente primeiro), título; em
   `situation=done`, a conclusão mais recente primeiro.
 - `summary` (`TaskListSummary`) usa **os mesmos filtros, exceto a situação** (e `dueBucket`/
-  `closedFrom`): atrasadas e a mais antiga, em aberto, vencem hoje / em 7 dias, aguardando cliente,
+  `closedFrom`): atrasadas e a mais antiga (`TaskOverdueRef`, tarefa ou ocorrência), fora da meta
+  (`targetMissed`), em aberto, vencem hoje / em 7 dias (pela data de trabalho), aguardando cliente,
   do mês (`month` ou o atual: que vencem no mês e quantas foram concluídas ou canceladas), em aberto
   por responsável e por cliente. `groups` conta as abertas por grupo de prazo com a situação aplicada;
   `byStatus` conta por estado com todos os filtros exceto a situação (cabeçalho das colunas do
@@ -894,19 +919,238 @@ membro do espaço → 422.
 ### Página de início (`GET /tasks/home`)
 
 - Unidade: tarefas abertas (qualquer vencimento) mais as que vencem, foram concluídas ou canceladas no
-  mês (`month`, padrão o atual) — de um departamento (padrão: o do membro), de todos (`all`,
-  administradores) ou, para membro sem departamento, só as dele (`view: 'mine'`).
-- `totals`: por estado, em aberto, atrasadas, vencem hoje / 7 dias, concluídas **no prazo** (dia da
-  conclusão no fuso do escritório ≤ vencimento; sem vencimento conta no prazo) e **com atraso**,
-  canceladas. `byAssignee` (`TaskAssigneeStats`, ranking "quem concentra mais": atrasadas, depois
-  abertas, depois volume) e `byClient` (com algo em aberto). `mine`: tarefas abertas atribuídas a você
-  (qualquer departamento), atrasadas primeiro, até 20. Tudo em SQL agregado.
+  mês (`month`, padrão o atual), e **ocorrências** da competência do mês mais as abertas atrasadas de
+  competências anteriores ou com prazo nos próximos 7 dias (uma por cliente) — de um departamento
+  (padrão: o do membro), de todos (`all`, administradores) ou, para membro sem departamento, só as
+  dele (`view: 'mine'`).
+- `totals`: por estado, em aberto, atrasadas, **fora da meta** (e o prazo legal mais próximo entre
+  elas, `targetMissedNextLegalDate`), vencem hoje (avulsas com vencimento hoje e ocorrências com meta
+  hoje; `appointmentsToday` = compromissos), 7 dias, aguardando cliente, concluídas **no prazo** (dia
+  da conclusão no fuso do escritório ≤ vencimento/prazo legal; sem vencimento conta no prazo) e **com
+  atraso**, canceladas, e a divisão `standalone`/`recurring`. `oldestOverdue` (a mais antiga
+  atrasada, com quem está). `byAssignee` (`TaskAssigneeStats`, ranking "quem concentra mais") e
+  `byClient` (com algo em aberto). `mine`: o que está aberto com você em qualquer departamento —
+  tarefas (até 20) e `occurrences` agregadas ("8 de 12 dos seus clientes"), até a próxima competência.
+- `obligations` (`TaskObligations`, spec §6.5): as recorrentes do departamento na competência, por
+  recorrente e período (atrasadas pendentes primeiro, depois pela meta, as completas por último), com o
+  total, concluídas, canceladas, pendentes e pendentes atrasadas. Tudo em SQL agregado.
 
 ### Atividade (`GET /tasks/activity`)
 
 Comentários dos **outros** nos últimos 5 dias em tarefas de que você é responsável ou criador, com
-trecho de 80 caracteres (do texto decifrado), até 50 (Effy `atividadeRecente`; anexos não foram
-portados).
+trecho de 80 caracteres (do texto decifrado), até 50 (Effy `atividadeRecente`).
+
+## Tarefas recorrentes e ocorrências (fase 2)
+
+Porte de `ObligationDef`/`ObligationCompany` do Effy, com as ocorrências **materializadas**: cada
+ocorrência é uma linha de `tasks` (uma por recorrente, cliente e período), aberta no mesmo detalhe da
+tarefa, com subtarefas, comentários, anexos e histórico. Serviços: `modules/tasks/recurring.ts`
+(cadastro), `generation.ts` (geração, ressincronização, reatribuição), `occurrences.ts` (agregação e
+células).
+
+- **Cadastro** (`recurringTaskInputSchema`, administradores): nome, descrição (cifrada), departamento
+  (obrigatório quando o espaço tem departamentos: 422 "Escolha o departamento."), categoria,
+  responsável padrão, periodicidade (`weekly | monthly | bimonthly | quarterly | semiannual | annual`),
+  **prazo legal obrigatório** (`dueDay`: dia 1–31, onde 31 vira o último dia dos meses curtos; na
+  semanal, o dia da semana ISO 1–7, a spec usa segunda a sexta) e, de bimestral a anual, o mês-âncora
+  `dueMonth`; meta interna `targetDaysBefore` (0–30; semanal 0–6); regra de dia não útil
+  (`anticipate | postpone | keep`); competência de referência `referenceOffset` (0 = a mesma, 1 = a
+  anterior — padrão —, até 12; semanal sempre 0); regimes e/ou clientes específicos (união), menos as
+  **exceções** (`excludedClientIds`); `startCompetence` (padrão: a atual) e `endCompetence` (inclusive).
+  Sem prazo legal nada é gerado: o schema recusa (400 "Informe o prazo legal").
+- **Competência** = mês em que cai o prazo legal **nominal** (antes do ajuste de dia não útil): é a
+  coluna da auditoria. Mensal e mais longas: um período por competência (`periodKey` = `AAAA-MM`).
+  Semanal: um período por semana de segunda a domingo cujo dia do prazo cai no mês (`periodKey` = a
+  segunda-feira `AAAA-MM-DD`). Bimestral/trimestral/semestral: o mês-âncora e a cada 2/3/6 meses; anual:
+  o mês-âncora. **Referência** = competência − `referenceOffset` ("ref. 09/2026").
+- **Prazos** (`utils/tasks.ts`, `occurrencesInCompetence`): prazo legal = dia nominal ajustado pela
+  regra (só fins de semana e **feriados nacionais**: os fixos — Confraternização, Tiradentes, Dia do
+  Trabalho, Independência, Aparecida, Finados, Proclamação, Consciência Negra a partir de 2024, Natal —
+  e os móveis pela Páscoa: Carnaval segunda e terça, Sexta-feira Santa, Corpus Christi; Carnaval e
+  Corpus Christi são pontos facultativos federais sem expediente bancário, por isso contam como não
+  úteis nos prazos — §18, item 19d da spec pede a confirmação do escritório). A meta = prazo legal − N
+  dias corridos, sempre antecipada para dia útil, nunca depois do prazo legal. `nationalHolidayName` dá
+  o nome do feriado (a prévia do cadastro diz "20/11 é feriado"). Feriados estaduais e municipais não
+  entram.
+- **Geração idempotente**: `ensureOccurrences` calcula, por competência, as ocorrências que deveriam
+  existir (clientes **ativos** na competência — início de contrato até ela, não inativados antes do seu
+  primeiro dia — que se aplicam, dentro do início/encerramento) e insere só as que faltam, com
+  `ON CONFLICT DO NOTHING` sobre `tasks_occurrence_uq` (dois pedidos ao mesmo tempo não duplicam).
+  Roda ao ler uma competência (lista e início: duas competências antes e duas depois da atual;
+  auditoria, calendário, relatórios e o detalhe da ocorrência: as competências pedidas), ao criar ou
+  editar a recorrente e em `POST /tasks/recurring/generate` (administradores). Limites: de 24
+  competências antes a 2 depois da atual (fora disso, 422); espaço sem assinatura com escrita não
+  gera (lê o que existe). Cada ocorrência gerada tem no histórico "criada" com origem `recurring` e o
+  nome da recorrente, sem autor.
+- **Responsável** da ocorrência: o do cliente no departamento (`client`), senão o padrão (`default`),
+  senão ninguém. `PATCH /tasks/:id` com `assigneeId` numa ocorrência vale **só para ela**
+  (`assignee_source = 'manual'`, nunca sobrescrito automaticamente). Os campos que vêm da recorrente
+  ficam travados (`TaskDetail.lockedFields`: título, cliente, categoria, departamento, início,
+  vencimento e horário; PATCH com eles → 422 "Este campo vem da tarefa recorrente…"); descrição,
+  prioridade, responsável, estado, subtarefas, comentários e anexos funcionam como numa avulsa.
+- **Situações derivadas** (`occurrenceSituationOf`, `OCCURRENCE_SITUATIONS`): não iniciada (`todo`),
+  em andamento (`in_progress` ou `waiting_client`), **fora da meta** (aberta, meta antes de hoje e
+  prazo legal hoje ou depois), **atrasada** (aberta com prazo legal antes de hoje), concluída **no
+  prazo** / **com atraso** (dia da conclusão no fuso do escritório ≤ / > prazo legal; a meta não entra)
+  e **cancelada** (conta à parte das concluídas). `Task.occurrence` traz recorrente, período,
+  competência, referência, meta, fora da meta, origem do responsável e a situação.
+- **Editar a recorrente** (`PUT`, substitui tudo) ressincroniza da competência atual em diante:
+  - as ocorrências **abertas não iniciadas** (`todo`) seguem o cadastro: nome, departamento, categoria,
+    prazos recalculados, referência e o responsável — menos o atribuído à mão naquela competência;
+  - **em andamento** (em andamento, aguardando cliente) e **concluídas** não mudam;
+  - as não iniciadas que **deixam de se aplicar** (cliente entrou nas **exceções** ou saiu dos regimes,
+    recorrente **encerrada** antes da competência, período que deixou de existir) são **canceladas**,
+    com o motivo no histórico ("A tarefa recorrente deixou de se aplicar a este cliente (exceção ou
+    regime)", "…foi encerrada antes desta competência", "…mudou e esta ocorrência deixou de existir");
+    as em andamento ficam;
+  - uma ocorrência que **o sistema** cancelou e que volta a se aplicar (a exceção foi retirada) volta a
+    "A fazer", com registro; um cancelamento feito por uma pessoa nunca é desfeito;
+  - as que faltam são geradas.
+- **Excluir** é recusado (409 "…já tem histórico… Defina \"Encerra em\"…") quando alguma ocorrência
+  foi trabalhada (estado diferente de "A fazer", atribuída à mão, com comentários, anexos ou
+  subtarefas); sem histórico, a recorrente sai com as ocorrências intocadas. Encerrar
+  (`endCompetence`) é o "arquivar" da spec (§18): a lista filtra `status=active|ended|all`.
+- **Lista** (`GET /tasks/recurring`): cada `RecurringTask` traz as regras, meses em que ocorre, clientes
+  a que se aplica hoje (`clientCount`), quantos sem responsável no departamento, a **distribuição**
+  da competência atual ("Ana 12 · Bruno 8 · padrão 3 · sem responsável 2"), ocorrências geradas e o
+  progresso do mês pedido (total, concluídas, canceladas, em andamento, atrasadas, prazo legal e
+  meta); filtros por mês, busca, periodicidade, departamento, responsável (padrão ou de alguma
+  ocorrência do mês), regime e situação. `summary`: ativas, encerradas e as ocorrências do mês.
+- **Ocorrência por cliente** (`GET /tasks/recurring/:id/occurrences/:period`,
+  `RecurringOccurrenceDetail`): o agregado, a descrição decifrada e uma `OccurrenceCell` por cliente
+  (com nome, razão social, CNPJ decifrado e regime).
+
+## Auditoria mensal (fase 2)
+
+Porte de `StatusMatrixEntry` + `AuditConclusion` + `monthlyAudit.service`, agora sobre as ocorrências
+geradas (`modules/tasks/audit.ts`). `GET /tasks/audit?competence=` devolve a matriz cliente ×
+recorrente: `columns` (um `RecurringOccurrence` por recorrente e período — a semanal tem uma coluna
+por semana —, pela meta e depois pelo nome), `clients` (`AuditClientRow`: contagens, pendentes
+atrasadas e fora da meta, e `monthConcludedAt`), `cells` (`OccurrenceCell`: id da tarefa, estado,
+situação, responsável e origem, prazos, atrasada, fora da meta, quem concluiu e quando, no prazo e
+`canReopen`) e `summary` (`AuditSummary`, **a competência inteira**, sem os filtros: concluídas, com
+atraso, canceladas, pendentes, atrasadas, fora da meta, clientes com pendência, com atraso e com o mês
+concluído, e por departamento). Filtros: regime, departamento, recorrente e responsável (os clientes
+em que a pessoa responde por alguma célula, com todas as células deles). Ausência de célula = "Não
+se aplica".
+
+- **Mudar o estado** de uma célula é `PATCH /tasks/:id/status` (o mesmo endpoint das listas e do
+  detalhe): o servidor grava quem concluiu e quando; qualquer membro marca a célula de um colega.
+- **Mês concluído do cliente** é derivado: todas as ocorrências do cliente na competência concluídas
+  (as canceladas não contam), com o instante da última conclusão. Reabrir uma célula (ou uma ocorrência
+  nova gerada para ele) desfaz.
+- **Reabrir uma ocorrência concluída**: só **quem concluiu** ou um **administrador** (403 "Só quem
+  concluiu ou um administrador pode reabrir esta tarefa."), com **motivo** obrigatório (`reason`, até
+  500 caracteres; 422 "Informe o motivo da reabertura.") — exceto o **desfazer** de quem concluiu em
+  até 15 minutos (`UNDO_WINDOW_MS`). O motivo (cifrado), quem e quando ficam no histórico; conclusões e
+  reaberturas nunca se apagam. Cancelada não é registro de conclusão: reabre-se livremente.
+
+## Processos e modelos (fase 2)
+
+Porte de `TaskFlow`/`TaskFlowStep`/`TaskFlowTemplate`/`TaskFlowTemplateStep` (`flows.ts` e
+`flow-engine.ts`).
+
+- **Modelos** são cadastro (administradores): etapas com título, descrição (cifrada), departamento,
+  categoria, responsável, prioridade e prazo **relativo** em dias (0–365), até 30 etapas. Editar
+  substitui as etapas (a ordem é a identidade, como no Effy); processos já aplicados são cópias e não
+  mudam; excluir o modelo só tira a referência deles. A lista traz etapas, prazo total, departamentos e
+  quantas vezes foi aplicado.
+- **Aplicar** (todos): escolhe-se o cliente (e, opcional, o nome; padrão "Modelo · Cliente"); as etapas
+  são copiadas com o cliente, e a **etapa 1 vira tarefa agora**, com vencimento hoje + N dias (fuso do
+  escritório). **Processo avulso** (todos): etapas montadas na mão, com data absoluta ou prazo em dias,
+  e um cliente por etapa se preciso; `saveAsTemplate` salva também como modelo (só administradores;
+  prazos em dias).
+- **Motor**: só a etapa ativa é tarefa (as demais não aparecem em lista nenhuma). Concluir a tarefa da
+  etapa N grava a conclusão da etapa uma vez e **ativa a N+1** (idempotente: a etapa é travada
+  `FOR UPDATE` e ativada uma vez), com vencimento = dia da conclusão no fuso do escritório + N dias; a
+  resposta do PATCH traz `activated`. A tarefa da etapa é criada pelo autor do processo, "A fazer", no
+  departamento do responsável (sem responsável, o da etapa). `Task.flow` = "Etapa 2/4";
+  `TaskDetail.flowProgress` = o processo inteiro.
+- **Reabrir uma etapa concluída** (qualquer saída de `done`, inclusive o desfazer): se a etapa seguinte
+  **não foi iniciada** (tarefa "A fazer", sem comentários, anexos ou subtarefas), ela **volta a
+  aguardar** — a tarefa dela é removida, o prazo calculado é limpo e o histórico da etapa reaberta diz
+  "A etapa N (…) voltou a aguardar esta etapa" —, e a conclusão da etapa é apagada (concluir de novo
+  conta o prazo da seguinte a partir do novo dia). Se a seguinte **já foi iniciada ou concluída**, a
+  reabertura é recusada: **409** "Não é possível reabrir esta etapa: a etapa seguinte, “…”, já foi
+  iniciada (concluída). Corrija pela etapa seguinte." (com `details.nextStep`).
+- **Excluir processo** (administradores): saem as etapas; as tarefas já criadas continuam, sem vínculo.
+  Excluir a tarefa de uma etapa deixa a etapa sem tarefa (o processo para ali). A lista
+  (`GET /tasks/flows`) traz até 200 processos (`active`, `done` ou `all`; filtro por cliente).
+
+## Histórico da tarefa (fase 2)
+
+`task_events`, escrito pelos serviços (`events.ts`), lido em `GET /tasks/:id/history`
+(`TaskHistoryResponse`, mais recentes primeiro, até 500, com o total). Tipos (`TASK_EVENT_KINDS`):
+`created` (origem `manual`, `recurring` ou `flow` e `originName`: a recorrente ou o processo, sem autor
+quando gerada), `updated` (`fields` alterados e `changes` com **antes/depois** de título, cliente e
+categoria — pelo nome —, prioridade, início, vencimento e horário; a descrição aparece só em `fields`,
+nunca o texto), `assigned` (de/para, com o motivo quando automático), `status` (de/para; cancelamento
+automático com o motivo), `reopened` (de/para e o motivo), `commented`, `comment_removed`,
+`attachment_added`/`attachment_removed` (o nome do arquivo) e `flow_step` (etapa `activated`,
+`completed` ou `deactivated`, com o nome do processo). Edições do autosave pela mesma pessoa em até 5
+minutos viram **uma** entrada (cada campo guarda o primeiro "antes" e o último "depois"; um campo que
+volta ao valor inicial sai das mudanças). O texto livre (motivo, nome de arquivo, motivo automático) é
+cifrado (`task_events.note`); `data` guarda só fatos estruturados (CHECK de 4000 caracteres).
+`seq` (identidade) ordena as entradas gravadas no mesmo instante. Subtarefas não geram eventos (têm
+seção própria). Tarefas anteriores à fase 2 não têm eventos (a tela mostra as linhas da fase 1).
+
+## Anexos (fase 2)
+
+Porte de `Attachment` + `fileSignature.js` + `zipLimit.js` (`attachments.ts`, `file-check.ts`).
+
+- **No banco**: `task_attachments.content` (bytea) **cifrado** com a chave do espaço (AES-256-GCM, IV
+  de 12 bytes + texto + tag de 16 bytes; AAD = espaço, tabela, coluna **e o id do anexo**: um conteúdo
+  copiado para outra linha não decifra); o nome é cifrado como texto livre. Custo: a cifra do arquivo
+  inteiro é feita pelo WebCrypto em memória (10 MB ≈ dezenas de ms, na API e no PGlite); o arquivo
+  viaja em base64 no JSON (o CSRF exige JSON), com `bodyLimit` próprio na rota. Funciona no demo.
+- **Limites**: 10 MB por arquivo, 50 MB e 50 arquivos por tarefa (422 com a mensagem), 60 envios por
+  minuto por IP.
+- **Tipos** (`TASK_ATTACHMENT_TYPES`): PDF, PNG, JPEG, WEBP, DOC, XLS, DOCX, XLSX, XML, TXT, CSV e ZIP.
+  O tipo declarado precisa estar na lista, a **extensão** precisa ser do tipo, e o conteúdo precisa ter
+  a **assinatura** do tipo (`%PDF-`, PNG, JPEG, RIFF/WEBP, OLE2, ZIP); XML, TXT e CSV não podem ter
+  NUL nem marcação HTML/SVG/script. ZIP, DOCX e XLSX são lidos pelo diretório central (nada é
+  descomprimido): soma declarada até 100 MB, até 10 000 entradas, ZIP64 e arquivo corrompido recusados;
+  DOCX/XLSX precisam de `[Content_Types].xml` e da pasta `word/` ou `xl/`. HTML disfarçado de PDF → 422
+  "O conteúdo do arquivo não corresponde ao tipo informado."; SVG/HTML como tipo → 400.
+- **Nome**: `sanitizeFileName` (sem caminho, sem caracteres de controle, aspas, reservados do Windows
+  e marcas bidirecionais; até 255 caracteres preservando a extensão).
+- **Download**: sempre `Content-Disposition: attachment` (nome ASCII e `filename*` UTF-8),
+  `Content-Type` do tipo gravado (nunca HTML/SVG), `X-Content-Type-Options: nosniff`,
+  `Content-Security-Policy: default-src 'none'; sandbox` e `Cache-Control: private, no-store`.
+- Qualquer membro anexa; remover é de quem anexou ou de um administrador. Antivírus não há (§18, item
+  10 da spec).
+
+## Anotações pessoais (fase 2)
+
+Porte de `UserNote` (`notes.ts`): título e texto (até 200 e 20 000 caracteres) **cifrados**; toda
+consulta filtra pelo membro da sessão — a anotação de outra pessoa é "não encontrada", inclusive para
+o proprietário —, e a exportação LGPD leva só as do solicitante. Até 500 por membro; saem com o
+membro que deixa o espaço (cascata). Nenhum texto do contrato sugere guardar senhas.
+
+## Calendário, relatórios e busca (fase 2)
+
+- **Calendário** (`GET /tasks/calendar`, `TaskCalendarResponse`, spec §7.6): até 62 dias; avulsas e
+  etapas pelo vencimento (compromissos primeiro no dia, até 1000 com `truncated`), ocorrências
+  agregadas por recorrente e período no **dia da meta** ("DCTFWeb · 12/30") e `noDueDate` (abertas sem
+  vencimento); escopo e filtros como a lista.
+- **Relatórios** (`GET /tasks/reports`, `TaskReportResponse`, `insights.ts`): tarefas de todos os tipos
+  (uma ocorrência por cliente) com vencimento (prazo legal) no período — sem vencimento, criadas nele
+  —, até 1 ano (422). Tudo em SQL (GROUP BY): resumo (concluídas no prazo e com atraso, canceladas, em
+  aberto, atrasadas, fora da meta), por estado, prioridade, departamento, responsável, categoria,
+  cliente, tipo e **mês**, e a **produtividade** (conclusões no período por quem concluiu: no prazo,
+  com atraso e a média de dias da criação à conclusão). Filtros: departamento, responsável, categoria,
+  cliente, prioridade, tipo, estado e situação (`open`, `done` = só concluídas, `overdue`,
+  **`doneLate`** = concluídas com atraso, `doneOnTime`). Detalhamento paginado (até 1000 por página).
+- **CSV** (`GET /tasks/reports/export.csv`): os mesmos filtros, até 10 000 linhas (422 pede refinar),
+  `;`, UTF-8 com BOM, CRLF, proteção contra fórmula (`'` antes de `= + - @`, tab e CR, `csv.ts`),
+  colunas Tarefa, Tipo, Competência, Referência, Cliente, Departamento, Categoria, Responsável,
+  Prioridade, Vencimento, Meta, Situação (Atrasada/Fora da meta/estado), Concluída em (data e hora em
+  São Paulo), No prazo e Concluída por; `relatorio-tarefas-AAAA-MM-DD.csv` como download (30 por
+  minuto por IP). O web gera Excel/PDF a partir do JSON se precisar.
+- **Busca global** (`GET /search`, ⌘K, para todos os membros): `tasks` (avulsas e etapas pelo título,
+  abertas primeiro e depois pela proximidade do vencimento, até 8; as ocorrências não aparecem uma a
+  uma) e `recurringTasks` (pelo nome, até 5). Sem responsável na resposta (a busca roda na transação de
+  tenant, que não lê os nomes dos membros).
 
 ## Banco (migração 0011)
 
@@ -956,19 +1200,90 @@ Descrição e comentários cifrados por campo (CWE-312):
   outra vez) e roda no PGlite (sem `CONCURRENTLY`). Teste: `test/tasks-db.test.ts` reaplica a 0013
   sobre linhas legadas e roda o backfill.
 
+## Banco (migração 0014)
+
+Fase 2, escrita à mão, reexecutável (IF NOT EXISTS, DROP … IF EXISTS antes de cada constraint,
+política e gatilho, CREATE OR REPLACE) e roda no PGlite (sem CONCURRENTLY). Mesmo padrão de tenant:
+RLS `ENABLE`+`FORCE` com política única por espaço, `GRANT` só de DML ao `effinance_app` (catálogo em
+`test/db-roles.ts`), FKs compostas `(workspace_id, …)` com `ON DELETE SET NULL (coluna)` onde a
+referência pode sumir, índice para cada FK, CHECKs espelhando o contrato. Tabelas novas só recebem
+dados cifrados pela API: não há backfill.
+
+- `recurring_tasks`: cadastro (descrição cifrada; CHECKs de periodicidade, do prazo por periodicidade —
+  semanal 1–7 sem mês, mensal 1–31, as demais com mês-âncora —, meta, referência, regimes de
+  `TAX_REGIMES`, competências `AAAA-MM` e encerramento ≥ início). Departamento sem cascata (o
+  departamento com recorrentes não é excluído), categoria e responsável padrão `SET NULL`.
+- `recurring_task_clients`: clientes específicos (`include`) e exceções (`exclude`), PK
+  `(workspace_id, recurring_task_id, client_id)`, só clientes (`client_kind` gerado), cascata com a
+  recorrente e com o cliente.
+- `tasks` ganha `recurring_task_id` (FK sem cascata), `competence`, `period_key`, `reference_month`,
+  `target_date` e `assignee_source`; `tasks_occurrence_uq` = `(workspace_id, recurring_task_id,
+  client_id, period_key)` (alvo do `ON CONFLICT` da geração; nulos nas avulsas) e
+  `tasks_occurrence_chk` (avulsa: tudo nulo; ocorrência: cliente, prazo legal, meta ≤ prazo legal,
+  competência, referência e período preenchidos e no formato). Índices por recorrente e competência.
+- `task_flow_templates`/`task_flow_template_steps` (descrições cifradas; posição 1–30 única; prazo
+  0–365; departamento, categoria e responsável `SET NULL`), `task_flows` (cliente sem cascata; modelo
+  `SET NULL`) e `task_flow_steps` (cascata com o processo; `task_id` único e `SET NULL (task_id)`;
+  CHECK de ativação/conclusão; descrição cifrada).
+- `task_events`: histórico (`seq` identidade para a ordem, `kind` do contrato, `data` jsonb objeto até
+  4000 caracteres, `note` cifrada; cascata com a tarefa).
+- `task_attachments`: id gerado pela API (entra na AAD), nome cifrado, tipo da lista, tamanho 1 B–10 MB
+  e `octet_length(content) = size_bytes + 28` (o conteúdo é sempre IV + cifra + tag), cascata com a
+  tarefa.
+- `task_notes`: título e texto cifrados (teto do texto: 81 000 caracteres de cifra), FK para
+  `workspace_members` em cascata (sai com o membro).
+- **LGPD**: gatilhos `BEFORE UPDATE` (como na 0012) trocam o nome gravado por "Usuário excluído"
+  quando a exclusão da conta limpa o id: `recurring_tasks`, `task_flow_templates` e `task_flows`
+  (`created_by_name`), `task_events` (`actor_name`) e `task_attachments` (`uploaded_by_name`).
+  Exportação (`GET /workspaces/current/export`): todas as tabelas novas decifradas, anexos só com
+  metadados (os arquivos se baixam um a um) e só as anotações do solicitante.
+- Testes: `test/tasks-phase2-db.test.ts` (RLS, referências entre espaços, CHECKs e listas do
+  contrato, ON DELETE, LGPD, exportação e reexecução da migração), além do catálogo em
+  `test/audit-db.test.ts`.
+
 ## Diferenças deliberadas em relação ao Effy
 
-- Departamento das tarefas abertas acompanha o membro quando ele muda de departamento.
-- Nomes de quem criou/concluiu/comentou ficam gravados (o Effy impedia excluir usuário com histórico;
-  aqui o membro pode sair sem perder a autoria; se a conta for excluída, o nome vira "Usuário
-  excluído" — LGPD).
+- Departamento das tarefas abertas acompanha o membro quando ele muda de departamento; a recorrente
+  tem departamento **escolhido** no cadastro (no Effy, derivado do responsável), e a ocorrência fica
+  nele.
+- Nomes de quem criou/concluiu/comentou/anexou ficam gravados (o Effy impedia excluir usuário com
+  histórico; aqui o membro pode sair sem perder a autoria; se a conta for excluída, o nome vira
+  "Usuário excluído" — LGPD).
 - "Reabrir" volta ao estado anterior à conclusão (`reopenStatus`), como a spec pede.
 - Excluir tarefa é de administrador (no Effy, a chave `delTasks`); criar/editar/concluir é de todos.
-- Anexos, recorrentes, auditoria, fluxos, relatórios e anotações ficam para as próximas fases.
+- **Ocorrências materializadas**: no Effy a matriz guardava só o estado (`StatusMatrixEntry`) e o
+  front calculava o produto empresa × obrigação; aqui cada ocorrência é uma tarefa, com responsável
+  por cliente, prazo legal, meta, comentários, anexos e histórico. A conclusão é o
+  `completed_at/by` da tarefa (no Effy, `AuditConclusion`, regravada a cada nova conclusão).
+- **Prazo legal obrigatório** (o Effy aceitava recorrente sem data-base), meta interna, regra de dia
+  não útil com feriados nacionais, competência de referência, 6 periodicidades, exceções e
+  vigência — novos.
+- **Reabrir célula** só por quem concluiu ou administrador, com motivo (no Effy, qualquer um voltava o
+  estado, e o registro de conclusão sumia).
+- **Excluir recorrente com histórico** é recusado (o Effy apagava a auditoria em cascata): encerra-se.
+- **Reabrir etapa de processo**: a seguinte não iniciada volta a aguardar; iniciada → 409 (no Effy,
+  reabrir não fazia nada com a seguinte, e o prazo dela ficava congelado).
+- **Anexos no banco e cifrados** (no Effy, disco do servidor), com assinatura conferida para todos os
+  tipos (o Effy aceitava TXT/CSV sem conferir) e XML/ZIP novos.
+- **Anotações cifradas** (no Effy, texto puro).
+- Relatórios calculados no servidor em SQL (no Effy, o front agrupava `taskItems`); canceladas à parte
+  das concluídas.
 
 ## Pendências
 
-- Fases 2–4 (aguardando o modelo de "Processos" do Domínio/Onvio).
-- Anexos de tarefa (armazenamento de arquivos; a spec §8.1 prevê a seção).
-- Busca global (`/search`, ⌘K) com tarefas (§17.8) e feriados no cálculo de dias úteis
-  (`HolidayCalendar` em `utils/tasks.ts`).
+- **Fase 3 da spec** (§13.7 a §13.10, §15.3, §18 itens 11 a 18): sindicatos, dados fiscais, acessos e
+  documentos do cliente, escritório e modelo de contrato, permissões por pessoa, foto do perfil.
+- **Um membro em mais de um departamento** não existe (spec rev. 3, §1: no máximo um; mantido).
+- **Feriados estaduais e municipais** (por cidade do escritório) e a confirmação de Carnaval e Corpus
+  Christi como dias não úteis (§18, item 19d).
+- **Prazos "N-ésimo dia útil"** (ex.: folha no 5º dia útil, EFD-Contribuições no 10º dia útil) não são
+  expressáveis: hoje é o dia do mês com a regra de dia não útil.
+- **Voltar a ocorrência ao responsável automático** depois de atribuída à mão: não há ação própria
+  (atribuir de novo à pessoa do cliente deixa a origem `manual`).
+- **Excluir a tarefa de uma etapa** deixa o processo parado na etapa (sem tarefa); a tela pode oferecer
+  excluir o processo.
+- **Anexos**: antivírus e, se o volume crescer, armazenamento de objetos (S3 cifrado, já previsto em
+  `docs/deploy-aws.md`) — §18, item 10.
+- **Notificações persistentes** (atribuição, menção): o sino usa a atividade recente e as atrasadas.
+- **Processos em andamento** (§12.1, §18 item 9): a API oferece a lista; o produto confirma se a tela a
+  mostra.

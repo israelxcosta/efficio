@@ -415,7 +415,12 @@ describe('recurring tasks: editing and deleting', () => {
     const ended = await ana.put(`/tasks/recurring/${id}`, das(fiscal, { endCompetence: '2026-10' }));
     expect(ended.body).toMatchObject({ endCompetence: '2026-10', active: true });
     after = await state();
-    expect(after.filter((o) => o.competence !== '2026-10').map((o) => [o.competence, o.client_id === a ? 'A' : 'B', o.status])).toEqual([
+    expect(
+      after
+        .filter((o) => o.competence !== '2026-10')
+        .map((o) => [o.competence, o.client_id === a ? 'A' : 'B', o.status])
+        .sort((x, y) => `${x[0]}${x[1]}`.localeCompare(`${y[0]}${y[1]}`)),
+    ).toEqual([
       ['2026-11', 'A', 'canceled'],
       ['2026-11', 'B', 'waiting_client'],
       ['2026-12', 'A', 'in_progress'],

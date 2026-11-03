@@ -544,6 +544,7 @@ export async function createTask(ctx: TaskContext, input: TaskInput): Promise<Ta
       createdBy: ctx.userId,
       createdByName: myName(ctx),
       createdAt: now(),
+      updatedAt: now(),
       ...statusFields(ctx, null, input.status),
     })
     .returning({ id: tasks.id });

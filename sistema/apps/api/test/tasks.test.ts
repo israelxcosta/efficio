@@ -591,13 +591,16 @@ describe('tasks: list, summary and start page', () => {
       dueDate: '2026-10-14',
       status: 'done',
     });
-    delete process.env.EFFINANCE_NOW;
+    // Closed in October whatever the real date (a canceled task closes on its creation/last update),
+    // and the most recent of the closed ones.
+    process.env.EFFINANCE_NOW = '2026-10-19T18:00:00Z';
     await t({
       title: 'Cancelada',
       assigneeId: o.bruno.userId,
       dueDate: '2026-10-05',
       status: 'canceled',
     });
+    delete process.env.EFFINANCE_NOW;
     return { ...o, client };
   }
 
