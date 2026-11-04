@@ -38,7 +38,6 @@ import {
   type RecurringTaskRow,
 } from '../../db/schema';
 import { now } from '../../lib/clock';
-import { appendTo, groupBy } from '../../lib/collections';
 import { inChunks } from '../../lib/sql';
 import type { TaskContext } from './access';
 import { recordEvents, type EventInput } from './events';
@@ -122,16 +121,11 @@ export async function loadDefs(ctx: Pick<TaskContext, 'db' | 'workspaceId'>, ids
         ),
       ),
   ]);
-  // Grouped once (a filter per recurring task would be recurring tasks × links on every read).
-  const byDef = groupBy(links, (l) => l.id);
-  return rows.map((row) => {
-    const own = byDef.get(row.id) ?? [];
-    return {
-      row,
-      included: new Set(own.filter((l) => l.mode === 'include').map((l) => l.clientId)),
-      excluded: new Set(own.filter((l) => l.mode === 'exclude').map((l) => l.clientId)),
-    };
-  });
+  return rows.map((row) => ({
+    row,
+    included: new Set(links.filter((l) => l.id === row.id && l.mode === 'include').map((l) => l.clientId)),
+    excluded: new Set(links.filter((l) => l.id === row.id && l.mode === 'exclude').map((l) => l.clientId)),
+  }));
 }
 
 export async function loadClients(ctx: Pick<TaskContext, 'db' | 'workspaceId'>): Promise<GenClient[]> {
@@ -436,7 +430,7 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
     const next = resolveAssignee(def.row, row.clientId!, responsibles);
     if (next.assigneeId === row.assigneeId && next.source === row.assigneeSource) continue;
     const key = `${next.assigneeId ?? ''}|${next.source ?? ''}`;
-    appendTo(changes, key, row.id);
+    changes.set(key, [...(changes.get(key) ?? []), row.id]);
     if (next.assigneeId !== row.assigneeId) {
       events.push({
         taskId: row.id,
@@ -529,7 +523,7 @@ export async function reassignClientOccurrences(
     const next = resolveAssignee(def, row.clientId!, responsibles);
     if (next.assigneeId === row.assigneeId && next.source === row.assigneeSource) continue;
     const key = `${next.assigneeId ?? ''}|${next.source ?? ''}`;
-    appendTo(changes, key, row.id);
+    changes.set(key, [...(changes.get(key) ?? []), row.id]);
     if (next.assigneeId !== row.assigneeId) {
       events.push({
         taskId: row.id,
