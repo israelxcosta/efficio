@@ -606,7 +606,7 @@ interface TemplatePickerDialogProps {
 /** "Escolha o modelo" (spec §12.3), before applying from Tarefas, the floating bar or the phone's "+". */
 export function TemplatePickerDialog({ open, onOpenChange, onPick, onNewTemplate, onAdHoc }: TemplatePickerDialogProps) {
   const templates = useFlowTemplates({ enabled: open });
-  const { isAdmin } = usePermissions();
+  const isAdmin = usePermissions().can('registry');
   const [search, setSearch] = useState('');
   useEffect(() => {
     if (open) setSearch('');

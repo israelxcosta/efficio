@@ -26,6 +26,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Area } from './nav';
+import { useDeadlinesSummary } from '@/features/deadlines/api';
+import { bellDeadlines } from '@/features/deadlines/deadline-logic';
+import { useTaskActions } from '@/features/tasks/task-actions';
 
 /**
  * Overdue bills (payables and receivables). Card purchases are settled through the invoice. Financial
@@ -56,11 +59,16 @@ export function useMyOverdueTasks() {
   });
 }
 
-/** Text of the bell's accessible name: "Notificações (2 tarefas atrasadas, 3 contas vencidas)". */
-export function notificationsLabel(tasks: number, bills: number | null): string {
+/**
+ * Text of the bell's accessible name: "Notificações (2 tarefas atrasadas, 3 contas vencidas, 1
+ * documento vencido)". Phase 3 adds the overdue documents and agreements.
+ */
+export function notificationsLabel(tasks: number, bills: number | null, deadlines: { documents: number; conventions: number } = { documents: 0, conventions: 0 }): string {
   const parts = [
     tasks ? pluralize(tasks, 'tarefa atrasada', 'tarefas atrasadas') : null,
     bills ? pluralize(bills, 'conta vencida', 'contas vencidas') : null,
+    deadlines.documents ? pluralize(deadlines.documents, 'documento vencido', 'documentos vencidos') : null,
+    deadlines.conventions ? pluralize(deadlines.conventions, 'convenção vencida', 'convenções vencidas') : null,
   ].filter(Boolean);
   return parts.length ? `Notificações (${parts.join(', ')})` : 'Notificações';
 }
@@ -75,7 +83,10 @@ export function Notifications({ area, className }: { area: Area; className?: str
   const activity = useTaskActivity().data ?? [];
   const taskCount = tasks?.total ?? 0;
   const billCount = canAccessFinance ? bills.length : 0;
-  const count = taskCount + billCount;
+  // Documents and agreements: only the overdue ones count (the number keeps saying "already passed").
+  const deadlines = bellDeadlines(useDeadlinesSummary().data);
+  const { openDeadlines } = useTaskActions();
+  const count = taskCount + billCount + deadlines.documents + deadlines.conventions;
 
   const taskGroup = (
     <>
@@ -100,6 +111,37 @@ export function Notifications({ area, className }: { area: Area; className?: str
           </span>
         </DropdownMenuItem>
       ))}
+    </>
+  );
+
+  const deadlineGroup = (
+    <>
+      <DropdownMenuLabel>Vencimentos</DropdownMenuLabel>
+      {deadlines.documents ? (
+        <DropdownMenuItem onSelect={() => openDeadlines('documents', 'overdue')}>
+          <span className="flex-1">Documentos de clientes vencidos</span>
+          <span className="tabular rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{deadlines.documents}</span>
+        </DropdownMenuItem>
+      ) : null}
+      {deadlines.conventions ? (
+        <DropdownMenuItem onSelect={() => openDeadlines('conventions', 'overdue')}>
+          <span className="flex-1">Convenções coletivas vencidas</span>
+          <span className="tabular rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{deadlines.conventions}</span>
+        </DropdownMenuItem>
+      ) : null}
+      {deadlines.soon ? (
+        <DropdownMenuItem onSelect={() => openDeadlines(deadlines.documents || !deadlines.conventions ? 'documents' : 'conventions', 'within30')}>
+          <span className="text-caption text-muted">
+            {deadlines.documents || deadlines.conventions ? 'e ' : ''}
+            {deadlines.soon} {deadlines.soon === 1 ? 'vence' : 'vencem'} em até 30 dias
+          </span>
+        </DropdownMenuItem>
+      ) : null}
+      {!deadlines.documents && !deadlines.conventions && !deadlines.soon ? (
+        <DropdownMenuItem onSelect={() => openDeadlines('documents')}>
+          <span className="text-sm text-muted">Nada vencido. Ver vencimentos</span>
+        </DropdownMenuItem>
+      ) : null}
     </>
   );
 
@@ -136,7 +178,7 @@ export function Notifications({ area, className }: { area: Area; className?: str
             'relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-bg-subtle hover:text-fg [&_svg]:size-4',
             className,
           )}
-          aria-label={notificationsLabel(taskCount, billCount)}
+          aria-label={notificationsLabel(taskCount, billCount, deadlines)}
         >
           <Bell />
           {count ? (
@@ -152,10 +194,14 @@ export function Notifications({ area, className }: { area: Area; className?: str
             {billGroup}
             <DropdownMenuSeparator />
             {taskGroup}
+            <DropdownMenuSeparator />
+            {deadlineGroup}
           </>
         ) : (
           <>
             {taskGroup}
+            <DropdownMenuSeparator />
+            {deadlineGroup}
             {billGroup ? (
               <>
                 <DropdownMenuSeparator />

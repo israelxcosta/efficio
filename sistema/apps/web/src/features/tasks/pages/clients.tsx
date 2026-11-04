@@ -14,6 +14,7 @@ import {
 } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { usePermissions } from '@/features/auth/permissions';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -52,7 +53,10 @@ export default function TaskClientsPage() {
   const options = useTaskOptions();
   const clients = useAllClients();
   const grid = useClientResponsibles();
-  const isAdmin = options.data?.me.isAdmin ?? false;
+  const { can } = usePermissions();
+  // Responsibles are `registry`; the client registry itself lives in the finances (`finance`).
+  const isAdmin = can('registry');
+  const canFinance = can('finance');
   const members = options.data?.members ?? [];
   const departments = grid.data?.departments ?? [];
   const items = grid.data?.items ?? [];
@@ -123,7 +127,7 @@ export default function TaskClientsPage() {
             : 'Cadastro mantido pelos administradores no financeiro'
         }
         actions={
-          isAdmin ? (
+          canFinance ? (
             <Button variant="outline" asChild>
               <Link to="/clientes">
                 <Wallet /> Editar no financeiro
@@ -340,7 +344,7 @@ export default function TaskClientsPage() {
                   >
                     Limpar filtros
                   </Button>
-                ) : isAdmin ? (
+                ) : canFinance ? (
                   <Button variant="outline" asChild>
                     <Link to="/clientes">Cadastrar no financeiro</Link>
                   </Button>
@@ -424,6 +428,7 @@ interface ClientRowProps {
 /** Client row in the pattern of the task row (spec §13.1): identification, CNPJ, regime, responsibles, menu. */
 function ClientRow({ client: c, columns, perDepartment, items, isAdmin, members, selected, selecting, onSelect, onOpen }: ClientRowProps) {
   const navigate = useNavigate();
+  const canFinance = usePermissions().can('finance');
   const name = c.tradeName || c.name;
   const inactive = c.status === 'inactive';
   const responsibles = columns.map((d) => ({ department: d, member: responsibleOf(items, c.id, d.id) }));
@@ -471,7 +476,7 @@ function ClientRow({ client: c, columns, perDepartment, items, isAdmin, members,
         <span className={cn('hidden w-28 min-w-0 @xl:block', perDepartment && '@4xl:hidden')}>
           <Tooltip content={stackTip}>
             <span tabIndex={0} className="flex flex-col items-start gap-0.5 rounded-md" aria-label={stackTip}>
-              <AvatarStack names={responsibles.filter((r) => r.member).map((r) => r.member!.name)} max={3} />
+              <AvatarStack people={responsibles.filter((r) => r.member).map((r) => r.member!)} max={3} />
               {missing ? <span className="text-mini text-warning">{missing} sem responsável</span> : null}
             </span>
           </Tooltip>
@@ -497,7 +502,7 @@ function ClientRow({ client: c, columns, perDepartment, items, isAdmin, members,
           <DropdownMenuItem icon={<ClipboardCheck />} onSelect={() => navigate(`/tarefas/auditoria?busca=${encodeURIComponent(name)}`)}>
             Ver na auditoria
           </DropdownMenuItem>
-          {isAdmin ? (
+          {canFinance ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem icon={<Wallet />} onSelect={() => navigate(`/clientes?editar=${c.id}`)}>

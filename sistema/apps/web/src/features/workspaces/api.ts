@@ -6,6 +6,8 @@ import type {
   InvitePreview,
   MeResponse,
   Member,
+  MemberPermissions,
+  MemberPermissionsInput,
   MemberRole,
   Paginated,
   WorkspaceInput,
@@ -65,6 +67,29 @@ export function useRemoveMember() {
   return useMutation({
     mutationFn: (userId: string) => api<void>(`/workspaces/current/members/${userId}`, { method: 'DELETE' }),
     onSuccess: invalidate,
+  });
+}
+
+/** Adjustments of one member (spec §13.10): `members` only; never for the owner nor yourself. */
+export function useMemberPermissions(userId: string | null) {
+  return useQuery({
+    queryKey: qk.memberPermissions(userId ?? ''),
+    queryFn: () => api<MemberPermissions>(`/workspaces/current/members/${userId}/permissions`),
+    enabled: Boolean(userId),
+  });
+}
+
+export function useSaveMemberPermissions() {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateMembers();
+  return useMutation({
+    mutationFn: ({ userId, input }: { userId: string; input: MemberPermissionsInput }) =>
+      api<MemberPermissions>(`/workspaces/current/members/${userId}/permissions`, { method: 'PUT', body: input }),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.memberPermissions(data.userId), data);
+      // Members list (roles, adjustments) and the task options (members' roles and departments).
+      return Promise.all([invalidate(), qc.invalidateQueries({ queryKey: ['tasks'] })]);
+    },
   });
 }
 

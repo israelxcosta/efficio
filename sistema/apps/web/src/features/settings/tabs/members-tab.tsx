@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Check, Copy, DoorOpen, Link2, MailPlus, Trash2, Users, X } from 'lucide-react';
+import { Check, Copy, DoorOpen, Link2, MailPlus, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { z } from 'zod';
 import {
@@ -24,7 +24,10 @@ import { SkeletonRows } from '@/components/ui/skeleton';
 import { copyText } from '@/lib/clipboard';
 import { formatDateTime } from '@/lib/datetime';
 import { toastError } from '@/lib/notify';
-import { cn, initials } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { MemberAvatar } from '@/components/ui/member-avatar';
+import { adjustmentSummary, memberAccessLine } from '../member-access';
+import { MemberAccessSheet, useMemberAccessParam } from '../member-access-sheet';
 import { useAuth } from '@/features/auth/auth-context';
 import { ROLE_HINTS, ROLE_LABELS } from '@/features/auth/roles';
 import { usePermissions } from '@/features/auth/permissions';
@@ -43,20 +46,23 @@ import { WORKSPACE_KIND_ICONS } from '@/features/workspaces/kind-icon';
 import { Cell, TabGrid } from './layout';
 
 export function MembersTab() {
-  const { isOwner } = usePermissions();
+  // Invites, roles, removals and permissions: the `members` key (by default, the owner).
+  const canManageMembers = usePermissions().can('members');
+  const access = useMemberAccessParam();
   return (
     <TabGrid>
       <Cell wide>
         <WorkspaceCard />
       </Cell>
-      <Cell wide={!isOwner}>
-        <MembersCard />
+      <Cell wide={!canManageMembers}>
+        <MembersCard onPermissions={access.open} />
       </Cell>
-      {isOwner ? (
+      {canManageMembers ? (
         <Cell>
           <InvitesCard />
         </Cell>
       ) : null}
+      <MemberAccessSheet userId={access.userId} onClose={access.close} />
     </TabGrid>
   );
 }
@@ -112,9 +118,10 @@ function WorkspaceCard() {
   );
 }
 
-function MembersCard() {
+function MembersCard({ onPermissions }: { onPermissions: (userId: string) => void }) {
   const { user, workspace, workspaces } = useAuth();
-  const { isOwner } = usePermissions();
+  const { isOwner, can } = usePermissions();
+  const canManageMembers = can('members');
   const members = useMembers();
   const subscription = useSubscription();
   const updateRole = useUpdateMemberRole();
@@ -179,18 +186,24 @@ function MembersCard() {
           <ul className="flex flex-col divide-y divide-border">
             {members.data.map((m) => (
               <li key={m.userId} className="flex flex-wrap items-center gap-3 py-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[13px] font-bold text-primary-soft-fg">
-                  {initials(m.name)}
-                </span>
+                <MemberAvatar size="lg" name={m.name} userId={m.userId} photoVersion={m.photoUpdatedAt} />
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                     <span className="truncate">{m.name}</span>
                     {m.isYou ? <Badge tone="brand">Você</Badge> : null}
                   </p>
                   <p className="truncate text-xs text-muted">{m.email}</p>
+                  {m.role !== 'owner' ? (
+                    <p className="text-caption text-muted" title={adjustmentSummary(m) ?? undefined}>
+                      {memberAccessLine(m)}
+                    </p>
+                  ) : null}
                 </div>
-                {isOwner && m.role !== 'owner' ? (
+                {canManageMembers && m.role !== 'owner' && !m.isYou ? (
                   <div className="flex items-center gap-1.5">
+                    <Button variant="ghost" size="sm" onClick={() => onPermissions(m.userId)} aria-label={`Permissões de ${m.name}`}>
+                      <SlidersHorizontal /> Permissões
+                    </Button>
                     <Select
                       size_="sm"
                       wrapperClassName="w-32"

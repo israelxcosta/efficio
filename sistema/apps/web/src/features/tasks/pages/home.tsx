@@ -37,8 +37,10 @@ import { monthName, SummaryLabel } from '../components/tasks-summary';
 import { daysText, DUE_TONE_CLASS, shortDate, shortName } from '../due';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
-import { resolveHomeDepartment } from '../home-view';
+import { canPickDepartment, resolveHomeDepartment } from '../home-view';
 import { homeDepartmentKey, readHomeDepartment, tasksHref, writeHomeDepartment, type TaskFilterPatch } from '../url-state';
+import { DeadlineAlertStrip } from '@/features/deadlines/components/deadline-alert-strip';
+import { useOffice } from '@/features/office/api';
 
 /** Filters of the task list that match what the home page shows. */
 function listBase(home: TaskHomeResponse): TaskFilterPatch {
@@ -91,7 +93,7 @@ export default function TaskHomePage() {
         actionsClassName="max-sm:w-full"
         actions={
           <>
-            {o?.me.isAdmin && o.departments.length > 0 ? (
+            {o && canPickDepartment(o) && o.departments.length > 0 ? (
               <DepartmentSwitcher value={departmentId ?? 'all'} options={o} onChange={chooseDepartment} />
             ) : null}
             <WriteGate scope="tasks">
@@ -109,6 +111,8 @@ export default function TaskHomePage() {
         <HomeSummary home={h} today={today} />
       )}
 
+      <DeadlineAlertStrip />
+
       {o && h?.view === 'mine' && o.departments.length > 0 ? (
         <p className="-mt-2 flex items-start gap-2 text-body-sm text-muted">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -116,7 +120,7 @@ export default function TaskHomePage() {
         </p>
       ) : null}
 
-      {o?.me.isAdmin ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
+      {o && canPickDepartment(o) ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
 
       {/* Row A: what I do and how the competence goes; row B: who carries the work and where it piles up. */}
       <div className="grid gap-5 lg:grid-cols-12">
@@ -481,7 +485,7 @@ function MyTasks({ home, loading, error, today, onRetry }: { home: TaskHomeRespo
 
 /** "Obrigações de outubro" (§6.5): the recurring tasks of the department in the competence. */
 function Obligations({ home, loading, error, today, onRetry }: { home: TaskHomeResponse | undefined; loading: boolean; error: unknown; today: string; onRetry: () => void }) {
-  const { isAdmin } = usePermissions();
+  const isAdmin = usePermissions().can('registry');
   const ob = home?.obligations;
   const competence = ob?.competence ?? home?.month ?? today.slice(0, 7);
   const monthName = competenceName(competence).split(' ')[0]!;
@@ -601,12 +605,12 @@ function ByAssignee({ home, people, where, loading }: { home: TaskHomeResponse |
       ...assigned.map((r) => ({
         key: r.assignee!.id,
         label: r.assignee!.name,
-        leading: <MemberAvatar name={r.assignee!.name} />,
+        leading: <MemberAvatar name={r.assignee!.name} userId={r.assignee!.id} />,
         open: r.open,
         overdue: r.overdue,
         href: tasksHref({ ...base, scope: 'all', assignee: r.assignee!.id }),
       })),
-      ...idle.map((p) => ({ key: p.id, label: p.name, leading: <MemberAvatar name={p.name} />, open: 0, overdue: 0, href: tasksHref({ ...base, scope: 'all', assignee: p.id }) })),
+      ...idle.map((p) => ({ key: p.id, label: p.name, leading: <MemberAvatar name={p.name} userId={p.id} />, open: 0, overdue: 0, href: tasksHref({ ...base, scope: 'all', assignee: p.id }) })),
     ];
   }, [home, people]);
   const max = Math.max(1, ...rows.map((r) => r.open + r.overdue));
@@ -697,6 +701,9 @@ function SetupChecklist({ options, storeKey }: { options: TaskOptionsResponse; s
   }, [storeKey]);
   const activeClients = options.clients.filter((c) => c.status === 'active');
   const recurring = useRecurringTasks({ status: 'active' }, { enabled: !hidden });
+  // The office (phase 3): only for whoever keeps it (`office`); the contract and the PDFs read it.
+  const canOffice = usePermissions().can('office');
+  const office = useOffice(canOffice && !hidden);
   const steps = [
     { label: 'Departamentos', done: options.departments.length > 0, href: '/tarefas/cadastros?aba=departamentos' },
     { label: 'Equipe nos departamentos', done: options.members.length > 0 && options.members.every((m) => m.department), href: '/tarefas/cadastros?aba=equipe' },
@@ -708,9 +715,10 @@ function SetupChecklist({ options, storeKey }: { options: TaskOptionsResponse; s
       href: '/tarefas/clientes?sem-responsavel=1',
     },
     { label: 'Tarefas recorrentes', done: (recurring.data?.summary.active ?? 0) > 0, href: '/tarefas/recorrentes' },
+    ...(canOffice ? [{ label: 'Dados do escritório', done: Boolean(office.data?.registered), href: '/configuracoes?aba=escritorio' }] : []),
   ];
   const doneCount = steps.filter((s) => s.done).length;
-  if (hidden || doneCount === steps.length || !recurring.data) return null;
+  if (hidden || doneCount === steps.length || !recurring.data || (canOffice && !office.data)) return null;
   return (
     <Card className="p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -735,7 +743,7 @@ function SetupChecklist({ options, storeKey }: { options: TaskOptionsResponse; s
           Ocultar
         </Button>
       </div>
-      <ul className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+      <ul className={cn('mt-3 grid gap-2 md:grid-cols-2', steps.length > 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4')}>
         {steps.map((s) => (
           <li key={s.label}>
             <Link to={s.href} className="flex items-center gap-2.5 rounded-md px-2 py-2 text-body-sm transition-colors hover:bg-surface-muted">

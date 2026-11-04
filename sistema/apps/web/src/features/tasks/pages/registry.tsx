@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { CircleAlert, Ellipsis, ListChecks, MailPlus, Pencil, Plus, Tags, Trash2, UsersRound, Building2, ShieldCheck } from 'lucide-react';
+import { CircleAlert, Ellipsis, ListChecks, MailPlus, Pencil, Plus, Scale, SlidersHorizontal, Tags, Trash2, UsersRound, Building2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TaskCategory, TaskDepartment, TaskMember } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
@@ -40,9 +40,12 @@ import {
 import { DepartmentSheet, TaskCategorySheet } from '../components/registry-sheets';
 import { namesSummary } from '../format';
 import { tasksHref } from '../url-state';
+import { UnionsTab, useUnionsHeader } from '@/features/unions/components/unions-tab';
+import { adjustmentCountText, adjustmentSummary } from '@/features/settings/member-access';
+import { MemberAccessSheet, useMemberAccessParam } from '@/features/settings/member-access-sheet';
 
-type Tab = 'departamentos' | 'categorias' | 'equipe';
-const TABS: Tab[] = ['departamentos', 'categorias', 'equipe'];
+type Tab = 'departamentos' | 'categorias' | 'equipe' | 'sindicatos';
+const TABS: Tab[] = ['departamentos', 'categorias', 'equipe', 'sindicatos'];
 const ADMIN_ONLY_NOTE = 'Somente administradores alteram estes cadastros.';
 
 const rowClass = 'group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-surface-muted @lg:px-4';
@@ -66,7 +69,9 @@ export default function TaskRegistryPage() {
   const [params, setParams] = useSearchParams();
   const raw = params.get('aba') as Tab | null;
   const tab: Tab = raw && TABS.includes(raw) ? raw : 'departamentos';
-  const { isAdmin, isOwner } = usePermissions();
+  const { can } = usePermissions();
+  const isAdmin = can('registry');
+  const isOwner = can('members');
   const options = useTaskOptions();
   const departments = useTaskDepartments();
   const categories = useTaskCategories();
@@ -76,15 +81,20 @@ export default function TaskRegistryPage() {
   const members = options.data?.members ?? [];
   const admins = members.filter((m) => m.isAdmin).length;
   const note = isAdmin ? '' : ` ${ADMIN_ONLY_NOTE}`;
+  const unionsHeader = useUnionsHeader(tab === 'sindicatos');
   const description =
-    tab === 'departamentos'
+    tab === 'sindicatos'
+      ? unionsHeader.description
+      : tab === 'departamentos'
       ? `${departments.data ? pluralize(departments.data.length, 'departamento', 'departamentos') : 'Departamentos'} · cada tarefa pertence a um departamento.${note}`
       : tab === 'categorias'
         ? `Rótulos para filtrar e analisar as tarefas.${note}`
         : `${pluralize(members.length, 'pessoa', 'pessoas')} · ${pluralize(admins, 'administrador', 'administradores')} e ${pluralize(members.length - admins, 'colaborador', 'colaboradores')}.${note}`;
 
   const action =
-    tab === 'departamentos' ? (
+    tab === 'sindicatos' ? (
+      unionsHeader.action
+    ) : tab === 'departamentos' ? (
       <WriteGate scope="admin">
         <Button onClick={() => setDeptSheet({ open: true, department: null })}>
           <Plus /> Novo departamento
@@ -119,6 +129,7 @@ export default function TaskRegistryPage() {
             { value: 'departamentos', label: 'Departamentos', icon: <UsersRound /> },
             { value: 'categorias', label: 'Categorias', icon: <Tags /> },
             { value: 'equipe', label: 'Equipe', icon: <ShieldCheck /> },
+            { value: 'sindicatos', label: 'Sindicatos', icon: <Scale /> },
           ]}
         />
       </div>
@@ -132,8 +143,10 @@ export default function TaskRegistryPage() {
         />
       ) : tab === 'categorias' ? (
         <CategoriesTab categories={categories} isAdmin={isAdmin} onNew={() => setCatSheet({ open: true, category: null })} onEdit={(c) => setCatSheet({ open: true, category: c })} />
-      ) : (
+      ) : tab === 'equipe' ? (
         <TeamTab />
+      ) : (
+        <UnionsTab />
       )}
 
       {isAdmin ? (
@@ -161,6 +174,7 @@ function DepartmentsTab({
   onNew: () => void;
   onEdit: (d: TaskDepartment) => void;
 }) {
+  const canDelete = usePermissions().can('deleteRegistry');
   const options = useTaskOptions();
   const remove = useDeleteDepartment();
   const [toDelete, setToDelete] = useState<TaskDepartment | null>(null);
@@ -218,7 +232,7 @@ function DepartmentsTab({
                   <span className="mt-0.5 block truncate text-xs text-muted">{namesSummary(d.members.map((m) => m.name))}</span>
                 </span>
                 <span className="hidden w-32 @2xl:block">
-                  {d.members.length ? <AvatarStack names={d.members.map((m) => m.name)} /> : <span className="text-body-sm text-subtle">—</span>}
+                  {d.members.length ? <AvatarStack people={d.members} /> : <span className="text-body-sm text-subtle">—</span>}
                 </span>
                 <Link to={tasksHref({ scope: 'all', department: d.id })} className="w-28 rounded-md text-right hover:underline" aria-label={`${d.name}: ${d.openCount} em aberto, ${d.overdueCount} atrasadas. Ver tarefas.`}>
                   <span className="tabular block text-body-sm font-semibold text-fg">{d.openCount}</span>
@@ -239,10 +253,14 @@ function DepartmentsTab({
                       <DropdownMenuItem icon={<Pencil />} onSelect={() => onEdit(d)}>
                         Editar
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => askDelete(d)}>
-                        Excluir
-                      </DropdownMenuItem>
+                      {canDelete ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => askDelete(d)}>
+                            Excluir
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
@@ -298,6 +316,7 @@ function CategoriesTab({
   onNew: () => void;
   onEdit: (c: TaskCategory) => void;
 }) {
+  const canDelete = usePermissions().can('deleteRegistry');
   const remove = useDeleteTaskCategory();
   const [toDelete, setToDelete] = useState<TaskCategory | null>(null);
   return (
@@ -339,10 +358,14 @@ function CategoriesTab({
                     <DropdownMenuItem icon={<Pencil />} onSelect={() => onEdit(c)}>
                       Editar
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => setToDelete(c)}>
-                      Excluir
-                    </DropdownMenuItem>
+                    {canDelete ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={() => setToDelete(c)}>
+                          Excluir
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
@@ -385,11 +408,14 @@ function TeamTab() {
   const navigate = useNavigate();
   const options = useTaskOptions();
   const people = useMembers();
-  const { isAdmin, isOwner } = usePermissions();
+  const { can } = usePermissions();
+  const isAdmin = can('registry');
+  const isOwner = can('members');
   // Open work per person: the summary of all open tasks (every member may read it).
   const open = useTasks({ scope: 'all', situation: 'open', page: 1, pageSize: 1, occurrences: 'false' });
   const setDepartment = useSetMemberDepartment();
   const [onlyWithout, setOnlyWithout] = useState(false);
+  const access = useMemberAccessParam();
   const o = options.data;
 
   const rows = useMemo(() => {
@@ -458,7 +484,7 @@ function TeamTab() {
               const load = open.data?.summary.openByAssignee.find((r) => r.assignee?.id === m.id);
               return (
                 <div key={m.id} className={rowClass}>
-                  <MemberAvatar size="md" name={m.name} />
+                  <MemberAvatar size="md" name={m.name} userId={m.id} />
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate text-sm font-semibold text-fg">{m.name}</span>
@@ -478,9 +504,10 @@ function TeamTab() {
                       </span>
                     )}
                   </span>
-                  <Tooltip content={ROLE_HINTS[m.role]}>
+                  <Tooltip content={adjustmentSummary(m) ?? ROLE_HINTS[m.role]}>
                     <span tabIndex={0} className="hidden w-32 rounded-sm text-body-sm text-muted @2xl:block">
                       {ROLE_LABELS[m.role]}
+                      {adjustmentCountText(m) ? <span className="block text-mini text-muted">{adjustmentCountText(m)}</span> : null}
                     </span>
                   </Tooltip>
                   <span className="hidden w-48 min-w-0 @xl:block">
@@ -506,11 +533,14 @@ function TeamTab() {
                       <DropdownMenuItem icon={<Building2 />} onSelect={() => navigate(`/tarefas/clientes?responsavel=${m.id}`)}>
                         Ver clientes
                       </DropdownMenuItem>
-                      {isOwner && !m.isYou ? (
+                      {isOwner && !m.isYou && m.role !== 'owner' ? (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem icon={<ShieldCheck />} onSelect={() => navigate('/configuracoes?aba=membros')}>
                             Alterar papel
+                          </DropdownMenuItem>
+                          <DropdownMenuItem icon={<SlidersHorizontal />} onSelect={() => access.open(m.id)}>
+                            Permissões…
                           </DropdownMenuItem>
                         </>
                       ) : null}
@@ -525,6 +555,7 @@ function TeamTab() {
       {isAdmin && o && o.departments.length > 0 ? (
         <p className="text-caption text-muted">Cada pessoa fica em um departamento; trocar aqui leva junto as tarefas em aberto dela.</p>
       ) : null}
+      {isOwner ? <MemberAccessSheet userId={access.userId} onClose={access.close} /> : null}
     </div>
   );
 }

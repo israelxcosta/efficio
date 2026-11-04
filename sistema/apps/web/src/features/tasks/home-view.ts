@@ -1,5 +1,10 @@
 import type { TaskOptionsResponse } from '@effinance/shared';
 
+/** Who chooses the department of the home page: `registry` (the API answers 403 to the others). */
+export function canPickDepartment(options: Pick<TaskOptionsResponse, 'me'>): boolean {
+  return options.me.permissions?.registry ?? options.me.isAdmin;
+}
+
 /** Department of the home page: `all`, an id, or undefined (the member's own; the API decides). */
 export function resolveHomeDepartment(
   options: Pick<TaskOptionsResponse, 'me' | 'departments'>,
@@ -7,7 +12,7 @@ export function resolveHomeDepartment(
   stored: string | null,
 ): string | undefined {
   const valid = (v: string | null) => (v === 'all' || (v && options.departments.some((d) => d.id === v)) ? v : null);
-  if (!options.me.isAdmin) return undefined;
+  if (!canPickDepartment(options)) return undefined;
   const url = fromUrl === 'todos' ? 'all' : valid(fromUrl);
   return url ?? valid(stored) ?? options.me.department?.id ?? 'all';
 }

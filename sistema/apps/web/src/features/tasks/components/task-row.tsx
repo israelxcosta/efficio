@@ -146,7 +146,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
           <>
             {!compact ? (
               <div className="hidden w-36 min-w-0 items-center gap-2 @2xl:flex">
-                <MemberAvatar name={task.assignee?.name} unassigned={!task.assignee} />
+                <MemberAvatar name={task.assignee?.name} unassigned={!task.assignee} userId={task.assignee?.id} />
                 <span className={cn('truncate text-[13px]', task.assignee ? 'text-fg' : 'text-subtle')}>
                   {task.assignee ? shortName(task.assignee.name) : 'Sem responsável'}
                 </span>
@@ -156,7 +156,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
               className={cn('hidden shrink-0', compact ? '@sm:inline-flex' : '@sm:inline-flex @2xl:hidden')}
               title={task.assignee ? task.assignee.name : 'Sem responsável'}
             >
-              <MemberAvatar name={task.assignee?.name} unassigned={!task.assignee} />
+              <MemberAvatar name={task.assignee?.name} unassigned={!task.assignee} userId={task.assignee?.id} />
               <span className="sr-only">{task.assignee ? `Responsável: ${task.assignee.name}` : 'Sem responsável'}</span>
             </span>
           </>
@@ -184,7 +184,9 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
 
 /** "⋯" of a task row and card (spec §5.4): Abrir, Mudar situação ›, Atribuir a mim, Duplicar, Excluir. */
 export function TaskRowMenu({ task, moveLabel = 'Mudar situação', className }: { task: Task; moveLabel?: string; className?: string }) {
-  const { canWriteTasks, isAdmin } = usePermissions();
+  const { canWriteTasks, can } = usePermissions();
+  // Deleting is `deleteTasks` (the others cancel the task).
+  const isAdmin = can('deleteTasks');
   const options = useTaskOptions();
   const me = options.data?.me;
   const status = useTaskStatusChange();

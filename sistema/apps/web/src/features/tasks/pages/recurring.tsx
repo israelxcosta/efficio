@@ -68,7 +68,9 @@ export default function RecurringTasksPage() {
   const month = today.slice(0, 7);
   const filters = parseRecurringFilters(params);
   const list = useRecurringTasks(toRecurringQuery(filters, month));
-  const { isAdmin, canManage } = usePermissions();
+  const { can, canManage } = usePermissions();
+  // Texts and the registry follow `registry`; deleting a recurring task, `deleteRegistry`.
+  const isAdmin = can('registry');
   const [ending, setEnding] = useState<RecurringTask | null>(null);
   const [reactivating, setReactivating] = useState<RecurringTask | null>(null);
   const [deleting, setDeleting] = useState<RecurringTask | null>(null);
@@ -186,7 +188,7 @@ export default function RecurringTasksPage() {
                     recurring={r}
                     monthName={monthName!}
                     canEdit={canManage}
-                    canDelete={isAdmin}
+                    canDelete={can('deleteRegistry')}
                     onOpen={() => update({ open: r.id })}
                     onDuplicate={() => setDuplicating(r)}
                     onEnd={() => setEnding(r)}
@@ -453,7 +455,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
             <>
               <Tooltip content={distributionTip(r) || `Padrão: ${r.assignee?.name ?? 'ninguém'}`}>
                 <span className="inline-flex" tabIndex={-1}>
-                  {names.length ? <AvatarStack names={names} max={3} /> : <MemberAvatar name={r.assignee?.name} />}
+                  {names.length ? <AvatarStack names={names} max={3} /> : <MemberAvatar name={r.assignee?.name} userId={r.assignee?.id} />}
                 </span>
               </Tooltip>
               {r.assignee ? <span className="mt-0.5 block truncate text-mini text-muted">Padrão: {shortName(r.assignee.name)}</span> : null}

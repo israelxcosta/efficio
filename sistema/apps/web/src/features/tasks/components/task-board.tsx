@@ -298,7 +298,7 @@ export function TaskCard({ task, today, draggable, dragging, onDragStart, onDrag
             </span>
           ) : null}
           <span title={task.assignee?.name ?? 'Sem responsável'}>
-            <MemberAvatar name={task.assignee?.name} unassigned={!task.assignee} />
+            <MemberAvatar name={task.assignee?.name} unassigned={!task.assignee} userId={task.assignee?.id} />
           </span>
         </div>
       </div>

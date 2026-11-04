@@ -383,7 +383,7 @@ interface ContentProps {
 
 function AuditContent({ data, loading, error, onRetry, filters, options, today, onChange, announce, stale }: ContentProps) {
   const navigate = useNavigate();
-  const { isAdmin } = usePermissions();
+  const isAdmin = usePermissions().can('registry');
   const monthName = competenceName(filters.competence).split(' ')[0]!;
   if (error) return <ErrorState error={error} onRetry={onRetry} />;
   if (loading || !data) {
@@ -931,7 +931,7 @@ function AccordionCellRow({ cell, column, client, title, subtitle, locked, showD
         ) : null}
       </div>
       <span className="hidden w-32 min-w-0 items-center gap-2 sm:flex">
-        <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} />
+        <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} userId={cell.assignee?.id} />
         <span className={cn('truncate text-[13px]', cell.assignee ? 'text-fg' : 'text-subtle')}>{cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável'}</span>
       </span>
       {showDeadline ? <span className={cn('hidden w-40 shrink-0 truncate text-right text-xs sm:block', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span> : null}

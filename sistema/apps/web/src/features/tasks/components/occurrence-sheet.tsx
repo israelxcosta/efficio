@@ -131,7 +131,7 @@ function RecurringOccurrenceSheet({ open, id, period, initialView, onClose, onOp
   const notFound = detail.error instanceof ApiRequestError && (detail.error.status === 404 || detail.error.status === 400);
   const cells = d ? occurrenceSheetCells(d, view, meId, search, assignee) : [];
   const deadline = d ? groupDeadlineInfo(d, today, true) : null;
-  const { isAdmin } = usePermissions();
+  const isAdmin = usePermissions().can('reopenOthers');
 
   const title = d ? occurrenceTitle(d, today) : 'Tarefa recorrente';
   const description = d ? (
@@ -310,7 +310,7 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
       </div>
       <Tooltip content={sourceTip}>
         <span className="hidden w-32 min-w-0 items-center gap-2 sm:flex" tabIndex={-1}>
-          <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} />
+          <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} userId={cell.assignee?.id} />
           <span className={cn('truncate text-[13px]', cell.assignee ? 'text-fg' : 'text-subtle')}>{cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável'}</span>
         </span>
       </Tooltip>

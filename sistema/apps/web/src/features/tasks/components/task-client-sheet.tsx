@@ -11,6 +11,7 @@ import { SkeletonRows } from '@/components/ui/skeleton';
 import { ClientProfile } from '@/features/clients/client-profile';
 import { copyText } from '@/lib/clipboard';
 import { pluralize } from '@/lib/utils';
+import { usePermissions } from '@/features/auth/permissions';
 import { useTaskAudit, useTasks } from '../api';
 import { competenceName } from '../occurrence';
 import { tasksHref } from '../url-state';
@@ -63,7 +64,9 @@ interface TaskClientSheetProps {
  */
 export function TaskClientSheet({ client: c, loading, notFound, error, onClose, grid, options }: TaskClientSheetProps) {
   const open = Boolean(c) || loading || notFound || Boolean(error);
-  const isAdmin = options?.me.isAdmin ?? false;
+  const { can } = usePermissions();
+  const isAdmin = can('registry');
+  const canFinance = can('finance');
   const tasks = useTasks(
     { scope: 'all', clientId: c?.id, situation: 'open', page: 1, pageSize: 5, occurrences: 'false' },
     { enabled: Boolean(c) },
@@ -89,7 +92,7 @@ export function TaskClientSheet({ client: c, loading, notFound, error, onClose, 
       width="lg"
       footer={
         <>
-          {isAdmin && c ? (
+          {canFinance && c ? (
             <Button variant="outline" asChild>
               <Link to={`/clientes?editar=${c.id}`}>
                 <Wallet /> Editar no financeiro
@@ -143,7 +146,7 @@ export function TaskClientSheet({ client: c, loading, notFound, error, onClose, 
             ) : (
               <p className="text-body-sm text-subtle">
                 Nenhum contato cadastrado.
-                {isAdmin ? (
+                {canFinance ? (
                   <>
                     {' '}
                     <Link to={`/clientes?editar=${c.id}`} className="font-medium text-brand-text hover:underline">

@@ -26,7 +26,7 @@ describe('visibleSearchHits (⌘K)', () => {
   it('never shows transactions, accounts (balances), categories or suppliers to a collaborator (security regression)', () => {
     // The palette used to render whatever `/search` returned: only the API kept amounts away.
     const hits = visibleSearchHits(answer, false);
-    expect(hits).toEqual({ transactions: [], accounts: [], categories: [], contacts: [answer.contacts[0]], tasks: [], recurringTasks: [] });
+    expect(hits).toEqual({ transactions: [], accounts: [], categories: [], contacts: [answer.contacts[0]], tasks: [], recurringTasks: [], unions: [] });
   });
 
   it('shows tasks and recurring tasks to every member', () => {
@@ -43,6 +43,27 @@ describe('visibleSearchHits (⌘K)', () => {
   });
 
   it('handles no answer yet', () => {
-    expect(visibleSearchHits(undefined, false)).toEqual({ transactions: [], accounts: [], categories: [], contacts: [], tasks: [], recurringTasks: [] });
+    expect(visibleSearchHits(undefined, false)).toEqual({ transactions: [], accounts: [], categories: [], contacts: [], tasks: [], recurringTasks: [], unions: [] });
+  });
+
+  it('shows unions to every member and leaves out hits of pages hidden for the person (phase 3)', () => {
+    const withUnions = {
+      ...answer,
+      recurringTasks: [{ id: 'r1', name: 'DCTFWeb', period: 'monthly' }],
+      unions: [{ id: 'u1', name: 'Sindicato dos Comerciários', acronym: 'SINDCOM', category: 'Comerciários', active: true }],
+    } as unknown as SearchResponse;
+    expect(visibleSearchHits(withUnions, false).unions.map((u) => u.id)).toEqual(['u1']);
+    const hidden = (key: string) => !['page.registry', 'page.recurring', 'page.clients'].includes(key);
+    const hits = visibleSearchHits(withUnions, false, hidden);
+    expect(hits.unions).toEqual([]);
+    expect(hits.recurringTasks).toEqual([]);
+    expect(hits.contacts).toEqual([]);
+    // An administrator still finds the client: it opens the finance registry.
+    expect(visibleSearchHits(withUnions, true, hidden).contacts.map((c) => c.id)).toEqual(['k1', 'k2']);
+  });
+
+  it('never carries a client access: the search answer has no such field to show', () => {
+    const hits = visibleSearchHits({ ...answer, unions: [] } as unknown as SearchResponse, true);
+    expect(JSON.stringify(hits)).not.toMatch(/simplesAccessCode|accountantPassword|senha/i);
   });
 });

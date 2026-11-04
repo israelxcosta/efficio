@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router';
-import { ArrowLeftRight, Bell, BriefcaseBusiness, CalendarClock, ListChecks, LogOut, Menu, Minus, NotebookPen, Plus, Search, TrendingUp, Wallet, Workflow } from 'lucide-react';
+import { ArrowLeftRight, Bell, BriefcaseBusiness, CalendarClock, FileClock, ListChecks, LogOut, Menu, Minus, NotebookPen, Plus, Search, TrendingUp, Wallet, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
@@ -20,6 +20,7 @@ import {
 import { lastPathOf, type AreaMemory } from './area-memory';
 import { AREA_LABELS, navItemsFor, SETTINGS_ITEM, type Area } from './nav';
 import { useMyOverdueTasks, useOverdueBills } from './notifications';
+import { useDeadlinesSummary } from '@/features/deadlines/api';
 
 const menuRow = 'flex items-center gap-3 rounded-md px-3 py-3 text-sm font-semibold';
 
@@ -29,15 +30,16 @@ const menuRow = 'flex items-center gap-3 rounded-md px-3 py-3 text-sm font-semib
  */
 export function MobileNav({ area, memory, onSearch }: { area: Area; memory: AreaMemory; onSearch: () => void }) {
   const { logout } = useAuth();
-  const { canAccessFinance } = usePermissions();
-  const { openNotes } = useTaskActions();
+  const { canAccessFinance, can } = usePermissions();
+  const { openNotes, openDeadlines } = useTaskActions();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   // Counts what each link opens: overdue payables (administrators) and your overdue tasks.
   const overdueBills = useOverdueBills().data?.filter((t) => t.type === 'expense').length ?? 0;
   const overdueTasks = useMyOverdueTasks().data?.total ?? 0;
-  const areaItems = navItemsFor(area);
+  const overdueDeadlines = useDeadlinesSummary().data?.overdueTotal ?? 0;
+  const areaItems = navItemsFor(area, can);
   const items = areaItems.filter((i) => i.mobile);
   const link = ({ isActive }: { isActive: boolean }) =>
     cn('flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-semibold', isActive ? 'text-fg' : 'text-muted');
@@ -128,6 +130,17 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
           >
             <ListChecks className="size-5" /> Tarefas atrasadas
             {overdueTasks ? <span className="ml-auto rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{overdueTasks}</span> : null}
+          </button>
+          <button
+            type="button"
+            className={cn(menuRow, 'text-fg hover:bg-bg-subtle')}
+            onClick={() => {
+              close();
+              openDeadlines();
+            }}
+          >
+            <FileClock className="size-5" /> Vencimentos
+            {overdueDeadlines ? <span className="ml-auto rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{overdueDeadlines}</span> : null}
           </button>
           {canAccessFinance ? (
             <button

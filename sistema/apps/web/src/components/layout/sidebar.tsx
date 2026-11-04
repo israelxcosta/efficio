@@ -37,9 +37,9 @@ export function Sidebar({ area, memory }: SidebarProps) {
   const KindIcon = workspace ? WORKSPACE_KIND_ICONS[workspace.kind] : null;
   // Icons that do not fit the window height go to the "more" menu beside the rail (no scrollbar).
   const rail = useElementSize<HTMLElement>();
-  const { visible, hidden } = splitRail(navItemsFor(area), rail.height);
   // Only members with both areas see the area label and the switch button.
-  const { canAccessFinance } = usePermissions();
+  const { canAccessFinance, can } = usePermissions();
+  const { visible, hidden } = splitRail(navItemsFor(area, can), rail.height);
   const { openNotes } = useTaskActions();
 
   return (

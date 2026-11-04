@@ -135,7 +135,7 @@ export function DepartmentSheet({
                       }
                       aria-label={m.name}
                     />
-                    <MemberAvatar name={m.name} />
+                    <MemberAvatar name={m.name} userId={m.id} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm text-fg">{m.name}</span>
                       {elsewhere ? (

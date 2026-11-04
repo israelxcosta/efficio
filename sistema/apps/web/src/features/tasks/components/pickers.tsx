@@ -44,7 +44,7 @@ export function memberOptions(
   if (allowNone) out.push({ value: NONE, label: noneLabel, leading: <MemberAvatar unassigned /> });
   const sorted = [...members].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const me = meFirst ? sorted.find((m) => m.isYou) : undefined;
-  if (me) out.push({ value: me.id, label: `${me.name} (você)`, hint: me.department?.name, leading: <MemberAvatar name={me.name} /> });
+  if (me) out.push({ value: me.id, label: `${me.name} (você)`, hint: me.department?.name, leading: <MemberAvatar name={me.name} userId={me.id} /> });
   const rest = sorted.filter((m) => m !== me);
   const dept = departmentId ? rest.filter((m) => m.department?.id === departmentId) : [];
   const others = departmentId ? rest.filter((m) => m.department?.id !== departmentId) : rest;
@@ -53,7 +53,7 @@ export function memberOptions(
     value: m.id,
     label: m.name,
     hint: m.department?.name ?? 'Sem departamento',
-    leading: <MemberAvatar name={m.name} />,
+    leading: <MemberAvatar name={m.name} userId={m.id} />,
     group,
   });
   out.push(...dept.map((m) => option(m, deptName ? `Do ${deptName}` : undefined)));

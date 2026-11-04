@@ -49,7 +49,8 @@ export default function ProcessesPage() {
   const templates = useFlowTemplates();
   const flows = useTaskFlows({ status });
   const activeFlows = useTaskFlows({ status: 'active' });
-  const { isAdmin, canManage } = usePermissions();
+  const { can, canManage } = usePermissions();
+  const isAdmin = can('registry');
   const actions = useTaskActions();
   const { openTask } = useTaskSheetLinks();
   const [duplicating, setDuplicating] = useState<FlowTemplate | null>(null);
@@ -133,7 +134,7 @@ export default function ProcessesPage() {
                   <TemplateRow
                     template={t}
                     canEdit={canManage}
-                    canDelete={isAdmin}
+                    canDelete={can('deleteRegistry')}
                     onOpen={() => set('modelo', t.id)}
                     onApply={() => actions.applyTemplate(t)}
                     onDuplicate={() => setDuplicating(t)}
@@ -171,7 +172,7 @@ export default function ProcessesPage() {
             <ul className={cn(flows.isPlaceholderData && 'opacity-60')}>
               {flows.data!.map((f) => (
                 <li key={f.id}>
-                  <FlowRow flow={f} today={today} canDelete={isAdmin} onOpenTask={openTask} onSteps={() => setViewing(f)} onDelete={() => setDeletingFlow(f)} />
+                  <FlowRow flow={f} today={today} canDelete={can('deleteTasks')} onOpenTask={openTask} onSteps={() => setViewing(f)} onDelete={() => setDeletingFlow(f)} />
                 </li>
               ))}
             </ul>
@@ -373,7 +374,7 @@ function FlowRow({
       <div className="hidden w-36 min-w-0 items-center gap-2 @2xl:flex">
         {!done ? (
           <>
-            <MemberAvatar name={step?.assignee?.name} unassigned={!step?.assignee} />
+            <MemberAvatar name={step?.assignee?.name} unassigned={!step?.assignee} userId={step?.assignee?.id} />
             <span className={cn('truncate text-[13px]', step?.assignee ? 'text-fg' : 'text-subtle')}>{step?.assignee ? shortName(step.assignee.name) : 'Sem responsável'}</span>
           </>
         ) : null}

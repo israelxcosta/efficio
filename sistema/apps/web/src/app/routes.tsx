@@ -37,6 +37,9 @@ const ProcessesPage = lazy(() => import('@/features/tasks/pages/processes'));
 const TaskReportsPage = lazy(() => import('@/features/tasks/pages/task-reports'));
 const TaskClientsPage = lazy(() => import('@/features/tasks/pages/clients'));
 const TaskRegistryPage = lazy(() => import('@/features/tasks/pages/registry'));
+// Phase 3: the contract template editor (`office`) and the contract of a client (finance).
+const ContractEditorPage = lazy(() => import('@/features/office/pages/contract-editor'));
+const ClientContractPage = lazy(() => import('@/features/office/pages/client-contract'));
 
 function NotFound() {
   return (
@@ -101,6 +104,7 @@ export const routes: RouteObject[] = [
           { path: 'categorias', element: <CategoriesPage /> },
           { path: 'metas', element: <GoalsPage /> },
           { path: 'clientes', element: <ClientsPage /> },
+          { path: 'clientes/:id/contrato', element: <ClientContractPage /> },
           { path: 'fornecedores', element: <ContactsPage /> },
           // Old address of the suppliers page (bookmarks, links in e-mails).
           { path: 'contatos', element: <LegacyContactsRedirect /> },
@@ -109,6 +113,7 @@ export const routes: RouteObject[] = [
         ],
       },
       { path: 'configuracoes', element: <SettingsPage /> },
+      { path: 'configuracoes/contrato', element: <ContractEditorPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },

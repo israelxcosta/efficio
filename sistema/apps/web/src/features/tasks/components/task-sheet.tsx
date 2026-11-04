@@ -795,7 +795,7 @@ function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptio
       <ul className="flex flex-col gap-4">
         {comments.map((c) => (
           <li key={c.id} className={cn('group/comment flex gap-3', c.id === 'pending' && 'opacity-70')}>
-            <MemberAvatar size="md" name={c.author?.name} unassigned={!c.author} />
+            <MemberAvatar size="md" name={c.author?.name} unassigned={!c.author} userId={c.author?.id} />
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-2">
                 <p className="min-w-0 flex-1 text-body-sm">
@@ -850,7 +850,7 @@ function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptio
       </ul>
       {!readOnly ? (
         <div className="flex gap-3">
-          <MemberAvatar size="md" name={me.name} />
+          <MemberAvatar size="md" name={me.name} userId={me.id} />
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <Textarea
               value={text}
@@ -879,7 +879,7 @@ function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptio
 function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; stamp: Stamp; readOnly: boolean; onClose: () => void }) {
   const status = useTaskStatusChange();
   const remove = useDeleteTask();
-  const { isAdmin } = usePermissions();
+  const isAdmin = usePermissions().can('deleteTasks');
   const [confirming, setConfirming] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [params, setParams] = useSearchParams();
@@ -997,10 +997,10 @@ export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsRes
   const day = params.get('prazo');
   const dueDay = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
   const dept = params.get('departamento');
-  const client = params.get('cliente');
+  const client = params.get('para-cliente') ?? params.get('cliente');
   const escopo = params.get('escopo');
   const base: NewTaskValues = {
-    title: '',
+    title: (params.get('titulo') ?? '').trim().slice(0, 200),
     description: '',
     status: statusFromParam(params.get('estado')),
     priority: 'medium',
@@ -1050,7 +1050,7 @@ function NewTaskSheet({
     () => newTaskDefaults(params, options, copy.data),
     // Only when the sheet opens or the data it copies arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [Boolean(options), copy.data?.id, params.get('estado'), params.get('horario'), params.get('prazo')],
+    [Boolean(options), copy.data?.id, params.get('estado'), params.get('horario'), params.get('prazo'), params.get('titulo'), params.get('para-cliente')],
   );
   const form = useForm<NewTaskValues>({ defaultValues: defaults });
   const [errors, setErrors] = useState<Partial<Record<keyof NewTaskValues, string>>>({});

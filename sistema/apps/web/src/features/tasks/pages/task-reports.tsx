@@ -742,7 +742,7 @@ function ProductivityList({ rows }: { rows: TaskProductivityRow[] }) {
           <li key={r.member?.id ?? `x-${i}`} className="@container">
             <div className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-2 py-1.5 [grid-template-areas:'name_total'_'bar_bar'] @md:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto] @md:[grid-template-areas:'name_bar_total']">
               <span className="flex min-w-0 items-center gap-2 [grid-area:name]">
-                <MemberAvatar name={r.member?.name} unassigned={!r.member} />
+                <MemberAvatar name={r.member?.name} unassigned={!r.member} userId={r.member?.id} />
                 <span className="truncate text-body-sm text-fg">{r.member?.name ?? 'Pessoa removida'}</span>
               </span>
               <span className="mt-1 flex h-2 overflow-hidden [grid-area:bar] @md:mt-0" aria-hidden>

@@ -7,8 +7,10 @@ import { areaOf } from '@/components/layout/nav';
 // existing task, `?nova=1` to create one (with `&horario=1` for an appointment, `&estado=` from a
 // board column, `&duplicar=<id>` to copy one, `&prazo=<date>` from a calendar day). Elsewhere it opens
 // over the task list. (`prazo`, not `vencimento`: on the list `vencimento` is a filter that must stay.)
+// Phase 3: `&titulo=` (renewal of a document, salary adjustment of an agreement) and `&para-cliente=<id>`
+// (the client of the new task; `cliente` is a filter of the list and must stay).
 
-export const SHEET_PARAMS = ['tarefa', 'nova', 'horario', 'estado', 'duplicar', 'prazo'] as const;
+export const SHEET_PARAMS = ['tarefa', 'nova', 'horario', 'estado', 'duplicar', 'prazo', 'titulo', 'para-cliente'] as const;
 
 const STATUS_PARAM: Partial<Record<TaskStatus, string>> = {
   in_progress: 'em-andamento',
@@ -28,6 +30,10 @@ export interface NewTaskOptions {
   duplicateOf?: string;
   /** Due date of the new task (a calendar day). */
   dueDate?: string;
+  /** Title already filled ("Renovar certificado digital"). */
+  title?: string;
+  /** Client of the new task. */
+  clientId?: string;
 }
 
 /** Search string with the sheet params of `base` replaced. */
@@ -45,7 +51,14 @@ function newTaskParams(options: NewTaskOptions): Record<string, string> {
   if (status) out.estado = status;
   if (options.duplicateOf) out.duplicar = options.duplicateOf;
   if (options.dueDate) out.prazo = options.dueDate;
+  if (options.title) out.titulo = options.title.slice(0, 200);
+  if (options.clientId) out['para-cliente'] = options.clientId;
   return out;
+}
+
+/** Href that opens a new task over the task list, from anywhere (toasts, other areas). */
+export function newTaskHref(options: NewTaskOptions = {}): string {
+  return `/tarefas?${withSheetParams(new URLSearchParams(), newTaskParams(options))}`;
 }
 
 export function useTaskSheetLinks() {
@@ -63,9 +76,12 @@ export function useTaskSheetLinks() {
   );
 
   const newTask = useCallback(
-    (options: NewTaskOptions = {}) => {
+    (options: NewTaskOptions = {}, { drop = [] }: { drop?: string[] } = {}) => {
       const sheet = newTaskParams(options);
-      if (here) setParams(withSheetParams(params, sheet));
+      // `drop`: params of another sheet that opened this one (`vencimentos`), so only one stays open.
+      const base = new URLSearchParams(params);
+      for (const k of drop) base.delete(k);
+      if (here) setParams(withSheetParams(base, sheet));
       else navigate(`/tarefas?${withSheetParams(new URLSearchParams(), sheet)}`);
     },
     [here, navigate, params, setParams],

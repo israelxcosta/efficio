@@ -21,6 +21,7 @@ import {
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
+import type { PagePermissionKey, PermissionKey } from '@effinance/shared';
 
 export interface NavItem {
   to: string;
@@ -33,6 +34,8 @@ export interface NavItem {
   keywords?: string;
   /** Active only on the exact path (Tarefas: the other Gestão pages live under `/tarefas/`). */
   end?: boolean;
+  /** Page key that hides it (phase 3, spec §13.10): Início and Tarefas have none. */
+  permission?: PagePermissionKey;
 }
 
 /**
@@ -60,6 +63,7 @@ export const GESTAO_NAV_ITEMS: NavItem[] = [
     label: 'Auditoria mensal',
     short: 'Auditoria',
     icon: ClipboardCheck,
+    permission: 'page.audit',
     keywords: 'competencia matriz obrigacoes entregas conclusao acompanhamento encerramento',
   },
   {
@@ -67,18 +71,26 @@ export const GESTAO_NAV_ITEMS: NavItem[] = [
     label: 'Tarefas recorrentes',
     short: 'Recorrentes',
     icon: Repeat,
+    permission: 'page.recurring',
     keywords: 'obrigacoes prazo legal meta das dctfweb folha periodicidade calendario feriados',
   },
-  { to: '/tarefas/processos', label: 'Processos', icon: Workflow, keywords: 'fluxos modelos etapas roteiro abertura alteracao' },
-  { to: '/tarefas/clientes', label: 'Clientes', icon: Building2, mobile: true, keywords: 'empresas cnpj regime contatos responsaveis carteira' },
+  { to: '/tarefas/processos', label: 'Processos', icon: Workflow, permission: 'page.processes', keywords: 'fluxos modelos etapas roteiro abertura alteracao' },
+  { to: '/tarefas/clientes', label: 'Clientes', icon: Building2, mobile: true, permission: 'page.clients', keywords: 'empresas cnpj regime contatos responsaveis carteira' },
   {
     to: '/tarefas/relatorios',
     label: 'Relatórios de tarefas',
     short: 'Relatórios',
     icon: ChartColumn,
+    permission: 'page.reports',
     keywords: 'produtividade pontualidade entregas atrasos exportar csv pdf',
   },
-  { to: '/tarefas/cadastros', label: 'Cadastros', icon: FolderCog, keywords: 'departamentos categorias equipe usuarios membros' },
+  {
+    to: '/tarefas/cadastros',
+    label: 'Cadastros',
+    icon: FolderCog,
+    permission: 'page.registry',
+    keywords: 'departamentos categorias equipe usuarios membros sindicatos convencoes coletivas data-base',
+  },
 ];
 
 /** Financeiro: the rail of the finance app, with the panel at `/financeiro`. */
@@ -104,8 +116,20 @@ export const AREA_LABELS: Record<Area, string> = { gestao: 'Gestão de tarefas',
 export const AREA_SHORT_LABELS: Record<Area, string> = { gestao: 'Gestão', financeiro: 'Financeiro' };
 export const AREA_HOME: Record<Area, string> = { gestao: '/', financeiro: '/financeiro' };
 
-export function navItemsFor(area: Area): NavItem[] {
-  return area === 'financeiro' ? FINANCE_NAV_ITEMS : GESTAO_NAV_ITEMS;
+/**
+ * Items of an area that the person sees: a Gestão page whose `page.*` key is off is gone from the
+ * rail, the "Mais" and ⌘K (its URL shows "Acesso restrito"). Without `can`, every item.
+ */
+export function navItemsFor(area: Area, can?: (key: PermissionKey) => boolean): NavItem[] {
+  const items = area === 'financeiro' ? FINANCE_NAV_ITEMS : GESTAO_NAV_ITEMS;
+  return can ? items.filter((i) => !i.permission || can(i.permission)) : items;
+}
+
+/** Page key of a Gestão path (`/tarefas/auditoria/...` → `page.audit`); null for Início, Tarefas and others. */
+export function pagePermissionOf(pathname: string): PagePermissionKey | null {
+  const path = routePath(pathname);
+  const item = GESTAO_NAV_ITEMS.find((i) => i.permission && underPath(path, i.to));
+  return item?.permission ?? null;
 }
 
 /** Old address of the suppliers page, still a finance path (it redirects). */

@@ -61,6 +61,18 @@ export const qk = {
   taskNotes: ['task-notes'] as const,
   /** Every client (all pages of /clients) for the read-only clients screen of the Gestão. */
   allClients: ['clients', 'all'] as const,
+  // Phase 3: unions, deadlines (documents and agreements), office, contract and permissions per person.
+  unions: (params?: Params) => ['unions', 'list', params ?? {}] as const,
+  union: (id: string) => ['unions', 'detail', id] as const,
+  deadlines: (kind?: string) => ['deadlines', 'list', kind ?? 'all'] as const,
+  deadlinesSummary: ['deadlines', 'summary'] as const,
+  deadlineClients: ['deadlines', 'clients'] as const,
+  officeBranding: ['office', 'branding'] as const,
+  office: ['office', 'registry'] as const,
+  contractTemplate: ['office', 'contract-template'] as const,
+  /** Under `clients`: a client or fee change makes it stale. */
+  clientContract: (id: string) => ['clients', 'contract', id] as const,
+  memberPermissions: (userId: string) => ['workspace', 'member-permissions', userId] as const,
 };
 
 /** Everything derived from transactions/balances. Called after any money-moving mutation. */

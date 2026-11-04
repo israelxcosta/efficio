@@ -55,7 +55,7 @@ export default function TasksPage() {
   const { openTask, newTask } = useTaskSheetLinks();
   const actions = useTaskActions();
   const navigate = useNavigate();
-  const { isAdmin } = usePermissions();
+  const isAdmin = usePermissions().can('registry');
   const data = list.data;
   const filterCount = activeFilterCount(filters);
   // Occurrences are listed aggregated (not paginated): they come on the first page of a flat list.

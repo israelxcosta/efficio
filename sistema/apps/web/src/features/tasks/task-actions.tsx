@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import type { FlowTemplate, TaskNote } from '@effinance/shared';
 import { useAuth } from '@/features/auth/auth-context';
@@ -6,6 +6,8 @@ import { useTaskOptions } from './api';
 import { ApplyTemplateDialog, FlowBuilderSheet, TemplatePickerDialog } from './components/flow-sheets';
 import { NoteSheet, NotesSheet } from './components/notes-sheet';
 import { taskHref } from './task-links';
+import { DeadlinesSheet, useOpenDeadlines } from '@/features/deadlines/components/deadlines-sheet';
+import type { DeadlineGroupKey, DeadlineKind } from '@/features/deadlines/deadline-logic';
 
 interface TaskActions {
   /** "Escolha o modelo", then "Aplicar" (Tarefas, the floating bar, the phone's "+", ⌘K). */
@@ -16,6 +18,8 @@ interface TaskActions {
   /** "Minhas anotações" (avatar menu, "Mais", ⌘K) in both areas. */
   openNotes: () => void;
   newNote: () => void;
+  /** "Vencimentos" (strip of the home page, bell, "Mais", ⌘K), over the current page. */
+  openDeadlines: (kind?: DeadlineKind, group?: DeadlineGroupKey) => void;
 }
 
 const Ctx = createContext<TaskActions | null>(null);
@@ -35,6 +39,9 @@ export function TaskActionsProvider({ children }: { children: ReactNode }) {
   const anyOpen = picker || applying !== null || builder;
   const options = useTaskOptions({ enabled: anyOpen && Boolean(workspace) });
   const openTask = useCallback((id: string) => navigate(taskHref(id)), [navigate]);
+  const openDeadlinesRaw = useOpenDeadlines();
+  const openDeadlinesRef = useRef(openDeadlinesRaw);
+  openDeadlinesRef.current = openDeadlinesRaw;
 
   const value = useMemo<TaskActions>(
     () => ({
@@ -43,6 +50,7 @@ export function TaskActionsProvider({ children }: { children: ReactNode }) {
       openFlowBuilder: () => setBuilder(true),
       openNotes: () => setNotes(true),
       newNote: () => setNote({ note: null }),
+      openDeadlines: (kind, group) => openDeadlinesRef.current(kind, group),
     }),
     [],
   );
@@ -72,6 +80,7 @@ export function TaskActionsProvider({ children }: { children: ReactNode }) {
           <FlowBuilderSheet open={builder} onOpenChange={setBuilder} options={options.data} onCreated={openTask} />
           <NotesSheet open={notes} onOpenChange={setNotes} onOpenNote={(n) => setNote({ note: n })} />
           <NoteSheet open={note !== null} note={note?.note ?? null} onOpenChange={(o) => !o && setNote(null)} />
+          <DeadlinesSheet />
         </>
       ) : null}
     </Ctx.Provider>

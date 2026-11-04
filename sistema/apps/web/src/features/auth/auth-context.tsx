@@ -15,6 +15,7 @@ import type {
 import { api, ApiRequestError, onUnauthorized, setBearerToken, setExpectedWorkspace } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { announceSessionChange, onSessionChange } from '@/lib/session-sync';
+import { clearPhotoCache } from '@/lib/photo-cache';
 
 /** Everything cached except the observed `me` query. */
 const notMe = { predicate: (q: Query) => q.queryKey[0] !== qk.me[0] };
@@ -69,6 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void qc.cancelQueries(notMe);
       qc.removeQueries(notMe);
       qc.getMutationCache().clear();
+      // Signed out: the photos (personal data) go too.
+      if (!session) clearPhotoCache();
       qc.setQueryData(qk.me, session);
     },
     [qc],

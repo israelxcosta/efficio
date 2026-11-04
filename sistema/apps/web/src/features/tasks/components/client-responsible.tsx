@@ -73,7 +73,7 @@ export function ClientResponsibleCell({ client, department, member, editable, me
   const name = member ? (full ? member.name : shortName(member.name)) : 'Sem responsável';
   const content = (
     <>
-      <MemberAvatar name={member?.name} unassigned={!member} />
+      <MemberAvatar name={member?.name} unassigned={!member} userId={member?.id} />
       <span className={cn('truncate', full ? 'text-body-sm' : 'text-[13px]', member ? 'text-fg' : 'text-subtle')}>{name}</span>
     </>
   );

@@ -8,6 +8,7 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarClock,
+  FileClock,
   FileUp,
   Landmark,
   ListChecks,
@@ -15,6 +16,7 @@ import {
   NotebookPen,
   Plus,
   Repeat,
+  Scale,
   Search,
   SquarePen,
   TrendingUp,
@@ -22,7 +24,7 @@ import {
   Wallet,
   Workflow,
 } from 'lucide-react';
-import { formatBRL, formatDateBR, RECURRENCE_PERIOD_LABELS, todayISO, type SearchResponse } from '@effinance/shared';
+import { formatBRL, formatDateBR, RECURRENCE_PERIOD_LABELS, todayISO, type PermissionKey, type SearchResponse } from '@effinance/shared';
 import { api } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { BankLogo } from '@/components/ui/bank-logo';
@@ -35,7 +37,7 @@ import { useTaskSheetLinks } from '@/features/tasks/task-links';
 import { useTaskActions } from '@/features/tasks/task-actions';
 import { shortDate } from '@/features/tasks/due';
 import { lastPathOf, type AreaMemory } from './area-memory';
-import { FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS, SETTINGS_ITEM, type Area, type NavItem } from './nav';
+import { FINANCE_NAV_ITEMS, navItemsFor, SETTINGS_ITEM, type Area, type NavItem } from './nav';
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
@@ -52,15 +54,20 @@ function useDebounced<T>(value: T, ms: number): T {
  * before a role change, or an API regression, must not put amounts on a collaborator's screen), and
  * suppliers only in the finance area's audience.
  */
-export function visibleSearchHits(r: SearchResponse | undefined, canAccessFinance: boolean) {
+export function visibleSearchHits(r: SearchResponse | undefined, canAccessFinance: boolean, can?: (key: PermissionKey) => boolean) {
+  // A hit that opens a page hidden for the person (`page.*`, spec §13.10) is left out too.
+  const page = (key: PermissionKey) => !can || can(key);
   return {
     transactions: canAccessFinance ? (r?.transactions ?? []) : [],
     accounts: canAccessFinance ? (r?.accounts ?? []) : [],
     categories: canAccessFinance ? (r?.categories ?? []) : [],
-    contacts: (r?.contacts ?? []).filter((c) => canAccessFinance || c.kind === 'client'),
+    // Clients open the Gestão sheet (or, for administrators, the finance registry).
+    contacts: (r?.contacts ?? []).filter((c) => (c.kind === 'client' ? canAccessFinance || page('page.clients') : canAccessFinance)),
     // Tasks and recurring tasks are for every member (titles only; never a client's access data).
     tasks: r?.tasks ?? [],
-    recurringTasks: r?.recurringTasks ?? [],
+    recurringTasks: page('page.recurring') ? (r?.recurringTasks ?? []) : [],
+    // Unions (phase 3): public data of the entity, for every member; they open Cadastros › Sindicatos.
+    unions: page('page.registry') ? (r?.unions ?? []) : [],
   };
 }
 
@@ -84,7 +91,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
   const navigate = useNavigate();
   const actions = useTransactionActions();
   const { openImport } = useImportActions();
-  const { canAccessFinance, canWriteTasks, canManage } = usePermissions();
+  const { canAccessFinance, canWriteTasks, canManage, can } = usePermissions();
   const { newTask, openTask } = useTaskSheetLinks();
   const taskActionsCtx = useTaskActions();
   const openFinance = useOpenFinanceStatus(open && canAccessFinance);
@@ -107,8 +114,23 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
   }
 
   const r = search.data;
-  const { transactions, accounts, categories, contacts, tasks, recurringTasks } = visibleSearchHits(r, canAccessFinance);
+  const { transactions, accounts, categories, contacts, tasks, recurringTasks, unions } = visibleSearchHits(r, canAccessFinance, can);
+  const gestaoItems = navItemsFor('gestao', can);
   const today = todayISO();
+
+  // Phase 3: the deadlines sheet (everyone) and a new union (`registry`, Cadastros visible).
+  const deadlineActions = (
+    <>
+      <Command.Item value="ver vencimentos documentos certidoes certificado alvara convencoes coletivas" className={itemClass} onSelect={() => run(() => taskActionsCtx.openDeadlines())}>
+        <FileClock /> Ver vencimentos
+      </Command.Item>
+      {canManage && can('page.registry') ? (
+        <Command.Item value="novo sindicato convencao coletiva data-base" className={itemClass} onSelect={() => run(() => navigate('/tarefas/cadastros?aba=sindicatos&sindicato=novo'))}>
+          <Scale /> Novo sindicato
+        </Command.Item>
+      ) : null}
+    </>
+  );
 
   const taskActions = canWriteTasks ? (
     <Command.Group heading="Ações da gestão" className={groupClass}>
@@ -127,17 +149,19 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
       <Command.Item value="nova anotacao nota lembrete" className={itemClass} onSelect={() => run(taskActionsCtx.newNote)}>
         <SquarePen /> Nova anotação
       </Command.Item>
-      {canManage ? (
+      {canManage && can('page.recurring') ? (
         <Command.Item value="nova tarefa recorrente obrigacao das dctfweb" className={itemClass} onSelect={() => run(() => navigate('/tarefas/recorrentes?recorrente=nova'))}>
           <Repeat /> Nova tarefa recorrente
         </Command.Item>
       ) : null}
+      {deadlineActions}
     </Command.Group>
   ) : (
     <Command.Group heading="Ações da gestão" className={groupClass}>
       <Command.Item value="minhas anotacoes notas lembretes" className={itemClass} onSelect={() => run(taskActionsCtx.openNotes)}>
         <NotebookPen /> Minhas anotações
       </Command.Item>
+      {deadlineActions}
     </Command.Group>
   );
 
@@ -241,6 +265,20 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                       ))}
                     </Command.Group>
                   ) : null}
+                  {unions.length ? (
+                    <Command.Group heading="Sindicatos" className={groupClass}>
+                      {unions.map((u) => (
+                        <Command.Item key={u.id} value={`union-${u.id}`} className={itemClass} onSelect={() => run(() => navigate(`/tarefas/cadastros?aba=sindicatos&sindicato=${u.id}`))}>
+                          <Scale />
+                          <span className="min-w-0 flex-1 truncate">
+                            {u.acronym ?? u.name}
+                            {u.acronym ? <span className="ml-2 text-xs text-muted">{u.name}</span> : null}
+                          </span>
+                          <span className="text-xs text-muted">{u.active ? (u.category ?? 'Sindicato') : 'Inativo'}</span>
+                        </Command.Item>
+                      ))}
+                    </Command.Group>
+                  ) : null}
                   {transactions.length ? (
                     <Command.Group heading="Lançamentos" className={groupClass}>
                       {transactions.map((t) => (
@@ -290,7 +328,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                               navigate(
                                 c.kind !== 'client'
                                   ? `/fornecedores?editar=${c.id}`
-                                  : area === 'financeiro' && canAccessFinance
+                                  : (area === 'financeiro' || !can('page.clients')) && canAccessFinance
                                     ? `/clientes?consultar=${c.id}`
                                     : `/tarefas/clientes?cliente=${c.id}`,
                               ),
@@ -321,11 +359,11 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
               {area === 'financeiro' && canAccessFinance ? (
                 <>
                   {goTo('Financeiro', FINANCE_NAV_ITEMS)}
-                  {goTo('Gestão de tarefas', GESTAO_NAV_ITEMS)}
+                  {goTo('Gestão de tarefas', gestaoItems)}
                 </>
               ) : (
                 <>
-                  {goTo('Gestão de tarefas', GESTAO_NAV_ITEMS)}
+                  {goTo('Gestão de tarefas', gestaoItems)}
                   {canAccessFinance ? goTo('Financeiro', FINANCE_NAV_ITEMS) : null}
                 </>
               )}

@@ -32,7 +32,16 @@ export function adminsToAsk(members: Pick<TaskMember, 'name' | 'role' | 'isAdmin
   return { names: admins.slice(0, 2).map((m) => m.name), more: admins.length > 2 };
 }
 
-export function RestrictedAccess() {
+/** Text of a Gestão page hidden by a `page.*` key (spec §13.10). */
+export const HIDDEN_PAGE_REASON = 'Esta página foi ocultada para você pelos administradores do espaço.';
+/** Text of the contract template editor without the `office` key. */
+export const OFFICE_ONLY_REASON = 'Os dados do escritório e o modelo de contrato são restritos aos administradores do espaço.';
+
+/**
+ * "Acesso restrito" at the same URL (no redirect). Finance pages by default; also the Gestão pages a
+ * person's `page.*` key hides and the contract template editor without `office`.
+ */
+export function RestrictedAccess({ message = FINANCE_ONLY_REASON }: { message?: string } = {}) {
   // Members are open to everyone (task module): the only request this page makes.
   const members = useTaskMembers();
   const location = useLocation();
@@ -58,7 +67,7 @@ export function RestrictedAccess() {
       <h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold tracking-tight outline-none">
         Acesso restrito
       </h1>
-      <p className="text-sm text-muted">{FINANCE_ONLY_REASON}</p>
+      <p className="max-w-md text-sm text-muted">{message}</p>
       {ask && ask.names.length ? (
         <p className="max-w-md text-sm text-muted">
           Para pedir acesso, fale com <strong className="font-semibold text-fg">{ask.names[0]}</strong>

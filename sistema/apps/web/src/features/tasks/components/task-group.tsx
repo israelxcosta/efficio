@@ -26,14 +26,16 @@ interface TaskGroupProps {
   title: string;
   count: number;
   tone?: 'danger' | 'warning';
+  /** Starts collapsed ("Sem vencimento informado" of the deadlines sheet). */
+  defaultCollapsed?: boolean;
   children: ReactNode;
 }
 
 /** Due-date group of the list ("Atrasadas", "Hoje"…): a section with a collapsible 36px header. */
-export function TaskGroup({ id, title, count, tone, children }: TaskGroupProps) {
+export function TaskGroup({ id, title, count, tone, defaultCollapsed, children }: TaskGroupProps) {
   const headingId = useId();
   const bodyId = useId();
-  const [collapsed, setCollapsed] = useState(() => readCollapsed().has(id));
+  const [collapsed, setCollapsed] = useState(() => defaultCollapsed || readCollapsed().has(id));
 
   function toggle() {
     const set = readCollapsed();

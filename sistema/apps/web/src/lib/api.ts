@@ -232,7 +232,12 @@ export function fileNameFromDisposition(header: string | null, fallback: string)
  * A file the API serves as a download (task attachments, CSV exports): the bytes and the name the
  * server chose. Same session handling as `api` (renews an expired token once); errors are JSON.
  */
-export async function apiDownload(path: string, options: RequestOptions = {}, fallbackName = 'arquivo'): Promise<{ blob: Blob; fileName: string }> {
+export async function apiDownload(
+  path: string,
+  options: RequestOptions = {},
+  fallbackName = 'arquivo',
+  { silent = false }: { silent?: boolean } = {},
+): Promise<{ blob: Blob; fileName: string }> {
   if (!isSafeApiPath(path)) {
     throw new ApiRequestError(400, { error: 'invalid_path', message: 'Endereço inválido.' });
   }
@@ -249,7 +254,8 @@ export async function apiDownload(path: string, options: RequestOptions = {}, fa
       data = null;
     }
     const error = new ApiRequestError(response.status, data);
-    if (response.status === 403) accessErrorHandler?.('forbidden', error);
+    // Background loads (profile photos) fail quietly: the initials stay.
+    if (response.status === 403 && !silent) accessErrorHandler?.('forbidden', error);
     throw error;
   }
   return { blob: await response.blob(), fileName: fileNameFromDisposition(response.headers.get('content-disposition'), fallbackName) };

@@ -8,6 +8,7 @@ import { onAccessError } from '@/lib/api';
 import { TransactionActionsProvider } from '@/features/transactions/transaction-actions';
 import { ImportActionsProvider } from '@/features/imports/import-actions';
 import { TaskActionsProvider } from '@/features/tasks/task-actions';
+import { PhotoDirectoryProvider } from '@/features/profile/photos';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sidebar } from './sidebar';
 import { QuickBar } from './quick-bar';
@@ -88,6 +89,7 @@ export function AppShell() {
     <TransactionActionsProvider>
       <ImportActionsProvider>
       <TaskActionsProvider>
+      <PhotoDirectoryProvider>
       <div className="min-h-dvh">
         <Sidebar area={area} memory={memory} />
         <div className="lg:pl-[76px] print:pl-0">
@@ -103,6 +105,7 @@ export function AppShell() {
         <MobileNav area={area} memory={memory} onSearch={() => setPaletteOpen(true)} />
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} area={area} memory={memory} />
       </div>
+      </PhotoDirectoryProvider>
       </TaskActionsProvider>
       </ImportActionsProvider>
     </TransactionActionsProvider>
