@@ -621,6 +621,8 @@ export const TASK_ATTACHMENT_CONTENT_TYPES = Object.keys(TASK_ATTACHMENT_TYPES) 
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_TASK_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_TASK = 50;
+/** Storage quota of the attachments of a workspace (they live in the database). */
+export const MAX_WORKSPACE_ATTACHMENT_BYTES = 2 * 1024 * 1024 * 1024;
 
 /** Office time zone: "today" and the day something was concluded are taken here (deadlines are calendar dates). */
 export const TASK_TIME_ZONE = 'America/Sao_Paulo';
@@ -720,6 +722,68 @@ export const DEADLINE_BUCKET_LABELS: Record<DeadlineBucket, string> = {
   later: 'Em dia',
   noDate: 'Sem vencimento informado',
 };
+
+// --- Gestão dashboard (GET /tasks/dashboard: Effy's dashboard cards) -----------------------------------
+
+/** Situation of a certificate/document in the dashboard cards (Effy: "em dia" = more than 30 days ahead). */
+export const DASHBOARD_DOCUMENT_SITUATIONS = ['overdue', 'within30', 'ok', 'noDate'] as const;
+export type DashboardDocumentSituation = (typeof DASHBOARD_DOCUMENT_SITUATIONS)[number];
+
+export const DASHBOARD_DOCUMENT_SITUATION_LABELS: Record<DashboardDocumentSituation, string> = {
+  overdue: 'Vencidos',
+  within30: 'A vencer (30 dias)',
+  ok: 'Em dia',
+  noDate: 'Sem data de vencimento',
+};
+
+/** "Visão geral dos clientes": an overdue open occurrence, some open, or everything done (or nothing due). */
+export const CLIENT_OVERVIEW_STATUSES = ['attention', 'pending', 'upToDate'] as const;
+export type ClientOverviewStatus = (typeof CLIENT_OVERVIEW_STATUSES)[number];
+
+export const CLIENT_OVERVIEW_STATUS_LABELS: Record<ClientOverviewStatus, string> = {
+  attention: 'Atenção',
+  pending: 'Pendências',
+  upToDate: 'Em dia',
+};
+
+export const CLIENT_OVERVIEW_STATUS_HINTS: Record<ClientOverviewStatus, string> = {
+  attention: 'Tarefa vencida em aberto',
+  pending: 'Possui 1 ou mais pendências',
+  upToDate: 'Todos os processos em dia',
+};
+
+/**
+ * Fields of the "Cadastro incompleto" card (Effy's companyCompleteness, plus the digital certificate):
+ * the Simples access code for Simples Nacional and MEI, the annex only for Simples Nacional. The state
+ * registration counts as filled when the client is exempt.
+ */
+export const CLIENT_COMPLETENESS_FIELDS = [
+  'stateRegistration',
+  'municipalRegistration',
+  'accountantPassword',
+  'simplesAccessCode',
+  'simplesAnnex',
+  'digitalCertificate',
+] as const;
+export type ClientCompletenessField = (typeof CLIENT_COMPLETENESS_FIELDS)[number];
+
+export const CLIENT_COMPLETENESS_FIELD_LABELS: Record<ClientCompletenessField, string> = {
+  stateRegistration: 'Inscrição estadual',
+  municipalRegistration: 'Inscrição municipal',
+  accountantPassword: 'Senha do contador',
+  simplesAccessCode: 'Código de acesso do Simples',
+  simplesAnnex: 'Anexo do Simples Nacional',
+  digitalCertificate: 'Certificado digital',
+};
+
+/** The completeness fields that apply to a regime. */
+export function completenessFieldsOf(regime: TaxRegime | null): ClientCompletenessField[] {
+  return CLIENT_COMPLETENESS_FIELDS.filter((f) => {
+    if (f === 'simplesAccessCode') return regime === 'simples_nacional' || regime === 'mei';
+    if (f === 'simplesAnnex') return regime === 'simples_nacional';
+    return true;
+  });
+}
 
 /** Encrypted accesses of a client (never in lists): revealed one at a time, with an audit record. */
 export const CLIENT_CREDENTIAL_FIELDS = ['simplesAccessCode', 'accountantPassword'] as const;

@@ -260,7 +260,7 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
 - **Exclusão** só sem vínculos: com qualquer lançamento (`transactions.contact_id`) ou série
   (`recurrences.template.contactId`) do cliente a API responde 409 — use a inativação. Tarefas do
   cliente também impedem (409 "possui tarefas vinculadas"; FK sem cascata). As vigências e os
-  responsáveis do cliente por departamento vão junto com ele (FK em cascata).
+  ocorrências de recorrentes dependem dele (a exclusão é recusada com tarefas).
 - **Honorários** (`client_fees`): uma linha por **vigência de 1 ano**, com honorário mensal, taxa
   por empregado (centavos) e desconto por pontualidade (`discountBps`, pontos-base; veja "Desconto
   por pontualidade"). Só o índice da vigência é gravado; as datas derivam do início do
@@ -371,7 +371,7 @@ Contrato em `packages/shared/src/saas.ts`.
   - **Tarefas** (`/tasks/*`): todos os membros trabalham, `viewer` inclusive — criar, editar,
     concluir/reabrir, comentar, anexar, mexer em subtarefas, marcar ocorrências e a auditoria, aplicar
     modelos de processo e manter as próprias anotações. Cadastros do módulo (departamentos,
-    departamento do membro, categorias, responsável por cliente, tarefas recorrentes, modelos de
+    departamento do membro, categorias, grupos por regime, tarefas recorrentes, modelos de
     processo) e exclusões ficam com `owner`/`editor`. Ver "Tarefas → Permissões".
   - Mudança de papel vale na próxima requisição (o papel é relido a cada requisição).
 - Gravações exigem assinatura válida: `trialing` (14 dias, sem cartão), `active` ou `past_due` dentro
@@ -702,10 +702,10 @@ pt-BR), schemas em `schemas.ts` e tipos em `types.ts` (seção "Tasks") e regras
 dias úteis, agenda das recorrentes, situação da ocorrência, nome de arquivo seguro).
 
 **Fases.** A **fase 1** (núcleo: departamentos, categorias, tarefas avulsas, subtarefas, comentários,
-responsável por cliente, lista, início) e a **fase 2** estão implementadas: tarefas recorrentes com
+lista, início) e a **fase 2** estão implementadas: tarefas recorrentes com
 ocorrências geradas por cliente e competência, auditoria mensal, processos e modelos, relatórios e
 exportação CSV, calendário, anotações pessoais, anexos, histórico (linha do tempo) da tarefa, busca
-global com tarefas e responsáveis em lote. A fase 3 da spec (sindicatos, dados fiscais e documentos do
+global com tarefas. A fase 3 da spec (sindicatos, dados fiscais e documentos do
 cliente, escritório e contrato, permissões por pessoa, foto do perfil) está implementada: ver
 "Fase 3" no fim deste documento.
 
@@ -731,7 +731,7 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) está i
   | Aplicar modelo de processo; criar processo avulso | sim | sim |
   | Salvar processo avulso como modelo (`saveAsTemplate`, serviço) | não (403) | sim |
   | Anotações pessoais | as próprias | as próprias (nunca as de outro) |
-  | Departamentos, departamento do membro, categorias, responsável por cliente (um e em lote) | não | sim |
+  | Departamentos, departamento do membro, categorias, aplicar grupo padrão por regime | não | sim |
   | Tarefas recorrentes (criar, editar, excluir, gerar competência) | não | sim |
   | Modelos de processo (criar, editar, excluir) | não | sim |
   | Excluir tarefa avulsa; excluir processo | não | sim |
@@ -764,7 +764,7 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) está i
 
 | Método | Rota | Entrada | Resposta | Quem |
 | --- | --- | --- | --- | --- |
-| GET | `/api/tasks/options` | — | `TaskOptionsResponse` (hoje, você, membros com departamento, departamentos, categorias, clientes, responsáveis) | todos |
+| GET | `/api/tasks/options` | — | `TaskOptionsResponse` (hoje, você, membros com departamento, departamentos, categorias, clientes) | todos |
 | GET | `/api/tasks/clients` | — | `TaskClientOption[]` (clientes em leitura, sem honorários) | todos |
 | GET | `/api/tasks/members` | — | `TaskMember[]` | todos |
 | PUT | `/api/tasks/members/:userId/department` | `memberDepartmentSchema` | `TaskMember` | admin |
@@ -776,10 +776,10 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) está i
 | POST | `/api/tasks/categories` | `taskCategoryInputSchema` | `TaskCategory` (201) | admin |
 | PUT | `/api/tasks/categories/:id` | `taskCategoryInputSchema` | `TaskCategory` | admin |
 | DELETE | `/api/tasks/categories/:id` | — | 204 (tarefas, recorrentes e etapas ficam sem categoria) | admin |
-| GET | `/api/tasks/client-responsibles` | — | `ClientResponsiblesResponse` (grade cliente × departamento) | todos |
-| PUT | `/api/tasks/client-responsibles` | `clientResponsibleInputSchema` (`userId: null` remove) | `ClientResponsibleChangeResponse` | admin |
-| PUT | `/api/tasks/client-responsibles/batch` | `clientResponsibleBatchSchema` (até 500 pares) | `ClientResponsibleChangeResponse` | admin |
 | GET | `/api/tasks/home` | `taskHomeQuerySchema` (`departmentId` = id ou `all`, `month`) | `TaskHomeResponse` | todos (outro depto./`all`: admin) |
+| GET | `/api/tasks/dashboard` | `taskDashboardQuerySchema` (= `taskHomeQuerySchema`) | `TaskDashboardResponse` (cards do dashboard do Effy) | todos (outro depto./`all`: admin; `fees` só `finance`, `incomplete` só `registry`) |
+| GET | `/api/tasks/regime-groups` | — | `RegimeGroupsResponse` | todos |
+| POST | `/api/tasks/regime-groups/:regime/apply` | `regimeGroupApplySchema` (`keys`, `departments`) | `RegimeGroupApplyResponse` | admin |
 | GET | `/api/tasks/activity` | — | `TaskActivityItem[]` | todos |
 | GET | `/api/tasks/calendar` | `taskCalendarQuerySchema` (`from`, `to` ≤ 62 dias, escopo e filtros) | `TaskCalendarResponse` | todos |
 | GET | `/api/tasks/reports` | `taskReportQuerySchema` (período ≤ 1 ano, filtros, página até 1000) | `TaskReportResponse` | todos |
@@ -887,19 +887,13 @@ membro do espaço → 422.
   membros, 1 tarefa recorrente e 12 tarefas ainda estão neste departamento. Mova-os antes de excluir."). Categoria: exclusão simples, tarefas ficam
   sem categoria. Nomes de departamento e categoria são únicos no espaço (sem diferenciar maiúsculas;
   409). Cliente com tarefas não é excluído (409).
-- **Responsável por cliente em cada departamento** (`task_client_responsibles`, "carteira" como no
-  Onvio/Tareffa): um membro por cliente × departamento, editável por administradores e legível por
-  todos (`options.clientResponsibles`). Na tarefa avulsa, o web sugere o responsável do cliente no
-  departamento escolhido (o usuário pode trocar). A ocorrência de uma recorrente vai para o
-  responsável do cliente no departamento da recorrente, senão o responsável padrão, senão ninguém
-  (`occurrence.assigneeSource`: `client`, `default` ou `manual`). **Trocar ou remover** o responsável
-  (`PUT /tasks/client-responsibles` ou `/batch`, até 500 pares; o último par repetido vale) leva as
-  ocorrências **abertas** daquele cliente nas recorrentes do departamento, **da competência atual em
-  diante**, para a pessoa nova (ou de volta ao responsável padrão), menos as atribuídas à mão; as
-  concluídas não mudam. A resposta (`ClientResponsibleChangeResponse`) traz os pares como ficaram,
-  quantos foram removidos e `reassigned` (quantas ocorrências mudaram de mãos, para o toast); cada
-  ocorrência ganha no histórico "Responsável do cliente no departamento alterado". O "Desfazer" do web
-  reenvia os pares anteriores pelo lote. (Mudança de contrato: o PUT unitário devolvia o par ou 204.)
+- **Sem responsável por cliente** (migração 0017): a "carteira" (um membro por cliente × departamento,
+  `task_client_responsibles`, rotas `/tasks/client-responsibles`) foi removida a pedido do escritório. A
+  ocorrência de uma recorrente vai para o **responsável padrão** da recorrente (`assigneeSource: default`)
+  ou, sem ele, fica na **fila do departamento** (sem responsável); atribuir à mão vale só naquela
+  competência (`manual`). Na migração, as ocorrências que vinham da carteira e ainda estavam "A fazer"
+  da competência atual em diante passaram ao responsável padrão (ou à fila); as demais mantiveram a
+  pessoa, agora como `manual` (nada já trabalhado trocou de mãos; sem registro no histórico).
 
 ### Listagem (`GET /tasks`)
 
@@ -994,10 +988,18 @@ células).
   auditoria, calendário, relatórios e o detalhe da ocorrência: as competências pedidas), ao criar ou
   editar a recorrente e em `POST /tasks/recurring/generate` (administradores). Limites: de 24
   competências antes a 2 depois da atual (fora disso, 422); espaço sem assinatura com escrita não
-  gera (lê o que existe). Cada ocorrência gerada tem no histórico "criada" com origem `recurring` e o
+  gera (lê o que existe). **Marcador de geração** (migração 0018): cada par recorrente × competência
+  gerado fica em `task_generation_marks` com a versão de geração do espaço (`task_generation_state`) e a
+  versão das regras do código (`GENERATION_RULES`); as leituras seguintes pulam os pares marcados (sem
+  carregar clientes nem varrer as ocorrências existentes). Gatilhos do banco sobem a versão quando muda
+  o que decide quais ocorrências existem: recorrente (inserção; prazo, periodicidade, regimes,
+  competências), seus vínculos de clientes, e o tipo, regime, início de contrato, situação ou
+  inativação de um cliente (inserção/edição) — então cliente novo do regime entra sozinho na leitura
+  seguinte. A versão é lida antes dos dados: uma mudança confirmada no meio deixa a marca velha (gera de
+  novo depois), nunca uma marca nova sobre dados velhos. Cada ocorrência gerada tem no histórico "criada" com origem `recurring` e o
   nome da recorrente, sem autor.
-- **Responsável** da ocorrência: o do cliente no departamento (`client`), senão o padrão (`default`),
-  senão ninguém. `PATCH /tasks/:id` com `assigneeId` numa ocorrência vale **só para ela**
+- **Responsável** da ocorrência: o padrão da recorrente (`default`), senão ninguém (fila do
+  departamento). `PATCH /tasks/:id` com `assigneeId` numa ocorrência vale **só para ela**
   (`assignee_source = 'manual'`, nunca sobrescrito automaticamente). Os campos que vêm da recorrente
   ficam travados (`TaskDetail.lockedFields`: título, cliente, categoria, departamento, início,
   vencimento e horário; PATCH com eles → 422 "Este campo vem da tarefa recorrente…"); descrição,
@@ -1025,8 +1027,8 @@ células).
   subtarefas); sem histórico, a recorrente sai com as ocorrências intocadas. Encerrar
   (`endCompetence`) é o "arquivar" da spec (§18): a lista filtra `status=active|ended|all`.
 - **Lista** (`GET /tasks/recurring`): cada `RecurringTask` traz as regras, meses em que ocorre, clientes
-  a que se aplica hoje (`clientCount`), quantos sem responsável no departamento, a **distribuição**
-  da competência atual ("Ana 12 · Bruno 8 · padrão 3 · sem responsável 2"), ocorrências geradas e o
+  a que se aplica hoje (`clientCount`), a **distribuição** da competência atual (todas com o
+  responsável padrão, ou "sem responsável"), ocorrências geradas e o
   progresso do mês pedido (total, concluídas, canceladas, em andamento, atrasadas, prazo legal e
   meta); filtros por mês, busca, periodicidade, departamento, responsável (padrão ou de alguma
   ocorrência do mês), regime e situação. `summary`: ativas, encerradas e as ocorrências do mês.
@@ -1105,7 +1107,8 @@ automático com o motivo), `reopened` (de/para e o motivo), `commented`, `commen
 minutos viram **uma** entrada (cada campo guarda o primeiro "antes" e o último "depois"; um campo que
 volta ao valor inicial sai das mudanças). O texto livre (motivo, nome de arquivo, motivo automático) é
 cifrado (`task_events.note`); `data` guarda só fatos estruturados (CHECK de 4000 caracteres).
-`seq` (identidade) ordena as entradas gravadas no mesmo instante. Subtarefas não geram eventos (têm
+`seq` (identidade) ordena as entradas gravadas no mesmo instante (a exportação LGPD devolve as entradas
+nessa ordem, mas sem `seq`: a sequência é global e revelaria quantos eventos os outros espaços gravaram). Subtarefas não geram eventos (têm
 seção própria). Tarefas anteriores à fase 2 não têm eventos (a tela mostra as linhas da fase 1).
 
 ## Anexos (fase 2)
@@ -1117,8 +1120,10 @@ Porte de `Attachment` + `fileSignature.js` + `zipLimit.js` (`attachments.ts`, `f
   copiado para outra linha não decifra); o nome é cifrado como texto livre. Custo: a cifra do arquivo
   inteiro é feita pelo WebCrypto em memória (10 MB ≈ dezenas de ms, na API e no PGlite); o arquivo
   viaja em base64 no JSON (o CSRF exige JSON), com `bodyLimit` próprio na rota. Funciona no demo.
-- **Limites**: 10 MB por arquivo, 50 MB e 50 arquivos por tarefa (422 com a mensagem), 60 envios por
-  minuto por IP.
+- **Limites**: 10 MB por arquivo, 50 MB e 50 arquivos por tarefa e **2 GB por espaço**
+  (`MAX_WORKSPACE_ATTACHMENT_BYTES`; 422 "O escritório chegou ao limite de armazenamento de anexos…"),
+  60 envios por minuto por IP. Os limites são conferidos sob um lock transacional por espaço
+  (`pg_advisory_xact_lock`, liberado no COMMIT): dois envios simultâneos não passam juntos do limite.
 - **Tipos** (`TASK_ATTACHMENT_TYPES`): PDF, PNG, JPEG, WEBP, DOC, XLS, DOCX, XLSX, XML, TXT, CSV e ZIP.
   O tipo declarado precisa estar na lista, a **extensão** precisa ser do tipo, e o conteúdo precisa ter
   a **assinatura** do tipo (`%PDF-`, PNG, JPEG, RIFF/WEBP, OLE2, ZIP); XML, TXT e CSV não podem ter
@@ -1152,7 +1157,8 @@ membro que deixa o espaço (cascata). Nenhum texto do contrato sugere guardar se
   —, até 1 ano (422). Tudo em SQL (GROUP BY): resumo (concluídas no prazo e com atraso, canceladas, em
   aberto, atrasadas, fora da meta), por estado, prioridade, departamento, responsável, categoria,
   cliente, tipo e **mês**, e a **produtividade** (conclusões no período por quem concluiu: no prazo,
-  com atraso e a média de dias da criação à conclusão). Filtros: departamento, responsável, categoria,
+  com atraso e a média de dias da criação à conclusão; filtra por intervalo de `completed_at` — os dias
+  do escritório convertidos em instantes — servido pelo índice parcial `tasks_completed_idx`). Filtros: departamento, responsável, categoria,
   cliente, prioridade, tipo, estado e situação (`open`, `done` = só concluídas, `overdue`,
   **`doneLate`** = concluídas com atraso, `doneOnTime`). Detalhamento paginado (até 1000 por página).
 - **CSV** (`GET /tasks/reports/export.csv`): os mesmos filtros, até 10 000 linhas (422 pede refinar),
@@ -1165,6 +1171,76 @@ membro que deixa o espaço (cascata). Nenhum texto do contrato sugere guardar se
   abertas primeiro e depois pela proximidade do vencimento, até 8; as ocorrências não aparecem uma a
   uma) e `recurringTasks` (pelo nome, até 5). Sem responsável na resposta (a busca roda na transação de
   tenant, que não lê os nomes dos membros).
+
+## Grupos padrão por regime
+
+Como no Effy, uma recorrente se aplica por regime. O catálogo (`packages/shared/src/regime-groups.ts`:
+`REGIME_GROUP_ITEMS`, `regimeGroupItems`, `REGIME_GROUP_REGIMES`, `SUGGESTED_DEPARTMENTS`,
+`matchSuggestedDepartment`) traz as obrigações padrão com departamento sugerido (Fiscal, Pessoal,
+Contábil), periodicidade, dia do prazo legal, meta e regra de dia não útil:
+
+- **Comuns** (Simples Nacional, Lucro Presumido, Lucro Real): folha de pagamento, eSocial (eventos
+  periódicos), FGTS Digital, DCTFWeb, EFD-Reinf.
+- **Simples Nacional**: PGDAS-D e DAS (dia 20, prorroga), DEFIS (31/03, ref. dezembro).
+- **MEI**: DAS-MEI (dia 20), DASN-SIMEI (31/05).
+- **Lucro Presumido / Real**: PIS/COFINS, EFD-Contribuições, EFD ICMS/IPI, ECD (junho), ECF (julho);
+  IRPJ/CSLL trimestrais (Presumido) ou estimativa mensal (Real).
+
+`GET /tasks/regime-groups` (todos): por regime, `clientCount` (clientes ativos do regime na competência
+atual), os itens com o departamento que receberiam (`department.match`, pelo nome) e a recorrente já
+criada (`recurringTask`, `applied`), `missing` e todas as recorrentes do espaço que se aplicam ao regime
+(`recurring`, do catálogo ou feitas à mão). `POST /tasks/regime-groups/:regime/apply` (`registry`):
+cria as que faltam (competência atual, sem responsável padrão = fila do departamento, `catalog_key`
+gravada), acrescenta o regime à recorrente comum já criada para outro regime (`regimeAdded`, com
+ressincronização), não mexe nas que já o têm (`unchanged`) e informa as encerradas (`ended`). Aplicar de
+novo não duplica (chave única `recurring_tasks_catalog_key_uq`; corrida → 409 amigável).
+`keys` restringe os itens; `departments` escolhe o departamento de cada sugestão — sem ele, um existente
+com nome compatível, senão é criado com o nome sugerido (`departmentsCreated`); escritório sem
+departamentos recebe recorrentes sem departamento. Depois disso as recorrentes geram todo mês para cada
+cliente ativo do regime (cliente novo entra na leitura seguinte, ver o marcador de geração).
+Testes: `test/tasks-regime-groups.test.ts`, `packages/shared/test/regime-groups.test.ts`.
+
+## Dashboard da Gestão (`GET /tasks/dashboard`)
+
+Os dados dos cards do dashboard do Effy num só payload (`TaskDashboardResponse`), em SQL agregado, com a
+mesma regra de departamento do Início (`resolveView`: outro departamento ou `all` exige `registry`; sem
+departamento, só os seus itens) e `month` (competência dos cards de tarefas, padrão a atual):
+
+- `taskStatus` ("Situação das tarefas"): ocorrências da competência + avulsas/etapas com vencimento no
+  mês — pendentes, concluídas (com canceladas) e atrasadas.
+- `flow` ("Fluxo de tarefas por dia"): abertas por data de trabalho (meta nas ocorrências), hoje e os
+  6 dias seguintes, recorrentes × avulsas (o Effy usava o prazo legal; aqui segue o calendário).
+- `processes` ("Processos por departamento") e `fiscal` ("Pendências fiscais": `RecurringOccurrence`
+  por recorrente, atrasadas primeiro, e os totais): concluídas, pendentes e vencidas da competência.
+- `agenda`: recorrentes com prazo legal nos próximos 7 dias (competência atual e a próxima) e as já
+  vencidas no mês com pendência.
+- `clientsOverview` ("Visão geral dos clientes"): clientes ativos na competência em `attention`
+  (ocorrência vencida em aberto), `pending` ou `upToDate`, com a lista.
+- `certificates` / `documents` ("Certificados digitais" / "Laudos"): documentos dos clientes ativos em
+  `overdue`, `within30`, `ok` (mais de 30 dias) e `noDate`, com a lista (até 500, por vencimento) para
+  o drill-down por situação.
+- `conventions`: a regra de `/deadlines` (`conventionDeadlines`), mais `noBaseMonth` e `total`.
+- `fees` ("Honorários próximos de vencer", só `finance`; senão `null`): a última vigência cadastrada de
+  cada cliente ativo que termina em até 30 dias (inclui as já vencidas) ou entre 31 e 60, com o valor.
+- `incomplete` ("Cadastro incompleto", só `registry`; senão `null`): inscrição estadual (ou isenta),
+  municipal, senha do contador, código de acesso (Simples/MEI), anexo (Simples) e certificado digital —
+  só presença, nunca os valores cifrados (`CLIENT_COMPLETENESS_FIELDS`, `completenessFieldsOf`).
+
+Testes: `test/tasks-dashboard.test.ts`.
+
+## Banco (migrações 0017 e 0018)
+
+- **0017**: remove `task_client_responsibles` (política, grants e FKs com a tabela); converte as
+  ocorrências `assignee_source = 'client'` (por espaço, com `app.workspace_id`) e tira `client` do
+  `tasks_occurrence_chk`. Reexecutável; roda no PGlite. Teste: `test/tasks-0017-db.test.ts`.
+- **0018**: `task_generation_state` e `task_generation_marks` (tabelas de tenant: RLS ENABLE + FORCE,
+  política padrão, só DML para `effinance_app`, FK composta da marca para a recorrente em cascata);
+  gatilhos `task_generation_bump` (linha) e `task_generation_bump_links` (instrução, com tabela de
+  transição) — invoker, `search_path` fixo, sem EXECUTE para PUBLIC; exclusões não sobem a versão (a
+  cascata da exclusão do espaço não pode gravar), nem o `ON DELETE SET NULL` do criador/responsável
+  padrão (a recorrente só dispara nas colunas de agenda/regimes/competências). `recurring_tasks.catalog_key`
+  (CHECK de formato, único por espaço) e o índice parcial `tasks_completed_idx`. Testes:
+  `test/tasks-generation.test.ts`, catálogo em `test/audit-db.test.ts`.
 
 ## Banco (migração 0011)
 
@@ -1290,9 +1366,12 @@ dados cifrados pela API: não há backfill.
 - **Feriados estaduais e municipais** (por cidade do escritório) e a confirmação de Carnaval e Corpus
   Christi como dias não úteis (§18, item 19d).
 - **Prazos "N-ésimo dia útil"** (ex.: folha no 5º dia útil, EFD-Contribuições no 10º dia útil) não são
-  expressáveis: hoje é o dia do mês com a regra de dia não útil.
+  expressáveis: hoje é o dia do mês com a regra de dia não útil (o catálogo dos grupos por regime aproxima).
 - **Voltar a ocorrência ao responsável automático** depois de atribuída à mão: não há ação própria
-  (atribuir de novo à pessoa do cliente deixa a origem `manual`).
+  (atribuir de novo ao responsável padrão deixa a origem `manual`).
+- **Grupos por regime**: os prazos do catálogo são sugestões (dia usual; conferir a legislação vigente,
+  ex.: DCTFWeb, EFD ICMS/IPI por UF); MEI com empregado não recebe as obrigações de empregador; aplicar
+  não reabre recorrente encerrada (`ended`). O dashboard não filtra por regime (o Effy filtrava).
 - **Excluir a tarefa de uma etapa** deixa o processo parado na etapa (sem tarefa); a tela pode oferecer
   excluir o processo.
 - **Anexos**: antivírus e, se o volume crescer, armazenamento de objetos (S3 cifrado, já previsto em

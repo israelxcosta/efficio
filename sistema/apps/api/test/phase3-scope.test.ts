@@ -161,6 +161,7 @@ describe('phase 3: every query filters by the workspace', () => {
 
     // Deadlines.
     await run((c) => deadlines.listDeadlines(c, deadlinesQuerySchema.parse({})));
+    await run((c) => deadlines.conventionDeadlines(c));
     await run((c) => deadlines.listDeadlines(c, deadlinesQuerySchema.parse({ kind: 'documents' })));
     await run((c) => deadlines.listDeadlines(c, deadlinesQuerySchema.parse({ kind: 'conventions' })));
     await run((c) => deadlines.deadlinesSummary(c));
@@ -193,3 +194,49 @@ describe('phase 3: every query filters by the workspace', () => {
     expect(await snapshot(bWorkspace)).toEqual(before);
   });
 });
+
+describe('office: reads load only what they need (review risk)', () => {
+  it('branding and the office never select the watermark image or the template blocks', async () => {
+    const ana = await registerUser(app, 'Ana Titular');
+    const ws = await workspaceOf(ana);
+    expect((await ana.put('/office', { document: '60.415.732/0001-74', legalName: 'Escritório da Ana' })).status).toBe(200);
+    expect((await ana.put('/office/logo', { logo: PNG })).status).toBe(200);
+    // A custom template without the Pix placeholder and a custom watermark.
+    const saved = await ana.put('/office/contract-template', { blocks: [{ type: 'paragraph', text: 'Contrato simples' }], watermark: PNG });
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    const cipher = await getCipher(ws);
+    const ctxOf = (tx: DbExecutor): ScopedContext => ({
+      db: tx,
+      workspaceId: ws,
+      userId: ana.userId,
+      userName: 'Ana Titular',
+      permissions: rolePermissions('owner'),
+      cipher,
+      today: '2026-10-20',
+    });
+    const run = <T>(fn: (c: ScopedContext) => Promise<T>) => traced.transaction((tx) => fn(ctxOf(tx)));
+    // Column references other than presence checks (`… is not null`, `position(… in …)`).
+    const heavy = () =>
+      statements
+        .map((st) => st.sql.replace(/(?:"offices"\.)?"contract_(watermark|blocks)" is not null/g, '').replace(/position\([^)]*"contract_blocks"[^)]*\)/g, ''))
+        .filter((text) => /contract_watermark"|contract_blocks"/.test(text));
+
+    statements.length = 0;
+    const branding = await run((c) => officeModule.getBranding(c));
+    expect(branding).toMatchObject({ name: 'Escritório da Ana', registered: true });
+    expect(branding.logo).toMatch(/^data:image\/png;base64,/);
+    expect(heavy()).toEqual([]);
+
+    statements.length = 0;
+    const office = await run((c) => officeModule.getOffice(c));
+    expect(office.contract).toMatchObject({ source: 'custom', watermark: { source: 'custom', enabled: true } });
+    // The custom template has no Pix placeholder: the key is not required.
+    expect(office.missingForContract).not.toContain('Chave Pix');
+    expect(heavy()).toEqual([]);
+
+    // Back to the factory template (it uses the Pix key): now it is required.
+    expect((await ana.put('/office/contract-template', { blocks: null })).status).toBe(200);
+    expect((await run((c) => officeModule.getOffice(c))).missingForContract).toContain('Chave Pix');
+  });
+});
+

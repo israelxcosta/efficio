@@ -45,9 +45,11 @@ import type { DbExecutor } from '../src/db/client';
 import * as schema from '../src/db/schema';
 import { todayIn } from '../src/lib/clock';
 import { getCipher } from '../src/lib/crypto/keyring';
+import { executeRows } from '../src/lib/sql';
 import { isTaskAdmin, loadMembers, type TaskContext } from '../src/modules/tasks/access';
 import * as attachmentsModule from '../src/modules/tasks/attachments';
 import * as auditModule from '../src/modules/tasks/audit';
+import * as dashboardModule from '../src/modules/tasks/dashboard';
 import * as flowsModule from '../src/modules/tasks/flows';
 import * as homeModule from '../src/modules/tasks/home';
 import * as insightsModule from '../src/modules/tasks/insights';
@@ -293,6 +295,7 @@ describe('tasks: every query filters by the workspace', () => {
     const registry = tracked(registryModule, called);
     const service = tracked(serviceModule, called);
     const home = tracked(homeModule, called);
+    const dashboard = tracked(dashboardModule, called);
     const recurring = tracked(recurringModule, called);
     const regimeGroups = tracked(regimeGroupsModule, called);
     const audit = tracked(auditModule, called);
@@ -406,6 +409,9 @@ describe('tasks: every query filters by the workspace', () => {
     }
     await run(carlaCtx, (c) => home.taskHome(c, taskHomeQuerySchema.parse({})));
     await run(anaCtx, (c) => home.taskHome(c, taskHomeQuerySchema.parse({ departmentId: 'all' })));
+    await run(anaCtx, (c) => home.resolveView(c, 'all'));
+    await run(carlaCtx, (c) => dashboard.taskDashboard(c, taskHomeQuerySchema.parse({})));
+    await run(anaCtx, (c) => dashboard.taskDashboard(c, taskHomeQuerySchema.parse({ departmentId: 'all', month: '2026-11' })));
 
     // The history and removing a comment.
     const comment = await run(anaCtx, (c) => service.addComment(c, task.id, { text: 'Comentário da Ana' }));
@@ -553,6 +559,7 @@ describe('tasks: every query filters by the workspace', () => {
         registryModule,
         serviceModule,
         homeModule,
+        dashboardModule,
         recurringModule,
         regimeGroupsModule,
         auditModule,
@@ -569,6 +576,19 @@ describe('tasks: every query filters by the workspace', () => {
       .map((s) => ({ sql: s.sql, tables: unscopedReferences(s, ws) }))
       .filter((s) => s.tables.length > 0);
     expect(unscoped).toEqual([]);
+
+    // The report's productivity filters a range of `completed_at` (not a function of it) and the partial
+    // index `tasks_completed_idx` serves it (migration 0018; `status = 'done'` literal, not a parameter).
+    const productivity = statements.filter((st) => /"completed_by_name"/.test(st.sql) && /group by/i.test(st.sql));
+    expect(productivity.length).toBeGreaterThan(0);
+    for (const st of productivity) {
+      expect(st.sql).toMatch(/"completed_at" >= /);
+      expect(st.sql).toMatch(/"completed_at" < /);
+      expect(st.sql).toMatch(/"status" = 'done'/);
+      expect(st.sql).not.toMatch(/\("tasks"\."completed_at" at time zone 'America\/Sao_Paulo'\)::date between/);
+    }
+    const [index] = await executeRows<{ def: string }>(admin(), sql`select pg_get_indexdef('public.tasks_completed_idx'::regclass) as def`);
+    expect(index!.def).toContain('(workspace_id, completed_at) WHERE (status = \'done\'::text)');
 
     // 3. B is exactly as it was.
     expect(await snapshot(bWorkspace)).toEqual(before);

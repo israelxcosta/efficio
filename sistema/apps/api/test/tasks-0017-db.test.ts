@@ -36,6 +36,8 @@ async function runMigration(name: string) {
 
 describe('migration 0017: no responsible per client and department', () => {
   it('the table is gone and the occurrence CHECK no longer accepts the client source', async () => {
+    // Other suites re-run older migrations (0014 re-adds the old CHECK): apply 0017 again first.
+    await runMigration('0017_drop_client_responsibles.sql');
     const [table] = await rows<{ ok: boolean }>(sql`select to_regclass('public.task_client_responsibles') is null as ok`);
     expect(table!.ok).toBe(true);
     const [check] = await rows<{ def: string }>(sql`

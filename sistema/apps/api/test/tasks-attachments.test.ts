@@ -6,10 +6,11 @@
 
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { MAX_ATTACHMENT_BYTES } from '@effinance/shared';
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_TASK, MAX_WORKSPACE_ATTACHMENT_BYTES } from '@effinance/shared';
 import type { App } from '../src/app';
 import { taskAttachments } from '../src/db/schema';
 import { executeRows } from '../src/lib/sql';
+import { attachmentLimits } from '../src/modules/tasks/attachments';
 import { csvCell } from '../src/modules/tasks/csv';
 import { attachmentProblem, contentDisposition, MAX_UNCOMPRESSED_BYTES, readZipDirectory } from '../src/modules/tasks/file-check';
 import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
@@ -251,6 +252,37 @@ describe('task attachments', () => {
     const over = await upload(carla, task.id, 'mais.pdf', 'application/pdf', PDF_BASE64);
     expect(over).toMatchObject({ status: 422, body: { message: 'Esta tarefa chegou ao limite de 50 MB de anexos. Remova algum antes de anexar outro.' } });
   }, 120_000);
+
+  it('concurrent uploads never pass the per-task limit (serialized in the transaction)', async () => {
+    const { carla } = await office(app);
+    const task = (await carla.post('/tasks', { title: 'Corrida' })).body;
+    for (let i = 0; i < MAX_ATTACHMENTS_PER_TASK - 2; i++) {
+      expect((await upload(carla, task.id, `guia-${i}.pdf`, 'application/pdf', PDF_BASE64)).status).toBe(201);
+    }
+    const results = await Promise.all(
+      Array.from({ length: 5 }, (_, i) => upload(carla, task.id, `extra-${i}.pdf`, 'application/pdf', PDF_BASE64)),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([201, 201, 422, 422, 422]);
+    expect((await carla.get(`/tasks/${task.id}/attachments`)).body).toHaveLength(MAX_ATTACHMENTS_PER_TASK);
+  }, 120_000);
+
+  it('the workspace has a quota (2 GB), checked without races', async () => {
+    expect(MAX_WORKSPACE_ATTACHMENT_BYTES).toBe(2 * 1024 ** 3);
+    const { carla } = await office(app);
+    const size = Buffer.from(PDF_BASE64, 'base64').length;
+    const tasks = await Promise.all(Array.from({ length: 5 }, (_, i) => carla.post('/tasks', { title: `T${i}` }).then((r) => r.body.id as string)));
+    const previous = attachmentLimits.workspaceBytes;
+    attachmentLimits.workspaceBytes = size * 3;
+    try {
+      const results = await Promise.all(tasks.map((id) => upload(carla, id, 'guia.pdf', 'application/pdf', PDF_BASE64)));
+      expect(results.map((r) => r.status).sort()).toEqual([201, 201, 201, 422, 422]);
+      expect(results.find((r) => r.status === 422)!.body.message).toBe(
+        'O escritório chegou ao limite de armazenamento de anexos. Remova anexos antigos antes de anexar outro.',
+      );
+    } finally {
+      attachmentLimits.workspaceBytes = previous;
+    }
+  }, 60_000);
 
   it('ids of another workspace or of another task are "not found"', async () => {
     const { carla } = await office(app);

@@ -206,8 +206,11 @@ export async function taskReport(ctx: TaskContext, q: ReportQuery): Promise<Task
         .where(
           and(
             eq(tasks.workspaceId, ctx.workspaceId),
-            eq(tasks.status, 'done'),
-            sql`${COMPLETED_DAY} between ${q.from} and ${q.to}`,
+            // A range of `completed_at` (office days → instants) and `status = 'done'` as a literal: the
+            // partial index `tasks_completed_idx` (migration 0018) serves it; a parameter would not match.
+            sql`${tasks.status} = 'done'`,
+            sql`${tasks.completedAt} >= ((${q.from}::date)::timestamp at time zone 'America/Sao_Paulo')`,
+            sql`${tasks.completedAt} < (((${q.to}::date) + 1)::timestamp at time zone 'America/Sao_Paulo')`,
             ...filtersOf(ctx, { ...q, situation: undefined, status: undefined }),
           ),
         )

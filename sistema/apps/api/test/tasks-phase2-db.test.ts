@@ -200,6 +200,9 @@ describe('phase 2 tables: integrity', () => {
     expect(exported.taskAttachments[0]).toMatchObject({ fileName: 'rg.pdf', contentType: 'application/pdf' });
     expect(exported.taskAttachments[0].content).toBeUndefined();
     expect(exported.taskEvents.find((e: any) => e.kind === 'attachment_added').note).toBe('rg.pdf');
+    // In order, but without `seq`: a global sequence would tell how many events every office wrote.
+    expect(exported.taskEvents.length).toBeGreaterThan(1);
+    expect(exported.taskEvents.every((e: any) => !('seq' in e))).toBe(true);
     expect(exported.taskNotes).toEqual([]); // Carla's note is hers alone
     expect(JSON.stringify(exported)).not.toMatch(/"v1\.[\w-]{16}\./);
 
@@ -226,11 +229,14 @@ describe('phase 2 tables: integrity', () => {
 
   it('the migration runs again over existing rows', async () => {
     const a = await seed();
-    const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../drizzle/0014_tasks_phase2.sql');
-    const source = await readFile(file, 'utf8');
-    await admin().transaction(async (tx) => {
-      for (const statement of source.split('--> statement-breakpoint')) if (statement.trim()) await tx.execute(sql.raw(statement));
-    });
+    // 0014 again, then 0017 (which narrows the occurrence CHECK 0014 re-adds): the schema ends as today.
+    for (const name of ['0014_tasks_phase2.sql', '0017_drop_client_responsibles.sql']) {
+      const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), `../drizzle/${name}`);
+      const source = await readFile(file, 'utf8');
+      await admin().transaction(async (tx) => {
+        for (const statement of source.split('--> statement-breakpoint')) if (statement.trim()) await tx.execute(sql.raw(statement));
+      });
+    }
     const [n] = await rows<{ n: number }>(sql`select count(*)::int as n from tasks where workspace_id = ${a.ws} and recurring_task_id is not null`);
     expect(n!.n).toBeGreaterThan(0);
     expect((await a.carla.get(`/tasks/${a.applied.task.id}`)).body.attachments).toHaveLength(1);

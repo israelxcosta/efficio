@@ -7,7 +7,7 @@
 // an UPDATE to null, saved right away (Effy's lesson). The contract of a client is filled by the API
 // with `contractValues`/`fillContractBlocks` and comes with the list of what is missing.
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, sql } from 'drizzle-orm';
 import {
   CONTRACT_FACTORY_BLOCKS,
   CONTRACT_FACTORY_VERSION,
@@ -48,15 +48,53 @@ async function officeRow(ctx: Ctx): Promise<OfficeRow | null> {
   return row ?? null;
 }
 
+const PIX_PLACEHOLDER = '[CHAVE PIX ESCRITORIO]';
+const usesPix = (blocks: readonly ContractBlock[]) => blocks.some((b) => placeholdersIn(b.text).includes(PIX_PLACEHOLDER));
+const FACTORY_USES_PIX = usesPix(CONTRACT_FACTORY_BLOCKS);
+
+/**
+ * The office without the heavy columns (the watermark image, up to 500 KB, and the template blocks,
+ * up to 400 000 characters): only whether they are custom and whether the template asks for the Pix key.
+ */
+type OfficeLight = Omit<OfficeRow, 'contractWatermark' | 'contractBlocks'> & {
+  customWatermark: boolean;
+  customBlocks: boolean;
+  blocksUsePix: boolean;
+};
+
+const { contractWatermark: _watermark, contractBlocks: _blocks, ...LIGHT_COLUMNS } = getTableColumns(offices);
+
+async function officeLight(ctx: Ctx): Promise<OfficeLight | null> {
+  const [row] = await ctx.db
+    .select({
+      ...LIGHT_COLUMNS,
+      customWatermark: sql<boolean>`${offices.contractWatermark} is not null`,
+      customBlocks: sql<boolean>`${offices.contractBlocks} is not null`,
+      blocksUsePix: sql<boolean>`coalesce(position(${PIX_PLACEHOLDER} in ${offices.contractBlocks}::text) > 0, false)`,
+    })
+    .from(offices)
+    .where(eq(offices.workspaceId, ctx.workspaceId));
+  return row ?? null;
+}
+
+function lightOf(row: OfficeRow | null): OfficeLight | null {
+  if (!row) return null;
+  const { contractWatermark, contractBlocks, ...rest } = row;
+  return { ...rest, customWatermark: contractWatermark !== null, customBlocks: contractBlocks !== null, blocksUsePix: contractBlocks ? usesPix(contractBlocks) : false };
+}
+
 /** Creates the office row when missing (concurrent creators converge on the unique index). */
 async function ensureOfficeRow(ctx: Ctx): Promise<void> {
   await ctx.db.insert(offices).values({ workspaceId: ctx.workspaceId }).onConflictDoNothing();
 }
 
-const logoOf = (row: OfficeRow | null) => (row?.logo && row.logoType ? toDataUri(row.logoType, row.logo) : null);
+const logoOf = (row: Pick<OfficeRow, 'logo' | 'logoType'> | null | undefined) => (row?.logo && row.logoType ? toDataUri(row.logoType, row.logo) : null);
 
 export async function getBranding(ctx: Ctx): Promise<OfficeBranding> {
-  const row = await officeRow(ctx);
+  const [row] = await ctx.db
+    .select({ tradeName: offices.tradeName, legalName: offices.legalName, document: offices.document, logo: offices.logo, logoType: offices.logoType })
+    .from(offices)
+    .where(eq(offices.workspaceId, ctx.workspaceId));
   return {
     name: row?.tradeName?.trim() ? row.tradeName : (row?.legalName ?? null),
     legalName: row?.legalName ?? null,
@@ -65,20 +103,20 @@ export async function getBranding(ctx: Ctx): Promise<OfficeBranding> {
   };
 }
 
-function contractSummary(row: OfficeRow | null): OfficeContractSummary {
+function contractSummary(row: OfficeLight | null): OfficeContractSummary {
   return {
-    source: row?.contractBlocks ? 'custom' : 'factory',
+    source: row?.customBlocks ? 'custom' : 'factory',
     factoryVersion: CONTRACT_FACTORY_VERSION,
     updatedAt: row?.contractUpdatedAt?.toISOString() ?? null,
     updatedBy: row?.contractUpdatedByName ? { id: row.contractUpdatedBy, name: row.contractUpdatedByName } : null,
-    watermark: { enabled: row?.contractWatermarkEnabled ?? true, source: row?.contractWatermark ? 'custom' : 'factory' },
+    watermark: { enabled: row?.contractWatermarkEnabled ?? true, source: row?.customWatermark ? 'custom' : 'factory' },
   };
 }
 
 const blocksOf = (row: OfficeRow | null): readonly ContractBlock[] => row?.contractBlocks ?? CONTRACT_FACTORY_BLOCKS;
 
 /** Office fields the contract needs and are blank (labels in pt-BR). */
-function officeRequirements(office: Office | null, blocks: readonly ContractBlock[]): string[] {
+function officeRequirements(office: Office | null, pixRequired: boolean): string[] {
   if (!office?.registered) return ['Cadastro do escritório'];
   const fields: [keyof Office, string][] = [
     ['legalName', 'Razão social'],
@@ -93,12 +131,11 @@ function officeRequirements(office: Office | null, blocks: readonly ContractBloc
     ['responsibleDocument', 'CPF do responsável'],
   ];
   const missing = fields.filter(([k]) => !office[k]).map(([, label]) => label);
-  const usesPix = blocks.some((b) => placeholdersIn(b.text).includes('[CHAVE PIX ESCRITORIO]'));
-  if (usesPix && !office.pixKey) missing.push('Chave Pix');
+  if (pixRequired && !office.pixKey) missing.push('Chave Pix');
   return missing;
 }
 
-async function toOffice(ctx: Ctx, row: OfficeRow | null): Promise<Office> {
+async function toOffice(ctx: Ctx, row: OfficeLight | null): Promise<Office> {
   const plain = row ? await ctx.cipher.decryptFields(TABLE, row, ENCRYPTED) : null;
   const office: Office = {
     registered: Boolean(row?.legalName && row.document),
@@ -129,12 +166,12 @@ async function toOffice(ctx: Ctx, row: OfficeRow | null): Promise<Office> {
     updatedAt: row?.updatedByName ? row.updatedAt.toISOString() : null,
     updatedBy: row?.updatedByName ? { id: row.updatedBy, name: row.updatedByName } : null,
   };
-  office.missingForContract = officeRequirements(office, blocksOf(row));
+  office.missingForContract = officeRequirements(office, row?.customBlocks ? row.blocksUsePix : FACTORY_USES_PIX);
   return office;
 }
 
 export async function getOffice(ctx: Ctx): Promise<Office> {
-  return toOffice(ctx, await officeRow(ctx));
+  return toOffice(ctx, await officeLight(ctx));
 }
 
 export async function saveOffice(ctx: WriteCtx, input: OfficeInput): Promise<Office> {
@@ -160,7 +197,7 @@ export async function setLogo(ctx: WriteCtx, logo: string | null): Promise<Offic
 
 function toTemplate(row: OfficeRow | null): ContractTemplateResponse {
   return {
-    ...contractSummary(row),
+    ...contractSummary(lightOf(row)),
     blocks: [...blocksOf(row)].map((b) => ({ ...b })),
     watermarkImage:
       row?.contractWatermark && row.contractWatermarkType
@@ -229,7 +266,7 @@ export async function clientContract(ctx: Ctx, clientId: string): Promise<Client
     .where(and(eq(contacts.workspaceId, ctx.workspaceId), eq(contacts.id, clientId), eq(contacts.kind, 'client')));
   if (!client) throw new NotFoundError('Cliente não encontrado');
   const [row, fees] = await Promise.all([officeRow(ctx), listFees(ctx.db, ctx.workspaceId, clientId)]);
-  const office = await toOffice(ctx, row);
+  const office = await toOffice(ctx, lightOf(row));
   const plain = await ctx.cipher.decryptFields('contacts', client, ['document', 'street', 'number', 'district', 'zipCode', 'responsibleName', 'responsibleDocument']);
   const current = fees.current;
   const fee = current

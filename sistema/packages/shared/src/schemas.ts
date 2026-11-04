@@ -1207,6 +1207,10 @@ export const taskHomeQuerySchema = z.object({
 });
 export type TaskHomeQuery = z.input<typeof taskHomeQuerySchema>;
 
+/** GET /tasks/dashboard: the same department rule as the start page (another one or `all`: `registry`). */
+export const taskDashboardQuerySchema = taskHomeQuerySchema;
+export type TaskDashboardQuery = TaskHomeQuery;
+
 /** Up to 62 days (a month grid of 6 weeks fits). */
 export const MAX_CALENDAR_DAYS = 62;
 

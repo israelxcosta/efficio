@@ -68,6 +68,37 @@ export function applyPreview(group: Pick<RegimeGroup, 'items'>, usesDepartments:
   };
 }
 
+/** Name for comparison: no accents, case, spaces or punctuation ("DASN – SIMEI" = "dasn-simei"). */
+const nameKey = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+
+/**
+ * Missing items that the office already has as a recurring task made by hand (same name, no catalog
+ * key): applying would create a twin of each, so they are skipped unless the person asks.
+ */
+export function handMadeTwins(group: Pick<RegimeGroup, 'items' | 'recurring'>): { key: string; name: string; recurringId: string; recurringName: string }[] {
+  const byName = new Map(group.recurring.filter((r) => r.catalogKey === null).map((r) => [nameKey(r.name), r]));
+  return group.items
+    .filter((i) => itemState(i) === 'missing' && byName.has(nameKey(i.name)))
+    .map((i) => {
+      const r = byName.get(nameKey(i.name))!;
+      return { key: i.key, name: i.name, recurringId: r.id, recurringName: r.name };
+    });
+}
+
+/** Keys sent to "Aplicar grupo": what is missing or lacks the regime, the hand-made twins only if asked. */
+export function applyKeys(group: Pick<RegimeGroup, 'items' | 'recurring'>, includeTwins: boolean): string[] {
+  const twins = new Set(handMadeTwins(group).map((t) => t.key));
+  return group.items.filter((i) => {
+    const st = itemState(i);
+    return (st === 'missing' || st === 'addRegime') && (includeTwins || !twins.has(i.key));
+  }).map((i) => i.key);
+}
+
 const GENERATES = 'Elas geram todo mês uma tarefa para cada empresa do regime.';
 
 /** The toast after applying: "Simples Nacional: 5 tarefas recorrentes criadas e 2 passaram a incluir o regime. …". */

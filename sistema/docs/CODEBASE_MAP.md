@@ -31,7 +31,7 @@ graph TB
         Tenant["tenantRoutes / inTenant<br/>transação RLS por requisição"]
     end
     subgraph Dados
-        PG[("PostgreSQL 16<br/>RLS forçado em 34 tabelas")]
+        PG[("PostgreSQL 16<br/>RLS forçado em 35 tabelas")]
         KMS[["KeyProvider<br/>local ou AWS KMS"]]
         Redis[("Redis opcional<br/>rate limit")]
     end
@@ -61,11 +61,12 @@ sistema/
 │   ├── permissions.ts          chaves de permissão por pessoa, padrões por papel, ajustes (fase 3)
 │   ├── contract-template.ts    modelo de contrato de fábrica (+ contract-watermark.ts, a marca d'água)
 │   ├── integrations.ts         importação OFX/CSV e Open Finance
+│   ├── regime-groups.ts        catálogo dos grupos padrão de recorrentes por regime tributário
 │   └── utils/                  datas, dinheiro, documentos, fatura, recorrência, vigências,
 │                               juros/multa (late-fees), score de inadimplência (delinquency),
 │                               faixas de vencimento/ciclo da convenção (deadlines) e contrato
 ├── apps/api/
-│   ├── drizzle/0000…0016*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
+│   ├── drizzle/0000…0018*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
 │   ├── src/app.ts, server.ts   montagem do Fastify, hooks globais, árvore de rotas
 │   ├── src/routes.ts           domainRoutes (tenantRoutes) e scopedRoutes (inTenant)
 │   ├── src/setup.ts, env.ts    providers (e-mail, cobrança, Open Finance, CNPJ) e env validado
@@ -108,7 +109,7 @@ sistema/
   `feeCompetence`, `feeKind`, `feeOf`, `employees` em `Transaction`.
 - **Tarefas**: seções "Tasks" de `constants.ts` (estados `todo…canceled`, prioridades, escopos,
   situações, grupos de prazo com "Fora da meta", 6 periodicidades, regra de dia não útil, situações da
-  ocorrência, origem do responsável, tipos de evento do histórico, tipos e limites de anexo, todos com
+  ocorrência, origem do responsável (`manual`/`default`; o responsável por cliente saiu na 0017), tipos de evento do histórico, tipos e limites de anexo, todos com
   rótulos pt-BR), `schemas.ts` e `types.ts` (`Task` com `kind`/`occurrence`/`flow`, `TaskDetail`,
   `TaskListResponse`, `TaskHomeResponse` com `obligations`, `RecurringTask`, `RecurringOccurrence`,
   `OccurrenceCell`, `AuditMatrixResponse`, `TaskFlow`, `FlowTemplate`, `TaskReportResponse`,
@@ -197,7 +198,7 @@ sequenceDiagram
 | `search` | `/search` | lançamentos, contas, categorias, contatos (financeiro só com `finance`); tarefas, recorrentes e sindicatos para todos; ordena pela distância de hoje |
 | `imports` | `/imports` | OFX/CSV: prévia, duplicados, sugestão de categoria, lote com desfazer |
 | `open-finance` | `/open-finance/*` | Pluggy ou provedor simulado, vínculo de contas, sync incremental, webhooks |
-| `tasks` | `/tasks/*` | fases 1 e 2: departamentos (um por membro), categorias, tarefas, subtarefas, comentários, responsável por cliente (um e em lote, com reatribuição); **recorrentes** (`recurring.ts`) com ocorrências materializadas como tarefas, geradas de forma idempotente (`generation.ts`: janela −24/+2 competências, `ON CONFLICT`, ressincronização ao editar) e agregadas em SQL (`occurrences.ts`); **auditoria mensal** (`audit.ts`); **processos e modelos** (`flows.ts`, motor em `flow-engine.ts`); início (`home.ts`), relatórios/CSV/calendário (`insights.ts`, `csv.ts`); **histórico** (`events.ts`, `task_events`); **anexos** cifrados no banco (`attachments.ts`, assinatura e ZIP em `file-check.ts`); **anotações** (`notes.ts`); texto livre cifrado (`encrypted-text.ts`); toda consulta filtra por espaço (`test/tasks-scope.test.ts` roda todos os serviços) |
+| `tasks` | `/tasks/*` | fases 1 e 2: departamentos (um por membro), categorias, tarefas, subtarefas, comentários; **recorrentes** (`recurring.ts`) com ocorrências materializadas como tarefas (responsável padrão ou fila do departamento), geradas de forma idempotente (`generation.ts`: janela −24/+2 competências, `ON CONFLICT`, marcador de geração por recorrente × competência invalidado por gatilhos, ressincronização ao editar) e agregadas em SQL (`occurrences.ts`); **grupos padrão por regime** (`regime-groups.ts`); **dashboard** com os cards do Effy (`dashboard.ts`, `GET /tasks/dashboard`); **auditoria mensal** (`audit.ts`); **processos e modelos** (`flows.ts`, motor em `flow-engine.ts`); início (`home.ts`), relatórios/CSV/calendário (`insights.ts`, `csv.ts`); **histórico** (`events.ts`, `task_events`); **anexos** cifrados no banco (`attachments.ts`, assinatura e ZIP em `file-check.ts`); **anotações** (`notes.ts`); texto livre cifrado (`encrypted-text.ts`); toda consulta filtra por espaço (`test/tasks-scope.test.ts` roda todos os serviços) |
 
 ### Dados, segurança e migrações
 
@@ -205,7 +206,7 @@ sequenceDiagram
   `workspace_id = current_setting('app.workspace_id')` (sem valor = nenhuma linha). Referências
   entre tabelas são **FKs compostas** `(workspace_id, x_id)`; todo pai tem `unique(workspace_id, id)`.
 - **Papéis:** o dono das tabelas migra; `effinance_app` (NOLOGIN, sem BYPASSRLS) só tem DML nas 34
-  tabelas de tenant (13 financeiras + 16 de tarefas + 5 da fase 3); o login da API é membro dele e tem
+  tabelas de tenant (13 financeiras + 17 de tarefas + 5 da fase 3); o login da API é membro dele e tem
   privilégios mínimos nas tabelas de identidade (inclusive `user_photos`, fase 3) (`test/db-roles.ts`). Consultas comuns em tabelas financeiras fora de `withTenant` falham.
 - **Criptografia por campo:** AES-256-GCM com chave por espaço (embrulhada pelo KeyProvider), AAD
   `workspace:tabela:coluna`, valor `v1.<iv>.<ct>`. Cifrados: dados pessoais de contatos (documento,
@@ -226,7 +227,9 @@ sequenceDiagram
   anexos, anotações, gatilhos LGPD) · 0015 fase 3 (ajustes de permissão em `workspace_members`, dados
   fiscais/acessos em `contacts`, documentos, sindicatos/convenções/vínculos, escritório, fotos) · 0016
   revisão das fases 2/3 (responsáveis do histórico pseudonimizados na exclusão da conta, índices do
-  calendário e de "quem viu", CHECK do modelo de contrato). Escritas
+  calendário e de "quem viu", CHECK do modelo de contrato) · 0017 remoção do responsável por cliente
+  (`task_client_responsibles`) · 0018 marcador de geração (`task_generation_state`/`_marks` + gatilhos),
+  `recurring_tasks.catalog_key` e índice de conclusões (`tasks_completed_idx`). Escritas
   para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tarefas usam `todayIn('America/Sao_Paulo')` (o dia do escritório, não o do servidor
@@ -252,7 +255,7 @@ sequenceDiagram
 
 | Pasta | Rota | Resumo |
 |---|---|---|
-| `tasks` | `/`, `/tarefas`, `/tarefas/clientes`, `/tarefas/cadastros` | Gestão de tarefas (fase 1), a página inicial de todos: Início por departamento, Tarefas (lista agrupada por prazo e quadro; filtros na URL, `url-state.ts`), Clientes em leitura com responsável por departamento, Cadastros (departamentos, categorias, equipe). `TaskSheet` abre por `?tarefa=`/`?nova=1` sobre qualquer página da Gestão (`gestao-layout.tsx`); concluir/mover com "Desfazer" (`use-task-status.ts`) |
+| `tasks` | `/`, `/tarefas`, `/tarefas/clientes`, `/tarefas/cadastros` | Gestão de tarefas (fase 1), a página inicial de todos: Início por departamento, Tarefas (lista agrupada por prazo e quadro; filtros na URL, `url-state.ts`), Clientes em leitura, Cadastros (departamentos, categorias, equipe). `TaskSheet` abre por `?tarefa=`/`?nova=1` sobre qualquer página da Gestão (`gestao-layout.tsx`); concluir/mover com "Desfazer" (`use-task-status.ts`) |
 | `dashboard` | `/financeiro` | faixa de KPIs + quadro único de widgets com posição livre (arrastar, redimensionar, "Organizar"); aba "Dashboard inteligente". Sem widgets de tarefas |
 | `transactions` | `/contas-a-pagar`, `/contas-a-receber` | listas, `TransactionSheet`, ações centrais (`useTransactionActions`), confirmação com juros/multa |
 | `statement` | `/extrato` | extrato diário com saldo; links vindos do fluxo de caixa |
@@ -333,7 +336,10 @@ sequenceDiagram
     as devolve em `items` (vêm agregadas em `occurrences`), mas os resumos as contam uma por cliente.
     Consulta nova sobre `tasks` precisa decidir se inclui ocorrências (`OCCURRENCE_SQL`/
     `NOT_OCCURRENCE_SQL` em `task-rows.ts`). Leitura de uma competência chama `ensureOccurrences`
-    antes (gera o que falta; não gera sem assinatura com escrita nem fora da janela −24/+2).
+    antes (gera o que falta; não gera sem assinatura com escrita nem fora da janela −24/+2; pula os pares
+    recorrente × competência com marca na versão atual — mudança nova que decide ocorrências precisa
+    subir a versão: gatilho em `contacts`/`recurring_tasks`/`recurring_task_clients`, ou `GENERATION_RULES`
+    no código).
 14. **Histórico**: escreva eventos com `recordEvent(s)` (`events.ts`) na mesma transação; texto livre
     vai em `note` (cifrado), nunca em `data`. Ordem por `seq`, não por `created_at`.
 15. **Módulos de serviço novos** de tarefas entram em `test/tasks-scope.test.ts` (o teste exige que

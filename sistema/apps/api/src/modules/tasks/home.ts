@@ -66,7 +66,8 @@ function outcomeCounts(today: string) {
   };
 }
 
-async function resolveView(ctx: TaskContext, requested: HomeQuery['departmentId']) {
+/** The start page's department rule (also the dashboard's): another department or `all` needs `registry`. */
+export async function resolveView(ctx: TaskContext, requested: HomeQuery['departmentId']) {
   const [own, names] = await Promise.all([
     departmentOfMember(ctx.db, ctx.workspaceId, ctx.userId),
     departmentNames(ctx.db, ctx.workspaceId),

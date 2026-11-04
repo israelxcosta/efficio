@@ -20,6 +20,7 @@ import type {
   TaskAuditQuery,
   TaskCalendarQuery,
   TaskCalendarResponse,
+  TaskDashboardResponse,
   TaskFlow,
   TaskFlowCreatedResponse,
   TaskFlowInput,
@@ -94,6 +95,17 @@ export function useTaskHome(departmentId: string | 'all' | undefined, options: {
   return useQuery({
     queryKey: qk.taskHome(query),
     queryFn: () => api<TaskHomeResponse>('/tasks/home', { query }),
+    placeholderData: keepPreviousData,
+    enabled: options.enabled ?? true,
+  });
+}
+
+/** The cards of the start page (Effy's dashboard): same department rule as `/tasks/home`. */
+export function useTaskDashboard(departmentId: string | 'all' | undefined, options: { enabled?: boolean } = {}) {
+  const query = departmentId ? { departmentId } : {};
+  return useQuery({
+    queryKey: qk.taskDashboard(query),
+    queryFn: () => api<TaskDashboardResponse>('/tasks/dashboard', { query }),
     placeholderData: keepPreviousData,
     enabled: options.enabled ?? true,
   });

@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Info, Plus, Repeat } from 'lucide-react';
+import { Info, Plus } from 'lucide-react';
 import {
   addDays,
   diffInDays,
   monthKey,
-  RECURRENCE_PERIOD_LABELS,
   todayISO,
   type RecurringOccurrence,
   type Task,
   type TaskHomeResponse,
   type TaskOptionsResponse,
 } from '@effinance/shared';
-import { Badge } from '@/components/ui/badge';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MemberAvatar } from '@/components/ui/member-avatar';
@@ -27,19 +24,20 @@ import { usePermissions, WriteGate } from '@/features/auth/permissions';
 import { BodyEmpty, ListSkeleton } from '@/features/dashboard/widgets/shared';
 import { FitList, WidgetCard } from '@/features/dashboard/layout/widget-card';
 import { cn, pluralize } from '@/lib/utils';
-import { useRecurringTasks, useTaskHome, useTaskOptions, useTasks } from '../api';
+import { useRecurringTasks, useTaskDashboard, useTaskHome, useTaskOptions, useTasks } from '../api';
+import { AgendaCard, ClientsOverviewCard, DocumentsCard, FeesCard, FiscalCard, FlowCard, IncompleteCard, ProcessesCard, TaskStatusCard, ConventionsCard } from '../components/dashboard-cards';
+import { DashboardListSheet, type DashboardList } from '../components/dashboard-list-sheet';
 import { BreakdownItem, type BreakdownRow } from '../components/breakdown-list';
 import { TaskRow } from '../components/task-row';
 import { TaskStatusGlyph } from '../components/task-status';
-import { RecurringOccurrenceRow, useOccurrenceSheetLinks } from '../components/occurrence-row';
-import { competenceName, groupDeadlineInfo, occurrenceBucket, periodLabel, taskBucket } from '../occurrence';
+import { RecurringOccurrenceRow } from '../components/occurrence-row';
+import { occurrenceBucket, taskBucket } from '../occurrence';
 import { monthName, SummaryLabel } from '../components/tasks-summary';
-import { daysText, DUE_TONE_CLASS, shortDate, shortName } from '../due';
+import { daysText, shortDate, shortName } from '../due';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
 import { canPickDepartment, resolveHomeDepartment } from '../home-view';
 import { homeDepartmentKey, readHomeDepartment, tasksHref, writeHomeDepartment, type TaskFilterPatch } from '../url-state';
-import { DeadlineAlertStrip } from '@/features/deadlines/components/deadline-alert-strip';
 import { useOfficeBranding } from '@/features/office/api';
 
 /** Filters of the task list that match what the home page shows. */
@@ -58,6 +56,13 @@ export default function TaskHomePage() {
   const urlDept = params.get('departamento');
   const departmentId = o ? resolveHomeDepartment(o, urlDept, readHomeDepartment(storeKey)) : undefined;
   const home = useTaskHome(departmentId, { enabled: Boolean(o) });
+  // Effy's dashboard cards: same department rule as the start page.
+  const dash = useTaskDashboard(departmentId, { enabled: Boolean(o) });
+  const cards = { data: dash.data, loading: dash.isPending, error: dash.isError ? dash.error : null, onRetry: () => void dash.refetch() };
+  const [list, setList] = useState<DashboardList | null>(null);
+  const { can } = usePermissions();
+  const showFees = can('finance') && Boolean(dash.data?.fees);
+  const showIncomplete = Boolean(dash.data?.incomplete);
   const { newTask } = useTaskSheetLinks();
   const today = o?.today ?? todayISO();
   const h = home.data;
@@ -111,8 +116,6 @@ export default function TaskHomePage() {
         <HomeSummary home={h} today={today} />
       )}
 
-      <DeadlineAlertStrip />
-
       {o && h?.view === 'mine' && o.departments.length > 0 ? (
         <p className="-mt-2 flex items-start gap-2 text-body-sm text-muted">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -122,22 +125,70 @@ export default function TaskHomePage() {
 
       {o && canPickDepartment(o) ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
 
-      {/* Row A: what I do and how the competence goes; row B: who carries the work and where it piles up. */}
-      <div className="grid gap-5 lg:grid-cols-12">
+      <Section title="Tarefas">
         <div className="h-[29rem] lg:col-span-7 lg:h-[26rem]">
           <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
         </div>
-        <div className="h-[24rem] lg:col-span-5 lg:h-[26rem]">
-          <Obligations home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
+        <div className="h-[19rem] lg:col-span-5 lg:h-[26rem]">
+          <TaskStatusCard {...cards} base={h ? listBase(h) : {}} />
+        </div>
+        <div className="h-[19rem] lg:col-span-6 lg:h-[20rem]">
+          <FlowCard {...cards} base={h ? listBase(h) : {}} />
+        </div>
+        <div className="h-[17rem] lg:col-span-6 lg:h-[20rem]">
+          <ProcessesCard {...cards} />
+        </div>
+        <div className="h-[24rem] lg:col-span-6 lg:h-[22rem]">
+          <AgendaCard {...cards} />
         </div>
         <div className="h-[22rem] lg:col-span-6">
           <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
         </div>
-        <div className="h-[22rem] lg:col-span-6">
-          <ByClient home={h} where={where} loading={home.isPending} />
+      </Section>
+
+      <Section title="Vencimentos">
+        <div className={cn('h-[17rem]', showFees ? 'lg:col-span-3' : 'lg:col-span-4')}>
+          <DocumentsCard {...cards} kind="certificates" onList={setList} />
         </div>
-      </div>
+        <div className={cn('h-[17rem]', showFees ? 'lg:col-span-3' : 'lg:col-span-4')}>
+          <DocumentsCard {...cards} kind="documents" onList={setList} />
+        </div>
+        <div className={cn('h-[19rem]', showFees ? 'lg:col-span-3' : 'lg:col-span-4')}>
+          <ConventionsCard {...cards} />
+        </div>
+        {showFees ? (
+          <div className="h-[17rem] lg:col-span-3">
+            <FeesCard {...cards} onList={setList} />
+          </div>
+        ) : null}
+      </Section>
+
+      <Section title="Obrigações e clientes">
+        <div className="h-[30rem] lg:col-span-7 lg:h-[24rem]">
+          <FiscalCard {...cards} />
+        </div>
+        <div className="h-[19rem] lg:col-span-5 lg:h-[24rem]">
+          <ClientsOverviewCard {...cards} onList={setList} />
+        </div>
+        {showIncomplete ? (
+          <div className="h-[24rem] lg:col-span-12 lg:h-[20rem]">
+            <IncompleteCard {...cards} onList={setList} canFinance={can('finance')} />
+          </div>
+        ) : null}
+      </Section>
+
+      <DashboardListSheet list={list} data={dash.data} onChange={setList} />
     </div>
+  );
+}
+
+/** A block of the start page: a quiet heading over a 12-column grid of cards. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="flex flex-col gap-3">
+      <h2 className="text-title-sm font-semibold tracking-tight text-fg">{title}</h2>
+      <div className="grid gap-5 lg:grid-cols-12">{children}</div>
+    </section>
   );
 }
 
@@ -483,107 +534,6 @@ function MyTasks({ home, loading, error, today, onRetry }: { home: TaskHomeRespo
   );
 }
 
-/** "Obrigações de outubro" (§6.5): the recurring tasks of the department in the competence. */
-function Obligations({ home, loading, error, today, onRetry }: { home: TaskHomeResponse | undefined; loading: boolean; error: unknown; today: string; onRetry: () => void }) {
-  const isAdmin = usePermissions().can('registry');
-  const ob = home?.obligations;
-  const competence = ob?.competence ?? home?.month ?? today.slice(0, 7);
-  const monthName = competenceName(competence).split(' ')[0]!;
-  const dept = home?.view === 'department' ? home.department : null;
-  const live = ob ? ob.total - ob.canceled : 0;
-  const auditHref = `/tarefas/auditoria?competencia=${competence}${dept ? `&departamento=${dept.id}` : ''}`;
-  const subtitle = ob && live > 0 ? (
-    <>
-      {ob.done} de {live} concluídas ({Math.round((ob.done / live) * 100)}%)
-      {ob.overdue ? <span className="text-danger"> · {ob.overdue} {ob.overdue === 1 ? 'atrasada' : 'atrasadas'}</span> : ' · nada atrasado'}
-      {ob.canceled ? ` · ${ob.canceled} ${ob.canceled === 1 ? 'cancelada' : 'canceladas'}` : ''}
-    </>
-  ) : null;
-  return (
-    <WidgetCard
-      title={`Obrigações de ${monthName}`}
-      subtitle={subtitle}
-      action={
-        <Button variant="ghost" size="sm" asChild>
-          <Link to={auditHref}>Abrir auditoria</Link>
-        </Button>
-      }
-    >
-      {loading ? (
-        <ListSkeleton rowClassName="h-[52px]" />
-      ) : error && !home ? (
-        <ErrorState error={error} onRetry={onRetry} className="p-4" />
-      ) : !ob || ob.items.length === 0 ? (
-        <EmptyState
-          compact
-          className="min-h-0 flex-1 overflow-hidden py-3"
-          icon={<Repeat />}
-          title={`Nenhuma tarefa recorrente ${dept ? `no ${dept.name}` : 'no escritório'}`}
-          description="As obrigações do departamento (DAS, DCTFWeb, folha) aparecem aqui com o progresso da competência."
-          action={
-            isAdmin ? (
-              <WriteGate scope="admin">
-                <Button variant="outline" size="sm" asChild>
-                  <Link to="/tarefas/recorrentes?recorrente=nova">Cadastrar tarefas recorrentes</Link>
-                </Button>
-              </WriteGate>
-            ) : undefined
-          }
-        />
-      ) : (
-        <FitList
-          items={ob.items}
-          getKey={(o) => `${o.recurringTaskId}:${o.periodKey}`}
-          moreLabel="obrigações"
-          moreHref={`/tarefas/auditoria?visao=tarefa&competencia=${competence}${dept ? `&departamento=${dept.id}` : ''}`}
-          renderItem={(o) => <ObligationProgressRow occurrence={o} today={today} showDepartment={home?.view === 'all'} />}
-        />
-      )}
-    </WidgetCard>
-  );
-}
-
-/** One obligation of the competence: name, deadline of the worst pending case, "18/23" and the bar. */
-function ObligationProgressRow({ occurrence: o, today, showDepartment }: { occurrence: RecurringOccurrence; today: string; showDepartment: boolean }) {
-  const { openOccurrence } = useOccurrenceSheetLinks();
-  const live = o.total - o.canceled;
-  const complete = o.pending === 0;
-  const dl = groupDeadlineInfo(o, today);
-  return (
-    <button
-      type="button"
-      onClick={() => openOccurrence(o, complete ? 'all' : 'pending')}
-      className="flex min-h-[52px] w-full items-center gap-3 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-surface-muted"
-      aria-label={`${o.name}: ${o.done} de ${live} concluídas. ${dl.text}.`}
-    >
-      {complete ? (
-        <span className="flex size-6 shrink-0 items-center justify-center text-success" aria-hidden>
-          <TaskStatusGlyph status="done" />
-        </span>
-      ) : null}
-      <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className={cn('truncate text-sm font-semibold', complete ? 'text-muted' : 'text-fg')}>{o.name}</span>
-          {o.period !== 'monthly' ? <Badge tone="neutral">{RECURRENCE_PERIOD_LABELS[o.period]}</Badge> : null}
-          {o.period === 'weekly' ? <span className="shrink-0 text-xs text-muted">{periodLabel(o, today)}</span> : null}
-        </span>
-        <span className={cn('block truncate text-xs', complete ? 'text-muted' : DUE_TONE_CLASS[dl.tone])}>
-          {showDepartment && o.department ? <span className="text-muted">{o.department.name} · </span> : null}
-          {dl.text}
-        </span>
-      </span>
-      <span className="flex w-24 shrink-0 flex-col items-end gap-1 sm:w-28">
-        <span className="tabular text-[13px] font-medium text-fg">
-          {o.done}/{live}
-        </span>
-        <span className="block h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
-          <span className="block h-full rounded-full bg-data" style={{ width: `${(o.done / Math.max(1, live)) * 100}%` }} />
-        </span>
-      </span>
-    </button>
-  );
-}
-
 function ByAssignee({ home, people, where, loading }: { home: TaskHomeResponse | undefined; people: TaskOptionsResponse['members']; where: string; loading: boolean }) {
   const rows = useMemo<BreakdownRow[]>(() => {
     if (!home) return [];
@@ -631,48 +581,6 @@ function ByAssignee({ home, people, where, loading }: { home: TaskHomeResponse |
         <BodyEmpty title="Ninguém com tarefas em aberto" />
       ) : (
         <FitList items={rows} getKey={(r) => r.key} moreLabel="pessoas" renderItem={(r) => <BreakdownItem row={r} max={max} />} />
-      )}
-    </WidgetCard>
-  );
-}
-
-function ByClient({ home, where, loading }: { home: TaskHomeResponse | undefined; where: string; loading: boolean }) {
-  const rows = useMemo<BreakdownRow[]>(() => {
-    if (!home) return [];
-    const base = listBase(home);
-    const all = home.byClient.map((r) => ({
-      key: r.client?.id ?? 'internal',
-      label: r.client?.name ?? 'Interna',
-      muted: !r.client,
-      open: r.open - r.overdue,
-      overdue: r.overdue,
-      href: tasksHref({ ...base, scope: 'all', client: r.client?.id ?? 'internal' }),
-    }));
-    if (all.length <= 7) return all;
-    const rest = all.slice(6);
-    return [
-      ...all.slice(0, 6),
-      {
-        key: 'others',
-        label: `Outros (${rest.length} clientes)`,
-        muted: true,
-        open: rest.reduce((s, r) => s + r.open, 0),
-        overdue: rest.reduce((s, r) => s + r.overdue, 0),
-      },
-    ];
-  }, [home]);
-  const max = Math.max(1, ...rows.filter((r) => r.key !== 'others').map((r) => r.open + r.overdue));
-
-  return (
-    <WidgetCard title="Por cliente" subtitle={`Clientes com mais pendências ${where}`}>
-      {loading ? (
-        <ListSkeleton rowClassName="h-9" />
-      ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border-strong/80 px-4 py-3 text-center text-body-sm text-muted">
-          Nenhum cliente com pendências {where}.
-        </p>
-      ) : (
-        <FitList items={rows} getKey={(r) => r.key} moreLabel="clientes" renderItem={(r) => <BreakdownItem row={r} max={Math.max(max, r.open + r.overdue)} />} />
       )}
     </WidgetCard>
   );

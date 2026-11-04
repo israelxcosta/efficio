@@ -42,6 +42,7 @@ export const qk = {
   tasks: (params?: Params) => ['tasks', 'list', params ?? {}] as const,
   task: (id: string) => ['tasks', 'detail', id] as const,
   taskHome: (params?: Params) => ['tasks', 'home', params ?? {}] as const,
+  taskDashboard: (params?: Params) => ['tasks', 'dashboard', params ?? {}] as const,
   taskDepartments: ['tasks', 'departments'] as const,
   taskCategories: ['tasks', 'categories'] as const,
   taskMembers: ['tasks', 'members'] as const,

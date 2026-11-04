@@ -56,6 +56,8 @@ import {
 import { NeutralIcon } from '../components/neutral-icon';
 import { MemberPicker } from '../components/pickers';
 import { EndRecurringDialog, RecurringTaskSheet } from '../components/recurring-sheet';
+import { RegimeGroupsView } from '../components/regime-groups-view';
+import { parseRecurringView, writeRecurringView, type RecurringView } from '../regime-groups-logic';
 
 const CALENDAR_HREF = '/tarefas?escopo=todas&tipo=recorrentes&visao=calendario';
 
@@ -67,6 +69,7 @@ export default function RecurringTasksPage() {
   const today = options.data?.today ?? todayISO();
   const month = today.slice(0, 7);
   const filters = parseRecurringFilters(params);
+  const view = parseRecurringView(params);
   const list = useRecurringTasks(toRecurringQuery(filters, month));
   const { can, canManage } = usePermissions();
   // Texts and the registry follow `registry`; deleting a recurring task, `deleteRegistry`.
@@ -129,78 +132,100 @@ export default function RecurringTasksPage() {
         }
       />
 
-      {emptyAll ? null : (
-        <RecurringFiltersBar filters={filters} options={options.data} counts={data?.summary} onChange={update} />
-      )}
+      <SegmentedControl<RecurringView>
+        ariaLabel="Visão"
+        value={view.view}
+        onChange={(v) => setParams(writeRecurringView(params, { view: v }), { replace: true })}
+        options={[
+          { value: 'list', label: 'Tarefas recorrentes' },
+          { value: 'regimes', label: 'Grupos por regime' },
+        ]}
+        className="max-sm:flex max-sm:w-full sm:self-start"
+        fullWidth={false}
+      />
 
-      <Card className="@container overflow-hidden">
-        {emptyAll ? null : (
-          <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
-            <span className="w-10" aria-hidden />
-            <span className="flex-1">Tarefa recorrente</span>
-            <span className="hidden w-32 @3xl:block">Departamento</span>
-            <span className="hidden w-44 @4xl:block">Aplica-se a</span>
-            <span className="hidden w-36 @2xl:block">Responsáveis</span>
-            <span className="w-40">{monthName!.charAt(0).toUpperCase() + monthName!.slice(1)}</span>
-            <span className="w-52 text-right">Prazo legal e meta</span>
-            <span className="w-8" aria-hidden />
-          </div>
-        )}
-        <div className="p-1.5">
-          {list.isPending ? (
-            <SkeletonRows rows={6} className="p-3" />
-          ) : list.isError && !data ? (
-            <ErrorState error={list.error} onRetry={() => list.refetch()} className="m-3" />
-          ) : data!.items.length === 0 ? (
-            emptyAll ? (
-              <EmptyState
-                className="m-3"
-                icon={<Repeat />}
-                title="Nenhuma tarefa recorrente"
-                description={`${isAdmin ? 'Cadastre' : 'Os administradores cadastram'} as obrigações que se repetem (DAS, DCTFWeb, folha), o departamento que cuida delas e a quais clientes se aplicam. Elas aparecem na auditoria mensal e nas tarefas de cada responsável.`}
-                action={
-                  <WriteGate scope="admin">
-                    <Button variant="outline" onClick={() => update({ open: 'nova' })}>
-                      Nova tarefa recorrente
-                    </Button>
-                  </WriteGate>
-                }
-              />
-            ) : count > 0 ? (
-              <EmptyState
-                className="m-3"
-                icon={<SearchX />}
-                title="Nenhuma tarefa recorrente com esses filtros"
-                action={
-                  <Button variant="outline" onClick={() => update({ search: '', period: '', department: '', assignee: '', regime: '' })}>
-                    Limpar filtros
-                  </Button>
-                }
-              />
-            ) : (
-              <EmptyState className="m-3" icon={<Repeat />} title={filters.status === 'ended' ? 'Nenhuma tarefa recorrente encerrada.' : 'Nenhuma tarefa recorrente ativa.'} />
-            )
-          ) : (
-            <ul className={cn(list.isPlaceholderData && 'opacity-60 transition-opacity')}>
-              {data!.items.map((r) => (
-                <li key={r.id}>
-                  <RecurringRow
-                    recurring={r}
-                    monthName={monthName!}
-                    canEdit={canManage}
-                    canDelete={can('deleteRegistry')}
-                    onOpen={() => update({ open: r.id })}
-                    onDuplicate={() => setDuplicating(r)}
-                    onEnd={() => setEnding(r)}
-                    onReactivate={() => setReactivating(r)}
-                    onDelete={() => setDeleting(r)}
-                  />
-                </li>
-              ))}
-            </ul>
+      {view.view === 'regimes' ? (
+        <RegimeGroupsView
+          regime={view.regime}
+          onRegime={(r) => setParams(writeRecurringView(params, { view: 'regimes', regime: r }), { replace: true })}
+          onOpenRecurring={(id) => update({ open: id })}
+        />
+      ) : (
+        <>
+          {emptyAll ? null : (
+            <RecurringFiltersBar filters={filters} options={options.data} counts={data?.summary} onChange={update} />
           )}
-        </div>
-      </Card>
+
+          <Card className="@container overflow-hidden">
+            {emptyAll ? null : (
+              <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
+                <span className="w-10" aria-hidden />
+                <span className="flex-1">Tarefa recorrente</span>
+                <span className="hidden w-32 @3xl:block">Departamento</span>
+                <span className="hidden w-44 @4xl:block">Aplica-se a</span>
+                <span className="hidden w-36 @2xl:block">Responsáveis</span>
+                <span className="w-40">{monthName!.charAt(0).toUpperCase() + monthName!.slice(1)}</span>
+                <span className="w-52 text-right">Prazo legal e meta</span>
+                <span className="w-8" aria-hidden />
+              </div>
+            )}
+            <div className="p-1.5">
+              {list.isPending ? (
+                <SkeletonRows rows={6} className="p-3" />
+              ) : list.isError && !data ? (
+                <ErrorState error={list.error} onRetry={() => list.refetch()} className="m-3" />
+              ) : data!.items.length === 0 ? (
+                emptyAll ? (
+                  <EmptyState
+                    className="m-3"
+                    icon={<Repeat />}
+                    title="Nenhuma tarefa recorrente"
+                    description={`${isAdmin ? 'Cadastre' : 'Os administradores cadastram'} as obrigações que se repetem (DAS, DCTFWeb, folha), o departamento que cuida delas e a quais clientes se aplicam. Elas aparecem na auditoria mensal e nas tarefas de cada responsável.`}
+                    action={
+                      <WriteGate scope="admin">
+                        <Button variant="outline" onClick={() => update({ open: 'nova' })}>
+                          Nova tarefa recorrente
+                        </Button>
+                      </WriteGate>
+                    }
+                  />
+                ) : count > 0 ? (
+                  <EmptyState
+                    className="m-3"
+                    icon={<SearchX />}
+                    title="Nenhuma tarefa recorrente com esses filtros"
+                    action={
+                      <Button variant="outline" onClick={() => update({ search: '', period: '', department: '', assignee: '', regime: '' })}>
+                        Limpar filtros
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <EmptyState className="m-3" icon={<Repeat />} title={filters.status === 'ended' ? 'Nenhuma tarefa recorrente encerrada.' : 'Nenhuma tarefa recorrente ativa.'} />
+                )
+              ) : (
+                <ul className={cn(list.isPlaceholderData && 'opacity-60 transition-opacity')}>
+                  {data!.items.map((r) => (
+                    <li key={r.id}>
+                      <RecurringRow
+                        recurring={r}
+                        monthName={monthName!}
+                        canEdit={canManage}
+                        canDelete={can('deleteRegistry')}
+                        onOpen={() => update({ open: r.id })}
+                        onDuplicate={() => setDuplicating(r)}
+                        onEnd={() => setEnding(r)}
+                        onReactivate={() => setReactivating(r)}
+                        onDelete={() => setDeleting(r)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Card>
+        </>
+      )}
 
       <RecurringTaskSheet
         open={Boolean(filters.open) || duplicating !== null}

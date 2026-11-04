@@ -2,7 +2,7 @@
 // already has and what applying the group does.
 import { describe, expect, it } from 'vitest';
 import type { RegimeGroup, RegimeGroupApplyResponse, RegimeGroupItemView } from '@effinance/shared';
-import { applyPreview, applyResultText, itemState, parseRecurringView, regimeFromParam, writeRecurringView } from './regime-groups-logic';
+import { applyKeys, applyPreview, applyResultText, handMadeTwins, itemState, parseRecurringView, regimeFromParam, writeRecurringView } from './regime-groups-logic';
 
 const item = (patch: Partial<RegimeGroupItemView> = {}): RegimeGroupItemView => ({
   key: 'das',
@@ -72,6 +72,20 @@ describe('applying a group', () => {
     expect(applyPreview(g, true)).toEqual({ create: 2, addRegime: 1, applied: 1, ended: 1, newDepartments: ['Pessoal'] });
     // Offices without departments: none is created.
     expect(applyPreview(g, false).newDepartments).toEqual([]);
+  });
+
+  it('spots the missing items that already exist made by hand (same name), so applying does not create twins', () => {
+    const g = {
+      ...group([item({ key: 'das-mei', name: 'DAS-MEI' }), item({ key: 'dasn', name: 'DASN-SIMEI' }), item({ key: 'x', name: 'Outra', recurringTask: ref({ regimes: ['real_profit'] }) })]),
+      recurring: [ref({ id: 'h1', name: 'das mei', catalogKey: null }), ref({ id: 'h2', name: 'DASN – SIMEI', catalogKey: null })],
+    };
+    expect(handMadeTwins(g).map((t) => [t.key, t.recurringName])).toEqual([
+      ['das-mei', 'das mei'],
+      ['dasn', 'DASN – SIMEI'],
+    ]);
+    // Applying skips them unless asked; the item that only gains the regime stays.
+    expect(applyKeys(g, false)).toEqual(['x']);
+    expect(applyKeys(g, true)).toEqual(['das-mei', 'dasn', 'x']);
   });
 
   it('says what happened, in one toast', () => {

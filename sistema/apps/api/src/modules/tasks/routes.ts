@@ -30,6 +30,7 @@ import {
   taskCalendarQuerySchema,
   taskCategoryInputSchema,
   taskCommentInputSchema,
+  taskDashboardQuerySchema,
   taskDepartmentInputSchema,
   taskFlowInputSchema,
   taskFlowQuerySchema,
@@ -60,6 +61,7 @@ import {
   listTemplates,
   updateTemplate,
 } from './flows';
+import { taskDashboard } from './dashboard';
 import { taskHome } from './home';
 import { exportTaskReport, taskCalendar, taskReport } from './insights';
 import { createNote, deleteNote, listNotes, updateNote } from './notes';
@@ -168,6 +170,9 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   // --- summaries, calendar, reports ------------------------------------------------------------------
   app.get('/home', { schema: { querystring: taskHomeQuerySchema } }, async (req) =>
     run(req, (ctx) => taskHome(ctx, req.query)),
+  );
+  app.get('/dashboard', { schema: { querystring: taskDashboardQuerySchema } }, async (req) =>
+    run(req, (ctx) => taskDashboard(ctx, req.query)),
   );
   app.get('/activity', async (req) => run(req, (ctx) => recentActivity(ctx)));
   app.get('/calendar', { schema: { querystring: taskCalendarQuerySchema } }, async (req) =>

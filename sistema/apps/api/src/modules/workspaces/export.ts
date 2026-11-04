@@ -1,6 +1,6 @@
 // LGPD data portability: every record of the workspace, decrypted, as JSON.
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns } from 'drizzle-orm';
 import type { DbExecutor } from '../../db/client';
 import {
   accounts,
@@ -68,6 +68,8 @@ import type { Access } from './access';
 const CONTACT_PHASE3_ENCRYPTED = ['responsibleDocument', 'simplesAccessCode', 'accountantPassword'] as const;
 const UNION_ENCRYPTED = ['responsibleName', 'responsibleEmail', 'responsiblePhone', 'notes'] as const;
 const OFFICE_ENCRYPTED = ['responsibleDocument', 'responsibleEmail', 'responsiblePhone', 'pixKey'] as const;
+/** History entries without `seq` (a sequence shared by every workspace). */
+const { seq: _seq, ...eventColumns } = getTableColumns(taskEvents);
 
 export async function exportWorkspace(db: DbExecutor, access: Access) {
   const cipher = await getCipher(access.workspaceId);
@@ -153,7 +155,8 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
         tx.select().from(taskFlowTemplateSteps).orderBy(asc(taskFlowTemplateSteps.templateId), asc(taskFlowTemplateSteps.position)),
         tx.select().from(taskFlows).orderBy(asc(taskFlows.createdAt)),
         tx.select().from(taskFlowSteps).orderBy(asc(taskFlowSteps.flowId), asc(taskFlowSteps.position)),
-        tx.select().from(taskEvents).orderBy(asc(taskEvents.seq)),
+        // In order, without `seq`: it is a global sequence (it would tell how many events every office wrote).
+        tx.select(eventColumns).from(taskEvents).orderBy(asc(taskEvents.seq)),
         tx
           .select({
             id: taskAttachments.id,

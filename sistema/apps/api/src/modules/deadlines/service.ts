@@ -47,13 +47,21 @@ async function documentCounts(ctx: Ctx): Promise<DeadlineCounts & { noDate: numb
   return row ?? { overdue: 0, within30: 0, within60: 0, noDate: 0, total: 0 };
 }
 
-/** Active unions with active linked clients whose tracked agreement is overdue or due within 60 days. */
-async function conventionDeadlines(ctx: Ctx): Promise<{ items: ConventionDeadline[]; counts: DeadlineCounts; hasUnions: boolean }> {
+/**
+ * Active unions with active linked clients whose tracked agreement is overdue or due within 60 days
+ * (also the dashboard's "Convenções coletivas": `noBaseMonth` = active unions with active clients and no
+ * base month; `activeUnions` = active unions).
+ */
+export async function conventionDeadlines(
+  ctx: Ctx,
+): Promise<{ items: ConventionDeadline[]; counts: DeadlineCounts; hasUnions: boolean; noBaseMonth: number; activeUnions: number }> {
   const all = await unionItems(ctx);
   const items: ConventionDeadline[] = [];
   const counts: DeadlineCounts = { overdue: 0, within30: 0, within60: 0 };
+  let noBaseMonth = 0;
   for (const { item } of all) {
     const t = item.tracked;
+    if (item.active && item.activeClientCount > 0 && !t) noBaseMonth += 1;
     if (!item.active || item.activeClientCount === 0 || !t) continue;
     if (t.bucket !== 'overdue' && t.bucket !== 'within30' && t.bucket !== 'within60') continue;
     counts[t.bucket] += 1;
@@ -67,7 +75,7 @@ async function conventionDeadlines(ctx: Ctx): Promise<{ items: ConventionDeadlin
     });
   }
   items.sort((a, b) => (a.cycle.dueDate < b.cycle.dueDate ? -1 : a.cycle.dueDate > b.cycle.dueDate ? 1 : a.name.localeCompare(b.name, 'pt-BR')));
-  return { items, counts, hasUnions: all.length > 0 };
+  return { items, counts, hasUnions: all.length > 0, noBaseMonth, activeUnions: all.filter(({ item }) => item.active).length };
 }
 
 /** The deadlines sheet: documents (overdue, up to 60 days, without date) and agreements. */

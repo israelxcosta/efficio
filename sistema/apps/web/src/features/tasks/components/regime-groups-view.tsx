@@ -5,6 +5,7 @@ import { RECURRENCE_PERIOD_LABELS, type RegimeGroup, type RegimeGroupItemView, t
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Modal } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/misc';
@@ -14,7 +15,7 @@ import { toastError } from '@/lib/notify';
 import { cn, pluralize } from '@/lib/utils';
 import { useApplyRegimeGroup, useRegimeGroups } from '../api';
 import { dueRuleText } from '../recurring-rules';
-import { applyPreview, applyResultText, companiesText, ITEM_STATE_LABELS, itemState, type RegimeItemState } from '../regime-groups-logic';
+import { applyKeys, applyPreview, applyResultText, companiesText, handMadeTwins, ITEM_STATE_LABELS, itemState, type RegimeItemState } from '../regime-groups-logic';
 
 const STATE_STYLE: Record<RegimeItemState, { tone: 'success' | 'neutral' | 'warning' | 'brand'; icon: typeof Check }> = {
   applied: { tone: 'success', icon: Check },
@@ -105,14 +106,19 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
   const { canManage } = usePermissions();
   const apply = useApplyRegimeGroup();
   const [confirming, setConfirming] = useState(false);
+  const [includeTwins, setIncludeTwins] = useState(false);
   const preview = applyPreview(g, usesDepartments);
   const pending = preview.create + preview.addRegime;
+  const twins = handMadeTwins(g);
+  const twinOf = new Map(twins.map((t) => [t.key, t]));
+  const keys = applyKeys(g, includeTwins);
+  const creates = preview.create - (includeTwins ? 0 : twins.length);
   const catalogIds = new Set(g.items.map((i) => i.recurringTask?.id).filter(Boolean));
   const others = g.recurring.filter((r) => !catalogIds.has(r.id) && r.active);
 
   async function confirm() {
     try {
-      const res = await apply.mutateAsync({ regime: g.regime });
+      const res = await apply.mutateAsync({ regime: g.regime, input: { keys } });
       toast.success(applyResultText(res, g.label), { duration: 7000 });
       setConfirming(false);
     } catch (error) {
@@ -146,7 +152,7 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
       ) : (
         <ul className="p-1.5">
           {g.items.map((item) => (
-            <GroupItemRow key={item.key} item={item} usesDepartments={usesDepartments} onOpenRecurring={onOpenRecurring} />
+            <GroupItemRow key={item.key} item={item} twin={twinOf.get(item.key)} usesDepartments={usesDepartments} onOpenRecurring={onOpenRecurring} />
           ))}
         </ul>
       )}
@@ -167,33 +173,45 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
             <Button variant="ghost" onClick={() => setConfirming(false)} disabled={apply.isPending}>
               Cancelar
             </Button>
-            <Button loading={apply.isPending} onClick={() => void confirm()}>
+            <Button loading={apply.isPending} disabled={keys.length === 0} onClick={() => void confirm()}>
               Aplicar grupo
             </Button>
           </>
         }
       >
         <ul className="flex flex-col gap-2 text-body-sm text-fg">
-          {preview.create ? <li>• {pluralize(preview.create, 'tarefa recorrente nova', 'tarefas recorrentes novas')}</li> : null}
+          {creates ? <li>• {pluralize(creates, 'tarefa recorrente nova', 'tarefas recorrentes novas')}</li> : null}
           {preview.addRegime ? <li>• {pluralize(preview.addRegime, 'tarefa recorrente existente passa', 'tarefas recorrentes existentes passam')} a incluir {g.label}</li> : null}
           {preview.applied ? <li className="text-muted">• {pluralize(preview.applied, 'já aplicada fica como está', 'já aplicadas ficam como estão')}</li> : null}
           {preview.ended ? <li className="text-muted">• {pluralize(preview.ended, 'encerrada não é reaberta', 'encerradas não são reabertas')} (edite "Encerra em" para voltar)</li> : null}
           {preview.newDepartments.length ? <li>• Departamento criado: {preview.newDepartments.join(', ')}</li> : null}
         </ul>
+        {twins.length ? (
+          <div className="mt-3 rounded-lg border border-border bg-surface-muted p-3">
+            <p className="text-body-sm text-fg">
+              {twins.length === 1 ? 'Já existe uma tarefa recorrente feita à mão com o mesmo nome' : `Já existem ${twins.length} tarefas recorrentes feitas à mão com o mesmo nome`}: {twins.map((t) => t.recurringName).join(', ')}. Para não duplicar, {twins.length === 1 ? 'ela fica' : 'elas ficam'} de fora.
+            </p>
+            <label className="mt-2 flex items-center gap-2 text-body-sm text-fg">
+              <Checkbox checked={includeTwins} onCheckedChange={(v) => setIncludeTwins(v === true)} />
+              Criar mesmo assim
+            </label>
+          </div>
+        ) : null}
         <p className="mt-3 text-caption text-muted">Prazos, metas e responsável padrão são sugestões; ajuste em cada tarefa recorrente depois de aplicar. Aplicar de novo não duplica nada.</p>
       </Modal>
     </Card>
   );
 }
 
-function GroupItemRow({ item, usesDepartments, onOpenRecurring }: { item: RegimeGroupItemView; usesDepartments: boolean; onOpenRecurring: (id: string) => void }) {
+function GroupItemRow({ item, twin, usesDepartments, onOpenRecurring }: { item: RegimeGroupItemView; twin?: { recurringId: string; recurringName: string }; usesDepartments: boolean; onOpenRecurring: (id: string) => void }) {
   const state = itemState(item);
   const style = STATE_STYLE[state];
+  const openId = item.recurringTask?.id ?? twin?.recurringId ?? null;
   const Icon = style.icon;
   const due = `${RECURRENCE_PERIOD_LABELS[item.period]} · ${dueRuleText(item).toLowerCase()}`;
   const dept = !usesDepartments ? '—' : item.department.match ? item.department.match.name : `${item.department.name} (novo)`;
-  const name = item.recurringTask ? (
-    <button type="button" onClick={() => onOpenRecurring(item.recurringTask!.id)} className="block max-w-full truncate text-left text-sm font-semibold text-fg hover:underline">
+  const name = openId ? (
+    <button type="button" onClick={() => onOpenRecurring(openId)} className="block max-w-full truncate text-left text-sm font-semibold text-fg hover:underline">
       {item.name}
     </button>
   ) : (
@@ -212,10 +230,17 @@ function GroupItemRow({ item, usesDepartments, onOpenRecurring }: { item: Regime
       <span className={cn('hidden w-36 truncate text-body-sm @3xl:block', item.department.match || !usesDepartments ? 'text-fg' : 'text-muted')}>{dept}</span>
       <span className="hidden w-48 truncate text-body-sm text-fg @3xl:block">{due}</span>
       <span className="flex shrink-0 justify-end @3xl:w-44 @3xl:justify-start">
-        <Badge tone={style.tone} className="inline-flex items-center gap-1">
-          <Icon className="size-3" aria-hidden />
-          {ITEM_STATE_LABELS[state]}
-        </Badge>
+        {twin ? (
+          <Badge tone="neutral" className="inline-flex items-center gap-1" title={`Feita à mão: ${twin.recurringName}`}>
+            <Check className="size-3" aria-hidden />
+            Existe (à mão)
+          </Badge>
+        ) : (
+          <Badge tone={style.tone} className="inline-flex items-center gap-1">
+            <Icon className="size-3" aria-hidden />
+            {ITEM_STATE_LABELS[state]}
+          </Badge>
+        )}
       </span>
     </li>
   );

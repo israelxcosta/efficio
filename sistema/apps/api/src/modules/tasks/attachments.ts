@@ -1,7 +1,8 @@
 // Attachments of a task (Effy's Attachment), stored in the database: no file storage to operate or to
 // back up separately, and the browser demo (PGlite) works the same. The content is encrypted with the
 // workspace key (AES-256-GCM, AAD bound to the workspace, the table and the attachment id) and the
-// name like any free text. Limits: 10 MB per file, 50 MB and 50 files per task. Any member attaches;
+// name like any free text. Limits: 10 MB per file, 50 MB and 50 files per task, 2 GB per workspace, checked
+// under a per-workspace transaction lock (no race between concurrent uploads). Any member attaches;
 // removing is for who attached it or an administrator. Downloads are always served as attachments
 // (routes.ts: Content-Disposition, nosniff, a sandboxing CSP): nothing is ever rendered inline.
 
@@ -10,6 +11,7 @@ import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_TASK,
   MAX_TASK_ATTACHMENT_BYTES,
+  MAX_WORKSPACE_ATTACHMENT_BYTES,
   type TaskAttachment,
   type taskAttachmentInputSchema,
   type TaskAttachmentType,
@@ -25,6 +27,9 @@ import { attachmentProblem, decodeBase64 } from './file-check';
 import { myName, personRef } from './shared';
 
 type AttachmentInput = z.output<typeof taskAttachmentInputSchema>;
+
+/** Limits read at call time (tests lower the workspace quota instead of uploading 2 GB). */
+export const attachmentLimits = { workspaceBytes: MAX_WORKSPACE_ATTACHMENT_BYTES };
 
 const CONTENT = { table: 'task_attachments', column: 'content' } as const;
 
@@ -99,14 +104,25 @@ export async function addAttachment(ctx: TaskContext, taskId: string, input: Att
   if (bytes.length > MAX_ATTACHMENT_BYTES) throw new ValidationError('O arquivo passa de 10 MB.');
   const problem = attachmentProblem(input.fileName, input.contentType, bytes);
   if (problem) throw new ValidationError(problem);
-  const [used] = await ctx.db
-    .select({ n: sql<number>`count(*)`.mapWith(Number), bytes: sql<number>`coalesce(sum(${taskAttachments.sizeBytes}), 0)`.mapWith(Number) })
-    .from(taskAttachments)
-    .where(and(eq(taskAttachments.workspaceId, ctx.workspaceId), eq(taskAttachments.taskId, taskId)));
+  // One upload at a time per workspace (transaction-scoped lock, released at COMMIT/ROLLBACK): two
+  // concurrent uploads could both see room under the limits and both insert.
+  await ctx.db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`task_attachments:${ctx.workspaceId}`}, 0))`);
+  const [[used], [workspace]] = await Promise.all([
+    ctx.db
+      .select({ n: sql<number>`count(*)`.mapWith(Number), bytes: sql<number>`coalesce(sum(${taskAttachments.sizeBytes}), 0)`.mapWith(Number) })
+      .from(taskAttachments)
+      .where(and(eq(taskAttachments.workspaceId, ctx.workspaceId), eq(taskAttachments.taskId, taskId))),
+    ctx.db
+      .select({ bytes: sql<number>`coalesce(sum(${taskAttachments.sizeBytes}), 0)`.mapWith(Number) })
+      .from(taskAttachments)
+      .where(eq(taskAttachments.workspaceId, ctx.workspaceId)),
+  ]);
   if ((used?.n ?? 0) >= MAX_ATTACHMENTS_PER_TASK)
     throw new ValidationError(`Uma tarefa pode ter até ${MAX_ATTACHMENTS_PER_TASK} anexos. Remova algum antes de anexar outro.`);
   if ((used?.bytes ?? 0) + bytes.length > MAX_TASK_ATTACHMENT_BYTES)
     throw new ValidationError('Esta tarefa chegou ao limite de 50 MB de anexos. Remova algum antes de anexar outro.');
+  if ((workspace?.bytes ?? 0) + bytes.length > attachmentLimits.workspaceBytes)
+    throw new ValidationError('O escritório chegou ao limite de armazenamento de anexos. Remova anexos antigos antes de anexar outro.');
 
   const id = globalThis.crypto.randomUUID();
   const [row] = await ctx.db

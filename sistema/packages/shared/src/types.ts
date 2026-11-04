@@ -5,7 +5,10 @@ import type {
   BankCode,
   CardBrand,
   CategoryType,
+  ClientCompletenessField,
   ClientCredentialField,
+  ClientOverviewStatus,
+  DashboardDocumentSituation,
   ClientDocumentKind,
   ClientStatus,
   DeadlineBucket,
@@ -1658,6 +1661,95 @@ export interface TaskHomeResponse {
     occurrences: RecurringOccurrence[];
   };
   obligations: TaskObligations;
+}
+
+// --- GET /tasks/dashboard (Effy's dashboard cards) ------------------------------------------------
+
+export interface DashboardDocumentItem {
+  id: string;
+  client: TaskClientRef;
+  kind: ClientDocumentKind;
+  /** Kind label, or the custom name of an "Outro…" document. */
+  name: string;
+  expiresAt: ISODate | null;
+  situation: DashboardDocumentSituation;
+  /** Days to the expiry (negative when overdue); null without a date. */
+  days: number | null;
+}
+
+/** Certificates or the other documents ("laudos") of the active clients. */
+export interface DashboardDocuments {
+  counts: Record<DashboardDocumentSituation, number>;
+  total: number;
+  /** Every item (by expiry, without date last), up to 500: the lists by situation filter it. */
+  items: DashboardDocumentItem[];
+  truncated: boolean;
+}
+
+export interface DashboardFeeItem {
+  client: TaskClientRef;
+  taxRegime: TaxRegime;
+  /** Last day of the latest registered fee period ("vigência"). */
+  periodEnd: ISODate;
+  /** Days to it (negative: already ended without a new period). */
+  days: number;
+  /** Monthly fee of that period (cents). */
+  monthlyAmount: number;
+}
+
+export interface DashboardClientOverviewItem {
+  client: { id: string; name: string; legalName: string; taxRegime: TaxRegime };
+  status: ClientOverviewStatus;
+  /** Open occurrences of the competence / of them, past the legal deadline. */
+  pending: number;
+  overdue: number;
+}
+
+export interface DashboardIncompleteItem {
+  client: { id: string; name: string; legalName: string; taxRegime: TaxRegime };
+  /** Fields that apply to the regime and are blank (`CLIENT_COMPLETENESS_FIELDS` order). */
+  missing: ClientCompletenessField[];
+  filled: number;
+  total: number;
+  /** filled / total, 0–100. */
+  percent: number;
+}
+
+export interface TaskDashboardResponse {
+  today: ISODate;
+  /** Competence of the task cards (default: the current one). */
+  month: MonthKey;
+  /** Same as the start page: one department, all (`registry`) or, without department, your own items. */
+  view: 'department' | 'all' | 'mine';
+  department: TaskRef | null;
+  /** "Situação das tarefas": occurrences of the competence + standalone tasks due in the month. */
+  taskStatus: { total: number; pending: number; concluded: number; overdue: number };
+  /** "Fluxo de tarefas por dia": open items per work date, today and the next 6 days. */
+  flow: { date: ISODate; recurring: number; standalone: number }[];
+  /** "Processos por departamento": occurrences of the competence per department. */
+  processes: { department: TaskRef | null; recurringCount: number; total: number; done: number; pending: number; overdue: number }[];
+  /** "Pendências fiscais": per recurring task and period of the competence (overdue first). */
+  fiscal: { totals: { total: number; done: number; pending: number; overdue: number }; items: RecurringOccurrence[] };
+  /** "Agenda": legal deadlines in the next 7 days (this and the next competence) and, past this month, with pending work. */
+  agenda: { upcoming: RecurringOccurrence[]; overdue: RecurringOccurrence[] };
+  /** "Visão geral dos clientes": active clients of the competence by the state of their occurrences. */
+  clientsOverview: { counts: Record<ClientOverviewStatus, number>; items: DashboardClientOverviewItem[] };
+  certificates: DashboardDocuments;
+  /** Every other document ("Laudos"). */
+  documents: DashboardDocuments;
+  /** "Convenções coletivas" (same rule as /deadlines). */
+  conventions: {
+    counts: DeadlineCounts;
+    /** Active unions with active clients and no base month. */
+    noBaseMonth: number;
+    /** Active unions. */
+    total: number;
+    items: ConventionDeadline[];
+  };
+  /** "Honorários próximos de vencer" (null without `finance`). within30 includes ended periods. */
+  fees: { within30: DashboardFeeItem[]; within60: DashboardFeeItem[] } | null;
+  /** "Cadastro incompleto" (null without `registry`). */
+  incomplete: { count: number; averagePercent: number; items: DashboardIncompleteItem[] } | null;
 }
 
 /** GET /tasks/calendar: items by work date in a range (tasks by due date, occurrences by target). */

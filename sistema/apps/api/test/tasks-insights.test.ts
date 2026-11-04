@@ -3,9 +3,10 @@
 // of an occurrence) in the office time zone; canceled apart. Today is pinned to 2026-10-20 (Tuesday);
 // conclusions to 2026-10-20 12:00 in São Paulo.
 
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { App } from '../src/app';
-import { createTestApp, registerUser, resetDb, type Client } from './helpers';
+import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
 import { createClient, office } from './task-helpers';
 
 let app: App;
@@ -92,6 +93,23 @@ describe('tasks insights', () => {
     const list = (await carla.get('/tasks?scope=department&situation=open')).body;
     expect(list.groups).toMatchObject({ overdue: 3, targetMissed: 1, today: 1 });
     expect(list.summary.oldestOverdue).toMatchObject({ id: overdue.id });
+  });
+
+  it('productivity counts conclusions by the office day, at the edges of the period', async () => {
+    const { ana } = await scenario();
+    const ws = (await ana.get('/auth/me')).body.workspace.id;
+    const late = await ana.post('/tasks', { title: 'Concluída tarde da noite', status: 'done' });
+    const early = await ana.post('/tasks', { title: 'Concluída de madrugada', status: 'done' });
+    // 2026-11-01 02:30 UTC is still October 31st in São Paulo; 2026-10-01 03:00 UTC is October 1st.
+    await admin().execute(sql`update tasks set completed_at = '2026-11-01T02:30:00Z', created_at = '2026-10-31T12:00:00Z' where id = ${late.body.id} and workspace_id = ${ws}`);
+    await admin().execute(sql`update tasks set completed_at = '2026-10-01T03:00:00Z', created_at = '2026-10-01T03:00:00Z' where id = ${early.body.id} and workspace_id = ${ws}`);
+    const october = (await ana.get('/tasks/reports?from=2026-10-01&to=2026-10-31')).body.productivity;
+    const november = (await ana.get('/tasks/reports?from=2026-11-01&to=2026-11-30')).body.productivity;
+    const of = (rows: any[]) => rows.find((r) => r.member?.id === ana.userId)?.concluded ?? 0;
+    expect(of(october)).toBeGreaterThanOrEqual(2);
+    expect(of(november)).toBe(0);
+    const september = (await ana.get('/tasks/reports?from=2026-09-01&to=2026-09-30')).body.productivity;
+    expect(of(september)).toBe(0);
   });
 
   it('reports aggregate in SQL by every dimension, filter the late ones and export CSV', async () => {
