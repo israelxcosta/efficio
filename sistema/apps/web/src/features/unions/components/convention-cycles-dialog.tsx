@@ -138,7 +138,7 @@ export function ConventionCyclesDialog({ unionId, onClose, onEdit }: { unionId: 
                     <Badge tone="neutral">Acompanhando</Badge>
                   ) : c.published ? (
                     <span className="flex items-center gap-1 text-caption font-medium text-success">
-                      <CircleCheck className="size-3.5" aria-hidden /> Publicada
+                      <CircleCheck className="size-3.5" aria-hidden /> <span className="max-sm:sr-only">Publicada</span>
                     </span>
                   ) : null}
                 </li>

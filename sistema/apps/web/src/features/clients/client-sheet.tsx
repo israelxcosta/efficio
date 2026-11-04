@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { Building2, CloudDownload, Info, TriangleAlert, UserRound } from 'lucide-react';
+import { Building2, CloudDownload, FileClock, Info, KeyRound, TriangleAlert, UserRound } from 'lucide-react';
 import type { z } from 'zod';
 import {
   BR_STATES,
+  SIMPLES_ACCESS_REGIMES,
   SIMPLES_ANNEXES,
   SIMPLES_ANNEX_LABELS,
   TAX_REGIMES,
@@ -13,6 +14,7 @@ import {
   clientInputSchema,
   formatCEP,
   formatCNPJ,
+  formatCPF,
   formatDateBR,
   formatPhone,
   isValidCNPJ,
@@ -28,11 +30,16 @@ import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { toastError } from '@/lib/notify';
 import { WriteGate } from '@/features/auth/permissions';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useCnpjLookup, useSaveClient } from './api';
+import { ClientDocumentsEditor, type DocumentRowErrors } from './client-documents-editor';
+import { SecretInput } from './secret-input';
 
 type FormIn = z.input<typeof clientInputSchema>;
 type FormOut = z.output<typeof clientInputSchema>;
-type MaskedField = 'document' | 'phone' | 'responsiblePhone' | 'zipCode';
+type MaskedField = 'document' | 'phone' | 'responsiblePhone' | 'zipCode' | 'responsibleDocument';
+
+const takesSimplesCode = (regime: string | undefined) => (SIMPLES_ACCESS_REGIMES as readonly string[]).includes(regime ?? '');
 
 function defaults(c?: Client | null): FormIn {
   return {
@@ -59,6 +66,14 @@ function defaults(c?: Client | null): FormIn {
     city: c?.city ?? '',
     state: c?.state ?? '',
     notes: c?.notes ?? '',
+    // Phase 3 (spec §13.8.1): fiscal data, accesses (never prefilled: keep/set/clear) and documents.
+    stateRegistration: c?.stateRegistration ?? '',
+    stateRegistrationExempt: c?.stateRegistrationExempt ?? false,
+    municipalRegistration: c?.municipalRegistration ?? '',
+    responsibleDocument: c?.responsibleDocument ? formatCPF(c.responsibleDocument) : '',
+    simplesAccessCode: { action: 'keep' },
+    accountantPassword: { action: 'keep' },
+    documents: (c?.documents ?? []).map((d) => ({ id: d.id, kind: d.kind, customName: d.customName ?? '', expiresAt: d.expiresAt ?? '', note: d.note ?? '' })),
   };
 }
 
@@ -92,17 +107,25 @@ export function ClientSheet({
   } = form;
   const e = formState.errors;
   const regime = watch('taxRegime');
+  const exempt = watch('stateRegistrationExempt');
+  const docErrors = (Array.isArray(e.documents) ? e.documents : []) as ({ [K in keyof DocumentRowErrors]?: { message?: string } } | undefined)[];
 
   useEffect(() => {
     if (open) {
       reset(defaults(client));
       setImported(null);
+    } else {
+      // Closed without saving: what was typed in the accesses does not stay in the form state.
+      setValue('simplesAccessCode', { action: 'keep' });
+      setValue('accountantPassword', { action: 'keep' });
     }
-  }, [open, client, reset]);
+  }, [open, client, reset, setValue]);
 
   const onSubmit = handleSubmit(async (input) => {
     try {
       await save.mutateAsync({ id: client?.id, input });
+      // Drops the request (with any typed access) from the mutation cache right away.
+      save.reset();
       toast.success(client ? 'Cliente atualizado' : 'Cliente cadastrado');
       onOpenChange(false);
     } catch (error) {
@@ -330,6 +353,8 @@ export function ClientSheet({
                   onChange={(ev) => {
                     field.onChange(ev.target.value);
                     if (ev.target.value !== 'simples_nacional') setValue('simplesAnnex', '');
+                    // The Simples access code only exists for Simples Nacional and MEI.
+                    if (!takesSimplesCode(ev.target.value)) setValue('simplesAccessCode', { action: 'keep' });
                   }}
                 >
                   <option value="">Selecione…</option>
@@ -389,11 +414,106 @@ export function ClientSheet({
         </div>
 
         <p className="eyebrow mt-2 flex items-center gap-1.5 text-brand-text">
+          <KeyRound className="size-3.5" /> Inscrições e acessos
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Field label="Inscrição estadual" error={e.stateRegistration?.message}>
+              <Controller
+                control={control}
+                name="stateRegistration"
+                render={({ field }) => (
+                  <Input
+                    placeholder="Ex.: 110.042.490.114"
+                    value={exempt ? '' : (field.value ?? '')}
+                    disabled={Boolean(exempt)}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
+            </Field>
+            <Controller
+              control={control}
+              name="stateRegistrationExempt"
+              render={({ field }) => (
+                <label className="flex items-center gap-2 text-body-sm text-fg">
+                  <Checkbox
+                    checked={Boolean(field.value)}
+                    onCheckedChange={(v) => {
+                      field.onChange(v);
+                      if (v) setValue('stateRegistration', '');
+                    }}
+                  />
+                  Isenta de inscrição estadual
+                </label>
+              )}
+            />
+          </div>
+          <Field label="Inscrição municipal" hint="Opcional" error={e.municipalRegistration?.message}>
+            <Input {...register('municipalRegistration')} />
+          </Field>
+          {takesSimplesCode(regime) ? (
+            <Controller
+              control={control}
+              name="simplesAccessCode"
+              render={({ field }) => (
+                <SecretInput
+                  label="Código de acesso do Simples Nacional"
+                  hint="Usado no portal do Simples Nacional. Fica cifrado; só quem tem permissão vê."
+                  stored={Boolean(client?.credentials.simplesAccessCode)}
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={e.simplesAccessCode?.message ?? (e.simplesAccessCode as { value?: { message?: string } } | undefined)?.value?.message}
+                  resetKey={`${client?.id ?? 'new'}-${open}`}
+                />
+              )}
+            />
+          ) : null}
+          <Controller
+            control={control}
+            name="accountantPassword"
+            render={({ field }) => (
+              <SecretInput
+                label="Senha do contador"
+                hint="Senha do escritório nos portais deste cliente. Fica cifrada; só quem tem permissão vê."
+                stored={Boolean(client?.credentials.accountantPassword)}
+                value={field.value}
+                onChange={field.onChange}
+                error={e.accountantPassword?.message ?? (e.accountantPassword as { value?: { message?: string } } | undefined)?.value?.message}
+                resetKey={`${client?.id ?? 'new'}-${open}`}
+              />
+            )}
+          />
+        </div>
+
+        <p className="eyebrow mt-2 flex items-center gap-1.5 text-brand-text">
+          <FileClock className="size-3.5" /> Documentos com vencimento
+        </p>
+        <Controller
+          control={control}
+          name="documents"
+          render={({ field }) => (
+            <ClientDocumentsEditor
+              value={field.value ?? []}
+              onChange={field.onChange}
+              errors={docErrors.map((d) => (d ? { kind: d.kind?.message, customName: d.customName?.message, expiresAt: d.expiresAt?.message, note: d.note?.message } : undefined))}
+            />
+          )}
+        />
+        {e.documents?.message ? <p className="text-xs font-medium text-danger">{e.documents.message}</p> : null}
+
+        <p className="eyebrow mt-2 flex items-center gap-1.5 text-brand-text">
           <UserRound className="size-3.5" /> Responsável
         </p>
-        <Field label="Nome" error={e.responsibleName?.message}>
-          <Input placeholder="Quem responde pela empresa" {...register('responsibleName')} />
-        </Field>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+          <Field label="Nome" error={e.responsibleName?.message}>
+            <Input placeholder="Quem responde pela empresa" {...register('responsibleName')} />
+          </Field>
+          <Field label="CPF do responsável" hint="Usado no contrato de prestação de serviços." error={e.responsibleDocument?.message}>
+            {masked('responsibleDocument', formatCPF, { placeholder: '000.000.000-00', inputMode: 'numeric' })}
+          </Field>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="E-mail" error={e.responsibleEmail?.message}>
             <Controller

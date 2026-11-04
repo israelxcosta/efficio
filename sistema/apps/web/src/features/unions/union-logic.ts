@@ -23,7 +23,12 @@ export function unionsDescription(summary: UnionListSummary): string {
 
 /** Up to three letters of the neutral circle: the acronym, else the initials of the name. */
 export function unionInitials(u: { acronym: string | null; name: string }): string {
-  if (u.acronym) return u.acronym.replace(/[^A-Za-zÀ-ÿ0-9]/g, '').slice(0, 2).toUpperCase();
+  if (u.acronym) {
+    const clean = u.acronym.replace(/[^A-Za-zÀ-ÿ0-9]/g, '').toUpperCase();
+    // "SINDCOM" → "SC", "SINSAÚDE" → "SS": the S of "sindicato" and the first letter of the category.
+    const m = /^SIND?(.)/.exec(clean);
+    return m && clean.length > 4 ? `S${m[1]}` : clean.slice(0, 2);
+  }
   const words = u.name.split(/\s+/).filter((w) => w.length > 2 && !/^(dos|das|de|do|da|e)$/i.test(w));
   return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || u.name.slice(0, 2).toUpperCase();
 }

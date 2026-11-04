@@ -1,14 +1,15 @@
-import type { ReactNode } from 'react';
-import { Link } from 'react-router';
+import { useEffect, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { Copy, Mail, Phone, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCNPJ, formatDateBR, formatPhone, TAX_REGIME_LABELS, type Client, type ClientResponsiblesResponse, type TaskOptionsResponse } from '@effinance/shared';
+import { formatCNPJ, formatDateBR, formatPhone, TAX_REGIME_LABELS, todayISO, type Client, type ClientResponsiblesResponse, type TaskOptionsResponse } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/misc';
 import { Sheet } from '@/components/ui/sheet';
 import { SkeletonRows } from '@/components/ui/skeleton';
 import { ClientProfile } from '@/features/clients/client-profile';
+import { ClientDocumentsList, ClientRegistrations, ClientUnionsList } from '@/features/clients/client-records';
 import { copyText } from '@/lib/clipboard';
 import { pluralize } from '@/lib/utils';
 import { usePermissions } from '@/features/auth/permissions';
@@ -81,6 +82,14 @@ export function TaskClientSheet({ client: c, loading, notFound, error, onClose, 
   const description = c
     ? `${TAX_REGIME_LABELS[c.taxRegime]} · ${formatCNPJ(c.document)} · ${c.status === 'active' ? 'Ativo' : `Inativo${c.inactivation ? ` desde ${formatDateBR(c.inactivation.date)}` : ''}`}`
     : undefined;
+  // "Ver cliente" of the deadlines sheet opens the sheet on the documents (`&secao=documentos`).
+  const [params] = useSearchParams();
+  const section = params.get('secao');
+  useEffect(() => {
+    if (!c || section !== 'documentos') return;
+    const t = setTimeout(() => document.getElementById('client-documents')?.scrollIntoView({ block: 'start' }), 150);
+    return () => clearTimeout(t);
+  }, [c, section]);
   const hasContacts = c && (c.email || c.phone || c.responsibleName || c.responsibleEmail || c.responsiblePhone);
 
   return (
@@ -229,6 +238,10 @@ export function TaskClientSheet({ client: c, loading, notFound, error, onClose, 
               </p>
             ) : null}
           </section>
+
+          <ClientDocumentsList client={c} today={options?.today ?? todayISO()} id="client-documents" />
+          <ClientRegistrations client={c} />
+          <ClientUnionsList client={c} />
 
           <section className="flex flex-col gap-3" aria-label="Dados cadastrais">
             <h3 className="text-body-sm font-semibold text-fg">Dados cadastrais</h3>

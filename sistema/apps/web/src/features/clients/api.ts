@@ -50,6 +50,8 @@ function invalidateClients(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: ['clients'] }),
     qc.invalidateQueries({ queryKey: ['contacts'] }),
+    // Documents with expiry date (phase 3): the strip, the bell and the deadlines sheet.
+    qc.invalidateQueries({ queryKey: ['deadlines'] }),
   ]);
 }
 
@@ -60,6 +62,9 @@ export function useSaveClient() {
       id
         ? api<Client>(`/clients/${id}`, { method: 'PUT', body: input })
         : api<Client>('/clients', { method: 'POST', body: input }),
+    // The variables may carry a typed access (`{ action: 'set', value }`): gone from the mutation
+    // cache as soon as the form lets go of it (spec §13.8: accesses never linger in the page).
+    gcTime: 0,
     onSuccess: () => invalidateClients(qc),
   });
 }

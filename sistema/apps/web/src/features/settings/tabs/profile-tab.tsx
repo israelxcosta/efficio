@@ -12,7 +12,8 @@ import { Field, Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { useTheme, type ThemePreference } from '@/lib/theme';
 import { toastError } from '@/lib/notify';
-import { initials } from '@/lib/utils';
+import { MemberAvatar } from '@/components/ui/member-avatar';
+import { ProfilePhotoActions } from '@/features/profile/photo-actions';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions } from '@/features/auth/permissions';
 import { Cell, TabGrid } from './layout';
@@ -44,12 +45,13 @@ export function ProfileTab() {
         <Card className="p-6">
           <CardHeader title="Perfil" subtitle="Como você aparece para os membros dos seus espaços" />
           <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-4" noValidate>
-            <div className="flex items-center gap-4">
-              <span className="flex size-14 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary-soft-fg">{initials(user?.name)}</span>
-              <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-4">
+              <MemberAvatar size="xl" name={user?.name} userId={user?.id} photoVersion={user?.photoUpdatedAt ?? null} />
+              <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{user?.name}</p>
                 <p className="truncate text-sm text-muted">{user?.email}</p>
               </div>
+              <ProfilePhotoActions />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Nome" error={form.formState.errors.name?.message}>

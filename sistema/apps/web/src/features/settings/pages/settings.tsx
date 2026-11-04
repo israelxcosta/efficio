@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router';
-import { CreditCard, Plug, ShieldCheck, ShieldEllipsis, UserRound, Users } from 'lucide-react';
+import { CreditCard, Plug, ShieldCheck, ShieldEllipsis, Stamp, UserRound, Users } from 'lucide-react';
 import { WORKSPACE_KIND_LABELS } from '@effinance/shared';
 import { PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -12,20 +12,22 @@ import { MembersTab } from '../tabs/members-tab';
 import { SubscriptionTab } from '../tabs/subscription-tab';
 import { PrivacyTab } from '../tabs/privacy-tab';
 import { IntegrationsTab } from '../tabs/integrations-tab';
+import { OfficeTab } from '@/features/office/components/office-tab';
 
-const TABS = ['perfil', 'seguranca', 'membros', 'assinatura', 'integracoes', 'privacidade'] as const;
+const TABS = ['perfil', 'seguranca', 'membros', 'escritorio', 'assinatura', 'integracoes', 'privacidade'] as const;
 type Tab = (typeof TABS)[number];
 /** Collaborators (no finance access) see Perfil, Segurança, Membros and Privacidade (spec §2.6). */
 const ADMIN_TABS: readonly Tab[] = ['assinatura', 'integracoes'];
 
-export function settingsTabsFor(canAccessFinance: boolean): readonly Tab[] {
-  return canAccessFinance ? TABS : TABS.filter((t) => !ADMIN_TABS.includes(t));
+/** Escritório (phase 3) only for whoever has `office`; Assinatura and Integrações with the finances. */
+export function settingsTabsFor(canAccessFinance: boolean, canOffice = false): readonly Tab[] {
+  return TABS.filter((t) => (t === 'escritorio' ? canOffice : canAccessFinance || !ADMIN_TABS.includes(t)));
 }
 
 export default function SettingsPage() {
   const { workspace } = useAuth();
-  const { canAccessFinance } = usePermissions();
-  const tabs = settingsTabsFor(canAccessFinance);
+  const { canAccessFinance, can } = usePermissions();
+  const tabs = settingsTabsFor(canAccessFinance, can('office'));
   const [params, setParams] = useSearchParams();
   const raw = params.get('aba');
   const tab: Tab = (tabs as readonly string[]).includes(raw ?? '') ? (raw as Tab) : 'perfil';
@@ -70,6 +72,7 @@ export default function SettingsPage() {
             { value: 'perfil' as const, label: 'Perfil', icon: <UserRound /> },
             { value: 'seguranca' as const, label: 'Segurança', icon: <ShieldCheck /> },
             { value: 'membros' as const, label: 'Membros', icon: <Users /> },
+            { value: 'escritorio' as const, label: 'Escritório', icon: <Stamp /> },
             { value: 'assinatura' as const, label: 'Assinatura', icon: <CreditCard /> },
             { value: 'integracoes' as const, label: 'Integrações', icon: <Plug /> },
             { value: 'privacidade' as const, label: 'Privacidade', icon: <ShieldEllipsis /> },
@@ -79,6 +82,7 @@ export default function SettingsPage() {
       {tab === 'perfil' ? <ProfileTab /> : null}
       {tab === 'seguranca' ? <SecurityTab /> : null}
       {tab === 'membros' ? <MembersTab /> : null}
+      {tab === 'escritorio' ? <OfficeTab /> : null}
       {tab === 'assinatura' ? <SubscriptionTab /> : null}
       {tab === 'integracoes' ? <IntegrationsTab /> : null}
       {tab === 'privacidade' ? <PrivacyTab /> : null}

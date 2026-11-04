@@ -21,6 +21,7 @@ import { usePermissions } from '@/features/auth/permissions';
 import { useTaskActions } from '@/features/tasks/task-actions';
 import { lastPathOf, type AreaMemory } from './area-memory';
 import { AREA_HOME, AREA_SHORT_LABELS, isActivePath, navItemsFor, SETTINGS_ITEM, splitRail, type Area, type NavItem } from './nav';
+import { MemberAvatar } from '@/components/ui/member-avatar';
 
 interface SidebarProps {
   /** Area whose rail is shown (Gestão or Financeiro). */
@@ -74,10 +75,10 @@ export function Sidebar({ area, memory }: SidebarProps) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="relative flex size-10 items-center justify-center rounded-full bg-primary-soft text-[13px] font-bold text-primary-soft-fg ring-2 ring-surface transition-transform hover:scale-105"
+              className="relative flex size-10 items-center justify-center rounded-full ring-2 ring-surface transition-transform hover:scale-105"
               aria-label={`Menu do usuário — espaço ${workspace?.name ?? ''}`}
             >
-              {initials(user?.name)}
+              <MemberAvatar size="lg" name={user?.name} userId={user?.id} photoVersion={user?.photoUpdatedAt ?? null} />
               {/* Shared workspaces get a small badge so the active one is visible at a glance. */}
               {KindIcon && workspace?.kind !== 'personal' ? (
                 <span className="absolute -right-1 -bottom-1 flex size-[18px] items-center justify-center rounded-full bg-primary text-primary-fg ring-2 ring-bg-subtle">

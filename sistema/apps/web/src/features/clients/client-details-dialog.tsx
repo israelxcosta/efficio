@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router';
-import { HandCoins, Pencil, ReceiptText } from 'lucide-react';
-import { TAX_REGIME_LABELS, formatBRL, formatBps, formatCNPJ, formatDateBR, type Client } from '@effinance/shared';
+import { FileSignature, HandCoins, Pencil, ReceiptText } from 'lucide-react';
+import { TAX_REGIME_LABELS, formatBRL, formatBps, formatCNPJ, formatDateBR, todayISO, type Client } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/dialog';
 import { WriteGate } from '@/features/auth/permissions';
 import { pluralize } from '@/lib/utils';
 import { ClientProfile, ProfileItem } from './client-profile';
+import { ClientDocumentsList, ClientRegistrations } from './client-records';
 
 /** Read-only view of a client ("Consultar"). */
 export function ClientDetailsDialog({
@@ -14,11 +15,14 @@ export function ClientDetailsDialog({
   onClose,
   onEdit,
   onFees,
+  onContract,
 }: {
   client: Client | null;
   onClose: () => void;
   onEdit: (c: Client) => void;
   onFees: (c: Client) => void;
+  /** "Gerar contrato" (spec §13.9): checks what is missing first. */
+  onContract?: (c: Client) => void;
 }) {
   const navigate = useNavigate();
   const c = client;
@@ -43,6 +47,11 @@ export function ClientDetailsDialog({
             <Button variant="outline" onClick={() => onFees(c)}>
               <HandCoins /> Honorários
             </Button>
+            {onContract ? (
+              <Button variant="outline" onClick={() => onContract(c)}>
+                <FileSignature /> Gerar contrato
+              </Button>
+            ) : null}
             <WriteGate>
               <Button onClick={() => onEdit(c)}>
                 <Pencil /> Editar
@@ -69,6 +78,12 @@ export function ClientDetailsDialog({
 
           <ClientProfile
             client={c}
+            afterContract={
+              <>
+                <ClientRegistrations client={c} />
+                <ClientDocumentsList client={c} today={todayISO()} />
+              </>
+            }
             contractExtra={
               <>
                 <ProfileItem label="Vencimento do honorário">Dia {c.feeDueDay} do mês seguinte à competência</ProfileItem>

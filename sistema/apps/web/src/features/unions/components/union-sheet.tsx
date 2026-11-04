@@ -194,7 +194,8 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
           }}
         >
           <fieldset className="flex flex-col gap-3" disabled={readOnly}>
-            <legend className={groupTitle}>Identificação</legend>
+            <legend className="sr-only">Identificação</legend>
+            <h3 aria-hidden className={groupTitle}>Identificação</h3>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="union-document">CNPJ*</Label>
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -239,7 +240,8 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
           </fieldset>
 
           <fieldset className="flex flex-col gap-3" disabled={readOnly}>
-            <legend className={groupTitle}>Convenção coletiva</legend>
+            <legend className="sr-only">Convenção coletiva</legend>
+            <h3 aria-hidden className={groupTitle}>Convenção coletiva</h3>
             <Field
               label="Mês da data-base"
               error={e.baseMonth?.message}
@@ -289,7 +291,8 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
           </section>
 
           <fieldset className="flex flex-col gap-3" disabled={readOnly}>
-            <legend className={groupTitle}>Endereço</legend>
+            <legend className="sr-only">Endereço</legend>
+            <h3 aria-hidden className={groupTitle}>Endereço</h3>
             <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
               <Field label="CEP" error={e.zipCode?.message}>
                 {masked('zipCode', formatCEP, { placeholder: '00000-000', inputMode: 'numeric' })}
@@ -333,7 +336,8 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
           </fieldset>
 
           <fieldset className="flex flex-col gap-3" disabled={readOnly}>
-            <legend className={groupTitle}>Contato e responsável</legend>
+            <legend className="sr-only">Contato e responsável</legend>
+            <h3 aria-hidden className={groupTitle}>Contato e responsável</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Telefone" error={e.phone?.message}>
                 {masked('phone', formatPhone, { placeholder: '(00) 0000-0000', inputMode: 'tel' })}

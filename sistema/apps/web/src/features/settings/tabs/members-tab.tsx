@@ -193,7 +193,7 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
                     {m.isYou ? <Badge tone="brand">Você</Badge> : null}
                   </p>
                   <p className="truncate text-xs text-muted">{m.email}</p>
-                  {m.role !== 'owner' ? (
+                  {canManageMembers && m.role !== 'owner' ? (
                     <p className="text-caption text-muted" title={adjustmentSummary(m) ?? undefined}>
                       {memberAccessLine(m)}
                     </p>
@@ -206,7 +206,7 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
                     </Button>
                     <Select
                       size_="sm"
-                      wrapperClassName="w-32"
+                      wrapperClassName="w-36"
                       aria-label={`Permissão de ${m.name}`}
                       value={m.role}
                       disabled={updateRole.isPending}

@@ -45,6 +45,8 @@ interface ClientProfileProps {
   /** The Gestão sheet shows the contacts in its own section. */
   showContacts?: boolean;
   showNotes?: boolean;
+  /** Sections right after "Contrato e tributação" (the finance dialog: accesses and documents). */
+  afterContract?: ReactNode;
 }
 
 /**
@@ -52,7 +54,7 @@ interface ClientProfileProps {
  * company and the inactivation. Used by the read-only client sheet of the Gestão and, with the fees,
  * by the "Consultar" dialog of the finances.
  */
-export function ClientProfile({ client: c, contractExtra, showContacts = true, showNotes = true }: ClientProfileProps) {
+export function ClientProfile({ client: c, contractExtra, showContacts = true, showNotes = true, afterContract }: ClientProfileProps) {
   return (
     <div className="flex flex-col gap-6">
       {c.inactivation ? (
@@ -91,6 +93,8 @@ export function ClientProfile({ client: c, contractExtra, showContacts = true, s
         <ProfileItem label="Cliente desde">{formatDateBR(c.contractStartDate)}</ProfileItem>
         {contractExtra}
       </ProfileSection>
+
+      {afterContract}
 
       {showContacts ? (
         <ProfileSection title="Responsável na empresa">

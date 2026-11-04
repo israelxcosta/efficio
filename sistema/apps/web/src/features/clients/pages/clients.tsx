@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  FileSignature,
   HandCoins,
   Pencil,
   Plus,
@@ -47,6 +48,7 @@ import { ClientSheet } from '../client-sheet';
 import { ClientsSummary } from '../clients-summary';
 import { FeesDialog } from '../fees-dialog';
 import { InactivateDialog } from '../inactivate-dialog';
+import { useGenerateContract } from '@/features/office/components/contract-requirements-dialog';
 
 const PAGE_SIZE = 25;
 
@@ -138,6 +140,8 @@ export default function ClientsPage() {
   const [toInactivate, setToInactivate] = useState<Client | null>(null);
   const [toReactivate, setToReactivate] = useState<Client | null>(null);
   const [toDelete, setToDelete] = useState<Client | null>(null);
+  // "Gerar contrato" (phase 3): what is missing first, then the print page.
+  const contract = useGenerateContract({ onEdit: (c) => setSheet({ open: true, client: c }), onFees: (c) => setFeesFor(c) });
   const del = useDeleteClient();
   const reactivate = useReactivateClient();
   const today = todayISO();
@@ -202,6 +206,7 @@ export default function ClientsPage() {
         icon={<HandCoins />}
         onClick={() => setFeesFor(c)}
       />
+      <RowAction label="Gerar contrato" icon={<FileSignature />} onClick={() => void contract.start(c)} />
       {c.status === 'active' ? (
         <RowAction
           label="Inativar"
@@ -515,7 +520,12 @@ export default function ClientsPage() {
           setViewingId(null);
           setFeesFor(c);
         }}
+        onContract={(c) => {
+          setViewingId(null);
+          void contract.start(c);
+        }}
       />
+      {contract.dialog}
       <FeesDialog client={feesFor} onClose={() => setFeesFor(null)} />
       <InactivateDialog client={toInactivate} onClose={() => setToInactivate(null)} />
       <ConfirmDialog

@@ -124,7 +124,8 @@ export function railAreaFor(pathname: string, memory: AreaMemory, canAccessFinan
  * Where to land after signing in: the page the visitor first opened (`from`), unless it is a finance
  * page and the member cannot open it — then the Início, not "Acesso restrito" right at the entrance.
  */
-export function landingPath(from: string, role: string | null | undefined): string {
-  const admin = role === 'owner' || role === 'editor';
-  return areaOf(from) === 'financeiro' && !admin ? '/' : from;
+export function landingPath(from: string, access: string | boolean | null | undefined): string {
+  // `access`: the `finance` key (phase 3) or, as before, the role's default.
+  const finance = typeof access === 'boolean' ? access : access === 'owner' || access === 'editor';
+  return areaOf(from) === 'financeiro' && !finance ? '/' : from;
 }

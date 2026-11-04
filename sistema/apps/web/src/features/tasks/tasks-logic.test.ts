@@ -1,3 +1,4 @@
+import { rolePermissions } from '@effinance/shared';
 import { describe, expect, it } from 'vitest';
 import type { Client, ClientResponsible } from '@effinance/shared';
 import { settingsTabsFor } from '@/features/settings/pages/settings';
@@ -99,7 +100,15 @@ describe('home department', () => {
 
   it('gives collaborators their own department only (the API decides)', () => {
     const o = makeOptions();
-    expect(resolveHomeDepartment({ ...o, me: { ...o.me, isAdmin: false, role: 'viewer' } }, CONTABIL.id, 'all')).toBeUndefined();
+    expect(resolveHomeDepartment({ ...o, me: { ...o.me, isAdmin: false, role: 'viewer', permissions: rolePermissions('viewer') } }, CONTABIL.id, 'all')).toBeUndefined();
+  });
+
+  it('follows the `registry` key, not the role (phase 3 adjustments)', () => {
+    const o = makeOptions();
+    const viewerWithRegistry = { ...o, me: { ...o.me, isAdmin: false, role: 'viewer' as const, permissions: { ...rolePermissions('viewer'), registry: true } } };
+    expect(resolveHomeDepartment(viewerWithRegistry, CONTABIL.id, null)).toBe(CONTABIL.id);
+    const editorWithout = { ...o, me: { ...o.me, permissions: { ...rolePermissions('editor'), registry: false } } };
+    expect(resolveHomeDepartment(editorWithout, CONTABIL.id, 'all')).toBeUndefined();
   });
 });
 

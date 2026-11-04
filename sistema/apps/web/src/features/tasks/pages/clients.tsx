@@ -7,6 +7,7 @@ import {
   TAX_REGIME_LABELS,
   TAX_REGIMES,
   type Client,
+  type ClientDocumentAlert,
   type ClientResponsible,
   type TaskMember,
   type TaskRef,
@@ -43,6 +44,8 @@ import { TaskClientSheet } from '../components/task-client-sheet';
 import { shortName } from '../due';
 import { tasksHref } from '../url-state';
 import { filterClients, missingDepartments, type ClientFilters, type ClientSituation } from '../client-filters';
+import { useClientDocumentAlerts } from '@/features/deadlines/api';
+import { mostUrgentText } from '@/features/deadlines/deadline-logic';
 
 const PAGE_SIZE = 50;
 type Situation = ClientSituation;
@@ -72,6 +75,11 @@ export default function TaskClientsPage() {
   };
   const page = Math.max(1, Number(params.get('pagina') ?? '1') || 1);
   const openId = params.get('cliente');
+  // Documents with expiry date (phase 3): the summary cell, the filter and the subtitle.
+  const docsRaw = params.get('documentos');
+  const docsFilter: 'overdue' | 'within30' | null = docsRaw === 'vencidos' ? 'overdue' : docsRaw === '30-dias' ? 'within30' : null;
+  const docAlerts = useClientDocumentAlerts();
+  const alertsById = useMemo(() => new Map((docAlerts.data?.items ?? []).map((a) => [a.clientId, a])), [docAlerts.data]);
 
   function update(patch: Record<string, string | null>) {
     const next = new URLSearchParams(params);
@@ -93,7 +101,15 @@ export default function TaskClientsPage() {
   }, [searchInput]);
 
   const all = clients.data ?? [];
-  const filtered = useMemo(() => filterClients(all, filters, departments, items), [all, departments, items, JSON.stringify(filters)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filtered = useMemo(() => {
+    const list = filterClients(all, filters, departments, items);
+    if (!docsFilter) return list;
+    return list.filter((c) => {
+      const a = alertsById.get(c.id);
+      return a ? (docsFilter === 'overdue' ? a.overdue > 0 : a.within30 > 0) : false;
+    });
+  }, [all, departments, items, JSON.stringify(filters), docsFilter, alertsById]); // eslint-disable-line react-hooks/exhaustive-deps
+  const docTotals = docAlerts.data?.totals;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const shown = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const active = all.filter((c) => c.status === 'active');
@@ -139,7 +155,7 @@ export default function TaskClientsPage() {
 
       {clients.isError && !clients.data ? null : (
         <section aria-label="Resumo dos responsáveis" aria-busy={ready ? undefined : true} className="overflow-hidden rounded-xl border border-border bg-surface">
-          <div className="grid md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div className="grid md:grid-cols-2 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.4fr)]">
             <div className="min-w-0 p-4 sm:p-5">
               <SummaryLabel>Clientes ativos</SummaryLabel>
               {ready ? (
@@ -194,7 +210,42 @@ export default function TaskClientsPage() {
                 </p>
               ) : null}
             </div>
-            <div className="min-w-0 border-t border-border px-4 pt-4 pb-4 sm:px-5 md:col-span-2 lg:col-span-1 lg:border-t-0 lg:border-l lg:pt-5">
+            <div className="min-w-0 border-t border-border p-4 sm:p-5 lg:border-t-0 lg:border-l">
+              <button
+                type="button"
+                aria-pressed={docsFilter === 'overdue'}
+                disabled={!docTotals}
+                onClick={() => update({ documentos: docsFilter === 'overdue' ? null : 'vencidos' })}
+                aria-label={docTotals ? `Documentos vencidos: ${docTotals.overdue}. Filtrar a lista.` : 'Documentos'}
+                className={cn('-m-2 block w-[calc(100%+1rem)] p-2 text-left disabled:cursor-default', toggleClass)}
+              >
+                <SummaryLabel info="Certificados, certidões e alvarás dos clientes ativos, cadastrados no financeiro.">Documentos</SummaryLabel>
+                {docTotals ? (
+                  <span className={cn('tabular mt-1 block text-kpi leading-10 font-semibold tracking-tight', docTotals.overdue > 0 ? 'text-danger' : 'text-fg')}>
+                    {pluralize(docTotals.overdue, 'vencido', 'vencidos')}
+                  </span>
+                ) : (
+                  <span className="mt-1 flex h-10 items-center">
+                    <Skeleton className="h-6 w-24" />
+                  </span>
+                )}
+              </button>
+              {docTotals ? (
+                docTotals.within30 > 0 ? (
+                  <button
+                    type="button"
+                    aria-pressed={docsFilter === 'within30'}
+                    onClick={() => update({ documentos: docsFilter === 'within30' ? null : '30-dias' })}
+                    className={cn('-mx-1.5 mt-1 flex min-h-7 items-center px-1.5 text-left text-body-sm font-semibold text-fg underline decoration-border-strong underline-offset-4 hover:decoration-current', toggleClass)}
+                  >
+                    {docTotals.within30} {docTotals.within30 === 1 ? 'vence' : 'vencem'} em até 30 dias
+                  </button>
+                ) : (
+                  <p className="mt-1 text-body-sm text-muted">Nada vence em 30 dias.</p>
+                )
+              ) : null}
+            </div>
+            <div className="min-w-0 border-t border-border px-4 pt-4 pb-4 sm:px-5 md:border-l lg:border-t-0 lg:pt-5">
               <SummaryLabel>Com responsável, por departamento</SummaryLabel>
               {!ready ? (
                 <div className="mt-2 flex flex-col gap-2" aria-hidden>
@@ -339,7 +390,7 @@ export default function TaskClientsPage() {
                     variant="outline"
                     onClick={() => {
                       setSearchInput('');
-                      update({ busca: null, situacao: null, regime: null, departamento: null, responsavel: null, 'sem-responsavel': null });
+                      update({ busca: null, situacao: null, regime: null, departamento: null, responsavel: null, 'sem-responsavel': null, documentos: null });
                     }}
                   >
                     Limpar filtros
@@ -365,6 +416,7 @@ export default function TaskClientsPage() {
                 selecting={selected.size > 0}
                 onSelect={(on) => toggleSelected(c.id, on)}
                 onOpen={() => update({ cliente: c.id, pagina: params.get('pagina') })}
+                docAlert={docsFilter ? alertsById.get(c.id) : undefined}
               />
             ))
           )}
@@ -423,10 +475,12 @@ interface ClientRowProps {
   selecting: boolean;
   onSelect: (on: boolean) => void;
   onOpen: () => void;
+  /** Under the "Documentos" filter: the most urgent document goes in the subtitle. */
+  docAlert?: ClientDocumentAlert;
 }
 
 /** Client row in the pattern of the task row (spec §13.1): identification, CNPJ, regime, responsibles, menu. */
-function ClientRow({ client: c, columns, perDepartment, items, isAdmin, members, selected, selecting, onSelect, onOpen }: ClientRowProps) {
+function ClientRow({ client: c, columns, perDepartment, items, isAdmin, members, selected, selecting, onSelect, onOpen, docAlert }: ClientRowProps) {
   const navigate = useNavigate();
   const canFinance = usePermissions().can('finance');
   const name = c.tradeName || c.name;
@@ -451,9 +505,15 @@ function ClientRow({ client: c, columns, perDepartment, items, isAdmin, members,
             <span className={cn('min-w-[4.5rem] truncate text-sm font-semibold', inactive ? 'text-muted' : 'text-fg')}>{name}</span>
             {inactive ? <Badge tone="neutral">Inativo</Badge> : null}
           </span>
-          <span className="mt-0.5 block truncate text-xs text-muted">
-            {inactive && c.inactivation ? `Inativo desde ${formatDateBR(c.inactivation.date)}` : c.tradeName ? c.name : TAX_REGIME_LABELS[c.taxRegime]}
-          </span>
+          {docAlert?.mostUrgent ? (
+            <span className={cn('mt-0.5 block truncate text-xs', docAlert.mostUrgent.deadline.bucket === 'overdue' ? 'text-danger' : 'text-warning')}>
+              {mostUrgentText(docAlert.mostUrgent)}
+            </span>
+          ) : (
+            <span className="mt-0.5 block truncate text-xs text-muted">
+              {inactive && c.inactivation ? `Inativo desde ${formatDateBR(c.inactivation.date)}` : c.tradeName ? c.name : TAX_REGIME_LABELS[c.taxRegime]}
+            </span>
+          )}
           <span className="mt-0.5 block truncate text-xs text-muted @3xl:hidden">
             <span className="tabular">{formatCNPJ(c.document)}</span>
             <span className="@2xl:hidden"> · {TAX_REGIME_LABELS[c.taxRegime]}</span>

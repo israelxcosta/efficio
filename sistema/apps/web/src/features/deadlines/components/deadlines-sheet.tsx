@@ -228,17 +228,28 @@ const menuButton =
 /** Right column of a deadline row: the date and "Venceu há 3 dias". */
 export function DeadlineWhen({ date, deadline, tooltip }: { date: string | null; deadline: { bucket: DocumentDeadline['deadline']['bucket']; days: number | null }; tooltip?: string }) {
   const content = (
-    <span className="flex shrink-0 flex-col items-end text-right">
+    <span className="hidden shrink-0 flex-col items-end text-right sm:flex">
       <span className="tabular text-[13px] font-medium text-fg">{date ? formatDateBR(date) : '—'}</span>
       <span className={cn('text-xs', deadlineClass(deadline))}>{deadlineLabel(deadline, 'Sem vencimento')}</span>
     </span>
   );
   return tooltip ? (
     <Tooltip content={tooltip}>
-      <span tabIndex={-1}>{content}</span>
+      <span tabIndex={-1} className="hidden sm:inline">
+        {content}
+      </span>
     </Tooltip>
   ) : (
     content
+  );
+}
+
+/** Phones: the date and the deadline go on a line of their own under the title. */
+function DeadlineInline({ date, deadline }: { date: string | null; deadline: { bucket: DocumentDeadline['deadline']['bucket']; days: number | null } }) {
+  return (
+    <span className="mt-0.5 block text-xs sm:hidden">
+      <span className="tabular text-fg">{date ? formatDateBR(date) : '—'}</span> · <span className={deadlineClass(deadline)}>{deadlineLabel(deadline, 'Sem vencimento')}</span>
+    </span>
   );
 }
 
@@ -255,6 +266,7 @@ export function DocumentDeadlineRow({ doc, today }: { doc: DocumentDeadline; tod
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-fg">{label}</span>
         <span className="block truncate text-xs text-muted">{subtitle}</span>
+        <DeadlineInline date={doc.expiresAt} deadline={doc.deadline} />
       </span>
       <DeadlineWhen date={doc.expiresAt} deadline={doc.deadline} />
       <DropdownMenu>
@@ -304,6 +316,7 @@ function ConventionDeadlineRow({ item }: { item: ConventionDeadline }) {
         <span className="block truncate text-xs text-muted">
           Convenção {item.cycle.label} · {pluralize(item.clientCount, 'cliente', 'clientes')}
         </span>
+        <DeadlineInline date={item.cycle.dueDate} deadline={item.cycle} />
       </span>
       <DeadlineWhen date={item.cycle.dueDate} deadline={item.cycle} tooltip={`Convenção Coletiva ${item.cycle.label}`} />
       <DropdownMenu>
