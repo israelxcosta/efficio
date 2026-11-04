@@ -88,7 +88,13 @@ export async function listAttachments(ctx: TaskContext, taskId: string): Promise
 /** Any member. The file comes in base64 (JSON body); size, type, signature and limits are checked. */
 export async function addAttachment(ctx: TaskContext, taskId: string, input: AttachmentInput): Promise<TaskAttachment> {
   await assertTask(ctx, taskId);
-  const bytes = decodeBase64(input.content);
+  let bytes: Uint8Array;
+  try {
+    bytes = decodeBase64(input.content);
+  } catch {
+    // Alphabet characters with an impossible length (or padding): the client's error, not a 500.
+    throw new ValidationError('Conteúdo do arquivo inválido.');
+  }
   if (bytes.length === 0) throw new ValidationError('O arquivo está vazio.');
   if (bytes.length > MAX_ATTACHMENT_BYTES) throw new ValidationError('O arquivo passa de 10 MB.');
   const problem = attachmentProblem(input.fileName, input.contentType, bytes);

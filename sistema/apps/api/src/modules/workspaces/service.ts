@@ -248,6 +248,30 @@ export function assertGrantable(actor: PermissionMap, before: PermissionMap, aft
   }
 }
 
+/**
+ * What a change by `actor` stores: the member goes to `role` with the `requested` adjustments, but only
+ * in the keys the actor holds. Nobody changes — grants or revokes — a key they do not have: those keep
+ * their current effective value, whatever the request or the new role's defaults say ("voltar ao padrão
+ * do papel" or a demotion never takes away a key the editor cannot give back). A request that would
+ * turn on a key the actor does not hold is refused (403 with `details.keys`).
+ */
+export function resolvePermissionChange(
+  actor: PermissionMap,
+  current: { role: MemberRole; permissions: PermissionOverrides },
+  role: Exclude<MemberRole, 'owner'>,
+  requested: PermissionOverrides,
+  opts: { normalize: boolean },
+): { before: PermissionMap; after: PermissionMap; overrides: PermissionOverrides } {
+  const before = effectivePermissions(current.role, current.permissions);
+  const desired = effectivePermissions(role, requested);
+  assertGrantable(actor, before, desired);
+  const kept: PermissionOverrides = { ...requested };
+  for (const k of PERMISSION_KEYS) if (!actor[k] && desired[k] !== before[k]) kept[k] = before[k];
+  // A role change keeps the stored adjustments as they are; the permissions sheet stores only what differs.
+  const overrides = opts.normalize ? normalizePermissionOverrides(role, kept) : kept;
+  return { before, after: effectivePermissions(role, overrides), overrides };
+}
+
 interface MembershipRow {
   userId: string;
   role: MemberRole;
@@ -274,7 +298,8 @@ export interface MemberRoleChange {
 /**
  * Changes a member's role (permission `members`; by default the owner, as before). The adjustments are
  * kept (only what was not adjusted follows the new role). Nobody grants what they do not have: every key
- * the new role turns on must be held by the requester.
+ * the new role turns on must be held by the requester; the keys the requester does not hold keep their
+ * value (`resolvePermissionChange`).
  */
 export async function changeMemberRole(
   db: DbExecutor,
@@ -285,12 +310,10 @@ export async function changeMemberRole(
   if (userId === access.userId) throw new ValidationError('Você não pode alterar o seu próprio papel');
   const current = await getMembershipOrThrow(db, access.workspaceId, userId);
   if (current.role === 'owner') throw new NotFoundError('Membro não encontrado');
-  const before = effectivePermissions(current.role, current.permissions);
-  const after = effectivePermissions(role, current.permissions);
-  assertGrantable(access.permissions, before, after);
+  const { before, after, overrides } = resolvePermissionChange(access.permissions, current, role, current.permissions, { normalize: false });
   const [row] = await db
     .update(workspaceMembers)
-    .set({ role })
+    .set({ role, permissions: overrides })
     .where(
       and(
         eq(workspaceMembers.workspaceId, access.workspaceId),
@@ -332,8 +355,9 @@ export interface MemberPermissionsChange {
 /**
  * Saves the adjustments of a member (and, optionally, the role). Rules (spec §13.10 and §18.11): the
  * owner has every key and is never adjusted; nobody changes their own permissions; nobody grants a key
- * they do not have, and a key the requester does not have cannot be adjusted either (its switch is
- * disabled on screen). Only the keys that differ from the role's default are stored.
+ * they do not have, and a key the requester does not have keeps its value whatever is sent (its switch is
+ * disabled on screen; `resolvePermissionChange`). Only the keys that differ from the role's default are
+ * stored.
  */
 export async function setMemberPermissions(
   db: DbExecutor,
@@ -347,19 +371,13 @@ export async function setMemberPermissions(
     throw new ValidationError('O proprietário tem todas as permissões, sempre, e não pode ser ajustado');
   }
   const role = input.role ?? (current.role as Exclude<MemberRole, 'owner'>);
-  const overrides = normalizePermissionOverrides(role, input.overrides);
-  const before = effectivePermissions(current.role, current.permissions);
-  const after = effectivePermissions(role, overrides);
-  assertGrantable(access.permissions, before, after);
-  // Adjusting (on or off) a key the requester does not have is refused too.
-  const touched = (PERMISSION_KEYS as readonly PermissionKey[]).filter((k) => current.permissions[k] !== overrides[k]);
-  const notHeld = touched.filter((k) => !access.permissions[k]);
-  if (notHeld.length > 0) {
-    throw new ForbiddenError(
-      `Você não tem estas permissões para ajustar: ${notHeld.map((k) => PERMISSION_LABELS[k]).join(', ')}.`,
-      { keys: notHeld },
-    );
-  }
+  const { before, after, overrides } = resolvePermissionChange(
+    access.permissions,
+    current,
+    role,
+    normalizePermissionOverrides(role, input.overrides),
+    { normalize: true },
+  );
   const [row] = await db
     .update(workspaceMembers)
     .set({ role, permissions: overrides })

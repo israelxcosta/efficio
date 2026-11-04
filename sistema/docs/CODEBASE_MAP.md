@@ -65,7 +65,7 @@ sistema/
 │                               juros/multa (late-fees), score de inadimplência (delinquency),
 │                               faixas de vencimento/ciclo da convenção (deadlines) e contrato
 ├── apps/api/
-│   ├── drizzle/0000…0015*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
+│   ├── drizzle/0000…0016*.sql  migrações (0004+ escritas à mão, reexecutáveis, rodam no PGlite)
 │   ├── src/app.ts, server.ts   montagem do Fastify, hooks globais, árvore de rotas
 │   ├── src/routes.ts           domainRoutes (tenantRoutes) e scopedRoutes (inTenant)
 │   ├── src/setup.ts, env.ts    providers (e-mail, cobrança, Open Finance, CNPJ) e env validado
@@ -224,7 +224,9 @@ sequenceDiagram
   0013 descrição e comentários de tarefas cifrados (CHECK de formato `NOT VALID` + backfill) · 0014
   tarefas fase 2 (recorrentes e colunas de ocorrência em `tasks`, processos e modelos, histórico,
   anexos, anotações, gatilhos LGPD) · 0015 fase 3 (ajustes de permissão em `workspace_members`, dados
-  fiscais/acessos em `contacts`, documentos, sindicatos/convenções/vínculos, escritório, fotos). Escritas
+  fiscais/acessos em `contacts`, documentos, sindicatos/convenções/vínculos, escritório, fotos) · 0016
+  revisão das fases 2/3 (responsáveis do histórico pseudonimizados na exclusão da conta, índices do
+  calendário e de "quem viu", CHECK do modelo de contrato). Escritas
   para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tarefas usam `todayIn('America/Sao_Paulo')` (o dia do escritório, não o do servidor

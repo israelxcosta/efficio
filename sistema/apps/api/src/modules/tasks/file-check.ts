@@ -35,6 +35,14 @@ export interface ZipInfo {
   entries: number;
   uncompressed: number;
   names: string[];
+  /** Some entry would land outside the extraction folder ("zip slip": `..`, absolute or drive paths). */
+  unsafePath: boolean;
+}
+
+/** `../x`, `a/../../x`, `/etc/x`, `C:\x` (with either separator): escapes the folder it is extracted to. */
+export function isUnsafeZipPath(name: string): boolean {
+  const path = name.replace(/\\/g, '/');
+  return path.startsWith('/') || /^[A-Za-z]:/.test(path) || path.split('/').includes('..');
 }
 
 /** Reads the central directory of a ZIP (never decompresses). Null for a broken or ZIP64 archive. */
@@ -57,6 +65,7 @@ export function readZipDirectory(bytes: Uint8Array): ZipInfo | null {
   const names: string[] = [];
   const decoder = new TextDecoder();
   let uncompressed = 0;
+  let unsafePath = false;
   let p = offset;
   for (let n = 0; n < total; n++) {
     if (p + 46 > offset + size || view.getUint32(p, true) !== 0x02014b50) return null;
@@ -66,10 +75,12 @@ export function readZipDirectory(bytes: Uint8Array): ZipInfo | null {
     const commentLength = view.getUint16(p + 32, true);
     if (entrySize === 0xffffffff) return null; // ZIP64 entry
     uncompressed += entrySize;
-    if (names.length < 200) names.push(decoder.decode(bytes.subarray(p + 46, p + 46 + nameLength)));
+    const name = decoder.decode(bytes.subarray(p + 46, p + 46 + nameLength));
+    if (isUnsafeZipPath(name)) unsafePath = true;
+    if (names.length < 200) names.push(name);
     p += 46 + nameLength + extraLength + commentLength;
   }
-  return { entries: total, uncompressed, names };
+  return { entries: total, uncompressed, names, unsafePath };
 }
 
 const decodeHead = (bytes: Uint8Array, length: number) =>
@@ -108,6 +119,7 @@ export function attachmentProblem(fileName: string, contentType: TaskAttachmentT
       if (!startsWith(bytes, ZIP_LOCAL) && !startsWith(bytes, ZIP_EMPTY)) return mismatch;
       const zip = readZipDirectory(bytes);
       if (!zip) return 'O arquivo compactado está corrompido ou usa um formato não aceito (ZIP64).';
+      if (zip.unsafePath) return 'O arquivo compactado tem um caminho inválido (fora da pasta de destino).';
       if (zip.entries > MAX_ZIP_ENTRIES || zip.uncompressed > MAX_UNCOMPRESSED_BYTES)
         return 'O arquivo expande para um tamanho muito maior que o permitido ao ser aberto. Envie um arquivo com menos conteúdo.';
       if (contentType !== 'application/zip') {

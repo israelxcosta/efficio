@@ -1884,6 +1884,11 @@ export interface OfficeBranding {
   legalName: string | null;
   /** `data:image/...;base64,…` or null. */
   logo: string | null;
+  /**
+   * Whether the office registry is filled in (legal name and CNPJ): what the home page needs to know,
+   * without reading `GET /office` (decrypted CPF and Pix key, `office` permission).
+   */
+  registered: boolean;
 }
 
 export interface OfficeContractSummary {

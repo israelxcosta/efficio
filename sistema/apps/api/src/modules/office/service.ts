@@ -61,6 +61,7 @@ export async function getBranding(ctx: Ctx): Promise<OfficeBranding> {
     name: row?.tradeName?.trim() ? row.tradeName : (row?.legalName ?? null),
     legalName: row?.legalName ?? null,
     logo: logoOf(row),
+    registered: Boolean(row?.legalName && row.document),
   };
 }
 
@@ -300,7 +301,7 @@ export async function clientContract(ctx: Ctx, clientId: string): Promise<Client
           : CONTRACT_FACTORY_WATERMARK
         : null,
     },
-    office: { name: office.tradeName?.trim() ? office.tradeName : office.legalName, legalName: office.legalName, logo: office.logo },
+    office: { name: office.tradeName?.trim() ? office.tradeName : office.legalName, legalName: office.legalName, logo: office.logo, registered: office.registered },
   };
 }
 

@@ -118,6 +118,20 @@ describe('attachment checks (pure)', () => {
     expect(attachmentProblem('planilha.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', small)).toMatch(/não corresponde/);
   });
 
+  it('refuses ZIP entries that would escape the folder they are extracted to (zip slip)', () => {
+    // Security review: the server never extracts, but whoever downloads the file does.
+    for (const name of ['../../etc/cron.d/x', 'docs/../../x.txt', '/etc/passwd', '..\\..\\Windows\\x.bat', 'C:\\x.bat', 'C:/x.bat']) {
+      const evil = zip([{ name: 'ok.txt', data: bytes('oi') }, { name, data: bytes('x') }]);
+      expect(attachmentProblem('a.zip', 'application/zip', evil), name).toMatch(/caminho/);
+    }
+    // Names after the first 200 entries are checked too.
+    const many = zip([...Array.from({ length: 205 }, (_, i) => ({ name: `f${i}.txt`, data: bytes('x') })), { name: '../x', data: bytes('x') }]);
+    expect(attachmentProblem('a.zip', 'application/zip', many)).toMatch(/caminho/);
+    // Ordinary names (folders, dots inside names, Windows separators) stay accepted.
+    const fine = zip([{ name: 'pasta/sub/a..b.txt', data: bytes('x') }, { name: 'pasta\\b.txt', data: bytes('x') }, { name: '.oculto', data: bytes('x') }]);
+    expect(attachmentProblem('a.zip', 'application/zip', fine)).toBeNull();
+  });
+
   it('writes safe headers and CSV cells', () => {
     expect(contentDisposition('Guia "DAS" ç.pdf')).toBe(`attachment; filename="Guia _DAS_ c.pdf"; filename*=UTF-8''Guia%20%22DAS%22%20%C3%A7.pdf`);
     expect(csvCell('=HYPERLINK("x")')).toBe(`"'=HYPERLINK(""x"")"`);
@@ -210,6 +224,20 @@ describe('task attachments', () => {
     // Far above it, the contract refuses the body before anything is decoded.
     const huge = Buffer.alloc(MAX_ATTACHMENT_BYTES + 4096, 0x41).toString('base64');
     expect((await upload(carla, task.id, 'grande.pdf', 'application/pdf', huge)).status).toBe(400);
+    expect((await carla.get(`/tasks/${task.id}/attachments`)).body).toEqual([]);
+  });
+
+  it('malformed base64 is the client\'s error (422), never a 500', async () => {
+    // Security review: characters of the alphabet with an impossible length passed the contract and
+    // made `atob` throw, answered as an unexpected error (500, logged as one).
+    const { carla } = await office(app);
+    const task = (await carla.post('/tasks', { title: 'Documentos' })).body;
+    for (const content of ['AAAAA', 'JVBERi0tA', 'AB=']) {
+      const res = await upload(carla, task.id, 'guia.pdf', 'application/pdf', content);
+      expect([400, 422], `${content}: ${res.status} ${JSON.stringify(res.body)}`).toContain(res.status);
+    }
+    const res = await upload(carla, task.id, 'guia.pdf', 'application/pdf', 'AAAAA');
+    expect(res).toMatchObject({ status: 422, body: { message: 'Conteúdo do arquivo inválido.' } });
     expect((await carla.get(`/tasks/${task.id}/attachments`)).body).toEqual([]);
   });
 

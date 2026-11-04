@@ -61,7 +61,7 @@ const CLIENT = {
 describe('office: registry, branding and logo', () => {
   it('every member reads name and logo; the rest needs `office`; personal data is encrypted', async () => {
     const { ana, bruno, carla } = await office(app);
-    expect((await carla.get('/office/branding')).body).toEqual({ name: null, legalName: null, logo: null });
+    expect((await carla.get('/office/branding')).body).toEqual({ name: null, legalName: null, logo: null, registered: false });
     const empty = await ana.get('/office');
     expect(empty.body).toMatchObject({ registered: false, missingForContract: ['Cadastro do escritório'], contract: { source: 'factory', watermark: { enabled: true, source: 'factory' } } });
 
@@ -98,7 +98,7 @@ describe('office: registry, branding and logo', () => {
     expect(row!.pix_key).toMatch(/^v1\./);
     expect(row!.legal_name).toBe('Efficio Contabilidade Ltda');
 
-    expect((await bruno.put('/office/logo', { logo: PNG })).body).toEqual({ name: 'Efficio Contabilidade', legalName: 'Efficio Contabilidade Ltda', logo: PNG });
+    expect((await bruno.put('/office/logo', { logo: PNG })).body).toEqual({ name: 'Efficio Contabilidade', legalName: 'Efficio Contabilidade Ltda', logo: PNG, registered: true });
     expect((await carla.get('/office/branding')).body.logo).toBe(PNG);
     expect((await ana.get('/office')).body.logo).toBe(PNG);
     expect((await bruno.del('/office/logo')).status).toBe(204);
@@ -113,6 +113,18 @@ describe('office: registry, branding and logo', () => {
     const other = await registerUser(app, 'Outro Escritório');
     expect((await other.get('/office')).body.registered).toBe(false);
     expect((await other.get('/office/branding')).body.name).toBeNull();
+  });
+
+  it('the branding says whether the office is registered, without the personal data of `GET /office`', async () => {
+    // Security review: the home page read `GET /office` (decrypted CPF and Pix key) only to know this.
+    const { ana, carla } = await office(app);
+    expect((await carla.get('/office/branding')).body.registered).toBe(false);
+    expect((await ana.put('/office', OFFICE)).status).toBe(200);
+    const branding = await carla.get('/office/branding');
+    expect(branding.status).toBe(200);
+    expect(branding.body).toEqual({ name: 'Efficio Contabilidade', legalName: 'Efficio Contabilidade Ltda', logo: null, registered: true });
+    expect(JSON.stringify(branding.body)).not.toMatch(/98765432100|financeiro@efficio\.app/i);
+    expect((await carla.get('/office')).status).toBe(403);
   });
 
   it('images: PNG, JPG or WebP checked by signature, up to 500 KB, never SVG', async () => {

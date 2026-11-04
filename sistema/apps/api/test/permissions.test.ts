@@ -190,17 +190,56 @@ describe('permissions: nobody grants what they do not have', () => {
     expect((await put(bruno, carla.userId, { overrides: { registry: true } })).status).toBe(200);
     // A role that would turn `finance` on is refused too.
     expect((await bruno.patch(`/workspaces/current/members/${carla.userId}`, { role: 'editor' })).status).toBe(403);
-    // Not even with an adjustment that keeps it off: `finance` is a key he cannot touch.
-    expect((await put(bruno, carla.userId, { role: 'editor', overrides: { finance: false } })).status).toBe(403);
+    // With an adjustment that keeps it off, the role changes and `finance`, a key he cannot touch, stays as it was.
+    const promoted = await put(bruno, carla.userId, { role: 'editor', overrides: { finance: false } });
+    expect(promoted.status).toBe(200);
+    expect(promoted.body).toMatchObject({ role: 'editor', overrides: { finance: false } });
+    expect(promoted.body.effective.finance).toBe(false);
     expect((await carla.get('/accounts')).status).toBe(403);
     // Invites: the invited role's defaults must be held.
     expect((await bruno.post('/workspaces/current/invites', { email: `x-${randomUUID()}@teste.com`, role: 'editor' })).status).toBe(403);
     expect((await bruno.post('/workspaces/current/invites', { email: `y-${randomUUID()}@teste.com`, role: 'viewer' })).status).toBe(201);
-    // A key he does not have cannot be adjusted at all (its switch is disabled on screen).
+    // A key he does not have is never changed by him (its switch is disabled on screen): it stays as it is.
     expect((await put(ana, carla.userId, { role: 'viewer', overrides: { finance: true } })).status).toBe(200);
     const revoke = await put(bruno, carla.userId, { overrides: {} });
-    expect(revoke.status).toBe(403);
-    expect(revoke.body.details).toEqual({ keys: ['finance'] });
+    expect(revoke.status).toBe(200);
+    expect(revoke.body).toMatchObject({ role: 'viewer', overrides: { finance: true } });
+    expect((await carla.get('/accounts')).status).toBe(200);
+  });
+
+  it('who edits only changes (grants or revokes) the keys they hold: "voltar ao padrão" and demotions keep the others', async () => {
+    // Security review: resetting to the role's defaults, or demoting, revoked keys the editor does not have.
+    const { ana, bruno, carla } = await office(app);
+    const dani = await member(app, ana, 'editor', 'Daniela Alves');
+    expect((await put(ana, bruno.userId, { overrides: { members: true, finance: false } })).status).toBe(200);
+    expect((await put(ana, carla.userId, { overrides: { finance: true, registry: true } })).status).toBe(200);
+
+    // "Voltar ao padrão do papel": `registry` (held) goes back to the default; `finance` (not held) stays on.
+    const reset = await put(bruno, carla.userId, { overrides: {} });
+    expect(reset.status, JSON.stringify(reset.body)).toBe(200);
+    expect(reset.body).toMatchObject({ role: 'viewer', overrides: { finance: true } });
+    expect(reset.body.effective).toMatchObject({ finance: true, registry: false });
+    expect((await carla.get('/accounts')).status).toBe(200);
+    expect((await carla.post('/tasks/categories', { name: 'Certidões' })).status).toBe(403);
+    const audit = await lastAudit('member.permissions_changed', carla.userId);
+    expect(audit!.metadata).toMatchObject({ changes: { registry: { from: true, to: false } } });
+    expect((audit!.metadata as { changes: Record<string, unknown> }).changes.finance).toBeUndefined();
+
+    // Demoting an administrator: what he holds follows the new role; `finance` stays (PUT and PATCH).
+    const demoted = await put(bruno, dani.userId, { role: 'viewer', overrides: {} });
+    expect(demoted.status, JSON.stringify(demoted.body)).toBe(200);
+    expect(demoted.body).toMatchObject({ role: 'viewer', overrides: { finance: true } });
+    expect(demoted.body.effective).toMatchObject({ finance: true, registry: false, office: false });
+    expect((await dani.get('/accounts')).status).toBe(200);
+    expect((await put(ana, dani.userId, { role: 'editor', overrides: {} })).body).toMatchObject({ role: 'editor', overrides: {} });
+    expect((await bruno.patch(`/workspaces/current/members/${dani.userId}`, { role: 'viewer' })).status).toBe(200);
+    const patched = (await ana.get(`/workspaces/current/members/${dani.userId}/permissions`)).body;
+    expect(patched).toMatchObject({ role: 'viewer', overrides: { finance: true } });
+    expect((await dani.get('/accounts')).status).toBe(200);
+
+    // The owner (every key) still resets and demotes completely.
+    expect((await put(ana, carla.userId, { overrides: {} })).body).toMatchObject({ overrides: {} });
+    expect((await carla.get('/accounts')).status).toBe(403);
   });
 
   it('the owner is never adjusted, nobody adjusts themselves, and other workspaces are not found', async () => {

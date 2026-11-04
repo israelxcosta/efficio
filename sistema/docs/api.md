@@ -1329,7 +1329,7 @@ em `packages/shared/test/phase3.test.ts`.
 | GET | `/api/deadlines` | `deadlinesQuerySchema` (`kind` documents\|conventions) | `DeadlinesResponse` | todos |
 | GET | `/api/deadlines/summary` | — | `DeadlinesSummary` (faixa do Início e sino) | todos |
 | GET | `/api/deadlines/clients` | — | `ClientDocumentAlertsResponse` (filtro e subtítulo de Clientes da Gestão) | todos |
-| GET | `/api/office/branding` | — | `OfficeBranding` (nome e logo) | todos |
+| GET | `/api/office/branding` | — | `OfficeBranding` (nome, logo e `registered`: escritório cadastrado, sem os dados pessoais de `GET /office`) | todos |
 | GET | `/api/office` | — | `Office` (decifrado, com `missingForContract` e o resumo do contrato) | `office` |
 | PUT | `/api/office` | `officeInputSchema` | `Office` (auditado) | `office` |
 | PUT | `/api/office/logo` | `officeLogoInputSchema` (data URI, até 500 KB) | `OfficeBranding` | `office` |
@@ -1384,8 +1384,10 @@ acesso.", "Somente quem gerencia os membros do espaço pode fazer isso.".
 - **Regras de quem ajusta**: precisa de `members`; ninguém altera as próprias permissões nem o próprio
   papel (422); o proprietário não é ajustável (422); **ninguém concede o que não tem**: toda chave que
   passa de desligada para ligada (por ajuste, troca de papel ou papel de um convite) tem de estar com
-  quem faz a mudança (403 com `details.keys`), e uma chave que quem edita não tem também não pode ser
-  ajustada para desligar (403) — é o switch desabilitado da tela.
+  quem faz a mudança (403 com `details.keys`); e quem edita só altera (concede ou revoga) as chaves que
+  tem: as demais ficam com o valor efetivo atual, seja qual for o pedido — "voltar ao padrão do papel" ou
+  rebaixar o papel não tira de ninguém uma chave que quem edita não poderia devolver
+  (`resolvePermissionChange`; é o switch desabilitado da tela).
 - **Auditoria**: `member.permissions_changed` (e `member.role_changed`) em `audit_logs`, com quem
   (usuário da linha), quando e `metadata.changes = { chave: { from, to } }` das chaves efetivas que
   mudaram, mais o papel de/para e os ajustes gravados — sem nomes nem e-mails.
@@ -1494,6 +1496,24 @@ LGPD: gatilhos trocam por "Usuário excluído" os nomes gravados em `client_docu
 espaços, CHECKs, LGPD, reexecução), `test/phase3-scope.test.ts` (todo SQL dos serviços novos filtra por
 espaço; o verificador ficou em `test/scope-checker.ts`, compartilhado com `tasks-scope`),
 `permissions`, `unions`, `client-records`, `office`, `profile-photo` e `demo-seed-phase3`.
+
+## Banco (migração 0016)
+
+Revisão de segurança das fases 2 e 3, reexecutável e compatível com o PGlite:
+
+- **LGPD**: `task_events` ganha `from_assignee_id`/`to_assignee_id` (FK para `users` `ON DELETE SET NULL`,
+  preenchidas por gatilho a partir de `data.fromAssignee/toAssignee`; a API continua gravando só `data`).
+  Excluir a conta troca aquele lado de `data` por `{ id: null, name: "Usuário excluído" }` em todos os
+  espaços, inclusive os que a pessoa já tinha deixado (sair mantém o nome). Backfill por espaço (o dono
+  só vê linhas com `app.workspace_id`; o RLS forçado continua): nomes de contas já excluídas e ids
+  malformados são pseudonimizados.
+- **Índices**: `tasks_occurrence_target_idx` (calendário por meta das ocorrências) e `audit_logs_entity_idx`
+  (`(workspace_id, entity_id, created_at)`, "quem viu" um acesso; não parcial porque o postgres-js
+  prepara as consultas e um plano genérico não casa `action = $n` com predicado parcial).
+- **Contrato**: CHECK `offices_contract_blocks_chk` com `contract_blocks_valid(jsonb)` (IMMUTABLE, sem
+  SECURITY DEFINER, `search_path` fixo, EXECUTE só para `effinance_app`): bloco objeto só com
+  `type`/`text`/`rule`, tipo e regra dos catálogos, até 20.000 caracteres por bloco e 400.000 no total.
+- Teste: `test/phase23-db-review.test.ts`.
 
 ## Lacunas
 
