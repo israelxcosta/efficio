@@ -16,6 +16,7 @@ import {
 import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
 import { categories, importBatches, transactions, users, workspaceMembers, type ImportBatchRow } from '../../db/schema';
+import { appendTo } from '../../lib/collections';
 import { NotFoundError, ValidationError } from '../../lib/errors';
 import { inTenant } from '../../lib/tenant-scope';
 import { getAccountOrThrow, getCardOrThrow } from '../common/ownership';
@@ -170,7 +171,7 @@ async function findDuplicates(
   for (const c of candidates) {
     if (used.has(c.id)) continue;
     const key = contentKey(c.date, c.type, c.amount, c.description);
-    pool.set(key, [...(pool.get(key) ?? []), c.id]);
+    appendTo(pool, key, c.id);
   }
   for (const r of rows) {
     if (out.has(r.index)) continue;

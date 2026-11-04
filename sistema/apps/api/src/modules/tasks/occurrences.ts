@@ -21,6 +21,7 @@ import {
   type TaskStatus,
 } from '@effinance/shared';
 import { contacts, recurringTasks, taskCategories, tasks } from '../../db/schema';
+import { appendTo } from '../../lib/collections';
 import { inChunks } from '../../lib/sql';
 import type { TaskContext } from './access';
 import { clientDisplayName, departmentNames, memberRef, personRef } from './shared';
@@ -100,7 +101,7 @@ export async function aggregateOccurrences(
   const people = new Map<string, OccurrenceAssigneeCount[]>();
   for (const a of assignees) {
     const key = `${a.recurringTaskId}:${a.periodKey}`;
-    people.set(key, [...(people.get(key) ?? []), { assignee: memberRef(ctx, a.assigneeId), count: a.n }]);
+    appendTo(people, key, { assignee: memberRef(ctx, a.assigneeId), count: a.n });
   }
 
   return groups.flatMap((g) => {

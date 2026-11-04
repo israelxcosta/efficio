@@ -18,6 +18,7 @@ import type {
 import type { z } from 'zod';
 import { taskFlowSteps, taskFlowTemplateSteps, taskFlowTemplates, taskFlows, type TaskFlowRow, type TaskFlowTemplateRow } from '../../db/schema';
 import { ForbiddenError, NotFoundError } from '../../lib/errors';
+import { groupBy } from '../../lib/collections';
 import { TASK_ADMIN_MESSAGE, type TaskContext } from './access';
 import { decryptTaskText, encryptTaskText, FLOW_STEP_DESCRIPTION, TEMPLATE_DESCRIPTION, TEMPLATE_STEP_DESCRIPTION } from './encrypted-text';
 import { activateStep, categoryRefs, hydrateFlows } from './flow-engine';
@@ -186,8 +187,9 @@ async function hydrateTemplates(ctx: TaskContext, rows: TaskFlowTemplateRow[]): 
     const name = id ? departments.get(id) : undefined;
     return id && name ? { id, name } : null;
   };
+  const stepsByTemplate = groupBy(steps, (s) => s.templateId);
   return rows.map((row, i) => {
-    const own = steps.filter((s) => s.templateId === row.id);
+    const own = stepsByTemplate.get(row.id) ?? [];
     const depts = new Map<string, TaskRef>();
     for (const s of own) {
       const d = deptRef(s.departmentId);

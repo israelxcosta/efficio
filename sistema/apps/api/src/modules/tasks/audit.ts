@@ -16,6 +16,7 @@ import {
 } from '@effinance/shared';
 import type { z } from 'zod';
 import { contacts, tasks } from '../../db/schema';
+import { groupBy } from '../../lib/collections';
 import type { TaskContext } from './access';
 import { ensureOccurrences, generationBounds } from './generation';
 import { aggregateOccurrences, CELL_COLUMNS, occurrenceClients, toOccurrenceCell } from './occurrences';
@@ -116,8 +117,7 @@ export async function auditMatrix(ctx: TaskContext, q: AuditQuery): Promise<Audi
     departmentNames(ctx.db, ctx.workspaceId),
   ]);
 
-  const byClient = new Map<string, typeof filtered>();
-  for (const c of filtered) byClient.set(c.clientId, [...(byClient.get(c.clientId) ?? []), c]);
+  const byClient = groupBy(filtered, (c) => c.clientId);
   const clients: AuditClientRow[] = [...info.values()]
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
     .map((client) => {

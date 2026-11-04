@@ -20,6 +20,7 @@ import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
 import { clientDocuments, contacts, unionClients, unionConventions, unions, type ClientDocumentRow, type ContactRow } from '../../db/schema';
 import type { FieldCipher } from '../../lib/crypto/field-cipher';
+import { groupBy } from '../../lib/collections';
 import { InvalidTextError, NotFoundError } from '../../lib/errors';
 import { inChunks } from '../../lib/sql';
 
@@ -245,6 +246,7 @@ export async function loadClientUnions(
         .where(and(eq(unionConventions.workspaceId, workspaceId), inArray(unionConventions.unionId, chunk)))),
     );
   }
+  const cyclesByUnion = groupBy(cycles, (c) => c.unionId);
   for (const link of links) {
     const ref: ClientUnionRef = {
       id: link.unionId,
@@ -253,7 +255,7 @@ export async function loadClientUnions(
       active: link.active,
       tracked: trackedConvention(
         link.baseMonth,
-        cycles.filter((c) => c.unionId === link.unionId),
+        cyclesByUnion.get(link.unionId) ?? [],
         today,
       ),
     };

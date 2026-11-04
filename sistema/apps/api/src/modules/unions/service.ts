@@ -24,6 +24,7 @@ import {
 import type { z } from 'zod';
 import { contacts, unionClients, unionConventions, unions, type UnionRow } from '../../db/schema';
 import { now } from '../../lib/clock';
+import { groupBy } from '../../lib/collections';
 import { InvalidTextError, NotFoundError, ValidationError } from '../../lib/errors';
 import type { ScopedContext } from '../../lib/scoped-context';
 import { inChunks } from '../../lib/sql';
@@ -117,12 +118,15 @@ export async function unionItems(ctx: Ctx): Promise<{ item: UnionListItem; activ
     cyclesOf(ctx),
     linksOf(ctx),
   ]);
+  // Grouped once: a filter per union would be unions × links (up to 1000 × millions) on every read.
+  const linksByUnion = groupBy(links, (l) => l.unionId);
+  const cyclesByUnion = groupBy(cycles, (c) => c.unionId);
   return rows.map((row) => {
-    const mine = links.filter((l) => l.unionId === row.id);
+    const mine = linksByUnion.get(row.id) ?? [];
     return {
       item: toListItem(
         row,
-        cycles.filter((c) => c.unionId === row.id),
+        cyclesByUnion.get(row.id) ?? [],
         mine,
         ctx.today,
       ),

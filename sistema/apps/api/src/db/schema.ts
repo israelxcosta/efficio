@@ -305,6 +305,9 @@ export const auditLogs = pgTable(
   (t) => [
     index('audit_logs_workspace_idx').on(t.workspaceId, t.createdAt),
     index('audit_logs_user_idx').on(t.userId, t.createdAt),
+    // Migration 0016: the records of one entity ("quem viu" a client's access) without scanning the
+    // workspace's whole trail. Not partial: prepared statements get generic plans (`action = $n`).
+    index('audit_logs_entity_idx').on(t.workspaceId, t.entityId, t.createdAt),
   ],
 );
 
@@ -1319,6 +1322,8 @@ export const tasks = pgTable(
     unique('tasks_occurrence_uq').on(t.workspaceId, t.recurringTaskId, t.clientId, t.periodKey),
     index('tasks_recurring_idx').on(t.workspaceId, t.recurringTaskId, t.competence),
     index('tasks_competence_idx').on(t.workspaceId, t.competence).where(sql`${t.recurringTaskId} is not null`),
+    // Migration 0016: the calendar aggregates occurrences by target date (a range per request).
+    index('tasks_occurrence_target_idx').on(t.workspaceId, t.targetDate).where(sql`${t.recurringTaskId} is not null`),
     check(
       'tasks_occurrence_chk',
       sql`(${t.recurringTaskId} is null and ${t.competence} is null and ${t.periodKey} is null and ${t.referenceMonth} is null and ${t.targetDate} is null and ${t.assigneeSource} is null) or (${t.recurringTaskId} is not null and ${t.clientId} is not null and ${t.dueDate} is not null and ${t.targetDate} is not null and ${t.targetDate} <= ${t.dueDate} and ${t.competence} is not null and ${t.competence} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.referenceMonth} is not null and ${t.referenceMonth} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.periodKey} is not null and ${t.periodKey} ~ '^[0-9]{4}-(0[1-9]|1[0-2])(-[0-9]{2})?$' and (${t.assigneeSource} is null or ${t.assigneeSource} in ('manual', 'client', 'default')))`,
@@ -1700,12 +1705,21 @@ export const taskEvents = pgTable(
     data: jsonb().$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     /** Encrypted with the workspace key. */
     note: text(),
+    /**
+     * Migration 0016 (LGPD): ids of `data.fromAssignee`/`data.toAssignee`, filled by a trigger from `data`
+     * (the API writes only `data`). Deleting the account clears them and a trigger replaces that side of
+     * `data` with "Usuário excluído".
+     */
+    fromAssigneeId: uuid().references(() => users.id, { onDelete: 'set null' }),
+    toAssigneeId: uuid().references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
   },
   (t) => [
     tenantUnique('task_events', t),
     index('task_events_task_idx').on(t.workspaceId, t.taskId, t.seq),
     index('task_events_actor_idx').on(t.actorId).where(sql`${t.actorId} is not null`),
+    index('task_events_from_assignee_idx').on(t.fromAssigneeId).where(sql`${t.fromAssigneeId} is not null`),
+    index('task_events_to_assignee_idx').on(t.toAssigneeId).where(sql`${t.toAssigneeId} is not null`),
     check(
       'task_events_kind_chk',
       sql`${t.kind} in ('created', 'updated', 'assigned', 'status', 'reopened', 'commented', 'comment_removed', 'attachment_added', 'attachment_removed', 'flow_step')`,
@@ -2033,6 +2047,9 @@ export const offices = pgTable(
       'offices_contract_chk',
       sql`jsonb_typeof(${t.contractBlocks}) = 'array' and jsonb_array_length(${t.contractBlocks}) <= 500 and length(${t.contractBlocks}::text) <= 1200000`,
     ),
+    // Migration 0016: each block as the contract says (type/rule from the catalogs, 20 000 characters per
+    // block, 400 000 in total; nothing else in the object). `contract_blocks_valid` is in the SQL file.
+    check('offices_contract_blocks_chk', sql`public.contract_blocks_valid(${t.contractBlocks})`),
     check('offices_recorded_names_chk', sql`length(${t.updatedByName}) between 1 and 120 and length(${t.contractUpdatedByName}) between 1 and 120`),
   ],
 );
