@@ -15,13 +15,14 @@ import { toastError } from '@/lib/notify';
 import { cn, pluralize } from '@/lib/utils';
 import { useApplyRegimeGroup, useRegimeGroups } from '../api';
 import { dueRuleText } from '../recurring-rules';
-import { applyKeys, applyPreview, applyResultText, companiesText, handMadeTwins, ITEM_STATE_LABELS, itemState, type RegimeItemState } from '../regime-groups-logic';
+import { applyInput, applyPreview, applyResultText, companiesText, ITEM_STATE_LABELS, itemState, type RegimeItemState } from '../regime-groups-logic';
 
 const STATE_STYLE: Record<RegimeItemState, { tone: 'success' | 'neutral' | 'warning' | 'brand'; icon: typeof Check }> = {
   applied: { tone: 'success', icon: Check },
   missing: { tone: 'neutral', icon: CircleDashed },
   addRegime: { tone: 'brand', icon: CirclePlus },
   ended: { tone: 'warning', icon: Power },
+  handmade: { tone: 'neutral', icon: Check },
 };
 
 interface RegimeGroupsViewProps {
@@ -75,7 +76,8 @@ export function RegimeGroupsView({ regime, onRegime, onOpenRecurring }: RegimeGr
 
 function RegimeChoice({ group: g, selected, onSelect }: { group: RegimeGroup; selected: boolean; onSelect: () => void }) {
   const total = g.items.length;
-  const applied = total - g.missing;
+  // Covered: applied from the catalog or already made by hand (same name).
+  const applied = g.items.filter((i) => i.state === 'applied' || i.state === 'handmade').length;
   return (
     <button
       type="button"
@@ -106,19 +108,17 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
   const { canManage } = usePermissions();
   const apply = useApplyRegimeGroup();
   const [confirming, setConfirming] = useState(false);
-  const [includeTwins, setIncludeTwins] = useState(false);
+  const [createHandmade, setCreateHandmade] = useState(false);
   const preview = applyPreview(g, usesDepartments);
-  const pending = preview.create + preview.addRegime;
-  const twins = handMadeTwins(g);
-  const twinOf = new Map(twins.map((t) => [t.key, t]));
-  const keys = applyKeys(g, includeTwins);
-  const creates = preview.create - (includeTwins ? 0 : twins.length);
+  const twins = preview.handmade;
+  const pending = preview.create + preview.addRegime + twins.length;
+  const creates = preview.create + (createHandmade ? twins.length : 0);
   const catalogIds = new Set(g.items.map((i) => i.recurringTask?.id).filter(Boolean));
   const others = g.recurring.filter((r) => !catalogIds.has(r.id) && r.active);
 
   async function confirm() {
     try {
-      const res = await apply.mutateAsync({ regime: g.regime, input: { keys } });
+      const res = await apply.mutateAsync({ regime: g.regime, input: applyInput(g, createHandmade) });
       toast.success(applyResultText(res, g.label), { duration: 7000 });
       setConfirming(false);
     } catch (error) {
@@ -131,7 +131,7 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
       <div className="border-b border-border p-5">
         <CardHeader
           title={`Grupo ${g.label}`}
-          subtitle={`${companiesText(g.clientCount)} no regime · ${g.items.length - g.missing} de ${pluralize(g.items.length, 'obrigação aplicada', 'obrigações aplicadas')}`}
+          subtitle={`${companiesText(g.clientCount)} no regime · ${g.items.filter((i) => i.state === 'applied' || i.state === 'handmade').length} de ${pluralize(g.items.length, 'obrigação em uso', 'obrigações em uso')}`}
           action={
             <WriteGate scope="admin">
               <Button size="sm" className="shrink-0" disabled={pending === 0} onClick={() => setConfirming(true)}>
@@ -152,7 +152,7 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
       ) : (
         <ul className="p-1.5">
           {g.items.map((item) => (
-            <GroupItemRow key={item.key} item={item} twin={twinOf.get(item.key)} usesDepartments={usesDepartments} onOpenRecurring={onOpenRecurring} />
+            <GroupItemRow key={item.key} item={item} usesDepartments={usesDepartments} onOpenRecurring={onOpenRecurring} />
           ))}
         </ul>
       )}
@@ -173,7 +173,7 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
             <Button variant="ghost" onClick={() => setConfirming(false)} disabled={apply.isPending}>
               Cancelar
             </Button>
-            <Button loading={apply.isPending} disabled={keys.length === 0} onClick={() => void confirm()}>
+            <Button loading={apply.isPending} disabled={creates + preview.addRegime === 0} onClick={() => void confirm()}>
               Aplicar grupo
             </Button>
           </>
@@ -189,10 +189,10 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
         {twins.length ? (
           <div className="mt-3 rounded-lg border border-border bg-surface-muted p-3">
             <p className="text-body-sm text-fg">
-              {twins.length === 1 ? 'Já existe uma tarefa recorrente feita à mão com o mesmo nome' : `Já existem ${twins.length} tarefas recorrentes feitas à mão com o mesmo nome`}: {twins.map((t) => t.recurringName).join(', ')}. Para não duplicar, {twins.length === 1 ? 'ela fica' : 'elas ficam'} de fora.
+              {twins.length === 1 ? 'Já existe uma tarefa recorrente feita à mão com o mesmo nome' : `Já existem ${twins.length} tarefas recorrentes feitas à mão com o mesmo nome`}: {twins.map((t) => t.existing).join(', ')}. Para não duplicar, {twins.length === 1 ? 'ela fica' : 'elas ficam'} de fora.
             </p>
             <label className="mt-2 flex items-center gap-2 text-body-sm text-fg">
-              <Checkbox checked={includeTwins} onCheckedChange={(v) => setIncludeTwins(v === true)} />
+              <Checkbox checked={createHandmade} onCheckedChange={setCreateHandmade} />
               Criar mesmo assim
             </label>
           </div>
@@ -203,10 +203,10 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
   );
 }
 
-function GroupItemRow({ item, twin, usesDepartments, onOpenRecurring }: { item: RegimeGroupItemView; twin?: { recurringId: string; recurringName: string }; usesDepartments: boolean; onOpenRecurring: (id: string) => void }) {
+function GroupItemRow({ item, usesDepartments, onOpenRecurring }: { item: RegimeGroupItemView; usesDepartments: boolean; onOpenRecurring: (id: string) => void }) {
   const state = itemState(item);
   const style = STATE_STYLE[state];
-  const openId = item.recurringTask?.id ?? twin?.recurringId ?? null;
+  const openId = item.recurringTask?.id ?? item.handmade?.id ?? null;
   const Icon = style.icon;
   const due = `${RECURRENCE_PERIOD_LABELS[item.period]} · ${dueRuleText(item).toLowerCase()}`;
   const dept = !usesDepartments ? '—' : item.department.match ? item.department.match.name : `${item.department.name} (novo)`;
@@ -230,17 +230,10 @@ function GroupItemRow({ item, twin, usesDepartments, onOpenRecurring }: { item: 
       <span className={cn('hidden w-36 truncate text-body-sm @3xl:block', item.department.match || !usesDepartments ? 'text-fg' : 'text-muted')}>{dept}</span>
       <span className="hidden w-48 truncate text-body-sm text-fg @3xl:block">{due}</span>
       <span className="flex shrink-0 justify-end @3xl:w-44 @3xl:justify-start">
-        {twin ? (
-          <Badge tone="neutral" className="inline-flex items-center gap-1" title={`Feita à mão: ${twin.recurringName}`}>
-            <Check className="size-3" aria-hidden />
-            Existe (à mão)
-          </Badge>
-        ) : (
-          <Badge tone={style.tone} className="inline-flex items-center gap-1">
-            <Icon className="size-3" aria-hidden />
-            {ITEM_STATE_LABELS[state]}
-          </Badge>
-        )}
+        <Badge tone={style.tone} className="inline-flex items-center gap-1" title={item.handmade ? `Feita à mão: ${item.handmade.name}` : undefined}>
+          <Icon className="size-3" aria-hidden />
+          {ITEM_STATE_LABELS[state]}
+        </Badge>
       </span>
     </li>
   );

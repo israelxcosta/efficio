@@ -34,17 +34,16 @@ export function writeRecurringView(params: URLSearchParams, patch: { view?: Recu
   return next;
 }
 
-export type RegimeItemState = 'applied' | 'missing' | 'addRegime' | 'ended';
+export type RegimeItemState = 'applied' | 'missing' | 'addRegime' | 'ended' | 'handmade';
 
 /**
- * An item of the group in the office: applied (its recurring task is active and includes the regime),
- * missing (no recurring task from it: applying creates one), present without the regime (applying adds
- * the regime to it) or ended (applying leaves it; "Encerra em" brings it back).
+ * The server's state of an item (`RegimeGroupItemView.state`), with "missing" split in two for the
+ * screen: no recurring task from it (applying creates one) or an active one without the regime
+ * (applying adds the regime). "handmade": a recurring task made by hand with the same name covers it.
  */
-export function itemState(item: Pick<RegimeGroupItemView, 'applied' | 'recurringTask'>): RegimeItemState {
-  if (item.applied) return 'applied';
-  if (!item.recurringTask) return 'missing';
-  return item.recurringTask.active ? 'addRegime' : 'ended';
+export function itemState(item: Pick<RegimeGroupItemView, 'state' | 'recurringTask'>): RegimeItemState {
+  if (item.state === 'missing' && item.recurringTask?.active) return 'addRegime';
+  return item.state;
 }
 
 export const ITEM_STATE_LABELS: Record<RegimeItemState, string> = {
@@ -52,9 +51,10 @@ export const ITEM_STATE_LABELS: Record<RegimeItemState, string> = {
   missing: 'Falta',
   addRegime: 'Existe, sem este regime',
   ended: 'Encerrada',
+  handmade: 'Existe (à mão)',
 };
 
-/** What "Aplicar grupo" will do, and the departments it creates (offices that use departments). */
+/** What "Aplicar grupo" will do, the hand-made ones it skips and the departments it creates. */
 export function applyPreview(group: Pick<RegimeGroup, 'items'>, usesDepartments: boolean) {
   const states = group.items.map((i) => itemState(i));
   const count = (s: RegimeItemState) => states.filter((x) => x === s).length;
@@ -64,53 +64,30 @@ export function applyPreview(group: Pick<RegimeGroup, 'items'>, usesDepartments:
     addRegime: count('addRegime'),
     applied: count('applied'),
     ended: count('ended'),
+    handmade: group.items.filter((i, k) => states[k] === 'handmade').map((i) => ({ key: i.key, name: i.name, existing: i.handmade?.name ?? i.name })),
     newDepartments: usesDepartments ? [...new Set(created)] : [],
   };
 }
 
-/** Name for comparison: no accents, case, spaces or punctuation ("DASN – SIMEI" = "dasn-simei"). */
-const nameKey = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '');
-
-/**
- * Missing items that the office already has as a recurring task made by hand (same name, no catalog
- * key): applying would create a twin of each, so they are skipped unless the person asks.
- */
-export function handMadeTwins(group: Pick<RegimeGroup, 'items' | 'recurring'>): { key: string; name: string; recurringId: string; recurringName: string }[] {
-  const byName = new Map(group.recurring.filter((r) => r.catalogKey === null).map((r) => [nameKey(r.name), r]));
-  return group.items
-    .filter((i) => itemState(i) === 'missing' && byName.has(nameKey(i.name)))
-    .map((i) => {
-      const r = byName.get(nameKey(i.name))!;
-      return { key: i.key, name: i.name, recurringId: r.id, recurringName: r.name };
-    });
-}
-
-/** Keys sent to "Aplicar grupo": what is missing or lacks the regime, the hand-made twins only if asked. */
-export function applyKeys(group: Pick<RegimeGroup, 'items' | 'recurring'>, includeTwins: boolean): string[] {
-  const twins = new Set(handMadeTwins(group).map((t) => t.key));
-  return group.items.filter((i) => {
-    const st = itemState(i);
-    return (st === 'missing' || st === 'addRegime') && (includeTwins || !twins.has(i.key));
-  }).map((i) => i.key);
+/** The body of "Aplicar grupo": the hand-made ones go in `force` only when asked ("Criar mesmo assim"). */
+export function applyInput(group: Pick<RegimeGroup, 'items'>, createHandmade: boolean): { force: string[] } {
+  return { force: createHandmade ? group.items.filter((i) => i.state === 'handmade').map((i) => i.key) : [] };
 }
 
 const GENERATES = 'Elas geram todo mês uma tarefa para cada empresa do regime.';
 
 /** The toast after applying: "Simples Nacional: 5 tarefas recorrentes criadas e 2 passaram a incluir o regime. …". */
-export function applyResultText(res: Pick<RegimeGroupApplyResponse, 'created' | 'regimeAdded' | 'departmentsCreated'>, label: string): string {
+export function applyResultText(res: Pick<RegimeGroupApplyResponse, 'created' | 'regimeAdded' | 'departmentsCreated' | 'skipped'>, label: string): string {
   const parts: string[] = [];
   if (res.created) parts.push(res.created === 1 ? '1 tarefa recorrente criada' : `${res.created} tarefas recorrentes criadas`);
   if (res.regimeAdded) parts.push(`${res.regimeAdded} ${res.regimeAdded === 1 ? 'passou' : 'passaram'} a incluir o regime`);
-  if (!parts.length) return `${label}: o grupo já estava aplicado.`;
+  const n = res.skipped.length;
+  const skipped = n ? `${n} já ${n === 1 ? 'existia feita à mão e não foi duplicada' : 'existiam feitas à mão e não foram duplicadas'}` : '';
+  if (!parts.length) return skipped ? `${label}: nada criado; ${skipped}.` : `${label}: o grupo já estava aplicado.`;
   const depts = res.departmentsCreated.length
     ? ` ${res.departmentsCreated.length === 1 ? 'Departamento criado' : 'Departamentos criados'}: ${res.departmentsCreated.map((d) => d.name).join(', ')}.`
     : '';
-  return `${label}: ${parts.join(' e ')}.${depts} ${GENERATES}`;
+  return `${label}: ${parts.join(' e ')}.${depts}${skipped ? ` ${skipped.charAt(0).toUpperCase()}${skipped.slice(1)}.` : ''} ${GENERATES}`;
 }
 
 /** "12 empresas" / "1 empresa" / "nenhuma empresa". */

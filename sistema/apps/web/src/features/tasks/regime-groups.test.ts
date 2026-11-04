@@ -2,7 +2,7 @@
 // already has and what applying the group does.
 import { describe, expect, it } from 'vitest';
 import type { RegimeGroup, RegimeGroupApplyResponse, RegimeGroupItemView } from '@effinance/shared';
-import { applyKeys, applyPreview, applyResultText, handMadeTwins, itemState, parseRecurringView, regimeFromParam, writeRecurringView } from './regime-groups-logic';
+import { applyInput, applyPreview, applyResultText, itemState, parseRecurringView, regimeFromParam, writeRecurringView } from './regime-groups-logic';
 
 const item = (patch: Partial<RegimeGroupItemView> = {}): RegimeGroupItemView => ({
   key: 'das',
@@ -45,11 +45,12 @@ describe('the view of the recurring tasks page in the URL', () => {
 });
 
 describe('an item of a group', () => {
-  it('is missing, applied, present without the regime, or ended', () => {
+  it('follows the state of the server, telling apart what applying creates from what gains the regime', () => {
     expect(itemState(item())).toBe('missing');
-    expect(itemState(item({ recurringTask: ref(), applied: true }))).toBe('applied');
-    expect(itemState(item({ recurringTask: ref({ regimes: ['presumed_profit'] }), applied: false }))).toBe('addRegime');
-    expect(itemState(item({ recurringTask: ref({ active: false }), applied: false }))).toBe('ended');
+    expect(itemState(item({ recurringTask: ref({ regimes: ['presumed_profit'] }) }))).toBe('addRegime');
+    expect(itemState(item({ recurringTask: ref(), applied: true, state: 'applied' }))).toBe('applied');
+    expect(itemState(item({ recurringTask: ref({ active: false }), state: 'ended' }))).toBe('ended');
+    expect(itemState(item({ handmade: ref({ id: 'h', name: 'DAS', catalogKey: null }), state: 'handmade' }))).toBe('handmade');
   });
 });
 
@@ -63,31 +64,24 @@ describe('applying a group', () => {
     recurring: [],
   });
 
-  it('previews what it creates, what gains the regime and what stays (ended ones are not reopened)', () => {
+  it('previews what it creates, what gains the regime, what stays, and what a hand-made one already covers', () => {
     const g = group([
       item({ key: 'a' }),
       item({ key: 'b', department: { key: 'personnel', name: 'Pessoal', match: null } }),
       item({ key: 'c', recurringTask: ref({ regimes: ['real_profit'] }) }),
-      item({ key: 'd', recurringTask: ref(), applied: true }),
-      item({ key: 'e', recurringTask: ref({ active: false }) }),
+      item({ key: 'd', recurringTask: ref(), applied: true, state: 'applied' }),
+      item({ key: 'e', recurringTask: ref({ active: false }), state: 'ended' }),
+      item({ key: 'f', handmade: ref({ id: 'h', name: 'DAS-MEI', catalogKey: null }), state: 'handmade', department: { key: 'accounting', name: 'Contábil', match: null } }),
     ]);
-    expect(applyPreview(g, true)).toEqual({ create: 2, addRegime: 1, applied: 1, ended: 1, newDepartments: ['Pessoal'] });
+    expect(applyPreview(g, true)).toEqual({ create: 2, addRegime: 1, applied: 1, ended: 1, handmade: [{ key: 'f', name: 'DAS', existing: 'DAS-MEI' }], newDepartments: ['Pessoal'] });
     // Offices without departments: none is created.
     expect(applyPreview(g, false).newDepartments).toEqual([]);
   });
 
-  it('spots the missing items that already exist made by hand (same name), so applying does not create twins', () => {
-    const g = {
-      ...group([item({ key: 'das-mei', name: 'DAS-MEI' }), item({ key: 'dasn', name: 'DASN-SIMEI' }), item({ key: 'x', name: 'Outra', recurringTask: ref({ regimes: ['real_profit'] }) })]),
-      recurring: [ref({ id: 'h1', name: 'das mei', catalogKey: null }), ref({ id: 'h2', name: 'DASN – SIMEI', catalogKey: null })],
-    };
-    expect(handMadeTwins(g).map((t) => [t.key, t.recurringName])).toEqual([
-      ['das-mei', 'das mei'],
-      ['dasn', 'DASN – SIMEI'],
-    ]);
-    // Applying skips them unless asked; the item that only gains the regime stays.
-    expect(applyKeys(g, false)).toEqual(['x']);
-    expect(applyKeys(g, true)).toEqual(['das-mei', 'dasn', 'x']);
+  it('sends the hand-made ones in `force` only when the person asks to create them anyway', () => {
+    const g = group([item({ key: 'a' }), item({ key: 'f', handmade: ref({ id: 'h', catalogKey: null }), state: 'handmade' })]);
+    expect(applyInput(g, false)).toEqual({ force: [] });
+    expect(applyInput(g, true)).toEqual({ force: ['f'] });
   });
 
   it('says what happened, in one toast', () => {
@@ -109,5 +103,11 @@ describe('applying a group', () => {
       'MEI: 1 tarefa recorrente criada. Departamento criado: Pessoal. Elas geram todo mês uma tarefa para cada empresa do regime.',
     );
     expect(applyResultText(res({ unchanged: 4 }), 'MEI')).toBe('MEI: o grupo já estava aplicado.');
+    expect(applyResultText(res({ created: 2, skipped: [{ key: 'f', name: 'DAS-MEI', reason: 'handmade', existing: { id: 'h', name: 'DAS MEI' } }] }), 'MEI')).toBe(
+      'MEI: 2 tarefas recorrentes criadas. 1 já existia feita à mão e não foi duplicada. Elas geram todo mês uma tarefa para cada empresa do regime.',
+    );
+    expect(applyResultText(res({ skipped: [{ key: 'f', name: 'DAS-MEI', reason: 'handmade', existing: { id: 'h', name: 'DAS MEI' } }] }), 'MEI')).toBe(
+      'MEI: nada criado; 1 já existia feita à mão e não foi duplicada.',
+    );
   });
 });

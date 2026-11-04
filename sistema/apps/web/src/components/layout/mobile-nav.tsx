@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router';
-import { ArrowLeftRight, Bell, BriefcaseBusiness, CalendarClock, FileClock, ListChecks, LogOut, Menu, Minus, NotebookPen, Plus, Search, TrendingUp, Wallet, Workflow } from 'lucide-react';
+import { ArrowLeftRight, Bell, BriefcaseBusiness, CalendarClock, FileClock, Layers, ListChecks, ListTree, LogOut, Menu, Minus, NotebookPen, Plus, Repeat, Search, TrendingUp, Wallet, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
@@ -9,6 +9,7 @@ import { useTransactionActions } from '@/features/transactions/transaction-actio
 import { useTaskSheetLinks } from '@/features/tasks/task-links';
 import { useTaskActions } from '@/features/tasks/task-actions';
 import { tasksHref } from '@/features/tasks/url-state';
+import { createActions } from '@/features/tasks/task-hub';
 import { Sheet } from '@/components/ui/sheet';
 import {
   DropdownMenu,
@@ -197,9 +198,13 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
 const plusClass =
   'mx-2 -mt-6 flex size-14 items-center justify-center rounded-full bg-primary text-primary-fg shadow-lg ring-4 ring-bg disabled:opacity-50';
 
+/** The phone's "+" in the Gestão: the same kinds as the hub of Tarefas (`createActions`, by permission). */
 function TaskCreate() {
   const { newTask } = useTaskSheetLinks();
-  const { openTemplatePicker } = useTaskActions();
+  const { openTemplatePicker, openFlowBuilder } = useTaskActions();
+  const { can } = usePermissions();
+  const navigate = useNavigate();
+  const ids = new Set(createActions(can).map((a) => a.id));
   return (
     <DropdownMenu>
       <WriteGate scope="tasks">
@@ -216,10 +221,26 @@ function TaskCreate() {
         <DropdownMenuItem icon={<CalendarClock />} onSelect={() => newTask({ appointment: true })}>
           Compromisso
         </DropdownMenuItem>
+        {ids.has('recurring') ? (
+          <DropdownMenuItem icon={<Repeat />} onSelect={() => navigate('/tarefas/recorrentes?recorrente=nova')}>
+            Tarefa recorrente
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem icon={<Workflow />} onSelect={openTemplatePicker}>
           Aplicar modelo de processo
         </DropdownMenuItem>
+        <DropdownMenuItem icon={<ListTree />} onSelect={openFlowBuilder}>
+          Processo avulso
+        </DropdownMenuItem>
+        {ids.has('regimeGroup') ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem icon={<Layers />} onSelect={() => navigate('/tarefas/recorrentes?visao=regimes')}>
+              Grupo por regime
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
