@@ -41,6 +41,7 @@ import type {
   TransferKind,
 } from './constants';
 import type { TransactionOrigin } from './integrations';
+import type { RegimeGroupApplyResult, RegimeGroupRegime, SuggestedDepartment } from './regime-groups';
 import type { PermissionMap, PermissionOverrides } from './permissions';
 import type { MemberRole } from './saas';
 import type { ContractBlock } from './utils/contract';
@@ -974,20 +975,6 @@ export interface TaskClientOption {
   inactivatedAt: ISODate | null;
 }
 
-/** Responsible member of a client in a department (Onvio/Tareffa style "carteira"). */
-export interface ClientResponsible {
-  clientId: string;
-  departmentId: string;
-  user: TaskMemberRef;
-}
-
-/** GET /tasks/client-responsibles: the grid client × department. */
-export interface ClientResponsiblesResponse {
-  departments: TaskRef[];
-  clients: TaskClientOption[];
-  items: ClientResponsible[];
-}
-
 /** GET /tasks/options: everything the pickers of the module need, in one request. */
 export interface TaskOptionsResponse {
   /** Today in the office time zone. */
@@ -1009,7 +996,6 @@ export interface TaskOptionsResponse {
   categories: TaskCategory[];
   /** Active and inactive clients (pickers usually show only the active ones). */
   clients: TaskClientOption[];
-  clientResponsibles: ClientResponsible[];
 }
 
 export interface TaskFlowRef {
@@ -1293,9 +1279,7 @@ export interface RecurringTask {
   active: boolean;
   /** Active clients it applies to in the current competence. */
   clientCount: number;
-  /** Of them, without a responsible in the department (their occurrences go to the default responsible). */
-  withoutResponsible: number;
-  /** Who receives the occurrences of the current competence: "Ana 12 · Bruno 8 · padrão 3 · sem responsável 2". */
+  /** Who receives the occurrences of the current competence: "Ana 12 (padrão) · Bruno 1 (à mão) · sem responsável 2". */
   distribution: { assignee: TaskMemberRef | null; source: AssigneeSource | null; count: number }[];
   /** Occurrences already generated (any competence). */
   occurrenceCount: number;
@@ -1331,6 +1315,74 @@ export interface RecurringTaskListResponse {
 export interface RecurringGenerateResponse {
   competence: MonthKey;
   created: number;
+}
+
+/** A recurring task of the office as the regime groups show it. */
+export interface RegimeGroupRecurringRef {
+  id: string;
+  name: string;
+  period: RecurrencePeriod;
+  department: TaskRef | null;
+  /** Not ended before the current competence. */
+  active: boolean;
+  regimes: TaxRegime[];
+  /** The catalog item it came from (null: made by hand). */
+  catalogKey: string | null;
+}
+
+/** One item of a regime's group, with what the office already has. */
+export interface RegimeGroupItemView {
+  key: string;
+  name: string;
+  description: string;
+  period: RecurrencePeriod;
+  dueDay: number;
+  dueMonth: number | null;
+  /** Months (1–12) it occurs in. */
+  months: number[];
+  targetDaysBefore: number;
+  nonBusinessDayRule: NonBusinessDayRule;
+  referenceOffset: number;
+  /** Suggested department and the office's department it would go to (null: created when applying). */
+  department: { key: SuggestedDepartment; name: string; match: TaskRef | null };
+  /** The recurring task created from this item (any regime), if any. */
+  recurringTask: RegimeGroupRecurringRef | null;
+  /** The recurring task exists, is active and includes this regime. */
+  applied: boolean;
+}
+
+export interface RegimeGroup {
+  regime: RegimeGroupRegime;
+  label: string;
+  /** Active clients of the regime in the current competence (they get the occurrences). */
+  clientCount: number;
+  items: RegimeGroupItemView[];
+  /** Items not applied yet. */
+  missing: number;
+  /** Every recurring task of the office that applies to the regime (catalog or made by hand). */
+  recurring: RegimeGroupRecurringRef[];
+}
+
+/** GET /tasks/regime-groups. */
+export interface RegimeGroupsResponse {
+  today: ISODate;
+  /** The office uses departments (applying maps or creates them; otherwise none is set). */
+  usesDepartments: boolean;
+  groups: RegimeGroup[];
+}
+
+/** POST /tasks/regime-groups/:regime/apply. Applying again changes nothing (`unchanged`). */
+export interface RegimeGroupApplyResponse {
+  regime: RegimeGroupRegime;
+  created: number;
+  /** Existing recurring tasks of the catalog that now include the regime. */
+  regimeAdded: number;
+  unchanged: number;
+  /** Existing but ended (not reopened: edit "Encerra em" to bring it back). */
+  ended: number;
+  items: { key: string; recurringTaskId: string; name: string; result: RegimeGroupApplyResult }[];
+  /** Departments created for the suggested ones that had no match. */
+  departmentsCreated: TaskRef[];
 }
 
 /** Audit column: the occurrence of a recurring task in a period, counted over the clients in view. */
@@ -1707,16 +1759,6 @@ export interface TaskNote {
   content: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-/**
- * PUT /tasks/client-responsibles(/batch): the pairs as they are now (removed ones absent) and how many
- * open occurrences (current competence on, not assigned by hand) changed hands.
- */
-export interface ClientResponsibleChangeResponse {
-  items: ClientResponsible[];
-  removed: number;
-  reassigned: number;
 }
 
 // ---------------------------------------------------------------------------

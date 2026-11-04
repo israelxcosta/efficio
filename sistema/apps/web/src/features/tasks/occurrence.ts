@@ -4,6 +4,7 @@
 // of a recurring task. Pure functions, tested in phase2-logic.test.ts.
 
 import {
+  type AssigneeSource,
   dateInTimeZone,
   diffInDays,
   dueBucketOf,
@@ -238,4 +239,14 @@ export function occurrenceHref(o: Pick<RecurringOccurrence, 'recurringTaskId' | 
 /** The audit page on this recurring task ("Abrir na auditoria"). */
 export function auditHref(o: Pick<RecurringOccurrence, 'recurringTaskId' | 'competence'>): string {
   return `/tarefas/auditoria?${new URLSearchParams({ visao: 'tarefa', recorrente: o.recurringTaskId, competencia: o.competence }).toString()}`;
+}
+
+/**
+ * Where the responsible of an occurrence comes from: the recurring task's default responsible (every
+ * client of it) or assigned by hand for that competence. There is no responsible per client.
+ */
+export function assigneeSourceText(source: AssigneeSource | null | undefined): string | null {
+  if (source === 'default') return 'Responsável padrão da recorrente';
+  if (source === 'manual') return 'Atribuída só nesta competência';
+  return null;
 }

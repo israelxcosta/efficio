@@ -276,19 +276,21 @@ export function appliesToText(r: Pick<RecurringTask, 'regimes' | 'clientIds' | '
   return `${head} · ${count}${exceptions}`;
 }
 
-/** "Hoje: Ana Paula 12 · Bruno 8 · padrão 3 · sem responsável 2" (who receives the current competence). */
-export function distributionText(r: Pick<RecurringTask, 'distribution'>): string {
-  if (r.distribution.length === 0) return '';
-  return `Hoje: ${r.distribution
-    .map((d) => (d.assignee ? `${d.source === 'default' ? 'padrão' : shortName(d.assignee.name)} ${d.count}` : `sem responsável ${d.count}`))
-    .join(' · ')}`;
+/** One line per receiver: "Ana P. 12 (padrão)", "Bruno C. 1 (à mão)", "sem responsável 2". */
+function distributionParts(r: Pick<RecurringTask, 'distribution'>): string {
+  return r.distribution
+    .map((d) => (d.assignee ? `${shortName(d.assignee.name)} ${d.count}${d.source === 'default' ? ' (padrão)' : d.source === 'manual' ? ' (à mão)' : ''}` : `sem responsável ${d.count}`))
+    .join(' · ');
 }
 
-/** Tooltip of the responsibles: "Ana P. 12 · Bruno C. 8 · Marina S. 3 (padrão)". */
+/** Who receives the current competence: "Hoje: Ana P. 12 (padrão) · Bruno C. 1 (à mão) · sem responsável 2". */
+export function distributionText(r: Pick<RecurringTask, 'distribution'>): string {
+  return r.distribution.length ? `Hoje: ${distributionParts(r)}` : '';
+}
+
+/** Tooltip of the responsibles (the same, without "Hoje"). */
 export function distributionTip(r: Pick<RecurringTask, 'distribution'>): string {
-  return r.distribution
-    .map((d) => (d.assignee ? `${shortName(d.assignee.name)} ${d.count}${d.source === 'default' ? ' (padrão)' : ''}` : `sem responsável ${d.count}`))
-    .join(' · ');
+  return distributionParts(r);
 }
 
 export const PERIOD_OPTIONS = RECURRENCE_PERIODS.map((p) => ({ value: p, label: RECURRENCE_PERIOD_LABELS[p] }));

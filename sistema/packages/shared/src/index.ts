@@ -17,3 +17,4 @@ export * from './utils/deadlines';
 export * from './utils/contract';
 export * from './contract-template';
 export * from './contract-watermark';
+export * from './regime-groups';

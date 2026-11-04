@@ -40,7 +40,7 @@ import { useTaskSheetLinks } from '../task-links';
 import { canPickDepartment, resolveHomeDepartment } from '../home-view';
 import { homeDepartmentKey, readHomeDepartment, tasksHref, writeHomeDepartment, type TaskFilterPatch } from '../url-state';
 import { DeadlineAlertStrip } from '@/features/deadlines/components/deadline-alert-strip';
-import { useOffice } from '@/features/office/api';
+import { useOfficeBranding } from '@/features/office/api';
 
 /** Filters of the task list that match what the home page shows. */
 function listBase(home: TaskHomeResponse): TaskFilterPatch {
@@ -134,7 +134,7 @@ export default function TaskHomePage() {
           <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
         </div>
         <div className="h-[22rem] lg:col-span-6">
-          <ByClient home={h} options={o} where={where} loading={home.isPending} />
+          <ByClient home={h} where={where} loading={home.isPending} />
         </div>
       </div>
     </div>
@@ -636,23 +636,18 @@ function ByAssignee({ home, people, where, loading }: { home: TaskHomeResponse |
   );
 }
 
-function ByClient({ home, options, where, loading }: { home: TaskHomeResponse | undefined; options: TaskOptionsResponse | undefined; where: string; loading: boolean }) {
+function ByClient({ home, where, loading }: { home: TaskHomeResponse | undefined; where: string; loading: boolean }) {
   const rows = useMemo<BreakdownRow[]>(() => {
     if (!home) return [];
     const base = listBase(home);
-    const dept = home.view === 'department' ? home.department : null;
-    const all = home.byClient.map((r) => {
-      const responsible = dept && r.client ? options?.clientResponsibles.find((x) => x.clientId === r.client!.id && x.departmentId === dept.id) : undefined;
-      return {
-        key: r.client?.id ?? 'internal',
-        label: r.client?.name ?? 'Interna',
-        muted: !r.client,
-        open: r.open - r.overdue,
-        overdue: r.overdue,
-        href: tasksHref({ ...base, scope: 'all', client: r.client?.id ?? 'internal' }),
-        hint: dept && r.client ? `Responsável no ${dept.name}: ${responsible?.user.name ?? 'ninguém'}` : undefined,
-      };
-    });
+    const all = home.byClient.map((r) => ({
+      key: r.client?.id ?? 'internal',
+      label: r.client?.name ?? 'Interna',
+      muted: !r.client,
+      open: r.open - r.overdue,
+      overdue: r.overdue,
+      href: tasksHref({ ...base, scope: 'all', client: r.client?.id ?? 'internal' }),
+    }));
     if (all.length <= 7) return all;
     const rest = all.slice(6);
     return [
@@ -665,7 +660,7 @@ function ByClient({ home, options, where, loading }: { home: TaskHomeResponse | 
         overdue: rest.reduce((s, r) => s + r.overdue, 0),
       },
     ];
-  }, [home, options]);
+  }, [home]);
   const max = Math.max(1, ...rows.filter((r) => r.key !== 'others').map((r) => r.open + r.overdue));
 
   return (
@@ -699,21 +694,14 @@ function SetupChecklist({ options, storeKey }: { options: TaskOptionsResponse; s
       // ignore
     }
   }, [storeKey]);
-  const activeClients = options.clients.filter((c) => c.status === 'active');
   const recurring = useRecurringTasks({ status: 'active' }, { enabled: !hidden });
   // The office (phase 3): only for whoever keeps it (`office`); the contract and the PDFs read it.
+  // `registered` comes with the branding (every member reads it), not from `GET /office`.
   const canOffice = usePermissions().can('office');
-  const office = useOffice(canOffice && !hidden);
+  const office = useOfficeBranding({ enabled: canOffice && !hidden });
   const steps = [
     { label: 'Departamentos', done: options.departments.length > 0, href: '/tarefas/cadastros?aba=departamentos' },
     { label: 'Equipe nos departamentos', done: options.members.length > 0 && options.members.every((m) => m.department), href: '/tarefas/cadastros?aba=equipe' },
-    {
-      label: 'Responsáveis dos clientes',
-      done:
-        options.departments.length > 0 &&
-        activeClients.every((c) => options.departments.every((d) => options.clientResponsibles.some((r) => r.clientId === c.id && r.departmentId === d.id))),
-      href: '/tarefas/clientes?sem-responsavel=1',
-    },
     { label: 'Tarefas recorrentes', done: (recurring.data?.summary.active ?? 0) > 0, href: '/tarefas/recorrentes' },
     ...(canOffice ? [{ label: 'Dados do escritório', done: Boolean(office.data?.registered), href: '/configuracoes?aba=escritorio' }] : []),
   ];
@@ -743,7 +731,7 @@ function SetupChecklist({ options, storeKey }: { options: TaskOptionsResponse; s
           Ocultar
         </Button>
       </div>
-      <ul className={cn('mt-3 grid gap-2 md:grid-cols-2', steps.length > 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4')}>
+      <ul className={cn('mt-3 grid gap-2 md:grid-cols-2', steps.length >= 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3')}>
         {steps.map((s) => (
           <li key={s.label}>
             <Link to={s.href} className="flex items-center gap-2.5 rounded-md px-2 py-2 text-body-sm transition-colors hover:bg-surface-muted">

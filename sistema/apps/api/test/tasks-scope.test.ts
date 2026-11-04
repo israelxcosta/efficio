@@ -19,11 +19,10 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   applyFlowTemplateSchema,
-  clientResponsibleBatchSchema,
-  clientResponsibleInputSchema,
   flowTemplateInputSchema,
   recurringTaskInputSchema,
   recurringTaskQuerySchema,
+  regimeGroupApplySchema,
   rolePermissions,
   TASK_TIME_ZONE,
   taskAttachmentInputSchema,
@@ -54,6 +53,7 @@ import * as homeModule from '../src/modules/tasks/home';
 import * as insightsModule from '../src/modules/tasks/insights';
 import * as notesModule from '../src/modules/tasks/notes';
 import * as recurringModule from '../src/modules/tasks/recurring';
+import * as regimeGroupsModule from '../src/modules/tasks/regime-groups';
 import * as registryModule from '../src/modules/tasks/registry';
 import * as serviceModule from '../src/modules/tasks/service';
 import { ADMIN_URL, TENANT_TABLES } from './db-roles';
@@ -217,15 +217,6 @@ describe('tasks: every query filters by the workspace', () => {
       memberIds: [bruno.userId],
     });
     const bCategory = await bruno.post('/tasks/categories', { name: 'Certidões' });
-    expect(
-      (
-        await bruno.put('/tasks/client-responsibles', {
-          clientId: bClient.body.id,
-          departmentId: bDepartment.body.id,
-          userId: bruno.userId,
-        })
-      ).status,
-    ).toBe(200);
     const bTask = await bruno.post('/tasks', {
       title: 'Tarefa do Bruno',
       description: 'Descrição do Bruno',
@@ -303,6 +294,7 @@ describe('tasks: every query filters by the workspace', () => {
     const service = tracked(serviceModule, called);
     const home = tracked(homeModule, called);
     const recurring = tracked(recurringModule, called);
+    const regimeGroups = tracked(regimeGroupsModule, called);
     const audit = tracked(auditModule, called);
     const flows = tracked(flowsModule, called);
     const insights = tracked(insightsModule, called);
@@ -343,20 +335,6 @@ describe('tasks: every query filters by the workspace', () => {
       ),
     );
     await run(anaCtx, (c) => registry.listCategories(c));
-    const responsible = { clientId: aClient.body.id as string, departmentId: fiscal.id };
-    await run(anaCtx, (c) =>
-      registry.setClientResponsible(
-        c,
-        clientResponsibleInputSchema.parse({ ...responsible, userId: carla.userId }),
-      ),
-    );
-    await run(anaCtx, (c) => registry.listClientResponsibles(c));
-    await run(anaCtx, (c) =>
-      registry.setClientResponsible(
-        c,
-        clientResponsibleInputSchema.parse({ ...responsible, userId: null }),
-      ),
-    );
 
     // Tasks, subtasks, comments.
     const task = await run(anaCtx, (c) =>
@@ -429,13 +407,7 @@ describe('tasks: every query filters by the workspace', () => {
     await run(carlaCtx, (c) => home.taskHome(c, taskHomeQuerySchema.parse({})));
     await run(anaCtx, (c) => home.taskHome(c, taskHomeQuerySchema.parse({ departmentId: 'all' })));
 
-    // Responsibles in batch, the history and removing a comment.
-    await run(anaCtx, (c) =>
-      registry.setClientResponsibles(
-        c,
-        clientResponsibleBatchSchema.parse({ items: [{ ...responsible, userId: carla.userId }] }),
-      ),
-    );
+    // The history and removing a comment.
     const comment = await run(anaCtx, (c) => service.addComment(c, task.id, { text: 'Comentário da Ana' }));
     await run(anaCtx, (c) => service.deleteComment(c, task.id, comment.id));
     await run(carlaCtx, (c) => service.taskHistory(c, task.id));
@@ -489,6 +461,14 @@ describe('tasks: every query filters by the workspace', () => {
     }
     await run(carlaCtx, (c) => service.listTasks(c, taskQuerySchema.parse({ kind: 'recurring', dueBucket: 'targetMissed' })));
     await run(anaCtx, (c) => recurring.deleteRecurring(c, weekly.id));
+
+    // Regime groups: list, apply (creates, then adds a regime to a common one), and a plain insert.
+    await run(carlaCtx, (c) => regimeGroups.listRegimeGroups(c));
+    await run(anaCtx, (c) => regimeGroups.applyRegimeGroup(c, 'simples_nacional', regimeGroupApplySchema.parse({ keys: ['fgts_digital', 'pgdas_das'] })));
+    await run(anaCtx, (c) => regimeGroups.applyRegimeGroup(c, 'presumed_profit', regimeGroupApplySchema.parse({ keys: ['fgts_digital', 'ecd'] })));
+    await run(anaCtx, (c) =>
+      recurring.insertRecurring(c, recurringTaskInputSchema.parse({ name: 'Inserida', departmentId: fiscal.id, dueDay: 8, regimes: ['mei'] })),
+    );
 
     // Processes and templates.
     const template = await run(anaCtx, (c) =>
@@ -574,6 +554,7 @@ describe('tasks: every query filters by the workspace', () => {
         serviceModule,
         homeModule,
         recurringModule,
+        regimeGroupsModule,
         auditModule,
         flowsModule,
         insightsModule,

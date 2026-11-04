@@ -4,12 +4,13 @@ import type {
   AuditMatrixResponse,
   Client,
   ClientListResponse,
-  ClientResponsibleChangeResponse,
-  ClientResponsibleInput,
-  ClientResponsiblesResponse,
   FlowTemplate,
   FlowTemplateInput,
   RecurringOccurrenceDetail,
+  RegimeGroupApplyInput,
+  RegimeGroupApplyResponse,
+  RegimeGroupRegime,
+  RegimeGroupsResponse,
   RecurringTask,
   RecurringTaskInput,
   RecurringTaskListResponse,
@@ -112,13 +113,6 @@ export function useTaskMembers(options: { enabled?: boolean } = {}) {
     queryFn: () => api<TaskMember[]>('/tasks/members'),
     staleTime: 60_000,
     enabled: options.enabled ?? true,
-  });
-}
-
-export function useClientResponsibles() {
-  return useQuery({
-    queryKey: qk.clientResponsibles,
-    queryFn: () => api<ClientResponsiblesResponse>('/tasks/client-responsibles'),
   });
 }
 
@@ -313,69 +307,6 @@ export function useSetMemberDepartment() {
   });
 }
 
-/**
- * Responsible of a client in a department, saved at once: the grid changes optimistically and an
- * error puts the previous member back.
- */
-export function useSetClientResponsible() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ClientResponsibleInput) =>
-      api<ClientResponsibleChangeResponse>('/tasks/client-responsibles', { method: 'PUT', body: input }),
-    onMutate: async (input) => {
-      await qc.cancelQueries({ queryKey: qk.clientResponsibles });
-      const before = qc.getQueryData<ClientResponsiblesResponse>(qk.clientResponsibles);
-      const members = qc.getQueryData<TaskOptionsResponse>(qk.taskOptions)?.members ?? [];
-      qc.setQueryData<ClientResponsiblesResponse>(qk.clientResponsibles, (old) => {
-        if (!old) return old;
-        const rest = old.items.filter((i) => !(i.clientId === input.clientId && i.departmentId === input.departmentId));
-        const member = input.userId ? members.find((m) => m.id === input.userId) : null;
-        const user = input.userId ? { id: input.userId, name: member?.name ?? '…' } : null;
-        return { ...old, items: user ? [...rest, { clientId: input.clientId, departmentId: input.departmentId, user }] : rest };
-      });
-      return { before };
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.before) qc.setQueryData(qk.clientResponsibles, ctx.before);
-    },
-    onSettled: () => void invalidateTasks(qc),
-  });
-}
-
-/**
- * Several responsibles at once (the batch dialog and its undo): one request, the grid changes
- * optimistically, and the answer says how many open recurring tasks changed hands.
- */
-export function useSetClientResponsibles() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (items: ClientResponsibleInput[]) =>
-      api<ClientResponsibleChangeResponse>('/tasks/client-responsibles/batch', { method: 'PUT', body: { items } }),
-    onMutate: async (items) => {
-      await qc.cancelQueries({ queryKey: qk.clientResponsibles });
-      const before = qc.getQueryData<ClientResponsiblesResponse>(qk.clientResponsibles);
-      const members = qc.getQueryData<TaskOptionsResponse>(qk.taskOptions)?.members ?? [];
-      qc.setQueryData<ClientResponsiblesResponse>(qk.clientResponsibles, (old) => {
-        if (!old) return old;
-        let next = old.items;
-        for (const input of items) {
-          next = next.filter((i) => !(i.clientId === input.clientId && i.departmentId === input.departmentId));
-          if (input.userId) {
-            const member = members.find((m) => m.id === input.userId);
-            next = [...next, { clientId: input.clientId, departmentId: input.departmentId, user: { id: input.userId, name: member?.name ?? '…' } }];
-          }
-        }
-        return { ...old, items: next };
-      });
-      return { before };
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.before) qc.setQueryData(qk.clientResponsibles, ctx.before);
-    },
-    onSettled: () => void invalidateTasks(qc),
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Phase 2: history, comments, attachments
 // ---------------------------------------------------------------------------
@@ -503,6 +434,25 @@ export function useSaveRecurring() {
       id
         ? api<RecurringTask>(`/tasks/recurring/${id}`, { method: 'PUT', body: input })
         : api<RecurringTask>('/tasks/recurring', { method: 'POST', body: input }),
+    onSuccess: () => void invalidateTasks(qc),
+  });
+}
+
+/** Default groups of recurring tasks per regime, with what the office already has (`page.recurring`). */
+export function useRegimeGroups(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: qk.regimeGroups,
+    queryFn: () => api<RegimeGroupsResponse>('/tasks/regime-groups'),
+    enabled: options.enabled ?? true,
+  });
+}
+
+/** "Aplicar grupo" (`registry`): creates the missing recurring tasks; applying again changes nothing. */
+export function useApplyRegimeGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ regime, input }: { regime: RegimeGroupRegime; input?: RegimeGroupApplyInput }) =>
+      api<RegimeGroupApplyResponse>(`/tasks/regime-groups/${regime}/apply`, { method: 'POST', body: input ?? {} }),
     onSuccess: () => void invalidateTasks(qc),
   });
 }

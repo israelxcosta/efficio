@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
 import { Info, Plus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -235,7 +234,7 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description="Vira uma coluna da auditoria mensal e uma tarefa por cliente a cada período, para o responsável do cliente no departamento."
+      description="Vira uma coluna da auditoria mensal e uma tarefa por cliente a cada período, para o responsável padrão."
       width="lg"
       footer={
         readOnly ? (
@@ -415,20 +414,8 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
               label="Responsável padrão"
               hint={
                 <>
-                  Recebe as tarefas dos clientes que não têm responsável{department ? ` no ${department.name}` : ' no departamento'}.
-                  {editing && recurring && distributionText(recurring) ? (
-                    <span className="mt-1 block">
-                      {distributionText(recurring)}
-                      {department ? (
-                        <>
-                          {' · '}
-                          <Link className="font-medium text-brand-text hover:underline" to={`/tarefas/clientes?departamento=${department.id}&sem-responsavel=1`}>
-                            Definir responsáveis dos clientes
-                          </Link>
-                        </>
-                      ) : null}
-                    </span>
-                  ) : null}
+                  Recebe as tarefas de todos os clientes desta recorrente, todo período. Sem responsável padrão, elas ficam na fila{department ? ` do ${department.name}` : ' do departamento'}.
+                  {editing && recurring && distributionText(recurring) ? <span className="mt-1 block">{distributionText(recurring)}</span> : null}
                 </>
               }
             >

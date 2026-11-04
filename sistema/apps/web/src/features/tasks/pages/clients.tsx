@@ -1,23 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Building2, ChevronLeft, ChevronRight, ClipboardCheck, Ellipsis, ExternalLink, ListChecks, Search, Wallet } from 'lucide-react';
-import {
-  formatCNPJ,
-  formatDateBR,
-  TAX_REGIME_LABELS,
-  TAX_REGIMES,
-  type Client,
-  type ClientDocumentAlert,
-  type ClientResponsible,
-  type TaskMember,
-  type TaskRef,
-  type TaxRegime,
-} from '@effinance/shared';
+import { formatCNPJ, formatDateBR, TAX_REGIME_LABELS, TAX_REGIMES, type Client, type ClientDocumentAlert, type TaxRegime } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePermissions } from '@/features/auth/permissions';
 import { Card } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,23 +15,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
-import { AvatarStack } from '@/components/ui/member-avatar';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
-import { Tooltip } from '@/components/ui/tooltip';
-import { isUuid } from '@/lib/safe-url';
 import { cn, initials, pluralize } from '@/lib/utils';
-import { useAllClients, useClientResponsibles, useTaskOptions } from '../api';
-import { AssignResponsibleDialog, ClientResponsibleCell, responsibleOf } from '../components/client-responsible';
-import { MemberPicker } from '../components/pickers';
+import { useAllClients, useTaskOptions } from '../api';
 import { SummaryLabel, toggleClass } from '../components/tasks-summary';
 import { TaskClientSheet } from '../components/task-client-sheet';
-import { shortName } from '../due';
 import { tasksHref } from '../url-state';
-import { filterClients, missingDepartments, type ClientFilters, type ClientSituation } from '../client-filters';
+import { activeByRegime, filterClients, type ClientFilters, type ClientSituation } from '../client-filters';
 import { useClientDocumentAlerts } from '@/features/deadlines/api';
 import { mostUrgentText } from '@/features/deadlines/deadline-logic';
 
@@ -55,23 +36,14 @@ export default function TaskClientsPage() {
   const [params, setParams] = useSearchParams();
   const options = useTaskOptions();
   const clients = useAllClients();
-  const grid = useClientResponsibles();
-  const { can } = usePermissions();
-  // Responsibles are `registry`; the client registry itself lives in the finances (`finance`).
-  const isAdmin = can('registry');
-  const canFinance = can('finance');
-  const members = options.data?.members ?? [];
-  const departments = grid.data?.departments ?? [];
-  const items = grid.data?.items ?? [];
+  // The client registry lives in the finances (`finance`); here it is read-only.
+  const canFinance = usePermissions().can('finance');
 
   const situationRaw = params.get('situacao');
   const filters: ClientFilters = {
     search: params.get('busca') ?? '',
     situation: (Object.keys(SITUATION_PARAM) as Situation[]).find((k) => SITUATION_PARAM[k] === situationRaw) ?? 'active',
     regime: (TAX_REGIMES as readonly string[]).includes(params.get('regime') ?? '') ? (params.get('regime') as TaxRegime) : '',
-    department: isUuid(params.get('departamento')) ? params.get('departamento')! : '',
-    responsible: isUuid(params.get('responsavel')) ? params.get('responsavel')! : '',
-    unassigned: params.get('sem-responsavel') === '1',
   };
   const page = Math.max(1, Number(params.get('pagina') ?? '1') || 1);
   const openId = params.get('cliente');
@@ -102,34 +74,21 @@ export default function TaskClientsPage() {
 
   const all = clients.data ?? [];
   const filtered = useMemo(() => {
-    const list = filterClients(all, filters, departments, items);
+    const list = filterClients(all, filters);
     if (!docsFilter) return list;
     return list.filter((c) => {
       const a = alertsById.get(c.id);
       return a ? (docsFilter === 'overdue' ? a.overdue > 0 : a.within30 > 0) : false;
     });
-  }, [all, departments, items, JSON.stringify(filters), docsFilter, alertsById]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [all, JSON.stringify(filters), docsFilter, alertsById]); // eslint-disable-line react-hooks/exhaustive-deps
   const docTotals = docAlerts.data?.totals;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const shown = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const active = all.filter((c) => c.status === 'active');
   const inactiveCount = all.length - active.length;
-  const gaps = active.flatMap((c) => missingDepartments(c.id, departments, items).map(() => c.id));
-  const gapClients = new Set(gaps).size;
-  const ready = clients.data && grid.data && options.data;
-  // Up to 4 departments get a column each; more (or a narrow list) share one "Responsáveis" column.
-  const columns = filters.department ? departments.filter((d) => d.id === filters.department) : departments;
-  const perDepartment = columns.length > 0 && columns.length <= 4;
-
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [batchOpen, setBatchOpen] = useState(false);
-  const toggleSelected = (id: string, on: boolean) =>
-    setSelected((s) => {
-      const next = new Set(s);
-      if (on) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+  const ready = clients.data && options.data;
+  const regimes = activeByRegime(all);
+  const maxRegime = Math.max(1, ...regimes.map((r) => r.count));
 
   const opened = openId ? all.find((c) => c.id === openId) ?? null : null;
 
@@ -154,8 +113,8 @@ export default function TaskClientsPage() {
       />
 
       {clients.isError && !clients.data ? null : (
-        <section aria-label="Resumo dos responsáveis" aria-busy={ready ? undefined : true} className="overflow-hidden rounded-xl border border-border bg-surface">
-          <div className="grid md:grid-cols-2 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.4fr)]">
+        <section aria-label="Resumo dos clientes" aria-busy={ready ? undefined : true} className="overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="grid md:grid-cols-2 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1.6fr)]">
             <div className="min-w-0 p-4 sm:p-5">
               <SummaryLabel>Clientes ativos</SummaryLabel>
               {ready ? (
@@ -181,36 +140,6 @@ export default function TaskClientsPage() {
               )}
             </div>
             <div className="min-w-0 border-t border-border p-4 sm:p-5 md:border-t-0 md:border-l">
-              <button
-                type="button"
-                aria-pressed={filters.unassigned}
-                disabled={!ready || departments.length === 0}
-                onClick={() => update({ 'sem-responsavel': filters.unassigned ? null : '1', situacao: null })}
-                aria-label={`Sem responsável: ${gaps.length} vagas em ${gapClients} clientes. Filtrar a lista.`}
-                className={cn('-m-2 block w-[calc(100%+1rem)] p-2 text-left disabled:cursor-default', toggleClass)}
-              >
-                <SummaryLabel info="Departamentos sem responsável definido em clientes ativos (cliente × departamento).">Sem responsável</SummaryLabel>
-                {ready ? (
-                  <span className={cn('tabular mt-1 block text-kpi leading-10 font-semibold tracking-tight', gaps.length > 0 ? 'text-warning' : 'text-fg')}>
-                    {gaps.length}
-                  </span>
-                ) : (
-                  <span className="mt-1 flex h-10 items-center">
-                    <Skeleton className="h-6 w-10" />
-                  </span>
-                )}
-              </button>
-              {ready ? (
-                <p className="mt-1 text-body-sm text-muted">
-                  {departments.length === 0
-                    ? 'Cadastre departamentos para definir responsáveis.'
-                    : gaps.length
-                      ? `em ${pluralize(gapClients, 'cliente', 'clientes')}`
-                      : 'Todo cliente ativo tem responsável em cada departamento.'}
-                </p>
-              ) : null}
-            </div>
-            <div className="min-w-0 border-t border-border p-4 sm:p-5 lg:border-t-0 lg:border-l">
               <button
                 type="button"
                 aria-pressed={docsFilter === 'overdue'}
@@ -245,36 +174,33 @@ export default function TaskClientsPage() {
                 )
               ) : null}
             </div>
-            <div className="min-w-0 border-t border-border px-4 pt-4 pb-4 sm:px-5 md:border-l lg:border-t-0 lg:pt-5">
-              <SummaryLabel>Com responsável, por departamento</SummaryLabel>
+            <div className="min-w-0 border-t border-border px-4 pt-4 pb-4 sm:px-5 md:col-span-2 lg:col-span-1 lg:border-t-0 lg:border-l lg:pt-5">
+              <SummaryLabel>Ativos por regime</SummaryLabel>
               {!ready ? (
                 <div className="mt-2 flex flex-col gap-2" aria-hidden>
                   <Skeleton className="h-3.5 w-full" />
                   <Skeleton className="h-3.5 w-4/5" />
                 </div>
-              ) : departments.length === 0 ? (
-                <p className="mt-1.5 text-body-sm text-muted">Nenhum departamento cadastrado.</p>
+              ) : regimes.length === 0 ? (
+                <p className="mt-1.5 text-body-sm text-muted">Nenhum cliente ativo.</p>
               ) : (
-                <ul className="-mx-2 mt-1 grid gap-x-4 md:grid-cols-2 lg:grid-cols-1" aria-label="Clientes ativos com responsável por departamento (filtra a lista)">
-                  {departments.map((d) => {
-                    const covered = active.filter((c) => items.some((i) => i.clientId === c.id && i.departmentId === d.id)).length;
-                    const pressed = filters.department === d.id;
+                <ul className="-mx-2 mt-1 grid gap-x-6 md:grid-cols-2" aria-label="Clientes ativos por regime (filtra a lista)">
+                  {regimes.map((r) => {
+                    const pressed = filters.regime === r.regime;
                     return (
-                      <li key={d.id}>
+                      <li key={r.regime}>
                         <button
                           type="button"
                           aria-pressed={pressed}
-                          aria-label={`${d.name}: ${covered} de ${active.length} clientes ativos com responsável`}
-                          onClick={() => update({ departamento: pressed ? null : d.id })}
-                          className={cn('grid w-full grid-cols-[7.5rem_minmax(0,1fr)_3.5rem] items-center gap-x-3 px-2 py-1 text-left pointer-coarse:py-2', toggleClass)}
+                          aria-label={`${TAX_REGIME_LABELS[r.regime]}: ${r.count} clientes ativos. ${pressed ? 'Remover o filtro' : 'Filtrar a lista'}.`}
+                          onClick={() => update({ regime: pressed ? null : r.regime })}
+                          className={cn('grid w-full grid-cols-[8.5rem_minmax(0,1fr)_2.5rem] items-center gap-x-3 px-2 py-1 text-left pointer-coarse:py-2', toggleClass)}
                         >
-                          <span className={cn('truncate text-body-sm text-fg', pressed && 'font-semibold')}>{d.name}</span>
-                          <span className="block h-1.5 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
-                            <span className="block h-full rounded-full bg-data" style={{ width: `${active.length ? (covered / active.length) * 100 : 0}%` }} />
+                          <span className={cn('truncate text-body-sm text-fg', pressed && 'font-semibold')}>{TAX_REGIME_LABELS[r.regime]}</span>
+                          <span className="block h-1.5" aria-hidden>
+                            <span className="block h-full min-w-1 rounded-full bg-data" style={{ width: `${(r.count / maxRegime) * 100}%` }} />
                           </span>
-                          <span className={cn('tabular text-right text-body-sm font-semibold', covered < active.length ? 'text-warning' : 'text-fg')}>
-                            {covered}/{active.length}
-                          </span>
+                          <span className="tabular text-right text-body-sm font-semibold text-fg">{r.count}</span>
                         </button>
                       </li>
                     );
@@ -317,61 +243,15 @@ export default function TaskClientsPage() {
               </option>
             ))}
           </Select>
-          {departments.length ? (
-            <Select size_="sm" wrapperClassName="w-full sm:w-auto sm:min-w-[170px]" value={filters.department} onChange={(e) => update({ departamento: e.target.value })} aria-label="Departamento">
-              <option value="">Todos os departamentos</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </Select>
-          ) : null}
-          <MemberPicker
-            size_="sm"
-            className="w-full sm:w-56"
-            value={filters.responsible}
-            onChange={(v) => update({ responsavel: v })}
-            members={members}
-            allowAll
-            meFirst
-            aria-label="Responsável"
-          />
-          {departments.length ? (
-            <label className="flex items-center gap-2 text-[13px] font-medium text-fg">
-              <Switch checked={filters.unassigned} onCheckedChange={(on) => update({ 'sem-responsavel': on ? '1' : null })} aria-label="Só sem responsável" />
-              Só sem responsável
-            </label>
-          ) : null}
           {ready ? <span className="ml-auto text-xs text-muted">{pluralize(filtered.length, 'cliente', 'clientes')}</span> : null}
         </div>
 
-        {selected.size > 0 ? (
-          <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface-muted px-4 py-2.5" aria-live="polite">
-            <span className="text-body-sm font-semibold text-fg">{pluralize(selected.size, 'cliente selecionado', 'clientes selecionados')}</span>
-            <Button variant="outline" size="sm" onClick={() => setBatchOpen(true)} disabled={departments.length === 0}>
-              Definir responsável…
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
-              Limpar seleção
-            </Button>
-          </div>
-        ) : (
-          <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
-            <span className="flex-1">Cliente</span>
-            <span className="hidden w-40 @3xl:block">CNPJ</span>
-            <span className="hidden w-36 @2xl:block">Regime</span>
-            {perDepartment ? (
-              columns.map((d) => (
-                <span key={d.id} className="hidden w-36 truncate @4xl:block">
-                  {d.name}
-                </span>
-              ))
-            ) : null}
-            {columns.length ? <span className={cn('w-28', perDepartment && '@4xl:hidden')}>Responsáveis</span> : null}
-            <span className="w-8" aria-hidden />
-          </div>
-        )}
+        <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
+          <span className="flex-1">Cliente</span>
+          <span className="hidden w-40 @3xl:block">CNPJ</span>
+          <span className="hidden w-36 @2xl:block">Regime</span>
+          <span className="w-8" aria-hidden />
+        </div>
 
         <div className="p-1.5">
           {!ready && !clients.isError ? (
@@ -390,7 +270,7 @@ export default function TaskClientsPage() {
                     variant="outline"
                     onClick={() => {
                       setSearchInput('');
-                      update({ busca: null, situacao: null, regime: null, departamento: null, responsavel: null, 'sem-responsavel': null, documentos: null });
+                      update({ busca: null, situacao: null, regime: null, documentos: null });
                     }}
                   >
                     Limpar filtros
@@ -407,14 +287,6 @@ export default function TaskClientsPage() {
               <ClientRow
                 key={c.id}
                 client={c}
-                columns={columns}
-                perDepartment={perDepartment}
-                items={items}
-                isAdmin={isAdmin}
-                members={members}
-                selected={selected.has(c.id)}
-                selecting={selected.size > 0}
-                onSelect={(on) => toggleSelected(c.id, on)}
                 onOpen={() => update({ cliente: c.id, pagina: params.get('pagina') })}
                 docAlert={docsFilter ? alertsById.get(c.id) : undefined}
               />
@@ -438,26 +310,12 @@ export default function TaskClientsPage() {
         ) : null}
       </Card>
 
-      {batchOpen ? (
-        <AssignResponsibleDialog
-          open={batchOpen}
-          onOpenChange={setBatchOpen}
-          clients={all.filter((c) => selected.has(c.id)).map((c) => ({ id: c.id, name: c.tradeName || c.name }))}
-          departments={departments}
-          members={members}
-          items={items}
-          defaultDepartment={filters.department || undefined}
-          onDone={() => setSelected(new Set())}
-        />
-      ) : null}
-
       <TaskClientSheet
         client={opened}
         loading={Boolean(openId) && clients.isPending}
         notFound={Boolean(openId) && Boolean(clients.data) && !opened}
         error={openId ? clients.error : null}
         onClose={() => update({ cliente: null, pagina: params.get('pagina') })}
-        grid={grid.data}
         options={options.data}
       />
     </div>
@@ -466,36 +324,20 @@ export default function TaskClientsPage() {
 
 interface ClientRowProps {
   client: Client;
-  columns: TaskRef[];
-  perDepartment: boolean;
-  items: ClientResponsible[];
-  isAdmin: boolean;
-  members: TaskMember[];
-  selected: boolean;
-  selecting: boolean;
-  onSelect: (on: boolean) => void;
   onOpen: () => void;
   /** Under the "Documentos" filter: the most urgent document goes in the subtitle. */
   docAlert?: ClientDocumentAlert;
 }
 
-/** Client row in the pattern of the task row (spec §13.1): identification, CNPJ, regime, responsibles, menu. */
-function ClientRow({ client: c, columns, perDepartment, items, isAdmin, members, selected, selecting, onSelect, onOpen, docAlert }: ClientRowProps) {
+/** Client row in the pattern of the task row (spec §13.1): identification, CNPJ, regime, menu. */
+function ClientRow({ client: c, onOpen, docAlert }: ClientRowProps) {
   const navigate = useNavigate();
   const canFinance = usePermissions().can('finance');
   const name = c.tradeName || c.name;
   const inactive = c.status === 'inactive';
-  const responsibles = columns.map((d) => ({ department: d, member: responsibleOf(items, c.id, d.id) }));
-  const missing = responsibles.filter((r) => !r.member).length;
-  const stackTip = responsibles.map((r) => `${r.department.name}: ${r.member ? shortName(r.member.name) : 'sem responsável'}`).join(' · ');
 
   return (
     <div className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-surface-muted @lg:px-4">
-      {isAdmin ? (
-        <span className={cn('flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100', (selected || selecting) && 'opacity-100')}>
-          <Checkbox checked={selected} onCheckedChange={onSelect} aria-label={`Selecionar ${name}`} />
-        </span>
-      ) : null}
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg" aria-hidden>
           {initials(name)}
@@ -525,23 +367,6 @@ function ClientRow({ client: c, columns, perDepartment, items, isAdmin, members,
         <span className="block truncate text-body-sm text-fg">{TAX_REGIME_LABELS[c.taxRegime]}</span>
         {c.simplesAnnex ? <span className="block text-xs text-muted">Anexo {c.simplesAnnex}</span> : null}
       </span>
-      {perDepartment
-        ? responsibles.map((r) => (
-            <span key={r.department.id} className="hidden w-36 min-w-0 @4xl:block">
-              <ClientResponsibleCell client={{ id: c.id, name }} department={r.department} member={r.member} editable={isAdmin && !inactive} members={members} />
-            </span>
-          ))
-        : null}
-      {columns.length ? (
-        <span className={cn('hidden w-28 min-w-0 @xl:block', perDepartment && '@4xl:hidden')}>
-          <Tooltip content={stackTip}>
-            <span tabIndex={0} className="flex flex-col items-start gap-0.5 rounded-md" aria-label={stackTip}>
-              <AvatarStack people={responsibles.filter((r) => r.member).map((r) => r.member!)} max={3} />
-              {missing ? <span className="text-mini text-warning">{missing} sem responsável</span> : null}
-            </span>
-          </Tooltip>
-        </span>
-      ) : null}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button

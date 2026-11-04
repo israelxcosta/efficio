@@ -16,7 +16,6 @@ import {
   recurringTasks,
   taskAttachments,
   taskCategories,
-  taskClientResponsibles,
   taskComments,
   taskDepartmentMembers,
   taskDepartments,
@@ -107,7 +106,7 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
     const integrations = await exportOpenFinance(tx);
     // Task module (migration 0011): registries, tasks with their subtasks and comments (authorship as
     // recorded: user id and the name at the time; descriptions and comments decrypted, migration 0013).
-    const [departments, departmentMembers, taskCats, taskRows, subtaskRows, commentRows, responsibleRows] =
+    const [departments, departmentMembers, taskCats, taskRows, subtaskRows, commentRows] =
       await Promise.all([
         tx.select().from(taskDepartments).orderBy(asc(taskDepartments.createdAt)),
         tx.select().from(taskDepartmentMembers).orderBy(asc(taskDepartmentMembers.createdAt)),
@@ -115,7 +114,6 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
         tx.select().from(tasks).orderBy(asc(tasks.createdAt), asc(tasks.id)),
         tx.select().from(taskSubtasks).orderBy(asc(taskSubtasks.createdAt), asc(taskSubtasks.id)),
         tx.select().from(taskComments).orderBy(asc(taskComments.createdAt), asc(taskComments.id)),
-        tx.select().from(taskClientResponsibles).orderBy(asc(taskClientResponsibles.clientId)),
       ]);
     // Phase 3 (migration 0015): clients' documents, unions with their agreements and clients, the office
     // (images as data URIs, the template blocks as stored; null = factory).
@@ -211,7 +209,6 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
       taskComments: await Promise.all(
         commentRows.map(async (c) => ({ ...c, text: await decryptTaskText(cipher, TASK_COMMENT_TEXT, c.text) })),
       ),
-      taskClientResponsibles: responsibleRows,
       recurringTasks: await Promise.all(
         recurringRows.map(async (r) => ({ ...r, description: await decryptTaskText(cipher, RECURRING_DESCRIPTION, r.description) })),
       ),

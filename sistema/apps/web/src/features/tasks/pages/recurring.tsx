@@ -459,11 +459,6 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
                 </span>
               </Tooltip>
               {r.assignee ? <span className="mt-0.5 block truncate text-mini text-muted">Padrão: {shortName(r.assignee.name)}</span> : null}
-              {r.withoutResponsible > 0 && r.department ? (
-                <span className="block truncate text-mini text-warning">
-                  {r.withoutResponsible} sem responsável no {r.department.name}
-                </span>
-              ) : null}
             </>
           ) : (
             <span className="text-body-sm text-subtle">Sem responsável</span>

@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Copy, Mail, Phone, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCNPJ, formatDateBR, formatPhone, TAX_REGIME_LABELS, todayISO, type Client, type ClientResponsiblesResponse, type TaskOptionsResponse } from '@effinance/shared';
+import { formatCNPJ, formatDateBR, formatPhone, TAX_REGIME_LABELS, todayISO, type Client, type TaskOptionsResponse } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/misc';
@@ -16,7 +16,6 @@ import { usePermissions } from '@/features/auth/permissions';
 import { useTaskAudit, useTasks } from '../api';
 import { competenceName } from '../occurrence';
 import { tasksHref } from '../url-state';
-import { ClientResponsibleCell, responsibleOf } from './client-responsible';
 import { TaskRow } from './task-row';
 
 function CopyButton({ value, label }: { value: string; label: string }) {
@@ -55,19 +54,16 @@ interface TaskClientSheetProps {
   notFound: boolean;
   error: unknown;
   onClose: () => void;
-  grid: ClientResponsiblesResponse | undefined;
   options: TaskOptionsResponse | undefined;
 }
 
 /**
- * Read-only client sheet of the Gestão (spec §13.2): contacts, the responsible of each department,
- * the open tasks and the registration data, never the fees. Editing stays in the finances.
+ * Read-only client sheet of the Gestão (spec §13.2): contacts, the open tasks, the month's
+ * obligations and the registration data, never the fees. Editing stays in the finances.
  */
-export function TaskClientSheet({ client: c, loading, notFound, error, onClose, grid, options }: TaskClientSheetProps) {
+export function TaskClientSheet({ client: c, loading, notFound, error, onClose, options }: TaskClientSheetProps) {
   const open = Boolean(c) || loading || notFound || Boolean(error);
-  const { can } = usePermissions();
-  const isAdmin = can('registry');
-  const canFinance = can('finance');
+  const canFinance = usePermissions().can('finance');
   const tasks = useTasks(
     { scope: 'all', clientId: c?.id, situation: 'open', page: 1, pageSize: 5, occurrences: 'false' },
     { enabled: Boolean(c) },
@@ -77,7 +73,6 @@ export function TaskClientSheet({ client: c, loading, notFound, error, onClose, 
   const competence = (options?.today ?? new Date().toISOString().slice(0, 10)).slice(0, 7);
   const audit = useTaskAudit({ competence }, { enabled: Boolean(c) });
   const auditRow = c ? audit.data?.clients.find((r) => r.id === c.id) : undefined;
-  const departments = grid?.departments ?? [];
 
   const description = c
     ? `${TAX_REGIME_LABELS[c.taxRegime]} · ${formatCNPJ(c.document)} · ${c.status === 'active' ? 'Ativo' : `Inativo${c.inactivation ? ` desde ${formatDateBR(c.inactivation.date)}` : ''}`}`
@@ -165,34 +160,6 @@ export function TaskClientSheet({ client: c, loading, notFound, error, onClose, 
                 ) : null}
               </p>
             )}
-          </section>
-
-          <section className="flex flex-col gap-2" aria-labelledby="client-responsibles">
-            <h3 id="client-responsibles" className="text-body-sm font-semibold text-fg">
-              Responsáveis por departamento
-            </h3>
-            {departments.length === 0 ? (
-              <p className="text-body-sm text-subtle">Nenhum departamento cadastrado.</p>
-            ) : (
-              <ul className="flex flex-col">
-                {departments.map((d) => (
-                  <li key={d.id} className="flex min-h-10 items-center gap-3">
-                    <span className="w-28 shrink-0 truncate text-body-sm text-muted">{d.name}</span>
-                    <span className="min-w-0 flex-1">
-                      <ClientResponsibleCell
-                        full
-                        client={{ id: c.id, name: c.tradeName || c.name }}
-                        department={d}
-                        member={responsibleOf(grid?.items ?? [], c.id, d.id)}
-                        editable={isAdmin}
-                        members={options?.members ?? []}
-                      />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="text-caption text-subtle">Quem cuida deste cliente em cada departamento: a sugestão de responsável ao criar uma tarefa para ele e quem recebe as tarefas recorrentes dele. Sem responsável, vale o responsável padrão de cada recorrente.</p>
           </section>
 
           <section className="flex flex-col gap-2" aria-labelledby="client-tasks">

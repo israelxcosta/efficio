@@ -1,8 +1,8 @@
 import { rolePermissions } from '@effinance/shared';
 import { describe, expect, it } from 'vitest';
-import type { Client, ClientResponsible } from '@effinance/shared';
+import type { Client } from '@effinance/shared';
 import { settingsTabsFor } from '@/features/settings/pages/settings';
-import { filterClients, missingDepartments, type ClientFilters } from './client-filters';
+import { activeByRegime, filterClients, type ClientFilters } from './client-filters';
 import { applyTaskPatch, newTaskDefaults } from './components/task-sheet';
 import { clientOptionsFor, memberOptions } from './components/pickers';
 import { resolveHomeDepartment } from './home-view';
@@ -120,14 +120,8 @@ describe('clients of the Gestão', () => {
     client('b', 'Padaria Pão Quente Ltda', { tradeName: 'Pão Quente' }),
     client('c', 'Clínica Sorriso', { status: 'inactive' }),
   ];
-  const departments = [FISCAL, CONTABIL];
-  const items: ClientResponsible[] = [
-    { clientId: 'a', departmentId: FISCAL.id, user: { id: 'ana', name: 'Ana' } },
-    { clientId: 'a', departmentId: CONTABIL.id, user: { id: 'bruno', name: 'Bruno' } },
-    { clientId: 'b', departmentId: FISCAL.id, user: { id: 'me', name: 'Marina' } },
-  ];
-  const base: ClientFilters = { search: '', situation: 'active', regime: '', department: '', responsible: '', unassigned: false };
-  const ids = (f: Partial<ClientFilters>) => filterClients(clients, { ...base, ...f }, departments, items).map((c) => c.id);
+  const base: ClientFilters = { search: '', situation: 'active', regime: '' };
+  const ids = (f: Partial<ClientFilters>) => filterClients(clients, { ...base, ...f }).map((c) => c.id);
 
   it('filters by situation, regime and search (name without accents, or CNPJ digits)', () => {
     expect(ids({})).toEqual(['a', 'b']);
@@ -137,12 +131,12 @@ describe('clients of the Gestão', () => {
     expect(ids({ search: '08.241.739' })).toEqual(['a']);
   });
 
-  it('filters by responsible (the portfolio) and by gaps', () => {
-    expect(ids({ responsible: 'bruno' })).toEqual(['a']);
-    expect(ids({ responsible: 'ana', department: CONTABIL.id })).toEqual([]);
-    expect(ids({ unassigned: true })).toEqual(['b']);
-    expect(ids({ unassigned: true, department: FISCAL.id })).toEqual([]);
-    expect(missingDepartments('b', departments, items)).toEqual([CONTABIL]);
+  it('counts the active clients per regime (the summary filters by it), the empty regimes left out', () => {
+    expect(activeByRegime(clients)).toEqual([
+      { regime: 'simples_nacional', count: 1 },
+      { regime: 'presumed_profit', count: 1 },
+    ]);
+    expect(activeByRegime([])).toEqual([]);
   });
 });
 

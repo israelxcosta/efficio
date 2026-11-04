@@ -1,28 +1,22 @@
 import { forwardRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Popover } from 'radix-ui';
 import { Check, CirclePause, CircleX, Contrast } from 'lucide-react';
-import { ASSIGNEE_SOURCE_LABELS, TASK_STATUS_LABELS, type OccurrenceCell, type OpenTaskStatus, type TaskStatus } from '@effinance/shared';
+import { TASK_STATUS_LABELS, type OccurrenceCell, type OpenTaskStatus, type TaskStatus } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useTaskHistory } from '../api';
 import { concludedInitials, nextCellStatus, statusForKey } from '../audit-logic';
 import { dateTimeBR } from '../format';
+import { assigneeSourceText } from '../occurrence';
 import { auditEvents } from '../timeline';
 import { ReopenReasonForm } from './reopen';
 
-/** "A fazer · Ana Paula Ribeiro (responsável do cliente no Fiscal)". */
+/** "A fazer · Ana Paula Ribeiro (responsável padrão da recorrente)". */
 export function cellTip(cell: OccurrenceCell, department: string | null): string {
   if (cell.status === 'done') return `Concluída${cell.concludedBy ? ` por ${cell.concludedBy.name}` : ''}${cell.concludedAt ? ` em ${dateTimeBR(cell.concludedAt)}` : ''}`;
   const who = cell.assignee ? cell.assignee.name : 'Sem responsável';
-  const source =
-    cell.assigneeSource === 'client'
-      ? department
-        ? `responsável do cliente no ${department}`
-        : 'responsável do cliente'
-      : cell.assigneeSource
-        ? ASSIGNEE_SOURCE_LABELS[cell.assigneeSource].toLowerCase()
-        : null;
+  const source = cell.assignee ? assigneeSourceText(cell.assigneeSource)?.toLowerCase() : null;
   return `${TASK_STATUS_LABELS[cell.status]} · ${who}${source ? ` (${source})` : ''}`;
 }
 

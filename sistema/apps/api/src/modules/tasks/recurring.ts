@@ -36,7 +36,6 @@ import {
   generationBounds,
   loadClients,
   loadDefs,
-  loadResponsibles,
   resolveAssignee,
   scheduleOf,
   syncOpenOccurrences,
@@ -109,7 +108,6 @@ async function occurrenceCounts(ctx: TaskContext, ids?: string[]): Promise<Map<s
 
 interface Shared {
   clients: GenClient[];
-  responsibles: Map<string, string>;
   departments: Map<string, string>;
   categories: Awaited<ReturnType<typeof categoryRefs>>;
   stats: Map<string, MonthStats>;
@@ -121,16 +119,10 @@ function toRecurringTask(ctx: TaskContext, def: GenDef, month: MonthKey, shared:
   const row = def.row;
   const current = monthKey(ctx.today);
   const applicable = shared.clients.filter((c) => clientActiveIn(c, current) && appliesTo(def, c));
-  const distribution = new Map<string, { assignee: TaskMemberRef | null; source: AssigneeSource | null; count: number }>();
-  let withoutResponsible = 0;
-  for (const client of applicable) {
-    const { assigneeId, source } = resolveAssignee(row, client.id, shared.responsibles);
-    if (source !== 'client') withoutResponsible += 1;
-    const key = `${assigneeId ?? ''}|${source ?? ''}`;
-    const entry = distribution.get(key) ?? { assignee: memberRef(ctx, assigneeId), source, count: 0 };
-    entry.count += 1;
-    distribution.set(key, entry);
-  }
+  // Every occurrence goes to the default responsible (or waits in the department's queue).
+  const { assigneeId, source } = resolveAssignee(row);
+  const distribution: RecurringTask['distribution'] =
+    applicable.length > 0 ? [{ assignee: memberRef(ctx, assigneeId), source, count: applicable.length }] : [];
   const scheduled = defActiveIn(row, month) ? occurrencesInCompetence(scheduleOf(row), month) : [];
   const upcoming = scheduled.find((s) => s.legalDueDate >= ctx.today) ?? scheduled.at(-1);
   const stats = shared.stats.get(row.id);
@@ -156,8 +148,7 @@ function toRecurringTask(ctx: TaskContext, def: GenDef, month: MonthKey, shared:
     endCompetence: row.endCompetence,
     active: row.endCompetence === null || row.endCompetence >= current,
     clientCount: applicable.length,
-    withoutResponsible,
-    distribution: [...distribution.values()].sort((a, b) => b.count - a.count),
+    distribution,
     occurrenceCount: shared.occurrences.get(row.id) ?? 0,
     month: {
       competence: month,
@@ -178,9 +169,8 @@ function toRecurringTask(ctx: TaskContext, def: GenDef, month: MonthKey, shared:
 
 async function loadShared(ctx: TaskContext, defs: GenDef[], month: MonthKey): Promise<Shared> {
   const ids = defs.map((d) => d.row.id);
-  const [clients, responsibles, departments, categories, stats, occurrences, descriptions] = await Promise.all([
+  const [clients, departments, categories, stats, occurrences, descriptions] = await Promise.all([
     loadClients(ctx),
-    loadResponsibles(ctx),
     departmentNames(ctx.db, ctx.workspaceId),
     categoryRefs(ctx),
     monthStats(ctx, month, ids.length === 1 ? ids : undefined),
@@ -189,7 +179,6 @@ async function loadShared(ctx: TaskContext, defs: GenDef[], month: MonthKey): Pr
   ]);
   return {
     clients,
-    responsibles,
     departments,
     categories,
     stats,
@@ -302,8 +291,11 @@ async function replaceLinks(ctx: TaskContext, id: string, input: RecurringInput)
   }
 }
 
-/** Administrators. Generates the occurrences of the current window at once. */
-export async function createRecurring(ctx: TaskContext, input: RecurringInput): Promise<RecurringTask> {
+/**
+ * Inserts a recurring task (validated) with its client links, without generating: the caller generates
+ * (one `ensureOccurrences` for several). `catalogKey`: the regime-group item it comes from.
+ */
+export async function insertRecurring(ctx: TaskContext, input: RecurringInput, opts: { catalogKey?: string } = {}): Promise<string> {
   await validate(ctx, input);
   const startCompetence = input.startCompetence ?? monthKey(ctx.today);
   if (input.endCompetence && input.endCompetence < startCompetence)
@@ -314,13 +306,20 @@ export async function createRecurring(ctx: TaskContext, input: RecurringInput): 
       workspaceId: ctx.workspaceId,
       ...(await values(ctx, input)),
       startCompetence,
+      catalogKey: opts.catalogKey ?? null,
       createdBy: ctx.userId,
       createdByName: myName(ctx),
     })
     .returning({ id: recurringTasks.id });
   await replaceLinks(ctx, row!.id, input);
-  await ensureOccurrences(ctx, defaultWindow(ctx.today), { recurringTaskIds: [row!.id] });
-  return getRecurring(ctx, row!.id);
+  return row!.id;
+}
+
+/** Administrators. Generates the occurrences of the current window at once. */
+export async function createRecurring(ctx: TaskContext, input: RecurringInput): Promise<RecurringTask> {
+  const id = await insertRecurring(ctx, input);
+  await ensureOccurrences(ctx, defaultWindow(ctx.today), { recurringTaskIds: [id] });
+  return getRecurring(ctx, id);
 }
 
 /**

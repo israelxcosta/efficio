@@ -83,7 +83,6 @@ describe('client accesses: encrypted, never listed, revealed with an audit recor
       '/search?q=11222333000181',
       '/tasks/options',
       '/tasks/clients',
-      '/tasks/client-responsibles',
       '/deadlines',
       '/deadlines/clients',
     ];

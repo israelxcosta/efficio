@@ -26,7 +26,7 @@ import {
   writeAuditFilters,
 } from './audit-logic';
 import { agendaDayTitle, calendarWeeks, itemsByDay } from './calendar-logic';
-import { reassignedText } from './components/client-responsible';
+import { cellTip } from './components/matrix-cell';
 import { filterNotes } from './components/notes-sheet';
 import { occurrenceSheetCells } from './components/occurrence-sheet';
 import { REOPEN_REASON_REQUIRED, reopenReasonError } from './components/reopen';
@@ -96,7 +96,7 @@ describe('deadlines of a recurring occurrence (target and legal deadline)', () =
   });
 
   it('says when a concluded occurrence was late, and a complete group is just its dates', () => {
-    const occurrence = { recurringTaskId: 'r', period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-15', targetMissed: false, assigneeSource: 'client', situation: 'done_late' } as const;
+    const occurrence = { recurringTaskId: 'r', period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-15', targetMissed: false, assigneeSource: 'default', situation: 'done_late' } as const;
     const t = makeTask({ status: 'done', dueDate: '2026-10-20', completedAt: '2026-10-22T15:00:00Z', occurrence });
     expect(occurrenceTaskDueInfo(t, TODAY)).toEqual({ text: 'Concluída em 22/10, com atraso', tone: 'muted' });
     expect(occurrenceTaskDueInfo({ ...t, status: 'canceled' }, TODAY).text).toBe('Cancelada');
@@ -161,13 +161,13 @@ describe('grouped recurring rows', () => {
 });
 
 describe('the occurrence in the task sheet', () => {
-  const occurrence = { recurringTaskId: 'r', period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-15', targetMissed: false, assigneeSource: 'client', situation: 'not_started' } as const;
+  const occurrence = { recurringTaskId: 'r', period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-15', targetMissed: false, assigneeSource: 'default', situation: 'not_started' } as const;
 
   it('describes it with the competence and the reference', () => {
     const t = makeDetail({ title: 'DCTFWeb', client: { id: 'c1', name: 'Padaria' }, department: FISCAL, occurrence });
     expect(taskSheetDescription(t)).toBe('Padaria · Fiscal · DCTFWeb de outubro de 2026 (ref. 09/2026)');
     expect(taskSheetDescription(makeDetail({ department: CONTABIL }))).toBe('Interna · Contábil');
-    expect(assigneeSourceHint(t)).toBe('Responsável do cliente no Fiscal.');
+    expect(assigneeSourceHint(t)).toBe('Responsável padrão da recorrente.');
     expect(assigneeSourceHint({ ...t, occurrence: { ...occurrence, assigneeSource: 'manual' } })).toBe('Atribuída só nesta competência.');
   });
 
@@ -361,7 +361,7 @@ describe('monthly audit', () => {
     expect(visibleColumns(data, { ...f, view: 'task', search: 'dctf' }).map((c) => c.name)).toEqual(['DCTFWeb']);
   });
 
-  it('opens "Por cliente" (below 1024px) with the recurring tasks that apply', () => {
+  it('opens "Por cliente" with the recurring tasks that apply', () => {
     const items = accordionByClient(data, f);
     expect(items.map((c) => [c.client.id, c.items.map((i) => i.column.name)])).toEqual([
       ['alfa', ['DAS', 'DCTFWeb']],
@@ -673,11 +673,10 @@ describe('notes and responsibles', () => {
     expect(filterNotes(notes, 'nfs').map((n) => n.id)).toEqual(['1']);
   });
 
-  it('says how many open recurring tasks changed hands', () => {
-    expect(reassignedText(5, { id: 'a', name: 'Ana Paula' })).toBe(' 5 tarefas em aberto passaram para Ana.');
-    expect(reassignedText(1, { id: 'a', name: 'Ana Paula' })).toBe(' 1 tarefa em aberto passou para Ana.');
-    expect(reassignedText(2, null)).toBe(' 2 tarefas em aberto passaram para o responsável padrão.');
-    expect(reassignedText(0, null)).toBe('');
+  it('says where the responsible of a cell comes from: the default of the recurring task, or by hand', () => {
+    expect(cellTip(makeCell({ assigneeSource: 'default' }), 'Fiscal')).toBe('A fazer · Ana Paula Ribeiro (responsável padrão da recorrente)');
+    expect(cellTip(makeCell({ assigneeSource: 'manual' }), 'Fiscal')).toBe('A fazer · Ana Paula Ribeiro (atribuída só nesta competência)');
+    expect(cellTip(makeCell({ assignee: null, assigneeSource: null }), 'Fiscal')).toBe('A fazer · Sem responsável');
   });
 });
 

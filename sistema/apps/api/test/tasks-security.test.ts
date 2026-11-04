@@ -107,12 +107,11 @@ const ADMIN_ROUTES = new Set([
   'POST /api/tasks/categories',
   'PUT /api/tasks/categories/:id',
   'DELETE /api/tasks/categories/:id',
-  'PUT /api/tasks/client-responsibles',
   'DELETE /api/tasks/:id',
-  // Phase 2: registries (recurring tasks, process templates, responsibles in batch) and deletions.
-  'PUT /api/tasks/client-responsibles/batch',
+  // Phase 2: registries (recurring tasks, process templates) and deletions.
   'POST /api/tasks/recurring',
   'POST /api/tasks/recurring/generate',
+  'POST /api/tasks/regime-groups/:regime/apply',
   'PUT /api/tasks/recurring/:id',
   'DELETE /api/tasks/recurring/:id',
   'DELETE /api/tasks/flows/:id',
@@ -128,8 +127,9 @@ const MEMBER_ROUTES = new Set([
   'GET /api/tasks/members',
   'GET /api/tasks/departments',
   'GET /api/tasks/categories',
-  'GET /api/tasks/client-responsibles',
   'GET /api/tasks/home',
+  'GET /api/tasks/dashboard',
+  'GET /api/tasks/regime-groups',
   'GET /api/tasks/activity',
   'GET /api/tasks',
   'POST /api/tasks',
@@ -226,10 +226,9 @@ const ROUTE_KEYS: Record<string, 'registry' | 'deleteRegistry' | 'deleteTasks'> 
   'POST /api/tasks/categories': 'registry',
   'PUT /api/tasks/categories/:id': 'registry',
   'DELETE /api/tasks/categories/:id': 'deleteRegistry',
-  'PUT /api/tasks/client-responsibles': 'registry',
   'DELETE /api/tasks/:id': 'deleteTasks',
-  'PUT /api/tasks/client-responsibles/batch': 'registry',
   'POST /api/tasks/recurring': 'registry',
+  'POST /api/tasks/regime-groups/:regime/apply': 'registry',
   'POST /api/tasks/recurring/generate': 'registry',
   'PUT /api/tasks/recurring/:id': 'registry',
   'DELETE /api/tasks/recurring/:id': 'deleteRegistry',
@@ -320,19 +319,7 @@ describe('tasks security: ids outside their scope', () => {
     expect((await b.patch(`/tasks/${own.body.id}`, { assigneeId: a.carla.userId })).status).toBe(
       422,
     );
-    // Responsible per client: every id is checked (client, department and member).
     const deptB = (await b.post('/tasks/departments', { name: 'Fiscal B' })).body.id as string;
-    const clientB = (await b.post('/clients', CLIENT)).body.id as string;
-    const put = (body: object) => b.put('/tasks/client-responsibles', body);
-    expect((await put({ clientId: clientA, departmentId: deptB, userId: b.userId })).status).toBe(
-      404,
-    );
-    expect(
-      (await put({ clientId: clientB, departmentId: a.fiscal, userId: b.userId })).status,
-    ).toBe(404);
-    expect(
-      (await put({ clientId: clientB, departmentId: deptB, userId: a.carla.userId })).status,
-    ).toBe(422);
     expect(
       (await b.put(`/tasks/departments/${deptB}`, { name: 'Fiscal B', memberIds: [a.ana.userId] }))
         .status,
@@ -581,15 +568,7 @@ describe('tasks security: what a collaborator sees', () => {
       employeeFee: 4_321,
     });
     expect(fee.status).toBe(201);
-    expect(
-      (
-        await ana.put('/tasks/client-responsibles', {
-          clientId: client.body.id,
-          departmentId: fiscal,
-          userId: carla.userId,
-        })
-      ).status,
-    ).toBe(200);
+    void fiscal;
     const task = await ana.post('/tasks', {
       title: 'Parcelamento',
       clientId: client.body.id,
@@ -605,7 +584,6 @@ describe('tasks security: what a collaborator sees', () => {
       '/tasks/members',
       '/tasks/departments',
       '/tasks/categories',
-      '/tasks/client-responsibles',
       '/tasks/home',
       '/tasks/activity',
       '/tasks',

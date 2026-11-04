@@ -1209,7 +1209,7 @@ export const recurringTasks = pgTable(
     description: text(),
     departmentId: uuid(),
     categoryId: uuid(),
-    /** Default responsible (clients without a responsible in the department). */
+    /** Default responsible of every occurrence (none: the department's queue). */
     defaultAssigneeId: uuid(),
     period: text().$type<RecurrencePeriod>().notNull().default('monthly'),
     /** Day of the month (1–31) or, weekly, the ISO weekday (1 = Monday). */
@@ -1221,6 +1221,11 @@ export const recurringTasks = pgTable(
     regimes: text().array().$type<TaxRegime[]>().notNull().default(sql`'{}'::text[]`),
     startCompetence: text().$type<MonthKey>().notNull(),
     endCompetence: text().$type<MonthKey>(),
+    /**
+     * Key of the regime-group catalog item it was created from (`REGIME_GROUP_ITEMS`, migration 0018):
+     * applying a group again finds it instead of creating a twin. Null for recurring tasks made by hand.
+     */
+    catalogKey: text(),
     createdBy: uuid().references(() => users.id, { onDelete: 'set null' }),
     createdByName: text().notNull(),
     createdAt: createdAt(),
@@ -1228,6 +1233,8 @@ export const recurringTasks = pgTable(
   },
   (t) => [
     tenantUnique('recurring_tasks', t),
+    uniqueIndex('recurring_tasks_catalog_key_uq').on(t.workspaceId, t.catalogKey).where(sql`${t.catalogKey} is not null`),
+    check('recurring_tasks_catalog_key_chk', sql`${t.catalogKey} is null or ${t.catalogKey} ~ '^[a-z0-9_]{1,60}$'`),
     index('recurring_tasks_department_idx').on(t.workspaceId, t.departmentId),
     index('recurring_tasks_category_idx').on(t.workspaceId, t.categoryId),
     index('recurring_tasks_assignee_idx').on(t.workspaceId, t.defaultAssigneeId),
@@ -1324,9 +1331,12 @@ export const tasks = pgTable(
     index('tasks_competence_idx').on(t.workspaceId, t.competence).where(sql`${t.recurringTaskId} is not null`),
     // Migration 0016: the calendar aggregates occurrences by target date (a range per request).
     index('tasks_occurrence_target_idx').on(t.workspaceId, t.targetDate).where(sql`${t.recurringTaskId} is not null`),
+    // Productivity of the report: conclusions in a period (migration 0018). Partial on a literal, so the
+    // query must say `status = 'done'` literally (a parameter would not match the predicate).
+    index('tasks_completed_idx').on(t.workspaceId, t.completedAt).where(sql`${t.status} = 'done'`),
     check(
       'tasks_occurrence_chk',
-      sql`(${t.recurringTaskId} is null and ${t.competence} is null and ${t.periodKey} is null and ${t.referenceMonth} is null and ${t.targetDate} is null and ${t.assigneeSource} is null) or (${t.recurringTaskId} is not null and ${t.clientId} is not null and ${t.dueDate} is not null and ${t.targetDate} is not null and ${t.targetDate} <= ${t.dueDate} and ${t.competence} is not null and ${t.competence} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.referenceMonth} is not null and ${t.referenceMonth} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.periodKey} is not null and ${t.periodKey} ~ '^[0-9]{4}-(0[1-9]|1[0-2])(-[0-9]{2})?$' and (${t.assigneeSource} is null or ${t.assigneeSource} in ('manual', 'client', 'default')))`,
+      sql`(${t.recurringTaskId} is null and ${t.competence} is null and ${t.periodKey} is null and ${t.referenceMonth} is null and ${t.targetDate} is null and ${t.assigneeSource} is null) or (${t.recurringTaskId} is not null and ${t.clientId} is not null and ${t.dueDate} is not null and ${t.targetDate} is not null and ${t.targetDate} <= ${t.dueDate} and ${t.competence} is not null and ${t.competence} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.referenceMonth} is not null and ${t.referenceMonth} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.periodKey} is not null and ${t.periodKey} ~ '^[0-9]{4}-(0[1-9]|1[0-2])(-[0-9]{2})?$' and (${t.assigneeSource} is null or ${t.assigneeSource} in ('manual', 'default')))`,
     ),
     index('tasks_due_idx').on(t.workspaceId, t.dueDate),
     index('tasks_assignee_idx').on(t.workspaceId, t.assigneeId),
@@ -1442,38 +1452,39 @@ export const taskComments = pgTable(
 );
 
 /**
- * Responsible member of a client in a department ("carteira"): suggested as the assignee of a task of
- * that client in the department, and the responsible of the client's recurring work (later phase).
+ * Generation version of a workspace (migration 0018): bumped by database triggers whenever something
+ * that decides which occurrences exist changes — a recurring task or its clients, a client's kind,
+ * regime, contract start, status or inactivation date. Read before the data it guards.
  */
-export const taskClientResponsibles = pgTable(
-  'task_client_responsibles',
+export const taskGenerationState = pgTable('task_generation_state', {
+  workspaceId: workspaceRef().notNull().primaryKey(),
+  version: bigint({ mode: 'number' }).notNull().default(0),
+  updatedAt: updatedAt(),
+});
+
+/**
+ * "These occurrences were generated" (migration 0018): per recurring task and competence, with the
+ * generation version (and the rules version of the code) it was computed with. `ensureOccurrences`
+ * skips the pairs whose mark is current, so a read does not regenerate the window every time.
+ */
+export const taskGenerationMarks = pgTable(
+  'task_generation_marks',
   {
     workspaceId: workspaceRef().notNull(),
-    clientId: uuid().notNull(),
-    /** Always 'client' (generated, migration 0012): the foreign key only accepts clients. */
-    clientKind: text()
-      .$type<'client'>()
-      .generatedAlwaysAs(sql`'client'`),
-    departmentId: uuid().notNull(),
-    userId: uuid().notNull(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
+    recurringTaskId: uuid().notNull(),
+    competence: text().$type<MonthKey>().notNull(),
+    version: bigint({ mode: 'number' }).notNull(),
+    rules: integer().notNull(),
+    generatedAt: createdAt(),
   },
   (t) => [
-    primaryKey({ name: 'task_client_responsibles_pk', columns: [t.workspaceId, t.clientId, t.departmentId] }),
-    index('task_client_responsibles_department_idx').on(t.workspaceId, t.departmentId),
-    index('task_client_responsibles_user_idx').on(t.workspaceId, t.userId),
+    primaryKey({ name: 'task_generation_marks_pk', columns: [t.workspaceId, t.recurringTaskId, t.competence] }),
     foreignKey({
-      name: 'task_client_responsibles_client_fk',
-      columns: [t.workspaceId, t.clientId, t.clientKind],
-      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
+      name: 'task_generation_marks_recurring_fk',
+      columns: [t.workspaceId, t.recurringTaskId],
+      foreignColumns: [recurringTasks.workspaceId, recurringTasks.id],
     }).onDelete('cascade'),
-    foreignKey({
-      name: 'task_client_responsibles_department_fk',
-      columns: [t.workspaceId, t.departmentId],
-      foreignColumns: [taskDepartments.workspaceId, taskDepartments.id],
-    }).onDelete('cascade'),
-    memberFk('task_client_responsibles_member_fk', [t.workspaceId, t.userId]).onDelete('cascade'),
+    check('task_generation_marks_competence_chk', sql`${t.competence} ~ ${sql.raw(MONTH_KEY_PATTERN)}`),
   ],
 );
 

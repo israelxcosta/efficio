@@ -75,7 +75,7 @@ export const GESTAO_NAV_ITEMS: NavItem[] = [
     keywords: 'obrigacoes prazo legal meta das dctfweb folha periodicidade calendario feriados',
   },
   { to: '/tarefas/processos', label: 'Processos', icon: Workflow, permission: 'page.processes', keywords: 'fluxos modelos etapas roteiro abertura alteracao' },
-  { to: '/tarefas/clientes', label: 'Clientes', icon: Building2, mobile: true, permission: 'page.clients', keywords: 'empresas cnpj regime contatos responsaveis carteira' },
+  { to: '/tarefas/clientes', label: 'Clientes', icon: Building2, mobile: true, permission: 'page.clients', keywords: 'empresas cnpj regime contatos documentos' },
   {
     to: '/tarefas/relatorios',
     label: 'Relatórios de tarefas',

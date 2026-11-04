@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { useRecurringOccurrence, useTaskOptions, useUpdateTask } from '../api';
 import { isPendingCell } from '../audit-logic';
 import { DUE_TONE_CLASS, firstName, shortDate, shortName } from '../due';
-import { auditHref, competenceName, groupDeadlineInfo, isOccurrenceRef, occurrenceTitle, periodLabel, referenceLabel } from '../occurrence';
+import { assigneeSourceText, auditHref, competenceName, groupDeadlineInfo, isOccurrenceRef, occurrenceTitle, periodLabel, referenceLabel } from '../occurrence';
 import { withSheetParams } from '../task-links';
 import { useCellStatus } from '../use-cell-status';
 import { cellTip, OccurrenceCellControl } from './matrix-cell';
@@ -263,16 +263,7 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
     }
   }
 
-  const sourceTip =
-    cell.assigneeSource === 'client'
-      ? department
-        ? `Responsável do cliente no ${department}`
-        : 'Responsável do cliente'
-      : cell.assigneeSource === 'default'
-        ? 'Responsável padrão'
-        : cell.assigneeSource === 'manual'
-          ? 'Atribuída só nesta competência'
-          : 'Sem responsável';
+  const sourceTip = (cell.assignee ? assigneeSourceText(cell.assigneeSource) : null) ?? 'Sem responsável';
 
   return (
     <li className="group flex min-h-[52px] items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-muted">
@@ -383,7 +374,7 @@ function AssignOccurrenceDialog({
       open
       onOpenChange={(o) => !o && onClose()}
       title={title}
-      description="Vale só para esta competência; o responsável do cliente não muda."
+      description="Vale só para esta competência; o responsável padrão da recorrente não muda."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

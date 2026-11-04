@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Building2, ChevronDown, CircleCheck, ClipboardCheck, LockKeyhole, Repeat, Search, SearchX, SlidersHorizontal, X } from 'lucide-react';
+import { Building2, ChevronDown, ChevronRight, ChevronsUpDown, CircleCheck, ClipboardCheck, LockKeyhole, Repeat, Search, SearchX, SlidersHorizontal, X } from 'lucide-react';
 import {
   formatCNPJ,
   formatMonthKey,
@@ -29,17 +29,19 @@ import { Sheet } from '@/components/ui/sheet';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { Tooltip } from '@/components/ui/tooltip';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
-import { cn, initials } from '@/lib/utils';
+import { cn, initials, pluralize } from '@/lib/utils';
 import { useTaskAudit, useTaskOptions } from '../api';
 import {
   accordionByClient,
   accordionByTask,
   auditFilterCount,
   auditHeadline,
-  cellKey,
+  auditListKey,
+  autoExpandedClients,
+  cellDeadlines,
+  cellSituationText,
   clientPending,
-  columnDeadline,
-  indexCells,
+  clientProgress,
   monthClosesWith,
   parseAuditFilters,
   toAuditQuery,
@@ -51,15 +53,15 @@ import {
 } from '../audit-logic';
 import { DUE_TONE_CLASS, shortDate, shortName } from '../due';
 import { dateTimeBR } from '../format';
-import { competenceName, groupDeadlineInfo, periodLabel } from '../occurrence';
+import { competenceName, deadlineTip, groupDeadlineInfo, periodLabel } from '../occurrence';
 import { toggleClass, SummaryLabel } from '../components/tasks-summary';
-import { NotApplicableCell, OccurrenceCellControl } from '../components/matrix-cell';
+import { OccurrenceCellControl } from '../components/matrix-cell';
 import { NeutralIcon } from '../components/neutral-icon';
 import { MemberPicker } from '../components/pickers';
 import { useTaskSheetLinks } from '../task-links';
 import { useCellStatus, type CellChangeContext } from '../use-cell-status';
 
-/** Auditoria mensal (spec §11): the client × recurring task matrix of a competence. */
+/** Auditoria mensal (spec §11): the recurring tasks of a competence, by client (a list) or by task. */
 export default function TaskAuditPage() {
   const [params, setParams] = useSearchParams();
   const options = useTaskOptions();
@@ -365,7 +367,7 @@ function AuditToolbar({ filters, options, onChange }: { filters: AuditFilters; o
 }
 
 // ---------------------------------------------------------------------------
-// Content: matrix (≥1024px) and accordions
+// Content: the client list ("Por cliente") and the task accordion ("Por tarefa")
 // ---------------------------------------------------------------------------
 
 interface ContentProps {
@@ -456,14 +458,7 @@ function AuditContent({ data, loading, error, onRetry, filters, options, today, 
   return (
     <div className={cn(stale && 'opacity-60 transition-opacity')}>
       {filters.view === 'client' ? (
-        <>
-          <div className="hidden lg:block">
-            <AuditMatrix {...shared} clients={clients} columns={data.columns} />
-          </div>
-          <div className="lg:hidden">
-            <ClientAccordion {...shared} />
-          </div>
-        </>
+        <AuditClientList {...shared} />
       ) : (
         <TaskAccordion {...shared} onExpand={(id) => onChange({ recurring: id })} />
       )}
@@ -486,203 +481,245 @@ function changeContext(data: AuditMatrixResponse, column: AuditColumn, cell: Occ
   return { taskName: column.name, clientName: client.name, monthCloses: closes ? monthName.charAt(0).toUpperCase() + monthName.slice(1) : null, announce };
 }
 
-/** Last column of the matrix (§11.2): the client's month, "7/9" or the lock with the date. */
-function ClientMonthCell({ client, today }: { client: AuditClientRow; today: string }) {
-  const live = client.total - client.canceled;
-  if (client.monthConcludedAt) {
-    const day = shortDate(client.monthConcludedAt.slice(0, 10), today);
-    return (
-      <Tooltip content={`Última conclusão em ${dateTimeBR(client.monthConcludedAt)}`}>
-        <span className="flex flex-col items-center gap-0.5 text-caption text-muted" tabIndex={-1}>
-          <LockKeyhole className="size-3.5" aria-hidden />
-          <span>Concluído em {day}</span>
-        </span>
-      </Tooltip>
-    );
-  }
+/** Lock of a concluded month, with the moment of the last conclusion. */
+function MonthLock({ client, today }: { client: AuditClientRow; today: string }) {
+  if (!client.monthConcludedAt) return null;
   return (
-    <span className="flex flex-col items-center gap-1">
-      <span className="tabular text-[13px] font-medium text-fg">
-        {client.done}/{live}
+    <Tooltip content={`Mês concluído. Última conclusão em ${dateTimeBR(client.monthConcludedAt)}`}>
+      <span role="img" tabIndex={-1} aria-label={`Mês concluído em ${shortDate(client.monthConcludedAt.slice(0, 10), today)}`} className="inline-flex shrink-0 text-muted">
+        <LockKeyhole className="size-3.5" aria-hidden />
       </span>
-      <span className="block h-1.5 w-12 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
-        <span className="block h-full rounded-full bg-data" style={{ width: `${(client.done / Math.max(1, live)) * 100}%` }} />
-      </span>
-    </span>
+    </Tooltip>
   );
 }
 
-/**
- * The matrix (§11.2): clients in rows (sticky name column), one column per recurring task and period
- * (sticky header with the column's deadline), the client's month at the right. Roving focus: one cell
- * is in the tab order; arrows, Home/End and Ctrl+Home move it.
- */
-function AuditMatrix({ data, clients, columns, filters, options, today, announce, monthName }: SharedProps & { clients: AuditClientRow[]; columns: AuditColumn[] }) {
-  const index = useMemo(() => indexCells(data.cells), [data.cells]);
-  const status = useCellStatus();
-  const { openTask } = useTaskSheetLinks();
-  const navigate = useNavigate();
-  const { canWriteTasks } = usePermissions();
-  const [focus, setFocus] = useState<[number, number]>([0, 0]);
-  const [hoverCol, setHoverCol] = useState<number | null>(null);
-  const [scrolled, setScrolled] = useState(false);
-  const gridRef = useRef<HTMLTableElement>(null);
-  const periodName = (c: AuditColumn) => periodLabel(c, today);
+/** Wide lists: what is left of the client's month, beside the bar ("2 atrasadas", "Mês concluído em 27/10"). */
+function ClientMonthNote({ client, today }: { client: AuditClientRow; today: string }) {
+  const pending = clientPending(client);
+  const [text, tone] = client.monthConcludedAt
+    ? [`Mês concluído em ${shortDate(client.monthConcludedAt.slice(0, 10), today)}`, 'text-muted']
+    : client.overduePending > 0
+      ? [`${client.overduePending} ${client.overduePending === 1 ? 'atrasada' : 'atrasadas'}`, 'font-medium text-danger']
+      : client.targetMissedPending > 0
+        ? [`${client.targetMissedPending} fora da meta`, 'font-medium text-warning']
+        : pending > 0
+          ? [`${pending} ${pending === 1 ? 'pendente' : 'pendentes'}`, 'text-muted']
+          : ['', ''];
+  return <span className={cn('hidden min-w-0 flex-1 truncate pl-4 text-right text-xs @3xl:block', tone)}>{text}</span>;
+}
 
-  function focusCell(r: number, c: number, dr: number, dc: number) {
-    let row = r;
-    let col = c;
-    for (let i = 0; i < clients.length * columns.length; i++) {
-      if (row < 0 || row >= clients.length || col < 0 || col >= columns.length) return;
-      const el = gridRef.current?.querySelector<HTMLElement>(`[data-cell="${row}:${col}"] button`);
-      if (el) {
-        setFocus([row, col]);
-        el.focus();
-        return;
-      }
-      row += dr;
-      col += dc;
-      if (dr === 0 && dc === 0) return;
-    }
+/**
+ * "Por cliente" (§11.2, as a list in every width): each client in a row — the arrow that opens it,
+ * the name, the bar of what is concluded in the competence with "N de M" — and, opened, the month's
+ * obligations with their department, responsible, deadlines and the status control (the same cycle,
+ * reopening and conclusion popover as before). Roving focus on the client rows: ↑/↓, Home/End move,
+ * → opens, ← closes; inside, 1–3 set a status and Shift+Enter opens the task.
+ */
+function AuditClientList({ data, filters, today, announce, monthName }: SharedProps) {
+  const items = accordionByClient(data, filters);
+  const status = useCellStatus();
+  const [open, setOpen] = useState<Set<string>>(() => new Set(autoExpandedClients(items.map((i) => i.client))));
+  const [focus, setFocus] = useState(0);
+  const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const ids = items.map((i) => i.client.id).join('|');
+  useEffect(() => {
+    const auto = autoExpandedClients(items.map((i) => i.client));
+    if (auto.length) setOpen((o) => new Set([...o, ...auto]));
+    setFocus((f) => Math.min(f, Math.max(0, items.length - 1)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids]);
+  const allOpen = items.length > 0 && items.every((i) => open.has(i.client.id));
+
+  function toggle(id: string, value?: boolean) {
+    setOpen((o) => {
+      const next = new Set(o);
+      if (value ?? !next.has(id)) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }
 
-  function onNavKey(e: KeyboardEvent<HTMLButtonElement>, r: number, c: number) {
-    const keys: Record<string, [number, number, number, number]> = {
-      ArrowRight: [r, c + 1, 0, 1],
-      ArrowLeft: [r, c - 1, 0, -1],
-      ArrowDown: [r + 1, c, 1, 0],
-      ArrowUp: [r - 1, c, -1, 0],
-      Home: e.ctrlKey ? [0, 0, 0, 1] : [r, 0, 0, 1],
-      End: [r, columns.length - 1, 0, -1],
-    };
-    const move = keys[e.key];
-    if (!move) return;
+  function onRowKey(e: KeyboardEvent<HTMLButtonElement>, index: number, id: string) {
+    const action = auditListKey(e.key, index, items.length, open.has(id));
+    if (!action) return;
     e.preventDefault();
-    focusCell(...move);
+    if (action.type === 'focus') {
+      setFocus(action.index);
+      rowRefs.current[action.index]?.focus();
+    } else toggle(id, action.type === 'expand');
   }
 
   return (
-    <Card className="overflow-hidden">
-      <div className="scrollbar-thin max-h-[calc(100dvh-14rem)] min-h-64 overflow-auto" onScroll={(e) => setScrolled((e.currentTarget as HTMLElement).scrollLeft > 0)}>
-        <table
-          ref={gridRef}
-          role="grid"
-          aria-rowcount={clients.length + 1}
-          aria-colcount={columns.length + 2}
-          aria-label={`Auditoria de ${monthName}`}
-          className="min-w-full table-fixed border-separate border-spacing-0 text-left"
-          style={{ width: 264 + columns.length * 104 + 104 }}
-        >
-          <colgroup>
-            <col style={{ width: 264 }} />
-            {columns.map((col) => (
-              <col key={`${col.recurringTaskId}:${col.periodKey}`} style={{ width: 104 }} />
-            ))}
-            <col style={{ width: 104 }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th
-                role="columnheader"
-                scope="col"
-                className={cn('sticky top-0 left-0 z-30 h-[72px] w-[264px] min-w-[264px] border-b border-border bg-surface px-4 text-xs font-medium text-muted', scrolled && 'border-r border-r-border-strong')}
-              >
-                Cliente
-              </th>
-              {columns.map((col, ci) => {
-                const dl = columnDeadline(col, today);
-                return (
-                  <th
-                    key={`${col.recurringTaskId}:${col.periodKey}`}
-                    role="columnheader"
-                    scope="col"
-                    className={cn('sticky top-0 z-20 h-[72px] border-b border-border bg-surface px-1.5 py-2 align-top font-normal transition-colors', hoverCol === ci && 'bg-surface-muted')}
-                  >
-                    <Tooltip
-                      content={`${col.name}${col.department ? ` · ${col.department.name}` : ''}${col.defaultAssignee ? ` · padrão: ${col.defaultAssignee.name}` : ''}${col.period !== 'weekly' ? ` · ref. ${col.referenceMonth.slice(5, 7)}/${col.referenceMonth.slice(0, 4)}` : ''}`}
-                    >
-                      <span className="line-clamp-2 text-caption font-semibold text-fg" tabIndex={-1}>
-                        {col.name}
-                      </span>
-                    </Tooltip>
-                    {col.period === 'weekly' ? <span className="block truncate text-mini text-muted">{periodLabel(col, today)}</span> : null}
-                    <span className={cn('line-clamp-2 block text-mini leading-tight', DUE_TONE_CLASS[dl.tone])} title={dl.text}>
-                      {dl.text}
-                    </span>
-                    <span className="tabular block text-mini text-muted">
-                      {col.done}/{col.total - col.canceled}
-                    </span>
-                  </th>
-                );
-              })}
-              <th role="columnheader" scope="col" className="sticky top-0 right-0 z-30 h-[72px] w-[104px] min-w-[104px] border-b border-l border-border bg-surface px-2 text-center text-xs font-medium text-muted">
-                Mês do cliente
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((client, ri) => (
-              <tr key={client.id} className="group/row">
-                <th
-                  role="rowheader"
-                  scope="row"
-                  className={cn('sticky left-0 z-10 h-[52px] w-[264px] min-w-[264px] border-b border-border bg-surface px-4 py-1.5 text-left font-normal group-hover/row:bg-surface-muted', scrolled && 'border-r border-r-border-strong')}
-                >
-                  <button type="button" onClick={() => navigate(`/tarefas/clientes?cliente=${client.id}`)} className="block max-w-[232px] truncate text-sm font-semibold text-fg hover:underline">
-                    {client.name}
-                  </button>
-                  <span className="tabular block max-w-[232px] truncate text-xs text-muted">
-                    {TAX_REGIME_LABELS[client.taxRegime]}
-                    {client.document ? ` · ${formatCNPJ(client.document)}` : ''}
-                  </span>
-                </th>
-                {columns.map((col, ci) => {
-                  const cell = index.get(cellKey(client.id, col));
-                  return (
-                    <td
-                      key={`${col.recurringTaskId}:${col.periodKey}`}
-                      role="gridcell"
-                      data-cell={cell ? `${ri}:${ci}` : undefined}
-                      className="h-[52px] border-b border-border text-center group-hover/row:bg-surface-muted"
-                      onMouseEnter={() => setHoverCol(ci)}
-                      onMouseLeave={() => setHoverCol(null)}
-                    >
-                      {!cell ? (
-                        <NotApplicableCell />
-                      ) : canWriteTasks ? (
-                        <OccurrenceCellControl
-                          cell={cell}
-                          taskName={col.name}
-                          clientName={client.name}
-                          periodName={periodName(col)}
-                          department={col.department?.name ?? null}
-                          busy={status.isBusy(cell.taskId)}
-                          dimmed={Boolean(filters.assignee) && cell.assignee?.id !== filters.assignee}
-                          tabIndex={focus[0] === ri && focus[1] === ci ? 0 : -1}
-                          onFocus={() => {
-                            setFocus([ri, ci]);
-                            setHoverCol(ci);
-                          }}
-                          onNavKey={(e) => onNavKey(e, ri, ci)}
-                          onChange={(s) => void status.change(cell, s, changeContext(data, col, cell, client, monthName, announce, s))}
-                          onReopen={(reason, s) => status.change(cell, s, changeContext(data, col, cell, client, monthName, announce, s), { reason })}
-                          onOpenTask={() => openTask(cell.taskId)}
-                        />
-                      ) : (
-                        <ReadOnlyCell cell={cell} />
-                      )}
-                    </td>
-                  );
-                })}
-                <td className="sticky right-0 z-10 h-[52px] border-b border-l border-border bg-surface text-center group-hover/row:bg-surface-muted">
-                  <ClientMonthCell client={client} today={today} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <Card className="@container overflow-hidden">
+      <div className="flex items-center gap-3 border-b border-border px-4 py-2.5">
+        <span className="text-xs font-medium text-muted">{pluralize(items.length, 'cliente', 'clientes')}</span>
+        <span className="ml-auto hidden text-xs text-subtle @2xl:inline">↑ ↓ navegam · → abre · ← fecha</span>
+        <Button variant="ghost" size="sm" className="-mr-2 h-8" onClick={() => setOpen(allOpen ? new Set() : new Set(items.map((i) => i.client.id)))}>
+          <ChevronsUpDown /> {allOpen ? 'Recolher todos' : 'Expandir todos'}
+        </Button>
       </div>
+      <ul className="p-1.5" aria-label={`Clientes de ${monthName}`}>
+        {items.map(({ client, items: cells }, index) => {
+          const expanded = open.has(client.id);
+          const progress = clientProgress(client);
+          const regionId = `audit-client-${client.id}`;
+          return (
+            <li key={client.id} className={cn('rounded-lg', expanded && 'bg-surface-muted/50')}>
+              <button
+                ref={(el) => void (rowRefs.current[index] = el)}
+                type="button"
+                aria-expanded={expanded}
+                aria-controls={regionId}
+                aria-label={`${client.name}: ${progress.text} concluídas${client.overduePending ? `, ${client.overduePending} atrasadas` : ''}${client.monthConcludedAt ? ', mês concluído' : ''}. ${expanded ? 'Recolher' : 'Mostrar'} obrigações.`}
+                tabIndex={index === focus ? 0 : -1}
+                onFocus={() => setFocus(index)}
+                onKeyDown={(e) => onRowKey(e, index, client.id)}
+                onClick={() => toggle(client.id)}
+                className="group/client flex min-h-14 w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @lg:gap-3 @lg:px-3"
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted transition-colors group-hover/client:bg-bg-subtle group-hover/client:text-fg" aria-hidden>
+                  <ChevronRight className={cn('size-4 transition-transform duration-150', expanded && 'rotate-90')} />
+                </span>
+                <span className="min-w-0 flex-1 @3xl:w-80 @3xl:flex-none">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold text-fg">{client.name}</span>
+                    <MonthLock client={client} today={today} />
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-muted">
+                    {TAX_REGIME_LABELS[client.taxRegime]}
+                    <span className="hidden @md:inline">{client.document ? ` · ${formatCNPJ(client.document)}` : ''}</span>
+                    <span className="@3xl:hidden">
+                      {client.overduePending > 0 ? (
+                        <span className="text-danger">
+                          {' '}
+                          · {client.overduePending} {client.overduePending === 1 ? 'atrasada' : 'atrasadas'}
+                        </span>
+                      ) : null}
+                      {client.monthConcludedAt ? ` · concluído em ${shortDate(client.monthConcludedAt.slice(0, 10), today)}` : null}
+                    </span>
+                  </span>
+                </span>
+                <span className="flex w-28 shrink-0 items-center gap-2 @md:w-44 @3xl:w-60">
+                  <span className="block h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
+                    <span className={cn('block h-full rounded-full', progress.ratio === 1 ? 'bg-success' : 'bg-data')} style={{ width: `${progress.ratio * 100}%` }} />
+                  </span>
+                  <span className="tabular w-14 shrink-0 text-right text-[13px] font-medium whitespace-nowrap text-fg">{progress.text}</span>
+                </span>
+                <ClientMonthNote client={client} today={today} />
+              </button>
+              {expanded ? (
+                <div id={regionId} role="region" aria-label={`Obrigações de ${client.name} em ${monthName}`} className="pb-2 @lg:pl-10">
+                  {cells.length === 0 ? (
+                    <p className="px-3 py-2 text-body-sm text-muted">{filters.clients === 'pending' ? 'Nenhuma pendência deste cliente.' : 'Nenhuma obrigação nesta competência.'}</p>
+                  ) : (
+                    <>
+                      <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_16.5rem] items-center gap-3 px-3 pt-1 pb-1.5 text-xs font-medium text-muted @4xl:grid">
+                        <span>Obrigação</span>
+                        <span>Departamento</span>
+                        <span>Responsável</span>
+                        <span>Prazo</span>
+                        <span>Situação</span>
+                      </div>
+                      <ul>
+                        {cells.map(({ column, cell }) => (
+                          <ClientObligationRow
+                            key={cell.taskId}
+                            cell={cell}
+                            column={column}
+                            client={client}
+                            data={data}
+                            today={today}
+                            monthName={monthName}
+                            announce={announce}
+                            status={status}
+                            dimmed={Boolean(filters.assignee) && cell.assignee?.id !== filters.assignee}
+                          />
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </Card>
+  );
+}
+
+interface ClientObligationRowProps {
+  cell: OccurrenceCell;
+  column: AuditColumn;
+  client: AuditClientRow;
+  data: AuditMatrixResponse;
+  today: string;
+  monthName: string;
+  announce: (t: string) => void;
+  status: ReturnType<typeof useCellStatus>;
+  dimmed: boolean;
+}
+
+/** An obligation of the opened client: name (opens the task), department, responsible, deadlines, status. */
+function ClientObligationRow({ cell, column, client, data, today, monthName, announce, status, dimmed }: ClientObligationRowProps) {
+  const { openTask } = useTaskSheetLinks();
+  const { canWriteTasks } = usePermissions();
+  const dl = cellDeadlines(cell, today);
+  const period = column.period === 'weekly' ? periodLabel(column, today) : column.period !== 'monthly' ? RECURRENCE_PERIOD_LABELS[column.period] : null;
+  const who = cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável';
+  const control = canWriteTasks ? (
+    <OccurrenceCellControl
+      cell={cell}
+      taskName={column.name}
+      clientName={client.name}
+      periodName={periodLabel(column, today)}
+      department={column.department?.name ?? null}
+      busy={status.isBusy(cell.taskId)}
+      dimmed={dimmed}
+      large
+      onChange={(s) => void status.change(cell, s, changeContext(data, column, cell, client, monthName, announce, s))}
+      onReopen={(reason, s) => status.change(cell, s, changeContext(data, column, cell, client, monthName, announce, s), { reason })}
+      onOpenTask={() => openTask(cell.taskId)}
+    />
+  ) : (
+    <span className="inline-flex size-10 shrink-0 items-center justify-center">
+      <ReadOnlyCell cell={cell} />
+    </span>
+  );
+  return (
+    <li className={cn('flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface @4xl:grid @4xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_16.5rem]', dimmed && 'opacity-70')}>
+      <div className="min-w-0 flex-1">
+        <button type="button" onClick={() => openTask(cell.taskId)} className="flex max-w-full items-center gap-1.5 text-left text-sm font-semibold text-fg hover:underline">
+          <span className="truncate">{column.name}</span>
+          {period ? <span className="shrink-0 text-xs font-normal text-muted">{period}</span> : null}
+        </button>
+        <p className="truncate text-xs text-muted @4xl:hidden">
+          {column.department?.name ?? 'Sem departamento'} · {who}
+        </p>
+        <p className="truncate text-xs @4xl:hidden">
+          <span className="text-muted">{dl.dates}</span>
+          {dl.status && dl.status.tone !== 'muted' ? <span className={DUE_TONE_CLASS[dl.status.tone]}> · {dl.status.text}</span> : null}
+        </p>
+        <p className="truncate text-xs text-muted @4xl:hidden">{cellSituationText(cell, today)}</p>
+      </div>
+      <span className="hidden truncate text-body-sm text-fg @4xl:block">{column.department?.name ?? <span className="text-subtle">Sem departamento</span>}</span>
+      <span className="hidden min-w-0 items-center gap-2 @4xl:flex">
+        <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} userId={cell.assignee?.id} />
+        <span className={cn('truncate text-body-sm', cell.assignee ? 'text-fg' : 'text-subtle')}>{who}</span>
+      </span>
+      <span className="hidden min-w-0 @4xl:block">
+        <Tooltip content={deadlineTip(cell, today)}>
+          <span tabIndex={-1} className="tabular block truncate text-body-sm text-fg">
+            {dl.dates}
+          </span>
+        </Tooltip>
+        {dl.status && dl.status.tone !== 'muted' ? <span className={cn('block truncate text-xs', DUE_TONE_CLASS[dl.status.tone])}>{dl.status.text}</span> : null}
+      </span>
+      <span className="flex shrink-0 items-center gap-2.5 @4xl:min-w-0">
+        {control}
+        <span className="hidden min-w-0 truncate text-[13px] text-muted @4xl:block">{cellSituationText(cell, today)}</span>
+      </span>
+    </li>
   );
 }
 
@@ -783,84 +820,6 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
                       ))}
                     </ul>
                   )}
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
-
-/** "Por cliente" below 1024px (§11.4): each client with its recurring tasks. */
-function ClientAccordion({ data, filters, today, announce, monthName }: SharedProps) {
-  const items = accordionByClient(data, filters);
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  return (
-    <Card className="@container overflow-hidden p-1.5">
-      <ul>
-        {items.map(({ client, items: cells }) => {
-          const expanded = open.has(client.id);
-          const live = client.total - client.canceled;
-          const regionId = `audit-client-${client.id}`;
-          return (
-            <li key={client.id}>
-              <button
-                type="button"
-                aria-expanded={expanded}
-                aria-controls={regionId}
-                onClick={() =>
-                  setOpen((o) => {
-                    const next = new Set(o);
-                    if (next.has(client.id)) next.delete(client.id);
-                    else next.add(client.id);
-                    return next;
-                  })
-                }
-                className="flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-surface-muted"
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg" aria-hidden>
-                  {initials(client.name)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-fg">{client.name}</span>
-                  <span className="block truncate text-xs text-muted">
-                    {TAX_REGIME_LABELS[client.taxRegime]} · {client.done} de {live}
-                    {clientPending(client) > 0 && client.overduePending > 0 ? <span className="text-danger"> · {client.overduePending} atrasada{client.overduePending === 1 ? '' : 's'}</span> : null}
-                  </span>
-                </span>
-                {client.monthConcludedAt ? (
-                  <span className="flex shrink-0 items-center gap-1 text-caption text-muted">
-                    <LockKeyhole className="size-3.5" aria-hidden /> Concluído em {shortDate(client.monthConcludedAt.slice(0, 10), today)}
-                  </span>
-                ) : (
-                  <span className="block h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-bg-subtle @sm:w-16" aria-hidden>
-                    <span className="block h-full rounded-full bg-data" style={{ width: `${(client.done / Math.max(1, live)) * 100}%` }} />
-                  </span>
-                )}
-                <ChevronDown className={cn('size-4 shrink-0 text-muted transition-transform duration-150', expanded && 'rotate-180')} aria-hidden />
-              </button>
-              {expanded ? (
-                <div id={regionId} role="region" aria-label={`Tarefas recorrentes de ${client.name}`} className="mb-2">
-                  <ul>
-                    {cells.map(({ column, cell }) => (
-                      <AccordionCellRow
-                        key={cell.taskId}
-                        cell={cell}
-                        column={column}
-                        client={client}
-                        title={column.name}
-                        subtitle={[column.department?.name, column.period === 'weekly' ? periodLabel(column, today) : null].filter(Boolean).join(' · ')}
-                        showDeadline
-                        data={data}
-                        today={today}
-                        monthName={monthName}
-                        announce={announce}
-                        dimmed={Boolean(filters.assignee) && cell.assignee?.id !== filters.assignee}
-                      />
-                    ))}
-                  </ul>
                 </div>
               ) : null}
             </li>

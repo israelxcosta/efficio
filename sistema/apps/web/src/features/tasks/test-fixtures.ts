@@ -67,7 +67,6 @@ export function makeOptions(patch: Partial<TaskOptionsResponse> = {}): TaskOptio
       { id: 'c1', name: 'Padaria', legalName: 'Padaria Pão Quente Ltda', taxRegime: 'simples_nacional', status: 'active', contractStartDate: '2025-01-01', inactivatedAt: null },
       { id: 'c2', name: 'Antiga', legalName: 'Antiga Ltda', taxRegime: 'real_profit', status: 'inactive', contractStartDate: '2020-01-01', inactivatedAt: '2026-01-01' },
     ],
-    clientResponsibles: [{ clientId: 'c1', departmentId: CONTABIL.id, user: { id: 'bruno', name: 'Bruno Carvalho' } }],
     ...patch,
   };
 }
@@ -113,7 +112,7 @@ export function makeCell(patch: Partial<import('@effinance/shared').OccurrenceCe
     status: 'todo',
     situation: 'not_started',
     assignee: { id: 'ana', name: 'Ana Paula Ribeiro' },
-    assigneeSource: 'client',
+    assigneeSource: 'default',
     legalDueDate: '2026-10-30',
     targetDate: '2026-10-28',
     overdue: false,

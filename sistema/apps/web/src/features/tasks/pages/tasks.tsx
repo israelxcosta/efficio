@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { ChevronLeft, ChevronRight, CircleCheck, Ellipsis, ListChecks, Plus, SearchX, Workflow } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CircleCheck, ListChecks, SearchX } from 'lucide-react';
 import { TASK_DUE_BUCKET_LABELS, todayISO } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,18 +9,18 @@ import { ErrorState, PageHeader } from '@/components/ui/misc';
 import { SkeletonRows } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useTaskCalendar, useTaskOptions, useTasks } from '../api';
 import { TaskBoard } from '../components/task-board';
 import { TaskCalendar } from '../components/task-calendar';
 import { RecurringOccurrenceRow } from '../components/occurrence-row';
 import { groupListItems, itemCount } from '../occurrence';
-import { useTaskActions } from '../task-actions';
 import { TaskFiltersBar } from '../components/task-filters';
 import { TaskGroup } from '../components/task-group';
 import { TaskRow } from '../components/task-row';
 import { TasksSummary } from '../components/tasks-summary';
+import { TaskCreateHub } from '../components/task-create-hub';
+import { PendingByClientCard } from '../components/pending-by-client-card';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
 import {
@@ -53,8 +53,8 @@ export default function TasksPage() {
   const list = useTasks(query);
   const calendar = useTaskCalendar(toCalendarQuery(filters, today), { enabled: filters.view === 'calendar' });
   const { openTask, newTask } = useTaskSheetLinks();
-  const actions = useTaskActions();
   const navigate = useNavigate();
+  const filtersRef = useRef<HTMLDivElement>(null);
   const isAdmin = usePermissions().can('registry');
   const data = list.data;
   const filterCount = activeFilterCount(filters);
@@ -141,33 +141,9 @@ export default function TasksPage() {
       <PageHeader
         title="Tarefas"
         description={`${longDay(today)} · ${scopeText}`}
-        actions={
-          <>
-            <WriteGate scope="tasks">
-              <Button variant="outline" className="max-sm:hidden" onClick={actions.openTemplatePicker}>
-                <Workflow /> Aplicar modelo de processo
-              </Button>
-            </WriteGate>
-            <WriteGate scope="tasks">
-              <Button onClick={() => newTask()}>
-                <Plus /> Nova tarefa
-              </Button>
-            </WriteGate>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="sm:hidden" aria-label="Mais ações">
-                  <Ellipsis />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem icon={<Workflow />} onSelect={actions.openTemplatePicker}>
-                  Aplicar modelo de processo
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        }
       />
+
+      <TaskCreateHub />
 
       {list.isError && !data ? null : workspaceEmpty ? null : (
         <TasksSummary
@@ -175,21 +151,21 @@ export default function TasksPage() {
           scope={filters.scope}
           situation={filters.view === 'list' ? filters.situation : 'all'}
           assignee={filters.assignee}
-          client={filters.client}
           onSituation={(situation) => update({ situation, view: 'list' })}
           onAssignee={(assignee) => update({ assignee })}
-          onClient={(client) => update({ client })}
           onOpenTask={openTask}
         />
       )}
 
-      <TaskFiltersBar
-        filters={filters}
-        onChange={update}
-        options={options.data}
-        months={data?.months ?? []}
-        resultCount={data ? data.total : null}
-      />
+      <div ref={filtersRef} className="scroll-mt-4">
+        <TaskFiltersBar
+          filters={filters}
+          onChange={update}
+          options={options.data}
+          months={data?.months ?? []}
+          resultCount={data ? data.total : null}
+        />
+      </div>
 
       {filters.view === 'calendar' ? (
         <TaskCalendar
@@ -309,6 +285,16 @@ export default function TasksPage() {
             </div>
           ) : null}
         </Card>
+      )}
+      {list.isError && !data ? null : workspaceEmpty ? null : (
+        <PendingByClientCard
+          summary={data?.summary}
+          client={filters.client}
+          onClient={(client) => {
+            update({ client });
+            filtersRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
       )}
     </div>
   );

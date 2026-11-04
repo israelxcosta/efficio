@@ -48,6 +48,7 @@ import {
   UNION_CYCLE_MIN_YEAR,
   UNION_SITUATIONS,
 } from './constants';
+import { REGIME_GROUP_ITEMS, REGIME_GROUP_REGIMES } from './regime-groups';
 import { isISODate } from './utils/dates';
 import { OCCURRENCE_PERIOD_RE, sanitizeFileName, TASK_TIME_RE } from './utils/tasks';
 import { isValidCNPJ, isValidCPF, isValidDocument, isValidPhone, onlyDigits } from './utils/documents';
@@ -795,7 +796,7 @@ export const searchQuerySchema = z.object({
 
 // ---------------------------------------------------------------------------
 // Tasks (módulo Tarefas). Every member writes tasks, subtasks, comments, audit cells, flows and notes;
-// the registries (departments, categories, recurring tasks, flow templates, client responsibles) and
+// the registries (departments, categories, recurring tasks, regime groups, flow templates) and
 // deletions are for administrators (owner/editor). See docs/api.md → "Tarefas".
 // ---------------------------------------------------------------------------
 
@@ -976,23 +977,6 @@ export const taskCategoryInputSchema = z.object({
 });
 export type TaskCategoryInput = z.input<typeof taskCategoryInputSchema>;
 
-/** Responsible member of a client in a department (`userId: null` removes it). */
-export const clientResponsibleInputSchema = z.object({
-  clientId: idSchema,
-  departmentId: idSchema,
-  userId: idSchema.nullable(),
-});
-export type ClientResponsibleInput = z.infer<typeof clientResponsibleInputSchema>;
-
-/** Several responsibles at once (the batch dialog; also its undo, with the previous members). */
-export const clientResponsibleBatchSchema = z.object({
-  items: z
-    .array(clientResponsibleInputSchema)
-    .min(1, { message: 'Escolha ao menos um cliente' })
-    .max(500, { message: 'Máximo de 500 clientes por vez' }),
-});
-export type ClientResponsibleBatchInput = z.infer<typeof clientResponsibleBatchSchema>;
-
 const recurringNameSchema = z
   .string()
   .trim()
@@ -1015,7 +999,7 @@ export const recurringTaskInputSchema = z
     /** Chosen in the registry (not derived): the occurrences belong to this department. */
     departmentId: nullableId(),
     categoryId: nullableId(),
-    /** Default responsible, for clients without a responsible in the department. */
+    /** Default responsible of every occurrence (none: the department's queue). */
     assigneeId: nullableId(),
     dueDay: z
       .int({ message: 'Informe o prazo legal' })
@@ -1087,6 +1071,26 @@ export const occurrencePeriodSchema = z.string().regex(OCCURRENCE_PERIOD_RE, { m
 /** Generates the occurrences of a competence now (they are also generated when a competence is read). */
 export const recurringGenerateSchema = z.object({ competence: monthKeySchema });
 export type RecurringGenerateInput = z.infer<typeof recurringGenerateSchema>;
+
+// --- regime groups (default recurring tasks per tax regime) ---------------------------------------
+
+const REGIME_GROUP_KEYS = REGIME_GROUP_ITEMS.map((i) => i.key) as [string, ...string[]];
+
+export const regimeGroupParamsSchema = z.object({ regime: z.enum(REGIME_GROUP_REGIMES) });
+
+/**
+ * POST /tasks/regime-groups/:regime/apply. `keys`: only these items of the group (default: all of it).
+ * `departments`: the department of each suggested one; without it, an existing department whose name
+ * matches (`matchSuggestedDepartment`), else one is created with the suggested name (only in offices
+ * that use departments).
+ */
+export const regimeGroupApplySchema = z.object({
+  keys: z.array(z.enum(REGIME_GROUP_KEYS)).min(1, { message: 'Escolha ao menos uma tarefa do grupo' }).max(REGIME_GROUP_KEYS.length).optional(),
+  departments: z
+    .object({ fiscal: idSchema.optional(), personnel: idSchema.optional(), accounting: idSchema.optional() })
+    .default({}),
+});
+export type RegimeGroupApplyInput = z.input<typeof regimeGroupApplySchema>;
 
 // --- monthly audit ---------------------------------------------------------------------------------
 

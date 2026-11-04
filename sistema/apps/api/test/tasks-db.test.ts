@@ -17,7 +17,6 @@ import type { DbExecutor } from '../src/db/client';
 import {
   contacts,
   taskCategories,
-  taskClientResponsibles,
   taskComments,
   taskDepartmentMembers,
   taskDepartments,
@@ -56,7 +55,6 @@ const TASK_TABLES = [
   'tasks',
   'task_subtasks',
   'task_comments',
-  'task_client_responsibles',
 ] as const satisfies readonly (typeof TENANT_TABLES)[number][];
 const DELETED_USER = 'Usuário excluído';
 /**
@@ -118,7 +116,6 @@ async function seedOffice(label: string) {
   const [department] = await db.insert(taskDepartments).values({ workspaceId: ws, name: 'Fiscal' }).returning();
   const [category] = await db.insert(taskCategories).values({ workspaceId: ws, name: 'Certidões' }).returning();
   await db.insert(taskDepartmentMembers).values({ workspaceId: ws, userId: staff!.id, departmentId: department!.id });
-  await db.insert(taskClientResponsibles).values({ workspaceId: ws, clientId: client!.id, departmentId: department!.id, userId: staff!.id });
   const [task] = await db
     .insert(tasks)
     .values({
@@ -175,7 +172,7 @@ describe('task tables: row level security', () => {
   it('every task table fails closed without a workspace and shows only the active one', async () => {
     const a = await seedOffice('A');
     const b = await seedOffice('B');
-    expect(TASK_TABLES).toHaveLength(7);
+    expect(TASK_TABLES).toHaveLength(6);
     const visible = (table: string, workspaceId: string | null) =>
       app.db.transaction(async (tx) => {
         await tx.execute(sql`select set_config('role', 'effinance_app', true)`);
@@ -207,10 +204,6 @@ describe('task tables: row level security', () => {
       [
         'task_department_members',
         (tx) => tx.insert(taskDepartmentMembers).values({ workspaceId: a.ws, userId: a.owner, departmentId: a.department }),
-      ],
-      [
-        'task_client_responsibles',
-        (tx) => tx.update(taskClientResponsibles).set({ workspaceId: a.ws }).where(eq(taskClientResponsibles.workspaceId, b.ws)),
       ],
       ['tasks (move)', (tx) => tx.update(tasks).set({ workspaceId: a.ws }).where(eq(tasks.id, b.task))],
       ['task_comments (move)', (tx) => tx.update(taskComments).set({ workspaceId: a.ws }).where(eq(taskComments.id, b.comment))],
@@ -256,22 +249,6 @@ describe('task tables: references never cross workspaces', () => {
         (tx, id) => tx.insert(taskDepartmentMembers).values({ workspaceId: b.ws, userId: id, departmentId: b.department }),
         a.staff,
       ],
-      [
-        'task_client_responsibles.client_id',
-        (tx, id) =>
-          tx.insert(taskClientResponsibles).values({ workspaceId: b.ws, clientId: id, departmentId: b.department, userId: b.staff }),
-        a.client,
-      ],
-      [
-        'task_client_responsibles.department_id',
-        (tx, id) => tx.insert(taskClientResponsibles).values({ workspaceId: b.ws, clientId: b.client, departmentId: id, userId: b.staff }),
-        a.department,
-      ],
-      [
-        'task_client_responsibles.user_id',
-        (tx, id) => tx.update(taskClientResponsibles).set({ userId: id }).where(eq(taskClientResponsibles.workspaceId, b.ws)),
-        a.staff,
-      ],
     ];
     for (const [label, attempt, foreignId] of attempts) {
       const crossTenant = await pgFailure(withTenant(app.db, b.ws, (tx) => attempt(tx, foreignId)));
@@ -289,17 +266,12 @@ describe('task tables: references never cross workspaces', () => {
 });
 
 describe('task tables: only clients (migration 0012)', () => {
-  it('a task or a client responsibility never points to a supplier, and a client with tasks stays a client', async () => {
+  it('a task never points to a supplier, and a client with tasks stays a client', async () => {
     const a = await seedOffice('A');
     const inA = (fn: (tx: DbExecutor) => Promise<unknown>) => pgFailure(withTenant(app.db, a.ws, fn));
     const attempts: [string, (tx: DbExecutor) => Promise<unknown>][] = [
       ['new task', (tx) => tx.insert(tasks).values({ workspaceId: a.ws, title: 'x', createdByName: 'X', clientId: a.supplier })],
       ['re-pointed task', (tx) => tx.update(tasks).set({ clientId: a.supplier }).where(eq(tasks.id, a.task))],
-      [
-        'new responsibility',
-        (tx) => tx.insert(taskClientResponsibles).values({ workspaceId: a.ws, clientId: a.supplier, departmentId: a.department, userId: a.staff }),
-      ],
-      ['re-pointed responsibility', (tx) => tx.update(taskClientResponsibles).set({ clientId: a.supplier }).where(eq(taskClientResponsibles.workspaceId, a.ws))],
       ['client turned into a supplier', (tx) => tx.update(contacts).set({ kind: 'supplier' }).where(eq(contacts.id, a.client))],
     ];
     for (const [label, attempt] of attempts) expect((await inA(attempt))?.code, label).toBe('23503');
@@ -336,7 +308,6 @@ describe('task tables: ON DELETE', () => {
     });
     expect(await commentRow(a.comment)).toMatchObject({ authorId: a.staff, authorName: a.staffName });
     expect(await countRows('task_department_members', a.ws)).toBe(0);
-    expect(await countRows('task_client_responsibles', a.ws)).toBe(0);
     for (const table of TASK_TABLES) expect(await countRows(table, b.ws), table).toBe(1);
   });
 
@@ -397,7 +368,6 @@ describe('task tables: ON DELETE', () => {
     expect(await countRows('task_subtasks', a.ws)).toBe(0);
     expect(await countRows('task_comments', a.ws)).toBe(0);
     expect(await inA((tx) => tx.delete(contacts).where(eq(contacts.id, a.client)))).toBeNull();
-    expect(await countRows('task_client_responsibles', a.ws)).toBe(0);
     expect(await countRows('task_department_members', a.ws)).toBe(1);
 
     // Deleting the workspace (API login) leaves no task row behind; the other office is intact.
@@ -543,10 +513,6 @@ describe('task data and LGPD', () => {
     expect(client.status).toBe(201);
     const department = await owner.post('/tasks/departments', { name: 'Fiscal', memberIds: [owner.userId] });
     const category = await owner.post('/tasks/categories', { name: 'Certidões' });
-    expect(
-      (await owner.put('/tasks/client-responsibles', { clientId: client.body.id, departmentId: department.body.id, userId: owner.userId }))
-        .status,
-    ).toBe(200);
     const task = await owner.post('/tasks', {
       title: 'Certidão negativa',
       description: 'Pedir na Receita',
@@ -575,9 +541,8 @@ describe('task data and LGPD', () => {
     expect(await storedDescription(task.body.id)).toMatch(CIPHERTEXT);
     expect(await storedComment(data.taskComments[0].id)).toMatch(CIPHERTEXT);
     expect(JSON.stringify([data.tasks, data.taskComments])).not.toMatch(/v1\.[\w-]{16}\./);
-    expect(data.taskClientResponsibles).toEqual([
-      expect.objectContaining({ clientId: client.body.id, departmentId: department.body.id, userId: owner.userId }),
-    ]);
+    // The responsible per client and department was removed (migration 0017).
+    expect(data).not.toHaveProperty('taskClientResponsibles');
     expect(JSON.stringify(data)).not.toContain('Tarefa de outro espaço');
   });
 

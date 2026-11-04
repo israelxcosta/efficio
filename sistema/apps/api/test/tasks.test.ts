@@ -151,15 +151,6 @@ describe('tasks: isolation between workspaces (IDOR)', () => {
     expect((await other.post('/tasks', { title: 'x', departmentId: a.fiscal })).status).toBe(404);
     expect((await other.post('/tasks', { title: 'x', assigneeId: a.ana.userId })).status).toBe(422);
     expect(
-      (
-        await other.put('/tasks/client-responsibles', {
-          clientId: clientA,
-          departmentId: a.fiscal,
-          userId: other.userId,
-        })
-      ).status,
-    ).toBe(404);
-    expect(
       (await other.put(`/tasks/members/${a.bruno.userId}/department`, { departmentId: null }))
         .status,
     ).toBe(404);
@@ -200,11 +191,6 @@ describe('tasks: permissions', () => {
       await carla.del(`/tasks/departments/${fiscal}`),
       await carla.post('/tasks/categories', { name: 'Abertura' }),
       await carla.put(`/tasks/members/${carla.userId}/department`, { departmentId: null }),
-      await carla.put('/tasks/client-responsibles', {
-        clientId: id,
-        departmentId: fiscal,
-        userId: carla.userId,
-      }),
       await carla.get('/tasks/home?departmentId=all'),
     ];
     for (const res of forbidden) expect(res.status).toBe(403);
@@ -424,7 +410,7 @@ describe('tasks: subtasks, comments and activity', () => {
     expect(after.comments[0].author).toEqual({ id: carla.userId, name: 'Carla Souza' });
   });
 
-  it('removing a member unassigns their tasks and drops their department and client responsibilities', async () => {
+  it('removing a member unassigns their tasks and drops their department', async () => {
     const { ana, bruno, contabil } = await office();
     const client = await createClient(ana);
     const task = await ana.post('/tasks', {
@@ -432,21 +418,11 @@ describe('tasks: subtasks, comments and activity', () => {
       assigneeId: bruno.userId,
       clientId: client,
     });
-    expect(
-      (
-        await ana.put('/tasks/client-responsibles', {
-          clientId: client,
-          departmentId: contabil,
-          userId: bruno.userId,
-        })
-      ).status,
-    ).toBe(200);
     expect((await ana.del(`/workspaces/current/members/${bruno.userId}`)).status).toBe(204);
     const after = (await ana.get(`/tasks/${task.body.id}`)).body;
     expect(after.assignee).toBeNull();
     // The task stays in the department it was in.
     expect(after.department.id).toBe(contabil);
-    expect((await ana.get('/tasks/client-responsibles')).body.items).toEqual([]);
     expect(
       (await ana.get('/tasks/departments')).body.find((d: any) => d.id === contabil).members,
     ).toEqual([]);
@@ -484,57 +460,12 @@ describe('tasks: registries', () => {
     expect((await ana.get(`/tasks/${task.body.id}`)).body.category).toBeNull();
   });
 
-  it('keeps one responsible per client and department, readable by everyone; a client with tasks is not deleted', async () => {
-    const { ana, bruno, carla, fiscal, contabil } = await office();
+  it('options are readable by everyone (no responsible per client any more); a client with tasks is not deleted', async () => {
+    const { ana, carla, fiscal } = await office();
     const client = await createClient(ana);
-    expect(
-      (
-        await ana.put('/tasks/client-responsibles', {
-          clientId: client,
-          departmentId: fiscal,
-          userId: carla.userId,
-        })
-      ).body,
-    ).toEqual({
-      items: [{ clientId: client, departmentId: fiscal, user: { id: carla.userId, name: 'Carla Souza' } }],
-      removed: 0,
-      // No recurring task yet: no occurrence changed hands.
-      reassigned: 0,
-    });
-    await ana.put('/tasks/client-responsibles', {
-      clientId: client,
-      departmentId: fiscal,
-      userId: ana.userId,
-    });
-    await ana.put('/tasks/client-responsibles', {
-      clientId: client,
-      departmentId: contabil,
-      userId: bruno.userId,
-    });
-    const grid = (await carla.get('/tasks/client-responsibles')).body;
-    expect(grid.departments.map((d: any) => d.name)).toEqual(['Contábil', 'Fiscal']);
-    expect(grid.clients).toEqual([
-      expect.objectContaining({ id: client, name: 'Pão Dourado', taxRegime: 'simples_nacional' }),
-    ]);
-    expect(grid.items).toHaveLength(2);
-    expect(grid.items.find((i: any) => i.departmentId === fiscal).user.id).toBe(ana.userId);
-    expect(
-      (
-        await ana.put('/tasks/client-responsibles', {
-          clientId: client,
-          departmentId: fiscal,
-          userId: null,
-        })
-      ).body,
-    ).toEqual({ items: [], removed: 1, reassigned: 0 });
     const options = (await carla.get('/tasks/options')).body;
-    expect(options.clientResponsibles).toEqual([
-      {
-        clientId: client,
-        departmentId: contabil,
-        user: { id: bruno.userId, name: 'Bruno Carvalho' },
-      },
-    ]);
+    expect(options).not.toHaveProperty('clientResponsibles');
+    expect(options.clients).toEqual([expect.objectContaining({ id: client, name: 'Pão Dourado', taxRegime: 'simples_nacional' })]);
     expect(options.me).toMatchObject({
       id: carla.userId,
       role: 'viewer',

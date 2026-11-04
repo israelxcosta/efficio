@@ -1,15 +1,9 @@
 // Registries of the task module (administrators write, every member reads): departments and the
-// department of each member, task categories, the responsible member of each client per department,
-// and the options every picker needs in one request.
+// department of each member, task categories, and the options every picker needs in one request.
 
 import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { monthKey } from '@effinance/shared';
 import type {
-  ClientResponsible,
-  ClientResponsibleChangeResponse,
-  ClientResponsiblesResponse,
-  clientResponsibleBatchSchema,
-  clientResponsibleInputSchema,
   TaskCategory,
   taskCategoryInputSchema,
   TaskClientOption,
@@ -24,14 +18,12 @@ import {
   contacts,
   recurringTasks,
   taskCategories,
-  taskClientResponsibles,
   taskDepartmentMembers,
   taskDepartments,
   tasks,
 } from '../../db/schema';
 import { ConflictError, NotFoundError } from '../../lib/errors';
 import type { TaskContext } from './access';
-import { reassignClientOccurrences } from './generation';
 import {
   assertClients,
   assertMember,
@@ -44,8 +36,6 @@ import { NOT_OCCURRENCE_SQL, OPEN_SQL } from './task-rows';
 
 type DepartmentInput = z.output<typeof taskDepartmentInputSchema>;
 type CategoryInput = z.output<typeof taskCategoryInputSchema>;
-type ResponsibleInput = z.output<typeof clientResponsibleInputSchema>;
-type ResponsibleBatch = z.output<typeof clientResponsibleBatchSchema>;
 
 const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name, 'pt-BR');
 
@@ -362,7 +352,7 @@ export async function deleteCategory(ctx: TaskContext, id: string): Promise<void
 }
 
 // ---------------------------------------------------------------------------
-// Clients (read only here) and their responsible per department
+// Clients (read only here)
 // ---------------------------------------------------------------------------
 
 export async function clientOptions(
@@ -392,89 +382,16 @@ export async function clientOptions(
   }));
 }
 
-async function responsibles(ctx: TaskContext): Promise<ClientResponsible[]> {
-  const rows = await ctx.db
-    .select()
-    .from(taskClientResponsibles)
-    .where(eq(taskClientResponsibles.workspaceId, ctx.workspaceId));
-  return rows.flatMap((r) => {
-    const user = memberRef(ctx, r.userId);
-    return user ? [{ clientId: r.clientId, departmentId: r.departmentId, user }] : [];
-  });
-}
-
-export async function listClientResponsibles(
-  ctx: TaskContext,
-): Promise<ClientResponsiblesResponse> {
-  const [departments, clients, items] = await Promise.all([
-    departmentRefs(ctx),
-    clientOptions(ctx),
-    responsibles(ctx),
-  ]);
-  return { departments, clients, items };
-}
-
-async function writeResponsibles(ctx: TaskContext, items: ResponsibleInput[]): Promise<ClientResponsibleChangeResponse> {
-  // The last entry wins when a pair repeats.
-  const pairs = new Map<string, ResponsibleInput>();
-  for (const item of items) pairs.set(`${item.clientId}:${item.departmentId}`, item);
-  const list = [...pairs.values()];
-  await assertClients(ctx.db, ctx.workspaceId, list.map((i) => i.clientId));
-  for (const departmentId of new Set(list.map((i) => i.departmentId))) await getDepartmentOrThrow(ctx.db, ctx.workspaceId, departmentId);
-  for (const item of list) assertMember(ctx, item.userId);
-
-  let removed = 0;
-  const out: ClientResponsible[] = [];
-  for (const item of list) {
-    const key = and(
-      eq(taskClientResponsibles.workspaceId, ctx.workspaceId),
-      eq(taskClientResponsibles.clientId, item.clientId),
-      eq(taskClientResponsibles.departmentId, item.departmentId),
-    );
-    if (item.userId === null) {
-      const gone = await ctx.db.delete(taskClientResponsibles).where(key).returning({ clientId: taskClientResponsibles.clientId });
-      removed += gone.length;
-      continue;
-    }
-    await ctx.db
-      .insert(taskClientResponsibles)
-      .values({ workspaceId: ctx.workspaceId, clientId: item.clientId, departmentId: item.departmentId, userId: item.userId })
-      .onConflictDoUpdate({
-        target: [taskClientResponsibles.workspaceId, taskClientResponsibles.clientId, taskClientResponsibles.departmentId],
-        set: { userId: item.userId, updatedAt: sql`now()` },
-      });
-    out.push({ clientId: item.clientId, departmentId: item.departmentId, user: memberRef(ctx, item.userId)! });
-  }
-  // Open occurrences from the current competence on follow the new responsible (not those assigned by hand).
-  const reassigned = await reassignClientOccurrences(ctx, list);
-  return { items: out, removed, reassigned };
-}
-
-/**
- * Sets (or, with `userId: null`, removes) the responsible of a client in a department. Administrators.
- * The open occurrences of the client in the department's recurring tasks, from the current competence
- * on, go to the new responsible (or back to the default one), except those assigned by hand.
- */
-export async function setClientResponsible(ctx: TaskContext, input: ResponsibleInput): Promise<ClientResponsibleChangeResponse> {
-  return writeResponsibles(ctx, [input]);
-}
-
-/** Several at once (the batch dialog and its undo). Administrators. */
-export async function setClientResponsibles(ctx: TaskContext, input: ResponsibleBatch): Promise<ClientResponsibleChangeResponse> {
-  return writeResponsibles(ctx, input.items);
-}
-
 // ---------------------------------------------------------------------------
 // Options
 // ---------------------------------------------------------------------------
 
 export async function taskOptions(ctx: TaskContext): Promise<TaskOptionsResponse> {
-  const [members, departments, categories, clients, items] = await Promise.all([
+  const [members, departments, categories, clients] = await Promise.all([
     listMembers(ctx),
     departmentRefs(ctx),
     listCategories(ctx),
     clientOptions(ctx),
-    responsibles(ctx),
   ]);
   const me = members.find((m) => m.isYou);
   return {
@@ -492,6 +409,5 @@ export async function taskOptions(ctx: TaskContext): Promise<TaskOptionsResponse
     departments,
     categories,
     clients,
-    clientResponsibles: items,
   };
 }

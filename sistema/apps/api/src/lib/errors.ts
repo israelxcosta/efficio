@@ -79,6 +79,7 @@ const UNIQUE_CONFLICTS: Record<string, string> = {
   transactions_fee_of_uq: 'Os empregados deste honorário já foram lançados. Atualize a página e tente novamente.',
   task_departments_name_uq: 'Já existe um departamento com este nome',
   task_categories_name_uq: 'Já existe uma categoria de tarefa com este nome',
+  recurring_tasks_catalog_key_uq: 'Este grupo foi aplicado ao mesmo tempo em outra aba. Atualize a página e tente novamente.',
   unions_document_uq: 'Já existe um sindicato com este CNPJ.',
   union_conventions_year_uq: 'Esta convenção já foi cadastrada. Atualize a página e tente novamente.',
   offices_workspace_uq: 'Os dados do escritório foram salvos ao mesmo tempo em outra aba. Atualize a página e tente novamente.',

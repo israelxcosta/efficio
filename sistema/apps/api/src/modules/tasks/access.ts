@@ -1,6 +1,6 @@
 // Tenant boundary of the task module. Unlike the financial modules, every member of the workspace
 // works here, `viewer` ("Colaborador") included: tasks, subtasks, comments, audit cells, flows and
-// personal notes. Registries (departments, categories, client responsibles, recurring tasks, flow
+// personal notes. Registries (departments, categories, recurring tasks, regime groups, flow
 // templates, member departments) need the `registry` permission, their deletion `deleteRegistry`, and
 // deleting tasks/processes (or someone else's comment/attachment) `deleteTasks` — by default the
 // administrators (owner/editor), exactly as in phases 1 and 2 (spec §13.10). Writes still need a

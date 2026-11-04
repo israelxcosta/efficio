@@ -34,46 +34,36 @@ interface TasksSummaryProps {
   scope: TaskScope;
   situation: TaskSituation;
   assignee: string;
-  client: string;
   onSituation: (s: TaskSituation) => void;
   onAssignee: (id: string) => void;
-  onClient: (id: string) => void;
   onOpenTask: (id: string) => void;
 }
 
 /**
  * Head of Tarefas (spec §7.2): the overdue tasks with the oldest one, what is open, what concluded
- * in the month and who (or which client) carries the open work. Same filters as the list except the
- * situation; every cell toggles a filter.
+ * in the month and who carries the open work (not in "Minhas": it would be only you; the pending work
+ * per client has its own card below the list). Same filters as the list except the situation; every
+ * cell toggles a filter.
  */
-export function TasksSummary({ summary, scope, situation, assignee, client, onSituation, onAssignee, onClient, onOpenTask }: TasksSummaryProps) {
+export function TasksSummary({ summary, scope, situation, assignee, onSituation, onAssignee, onOpenTask }: TasksSummaryProps) {
   const toggle = (s: TaskSituation) => onSituation(situation === s ? 'open' : s);
-  const byClient = scope === 'mine';
-  const rows = summary
-    ? byClient
-      ? summary.openByClient.slice(0, 5).map((r) => ({
-          key: r.client?.id ?? 'internal',
-          label: r.client?.name ?? 'Interna',
-          muted: !r.client,
-          open: r.open,
-          overdue: r.overdue,
-          avatar: null as string | null | undefined,
-        }))
-      : summary.openByAssignee.slice(0, 5).map((r) => ({
-          key: r.assignee?.id ?? 'none',
-          label: r.assignee ? shortName(r.assignee.name) : 'Sem responsável',
-          muted: !r.assignee,
-          open: r.open,
-          overdue: r.overdue,
-          avatar: r.assignee?.name ?? null,
-        }))
+  const byAssignee = scope !== 'mine';
+  const rows = summary && byAssignee
+    ? summary.openByAssignee.slice(0, 5).map((r) => ({
+        key: r.assignee?.id ?? 'none',
+        label: r.assignee ? shortName(r.assignee.name) : 'Sem responsável',
+        muted: !r.assignee,
+        open: r.open,
+        overdue: r.overdue,
+        avatar: r.assignee?.name ?? null,
+      }))
     : [];
   const max = Math.max(1, ...rows.map((r) => r.open));
   const month = summary ? monthName(summary.month) : '';
 
   return (
     <section aria-label="Resumo das tarefas" aria-busy={summary ? undefined : true} className="overflow-hidden rounded-xl border border-border bg-surface">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[minmax(0,1.15fr)_12.5rem_15rem_minmax(0,1fr)]">
+      <div className={cn('grid grid-cols-2 md:grid-cols-3', byAssignee ? 'lg:grid-cols-[minmax(0,1.15fr)_12.5rem_15rem_minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]')}>
         {/* 1. Overdue (principal) */}
         <div className="col-span-2 min-w-0 p-4 sm:p-5 md:col-span-1">
           <button
@@ -200,9 +190,10 @@ export function TasksSummary({ summary, scope, situation, assignee, client, onSi
           )}
         </div>
 
-        {/* 4. Open by assignee (or by client in "Minhas"): hidden on phones (the filter stays in the sheet). */}
+        {/* 4. Open by assignee (not in "Minhas"): hidden on phones (the filter stays in the sheet). */}
+        {byAssignee ? (
         <div className="hidden min-w-0 border-border px-4 pt-4 pb-4 sm:px-5 md:col-span-3 md:block md:border-t lg:col-span-1 lg:border-t-0 lg:border-l lg:pt-5">
-          <SummaryLabel>{byClient ? 'Em aberto por cliente' : 'Em aberto por responsável'}</SummaryLabel>
+          <SummaryLabel>Em aberto por responsável</SummaryLabel>
           {!summary ? (
             <div className="mt-1.5 flex flex-col gap-2" aria-hidden>
               {['w-full', 'w-4/5', 'w-3/5'].map((w) => (
@@ -212,20 +203,20 @@ export function TasksSummary({ summary, scope, situation, assignee, client, onSi
           ) : rows.length === 0 ? (
             <p className="mt-1.5 text-body-sm text-muted">Nada em aberto.</p>
           ) : (
-            <ul className="-mx-2 mt-1 grid gap-x-4 md:grid-cols-2 lg:grid-cols-1" aria-label={byClient ? 'Em aberto por cliente (filtra a lista)' : 'Em aberto por responsável (filtra a lista)'}>
+            <ul className="-mx-2 mt-1 grid gap-x-4 md:grid-cols-2 lg:grid-cols-1" aria-label="Em aberto por responsável (filtra a lista)">
               {rows.map((r) => {
-                const pressed = byClient ? client === r.key : assignee === r.key;
+                const pressed = assignee === r.key;
                 return (
                   <li key={r.key} className="min-w-0">
                     <button
                       type="button"
                       aria-pressed={pressed}
                       aria-label={`${r.label}: ${r.open} em aberto${r.overdue ? `, ${r.overdue} atrasadas` : ''}`}
-                      onClick={() => (byClient ? onClient(pressed ? '' : r.key) : onAssignee(pressed ? '' : r.key))}
+                      onClick={() => onAssignee(pressed ? '' : r.key)}
                       className={cn('grid w-full grid-cols-[8.5rem_minmax(0,1fr)_2rem_3rem] items-center gap-x-2.5 px-2 py-1 text-left pointer-coarse:py-2', toggleClass)}
                     >
                       <span className="flex min-w-0 items-center gap-1.5">
-                        {!byClient ? <MemberAvatar name={r.avatar} unassigned={!r.avatar} /> : null}
+                        <MemberAvatar name={r.avatar} unassigned={!r.avatar} />
                         <span className={cn('truncate text-body-sm', r.muted ? 'text-subtle' : 'text-fg', pressed && 'font-semibold')}>{r.label}</span>
                       </span>
                       <span className="block h-1.5" aria-hidden>
@@ -240,6 +231,7 @@ export function TasksSummary({ summary, scope, situation, assignee, client, onSi
             </ul>
           )}
         </div>
+        ) : null}
       </div>
     </section>
   );

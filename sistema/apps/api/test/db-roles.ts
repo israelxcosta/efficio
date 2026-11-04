@@ -55,7 +55,6 @@ export const TENANT_TABLES = [
   'tasks',
   'task_subtasks',
   'task_comments',
-  'task_client_responsibles',
   // Task module, phase 2 (migration 0014).
   'recurring_tasks',
   'recurring_task_clients',
@@ -72,4 +71,7 @@ export const TENANT_TABLES = [
   'union_conventions',
   'union_clients',
   'offices',
+  // Generation marker of the recurring occurrences (migration 0018).
+  'task_generation_state',
+  'task_generation_marks',
 ] as const;

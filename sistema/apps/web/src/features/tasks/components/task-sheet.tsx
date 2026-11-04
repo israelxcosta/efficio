@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
 import { CircleCheck, Copy, Ellipsis, Link2, ListChecks, Pencil, Plus, RotateCcw, Send, Trash2, X, CircleX } from 'lucide-react';
-import { ASSIGNEE_SOURCE_LABELS, formatDateBR, isoDateSchema, type OpenTaskStatus, type TaskLockedField } from '@effinance/shared';
+import { formatDateBR, isoDateSchema, type OpenTaskStatus, type TaskLockedField } from '@effinance/shared';
 import { toast } from 'sonner';
 import {
   daysOverdue,
@@ -64,7 +64,7 @@ import { daysText } from '../due';
 import { commentTime, dateTimeBR } from '../format';
 import { SHEET_PARAMS, statusFromParam, withSheetParams } from '../task-links';
 import { useTaskStatusChange } from '../use-task-status';
-import { competenceName, referenceLabel } from '../occurrence';
+import { assigneeSourceText, competenceName, referenceLabel } from '../occurrence';
 import { detailActions, primaryAction } from '../actions';
 import { AttachmentList } from './attachments';
 import { FlowStepper } from './flow-stepper';
@@ -193,10 +193,8 @@ export function taskSheetDescription(task: Pick<TaskDetail, 'client' | 'departme
 
 /** Where the responsible of an occurrence comes from, in the words of the screen. */
 export function assigneeSourceHint(task: Pick<TaskDetail, 'occurrence' | 'department'>): string | undefined {
-  const source = task.occurrence?.assigneeSource;
-  if (!source) return undefined;
-  if (source === 'client') return task.department ? `Responsável do cliente no ${task.department.name}.` : `${ASSIGNEE_SOURCE_LABELS.client}.`;
-  return `${ASSIGNEE_SOURCE_LABELS[source]}.`;
+  const text = assigneeSourceText(task.occurrence?.assigneeSource);
+  return text ? `${text}.` : undefined;
 }
 
 function DetailSkeleton() {
@@ -1065,12 +1063,6 @@ function NewTaskSheet({
 
   function setField(patch: TaskUpdateInput) {
     for (const [k, v] of Object.entries(patch)) form.setValue(k as keyof NewTaskValues, (v ?? '') as never, { shouldDirty: true });
-    // The client's responsible in the department, when nobody was chosen yet (the user may change it).
-    if (patch.clientId && !form.getValues('assigneeId') && options) {
-      const dept = form.getValues('departmentId');
-      const r = options.clientResponsibles.find((x) => x.clientId === patch.clientId && x.departmentId === dept);
-      if (r) form.setValue('assigneeId', r.user.id);
-    }
   }
 
   const submit = form.handleSubmit(async (v) => {

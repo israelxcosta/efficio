@@ -3,17 +3,22 @@
 // page, audit, calendar, reports) call `ensureOccurrences` first, and the unique constraint
 // `tasks_occurrence_uq` with ON CONFLICT DO NOTHING keeps concurrent requests from duplicating a row.
 //
-// Rules (Effy's obligations, plus the office's "carteira"):
+// Rules (Effy's obligations):
 // - a recurring task applies to the active clients of its regimes and/or the clients chosen by hand,
 //   minus the exceptions, from its start competence to its end competence;
 // - a client is active in a competence when its contract started by then (month of the contract start
 //   ≤ competence) and it was not inactivated before the competence began;
-// - the responsible is the client's responsible in the recurring task's department, else the default
-//   responsible, else nobody (`assignee_source` says which; `manual` = reassigned for that competence
-//   only, never overwritten automatically);
+// - the responsible is the recurring task's default responsible, else nobody — the occurrence waits in
+//   the department's queue (`assignee_source` says which; `manual` = reassigned for that competence
+//   only, never overwritten automatically). The responsible per client and department was removed (0017);
 // - deadlines come from the schedule (utils/tasks.ts: national holidays, non-business-day rule, target).
 // Generation is bounded: from 24 competences back to 2 ahead of the current one, and never for a
 // workspace whose subscription does not allow writing (reads keep showing what exists).
+// Marker (migration 0018): each recurring task × competence generated is recorded with the workspace's
+// generation version (bumped by database triggers when a recurring task, its client links or a client's
+// regime/contract/status change) and the rules version of this code; the next reads skip those pairs, so
+// a read does not recompute the window every time. The version is read before the data it guards: a
+// change committed meanwhile leaves the mark stale (regenerated later), never a fresh mark over old data.
 // Internal to the module: the services call these inside their tenant transaction.
 
 import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
@@ -32,8 +37,9 @@ import {
   contacts,
   recurringTaskClients,
   recurringTasks,
-  taskClientResponsibles,
   taskEvents,
+  taskGenerationMarks,
+  taskGenerationState,
   tasks,
   type RecurringTaskRow,
 } from '../../db/schema';
@@ -47,6 +53,12 @@ import { OPEN_SQL } from './task-rows';
 /** Competences generated on demand: from 24 back to 2 ahead of the current one. */
 export const PAST_COMPETENCES = 24;
 export const HORIZON_COMPETENCES = 2;
+
+/**
+ * Version of the generation rules of this code (schedule, holidays, who applies). Bump it when a change
+ * here alters which occurrences a competence should have: the marks of the old rules stop counting.
+ */
+export const GENERATION_RULES = 1;
 
 /** Recorded as the author of generated occurrences (there is no person behind them). */
 export const GENERATED_BY = 'Tarefa recorrente';
@@ -151,23 +163,10 @@ export async function loadClients(ctx: Pick<TaskContext, 'db' | 'workspaceId'>):
   return rows as GenClient[];
 }
 
-/** `${clientId}:${departmentId}` → responsible member. */
-export async function loadResponsibles(ctx: Pick<TaskContext, 'db' | 'workspaceId'>): Promise<Map<string, string>> {
-  const rows = await ctx.db
-    .select({ clientId: taskClientResponsibles.clientId, departmentId: taskClientResponsibles.departmentId, userId: taskClientResponsibles.userId })
-    .from(taskClientResponsibles)
-    .where(eq(taskClientResponsibles.workspaceId, ctx.workspaceId));
-  return new Map(rows.map((r) => [`${r.clientId}:${r.departmentId}`, r.userId]));
-}
-
-/** The client's responsible in the department, else the default responsible, else nobody. */
+/** The default responsible of the recurring task, else nobody (the department's queue). */
 export function resolveAssignee(
-  def: Pick<RecurringTaskRow, 'departmentId' | 'defaultAssigneeId'>,
-  clientId: string,
-  responsibles: ReadonlyMap<string, string>,
+  def: Pick<RecurringTaskRow, 'defaultAssigneeId'>,
 ): { assigneeId: string | null; source: AssigneeSource | null } {
-  const responsible = def.departmentId ? responsibles.get(`${clientId}:${def.departmentId}`) : undefined;
-  if (responsible) return { assigneeId: responsible, source: 'client' };
   if (def.defaultAssigneeId) return { assigneeId: def.defaultAssigneeId, source: 'default' };
   return { assigneeId: null, source: null };
 }
@@ -210,30 +209,39 @@ export async function ensureOccurrences(
   const { min, max } = generationBounds(ctx.today);
   const wanted = [...new Set(competences)].filter((c) => c >= min && c <= max).sort();
   if (wanted.length === 0) return 0;
+  // The version first: anything committed after this read makes the marks written below stale.
+  const version = await generationVersion(ctx);
   const defs = (await loadDefs(ctx, opts.recurringTaskIds)).filter((d) => wanted.some((c) => defActiveIn(d.row, c)));
   if (defs.length === 0) return 0;
-  const [clients, responsibles, existingRows] = await Promise.all([
+  const marked = await currentMarks(ctx, wanted, version);
+  // Pairs (recurring task × competence) that have periods and no current mark.
+  const pending = new Map<MonthKey, GenDef[]>();
+  for (const competence of wanted) {
+    for (const def of defs) {
+      if (!defActiveIn(def.row, competence) || marked.has(`${def.row.id}:${competence}`)) continue;
+      if (occurrencesInCompetence(scheduleOf(def.row), competence).length === 0) continue;
+      appendTo(pending, competence, def);
+    }
+  }
+  if (pending.size === 0) return 0;
+  const pendingDefIds = [...new Set([...pending.values()].flat().map((d) => d.row.id))];
+  const [clients, existingRows] = await Promise.all([
     loadClients(ctx),
-    loadResponsibles(ctx),
     ctx.db
       .select({ defId: tasks.recurringTaskId, clientId: tasks.clientId, periodKey: tasks.periodKey })
       .from(tasks)
       .where(
         and(
           eq(tasks.workspaceId, ctx.workspaceId),
-          inArray(
-            tasks.recurringTaskId,
-            defs.map((d) => d.row.id),
-          ),
-          inArray(tasks.competence, wanted),
+          inArray(tasks.recurringTaskId, pendingDefIds),
+          inArray(tasks.competence, [...pending.keys()]),
         ),
       ),
   ]);
   const existing = new Set(existingRows.map((r) => keyOf(r.defId!, r.clientId!, r.periodKey!)));
-  const missing = desiredOccurrences(defs, clients, wanted).filter(
-    (o) => !existing.has(keyOf(o.def.row.id, o.client.id, o.scheduled.periodKey)),
+  const missing = [...pending].flatMap(([competence, list]) =>
+    desiredOccurrences(list, clients, [competence]).filter((o) => !existing.has(keyOf(o.def.row.id, o.client.id, o.scheduled.periodKey))),
   );
-  if (missing.length === 0) return 0;
 
   let created = 0;
   const createdAt = now();
@@ -242,7 +250,7 @@ export async function ensureOccurrences(
       .insert(tasks)
       .values(
         chunk.map(({ def, client, scheduled: s }) => {
-          const { assigneeId, source } = resolveAssignee(def.row, client.id, responsibles);
+          const { assigneeId, source } = resolveAssignee(def.row);
           return {
             workspaceId: ctx.workspaceId,
             title: def.row.name,
@@ -273,7 +281,55 @@ export async function ensureOccurrences(
       inserted.map((r): EventInput => ({ taskId: r.id, kind: 'created', data: { origin: 'recurring', originName: r.title }, system: true })),
     );
   }
+  await writeMarks(
+    ctx,
+    [...pending].flatMap(([competence, list]) => list.map((d) => ({ recurringTaskId: d.row.id, competence }))),
+    version,
+  );
   return created;
+}
+
+/** The workspace's generation version (0 before the first change was ever recorded). */
+async function generationVersion(ctx: Pick<TaskContext, 'db' | 'workspaceId'>): Promise<number> {
+  const [row] = await ctx.db
+    .select({ version: taskGenerationState.version })
+    .from(taskGenerationState)
+    .where(eq(taskGenerationState.workspaceId, ctx.workspaceId));
+  return row?.version ?? 0;
+}
+
+/** `${recurringTaskId}:${competence}` of the marks computed with this version and these rules. */
+async function currentMarks(ctx: Pick<TaskContext, 'db' | 'workspaceId'>, competences: MonthKey[], version: number): Promise<Set<string>> {
+  const rows = await ctx.db
+    .select({ id: taskGenerationMarks.recurringTaskId, competence: taskGenerationMarks.competence })
+    .from(taskGenerationMarks)
+    .where(
+      and(
+        eq(taskGenerationMarks.workspaceId, ctx.workspaceId),
+        inArray(taskGenerationMarks.competence, competences),
+        eq(taskGenerationMarks.version, version),
+        eq(taskGenerationMarks.rules, GENERATION_RULES),
+      ),
+    );
+  return new Set(rows.map((r) => `${r.id}:${r.competence}`));
+}
+
+/** Records the pairs as generated with `version` (a newer mark is never overwritten by an older one). */
+async function writeMarks(
+  ctx: Pick<TaskContext, 'db' | 'workspaceId'>,
+  pairs: { recurringTaskId: string; competence: MonthKey }[],
+  version: number,
+): Promise<void> {
+  for (const chunk of inChunks(pairs, 500)) {
+    await ctx.db
+      .insert(taskGenerationMarks)
+      .values(chunk.map((p) => ({ workspaceId: ctx.workspaceId, ...p, version, rules: GENERATION_RULES })))
+      .onConflictDoUpdate({
+        target: [taskGenerationMarks.workspaceId, taskGenerationMarks.recurringTaskId, taskGenerationMarks.competence],
+        set: { version, rules: GENERATION_RULES, generatedAt: sql`now()` },
+        setWhere: sql`${taskGenerationMarks.version} <= ${version}`,
+      });
+  }
 }
 
 type SyncRow = {
@@ -331,9 +387,8 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
   const [def] = await loadDefs(ctx, [recurringTaskId]);
   if (!def) return;
   const { current } = generationBounds(ctx.today);
-  const [clients, responsibles, rows] = await Promise.all([
+  const [clients, rows] = await Promise.all([
     loadClients(ctx),
-    loadResponsibles(ctx),
     ctx.db
       .select({
         id: tasks.id,
@@ -433,7 +488,7 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
   const changes = new Map<string, string[]>();
   for (const { row } of follow) {
     if (row.assigneeSource === 'manual') continue;
-    const next = resolveAssignee(def.row, row.clientId!, responsibles);
+    const next = resolveAssignee(def.row);
     if (next.assigneeId === row.assigneeId && next.source === row.assigneeSource) continue;
     const key = `${next.assigneeId ?? ''}|${next.source ?? ''}`;
     appendTo(changes, key, row.id);
@@ -469,86 +524,4 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
   }
   await recordEvents(ctx, events);
   await ensureOccurrences(ctx, [0, 1, 2].map((n) => addMonthKey(current, n)), { recurringTaskIds: [recurringTaskId] });
-}
-
-/**
- * The responsible of these clients changed in these departments: their open occurrences from the
- * current competence on (of recurring tasks of the department; not those assigned by hand) go to the
- * new responsible, or to the default one when the responsible was removed. Returns how many changed.
- */
-export async function reassignClientOccurrences(
-  ctx: TaskContext,
-  pairs: readonly { clientId: string; departmentId: string }[],
-): Promise<number> {
-  if (pairs.length === 0) return 0;
-  const { current } = generationBounds(ctx.today);
-  const wanted = new Set(pairs.map((p) => `${p.clientId}:${p.departmentId}`));
-  const clientIds = [...new Set(pairs.map((p) => p.clientId))];
-  const departmentIds = [...new Set(pairs.map((p) => p.departmentId))];
-  const [responsibles, defs] = await Promise.all([
-    loadResponsibles(ctx),
-    ctx.db
-      .select({ id: recurringTasks.id, departmentId: recurringTasks.departmentId, defaultAssigneeId: recurringTasks.defaultAssigneeId })
-      .from(recurringTasks)
-      .where(and(eq(recurringTasks.workspaceId, ctx.workspaceId), inArray(recurringTasks.departmentId, departmentIds))),
-  ]);
-  if (defs.length === 0) return 0;
-  const defById = new Map(defs.map((d) => [d.id, d]));
-  const rows: { id: string; clientId: string | null; recurringTaskId: string | null; assigneeId: string | null; assigneeSource: AssigneeSource | null }[] = [];
-  for (const chunk of inChunks(clientIds)) {
-    rows.push(
-      ...(await ctx.db
-        .select({
-          id: tasks.id,
-          clientId: tasks.clientId,
-          recurringTaskId: tasks.recurringTaskId,
-          assigneeId: tasks.assigneeId,
-          assigneeSource: tasks.assigneeSource,
-        })
-        .from(tasks)
-        .where(
-          and(
-            eq(tasks.workspaceId, ctx.workspaceId),
-            inArray(tasks.clientId, chunk),
-            inArray(
-              tasks.recurringTaskId,
-              defs.map((d) => d.id),
-            ),
-            gte(tasks.competence, current),
-            OPEN_SQL,
-            sql`${tasks.assigneeSource} is distinct from 'manual'`,
-          ),
-        )),
-    );
-  }
-  const changes = new Map<string, string[]>();
-  const events: EventInput[] = [];
-  for (const row of rows) {
-    const def = defById.get(row.recurringTaskId!)!;
-    if (!wanted.has(`${row.clientId}:${def.departmentId}`)) continue;
-    const next = resolveAssignee(def, row.clientId!, responsibles);
-    if (next.assigneeId === row.assigneeId && next.source === row.assigneeSource) continue;
-    const key = `${next.assigneeId ?? ''}|${next.source ?? ''}`;
-    appendTo(changes, key, row.id);
-    if (next.assigneeId !== row.assigneeId) {
-      events.push({
-        taskId: row.id,
-        kind: 'assigned',
-        data: { fromAssignee: memberName(ctx, row.assigneeId), toAssignee: memberName(ctx, next.assigneeId) },
-        note: 'Responsável do cliente no departamento alterado',
-      });
-    }
-  }
-  for (const [key, ids] of changes) {
-    const [assigneeId, source] = key.split('|');
-    for (const chunk of inChunks(ids)) {
-      await ctx.db
-        .update(tasks)
-        .set({ assigneeId: assigneeId || null, assigneeSource: (source || null) as AssigneeSource | null })
-        .where(and(eq(tasks.workspaceId, ctx.workspaceId), inArray(tasks.id, chunk)));
-    }
-  }
-  await recordEvents(ctx, events);
-  // Occurrences that changed hands (a change of source alone, e.g. client → default, is not counted).
-  return events.length;
 }

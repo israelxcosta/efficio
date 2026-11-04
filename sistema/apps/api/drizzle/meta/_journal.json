@@ -120,6 +120,20 @@
       "when": 1793805479285,
       "tag": "0016_phase23_db_review",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793807279944,
+      "tag": "0017_drop_client_responsibles",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793807609882,
+      "tag": "0018_task_generation_regime_groups",
+      "breakpoints": true
     }
   ]
 }

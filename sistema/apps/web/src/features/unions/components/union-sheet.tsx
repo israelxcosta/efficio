@@ -8,6 +8,7 @@ import {
   BR_STATES,
   MONTH_NAMES,
   TAX_REGIME_LABELS,
+  TAX_REGIMES,
   formatCEP,
   formatCNPJ,
   formatDateBR,
@@ -16,6 +17,7 @@ import {
   onlyDigits,
   unionInputSchema,
   type TaskOptionsResponse,
+  type TaxRegime,
   type UnionDetail,
 } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
@@ -409,7 +411,7 @@ function UnionClientsPicker({
   disabled: boolean;
   linked: { id: string; name: string; legalName: string; taxRegime: UnionDetail['clients'][number]['taxRegime']; status: string }[];
 }) {
-  const [dept, setDept] = useState(ALL);
+  const [regime, setRegime] = useState<TaxRegime | ''>(ALL);
   const [search, setSearch] = useState('');
   const selected = useMemo(() => new Set(value), [value]);
   const rows = useMemo(() => {
@@ -419,21 +421,19 @@ function UnionClientsPicker({
     for (const l of linked) if (!base.some((c) => c.id === l.id)) base.push({ id: l.id, name: l.name, legalName: l.legalName, taxRegime: l.taxRegime, status: l.status as 'active', contractStartDate: '', inactivatedAt: null });
     const q = search.trim().toLocaleLowerCase('pt-BR');
     return base
-      .filter((c) => !dept || options?.clientResponsibles.some((r) => r.clientId === c.id && r.departmentId === dept))
+      .filter((c) => !regime || c.taxRegime === regime)
       .filter((c) => !q || c.name.toLocaleLowerCase('pt-BR').includes(q) || c.legalName.toLocaleLowerCase('pt-BR').includes(q))
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  }, [options, selected, linked, search, dept]);
-  const responsibleOf = (clientId: string) => (dept ? options?.clientResponsibles.find((r) => r.clientId === clientId && r.departmentId === dept)?.user.name : undefined);
-  const deptName = options?.departments.find((d) => d.id === dept)?.name;
+  }, [options, selected, linked, search, regime]);
 
   return (
     <div className="flex flex-col gap-2">
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Select size_="sm" aria-label="Mostrar" value={dept} onChange={(e) => setDept(e.target.value)}>
-          <option value={ALL}>Todos os clientes ativos</option>
-          {(options?.departments ?? []).map((d) => (
-            <option key={d.id} value={d.id}>
-              Com responsável no {d.name}
+        <Select size_="sm" aria-label="Regime" value={regime} onChange={(e) => setRegime(e.target.value as TaxRegime | '')}>
+          <option value={ALL}>Todos os regimes</option>
+          {TAX_REGIMES.map((r) => (
+            <option key={r} value={r}>
+              {TAX_REGIME_LABELS[r]}
             </option>
           ))}
         </Select>
@@ -458,11 +458,10 @@ function UnionClientsPicker({
             <SkeletonRows rows={3} />
           </li>
         ) : rows.length === 0 ? (
-          <li className="p-4 text-center text-body-sm text-muted">{search || dept ? 'Nenhum cliente com esse filtro.' : 'Nenhum cliente ativo.'}</li>
+          <li className="p-4 text-center text-body-sm text-muted">{search || regime ? 'Nenhum cliente com esse filtro.' : 'Nenhum cliente ativo.'}</li>
         ) : (
           rows.map((c) => {
             const id = `union-client-${c.id}`;
-            const responsible = responsibleOf(c.id);
             return (
               <li key={c.id} className="flex items-center gap-3 border-b border-border px-3 py-2 last:border-b-0">
                 <Checkbox
@@ -478,7 +477,6 @@ function UnionClientsPicker({
                   </span>
                   <span className="block truncate text-caption text-muted">
                     {TAX_REGIME_LABELS[c.taxRegime]}
-                    {responsible ? ` · ${responsible} (${deptName})` : ''}
                   </span>
                 </label>
               </li>

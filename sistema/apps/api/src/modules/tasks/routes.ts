@@ -1,7 +1,7 @@
 // Task module routes under /api/tasks. Mounted next to the financial boundary, with its own guards
 // (access.ts): every member reads and writes tasks, occurrences, audit cells, processes, comments,
-// attachments and their own notes; registries (departments, categories, client responsibles,
-// recurring tasks, process templates) need `registry`, their deletion `deleteRegistry`, and deleting a
+// attachments and their own notes; registries (departments, categories, recurring tasks, regime
+// groups, process templates) need `registry`, their deletion `deleteRegistry`, and deleting a
 // task or a process `deleteTasks` (`onRequest: requireTaskPermission(key)`; by default the
 // administrators, spec §13.10); a few rules are checked by the services (removing someone else's
 // comment or attachment: `deleteTasks`; reopening an occurrence someone else concluded: `reopenOthers`;
@@ -12,8 +12,6 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
   applyFlowTemplateSchema,
-  clientResponsibleBatchSchema,
-  clientResponsibleInputSchema,
   flowTemplateInputSchema,
   idSchema,
   MAX_ATTACHMENT_BYTES,
@@ -23,6 +21,8 @@ import {
   recurringGenerateSchema,
   recurringTaskInputSchema,
   recurringTaskQuerySchema,
+  regimeGroupApplySchema,
+  regimeGroupParamsSchema,
   subtaskInputSchema,
   subtaskUpdateSchema,
   taskAttachmentInputSchema,
@@ -63,6 +63,7 @@ import {
 import { taskHome } from './home';
 import { exportTaskReport, taskCalendar, taskReport } from './insights';
 import { createNote, deleteNote, listNotes, updateNote } from './notes';
+import { applyRegimeGroup, listRegimeGroups } from './regime-groups';
 import {
   createRecurring,
   deleteRecurring,
@@ -79,11 +80,8 @@ import {
   deleteCategory,
   deleteDepartment,
   listCategories,
-  listClientResponsibles,
   listDepartments,
   listMembers,
-  setClientResponsible,
-  setClientResponsibles,
   setMemberDepartment,
   taskOptions,
   updateCategory,
@@ -167,18 +165,6 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
     return reply.code(204).send();
   });
 
-  app.get('/client-responsibles', async (req) => run(req, (ctx) => listClientResponsibles(ctx)));
-  app.put(
-    '/client-responsibles',
-    { ...registry, schema: { body: clientResponsibleInputSchema } },
-    async (req) => run(req, (ctx) => setClientResponsible(ctx, req.body)),
-  );
-  app.put(
-    '/client-responsibles/batch',
-    { ...registry, schema: { body: clientResponsibleBatchSchema } },
-    async (req) => run(req, (ctx) => setClientResponsibles(ctx, req.body)),
-  );
-
   // --- summaries, calendar, reports ------------------------------------------------------------------
   app.get('/home', { schema: { querystring: taskHomeQuerySchema } }, async (req) =>
     run(req, (ctx) => taskHome(ctx, req.query)),
@@ -206,6 +192,14 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   // --- monthly audit -----------------------------------------------------------------------------------
   app.get('/audit', { schema: { querystring: taskAuditQuerySchema } }, async (req) =>
     run(req, (ctx) => auditMatrix(ctx, req.query)),
+  );
+
+  // --- regime groups (default recurring tasks per tax regime) -------------------------------------------
+  app.get('/regime-groups', async (req) => run(req, (ctx) => listRegimeGroups(ctx)));
+  app.post(
+    '/regime-groups/:regime/apply',
+    { ...registry, schema: { params: regimeGroupParamsSchema, body: regimeGroupApplySchema } },
+    async (req) => run(req, (ctx) => applyRegimeGroup(ctx, req.params.regime, req.body)),
   );
 
   // --- recurring tasks ---------------------------------------------------------------------------------

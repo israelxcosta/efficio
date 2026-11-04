@@ -1,7 +1,6 @@
 // Recurring tasks (phase 2): the registry (administrators), the idempotent generation of one
-// occurrence per client and period, who receives each occurrence (client responsible in the
-// department, else the default, else nobody; by hand for one competence only), the reassignment when a
-// client's responsible changes (single and batch), the derived situations (not started, in progress,
+// occurrence per client and period, who receives each occurrence (the default responsible, else the
+// department's queue; by hand for one competence only), the derived situations (not started, in progress,
 // past the target, overdue, done on time / late, canceled), national holidays, weekly tasks, the
 // reference month, editing (open occurrences follow, concluded ones never change) and deleting.
 // Today is pinned to 2026-10-20, a Tuesday; the conclusions to 2026-10-20 12:00 in São Paulo.
@@ -53,7 +52,7 @@ async function cellsOf(c: Client, recurringId: string, period: string) {
 }
 
 describe('recurring tasks: registry and generation', () => {
-  it('generates one occurrence per active client and period, for the client responsible or the default, idempotently', async () => {
+  it('generates one occurrence per active client and period, for the default responsible, idempotently', async () => {
     const { ana, carla, fiscal } = await office(app);
     const ws = await workspaceOf(ana);
     const withResponsible = await createClient(ana, { tradeName: 'Padaria' });
@@ -64,9 +63,8 @@ describe('recurring tasks: registry and generation', () => {
     const startsInNovember = await createClient(ana, { tradeName: 'Nova', contractStartDate: '2026-11-05' });
     const inactive = await createClient(ana, { tradeName: 'Antiga' });
     expect((await ana.post(`/clients/${inactive}/inactivate`, { date: '2026-09-15', reason: 'contract_end' })).status).toBe(200);
-    expect(
-      (await ana.put('/tasks/client-responsibles', { clientId: withResponsible, departmentId: fiscal, userId: carla.userId })).status,
-    ).toBe(200);
+    // The responsible per client and department is gone (the occurrences go to the default responsible).
+    expect((await ana.put('/tasks/client-responsibles', { clientId: withResponsible, departmentId: fiscal, userId: carla.userId })).status).toBe(404);
 
     // Collaborators read the registry but do not change it.
     expect((await carla.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId }))).status).toBe(403);
@@ -92,13 +90,10 @@ describe('recurring tasks: registry and generation', () => {
       endCompetence: null,
       active: true,
       clientCount: 3,
-      withoutResponsible: 2,
       month: { competence: '2026-10', occurs: true, legalDueDate: '2026-10-20', targetDate: '2026-10-16', total: 3, done: 0 },
     });
-    expect(r.distribution).toEqual([
-      { assignee: { id: ana.userId, name: 'Ana Paula Ribeiro' }, source: 'default', count: 2 },
-      { assignee: { id: carla.userId, name: 'Carla Souza' }, source: 'client', count: 1 },
-    ]);
+    expect(r).not.toHaveProperty('withoutResponsible');
+    expect(r.distribution).toEqual([{ assignee: { id: ana.userId, name: 'Ana Paula Ribeiro' }, source: 'default', count: 3 }]);
     void presumed;
 
     // October to December were generated with the registry; November brings the client that starts then.
@@ -107,8 +102,8 @@ describe('recurring tasks: registry and generation', () => {
     expect(generated.filter((o) => o.client_id === startsInNovember).map((o) => o.competence)).toEqual(['2026-11', '2026-12']);
     expect(generated.some((o) => o.client_id === inactive || o.client_id === excluded || o.client_id === presumed)).toBe(false);
     expect(generated.find((o) => o.client_id === withResponsible && o.competence === '2026-10')).toMatchObject({
-      assignee_id: carla.userId,
-      assignee_source: 'client',
+      assignee_id: ana.userId,
+      assignee_source: 'default',
       status: 'todo',
     });
     expect(generated.find((o) => o.client_id === withoutResponsible && o.competence === '2026-10')).toMatchObject({
@@ -146,8 +141,8 @@ describe('recurring tasks: registry and generation', () => {
     expect(padaria).toMatchObject({
       status: 'todo',
       situation: 'target_missed',
-      assignee: { id: carla.userId },
-      assigneeSource: 'client',
+      assignee: { id: ana.userId },
+      assigneeSource: 'default',
       overdue: false,
       targetMissed: true,
       concludedBy: null,
@@ -163,7 +158,7 @@ describe('recurring tasks: registry and generation', () => {
       title: 'DAS',
       dueDate: '2026-10-20',
       department: { id: fiscal },
-      occurrence: { recurringTaskId: r.id, period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-16', targetMissed: true, assigneeSource: 'client', situation: 'target_missed' },
+      occurrence: { recurringTaskId: r.id, period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-16', targetMissed: true, assigneeSource: 'default', situation: 'target_missed' },
       lockedFields: ['title', 'clientId', 'categoryId', 'departmentId', 'startDate', 'dueDate', 'startTime', 'endTime'],
     });
     expect((await carla.patch(`/tasks/${padaria.taskId}`, { dueDate: '2026-10-30' })).status).toBe(422);
@@ -285,57 +280,41 @@ describe('recurring tasks: deadlines, situations and holidays', () => {
   });
 });
 
-describe('recurring tasks: responsibles and reassignment', () => {
-  it('a new client responsible takes the open occurrences from the current competence on, except those assigned by hand', async () => {
+describe('recurring tasks: who receives the occurrences', () => {
+  it('without a default responsible the occurrences wait in the department queue; by hand only for that competence', async () => {
     const { ana, bruno, carla, fiscal } = await office(app);
     const ws = await workspaceOf(ana);
     const a = await createClient(ana, { tradeName: 'A' });
     const b = await createClient(ana, { tradeName: 'B' });
-    const created = await ana.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId }));
+    const created = await ana.post('/tasks/recurring', das(fiscal));
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
     const id = created.body.id;
-    // Reassign A's October occurrence by hand (only that competence), then conclude B's.
+    expect(created.body.distribution).toEqual([{ assignee: null, source: null, count: 2 }]);
+    const generated = await occurrenceRows(ws, id);
+    expect(generated).toHaveLength(6);
+    expect(generated.every((o) => o.assignee_id === null && o.assignee_source === null)).toBe(true);
+    // The department queue shows them (unassigned, in the recurring task's department).
+    const queue = (await carla.get('/tasks?scope=department&month=2026-10')).body;
+    expect(queue.occurrences).toHaveLength(1);
+    expect(queue.occurrences[0]).toMatchObject({ name: 'DAS', department: { id: fiscal }, total: 2, assignees: [{ assignee: null, count: 2 }] });
+
+    // Assigned by hand: that competence only; the registry's default reaches the others, never that one.
     const october = await cellsOf(carla, id, '2026-10');
     const aOct = october.cells.find((c: any) => c.clientId === a).taskId;
-    const bOct = october.cells.find((c: any) => c.clientId === b).taskId;
     const manual = await carla.patch(`/tasks/${aOct}`, { assigneeId: bruno.userId });
     expect(manual.body).toMatchObject({ assignee: { id: bruno.userId }, occurrence: { assigneeSource: 'manual' } });
-    await carla.patch(`/tasks/${bOct}/status`, { status: 'done' });
-
-    const set = await ana.put('/tasks/client-responsibles/batch', {
-      items: [
-        { clientId: a, departmentId: fiscal, userId: carla.userId },
-        { clientId: b, departmentId: fiscal, userId: carla.userId },
-      ],
-    });
-    expect(set.status).toBe(200);
-    // A: November and December (October was assigned by hand); B: November and December (October is done).
-    expect(set.body).toMatchObject({ removed: 0, reassigned: 4 });
-    expect(set.body.items).toHaveLength(2);
+    expect((await ana.put(`/tasks/recurring/${id}`, das(fiscal, { assigneeId: ana.userId }))).status).toBe(200);
     const after = await occurrenceRows(ws, id);
     expect(after.find((o) => o.client_id === a && o.competence === '2026-10')).toMatchObject({ assignee_id: bruno.userId, assignee_source: 'manual' });
-    expect(after.filter((o) => o.competence !== '2026-10').every((o) => o.assignee_id === carla.userId && o.assignee_source === 'client')).toBe(true);
-    expect(after.find((o) => o.client_id === b && o.competence === '2026-10')).toMatchObject({ assignee_id: ana.userId, status: 'done' });
-
-    // Removing the responsible sends them back to the default responsible.
-    const removed = await ana.put('/tasks/client-responsibles', { clientId: b, departmentId: fiscal, userId: null });
-    expect(removed.body).toEqual({ items: [], removed: 1, reassigned: 2 });
-    expect((await occurrenceRows(ws, id)).filter((o) => o.client_id === b && o.competence !== '2026-10').every((o) => o.assignee_source === 'default' && o.assignee_id === ana.userId)).toBe(true);
-    // The history of the occurrence says who changed it and why.
-    const nov = (await cellsOf(carla, id, '2026-11')).cells.find((c: any) => c.clientId === b).taskId;
-    const history = (await carla.get(`/tasks/${nov}/history`)).body;
-    expect(history.items.map((h: any) => h.kind)).toEqual(['assigned', 'assigned', 'created']);
-    expect(history.items[0]).toMatchObject({
-      actor: { id: ana.userId },
-      fromAssignee: { id: carla.userId, name: 'Carla Souza' },
-      toAssignee: { id: ana.userId, name: 'Ana Paula Ribeiro' },
-      note: 'Responsável do cliente no departamento alterado',
-    });
-    expect(history.items[2]).toMatchObject({ kind: 'created', actor: null, origin: 'recurring' });
-    // Batch writes are for administrators; ids of another workspace are "not found".
-    expect((await carla.put('/tasks/client-responsibles/batch', { items: [{ clientId: a, departmentId: fiscal, userId: null }] })).status).toBe(403);
-    const other = await registerUser(app, 'Outro Escritório');
-    const foreign = await createClient(other);
-    expect((await ana.put('/tasks/client-responsibles/batch', { items: [{ clientId: foreign, departmentId: fiscal, userId: null }] })).status).toBe(404);
+    expect(after.filter((o) => !(o.client_id === a && o.competence === '2026-10')).every((o) => o.assignee_id === ana.userId && o.assignee_source === 'default')).toBe(true);
+    void b;
+    // The old routes of the "carteira" are gone.
+    for (const path of ['/tasks/client-responsibles', '/tasks/client-responsibles/batch']) {
+      expect((await ana.put(path, { items: [] })).status).toBe(404);
+    }
+    // GET falls on `/tasks/:id` (not a uuid: 400); nothing answers 200 any more.
+    expect([400, 404]).toContain((await ana.get('/tasks/client-responsibles')).status);
+    expect((await ana.get('/tasks/options')).body).not.toHaveProperty('clientResponsibles');
   });
 });
 

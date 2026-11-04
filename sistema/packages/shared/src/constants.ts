@@ -545,15 +545,15 @@ export const OCCURRENCE_SITUATION_LABELS: Record<OccurrenceSituation, string> = 
 };
 
 /**
- * Where the responsible of an occurrence comes from: assigned by hand for that competence only, the
- * client's responsible in the recurring task's department, or the recurring task's default responsible.
+ * Where the responsible of an occurrence comes from: assigned by hand for that competence only, or the
+ * recurring task's default responsible (without one, the occurrence waits in the department's queue).
+ * The responsible per client and department ("carteira", `client`) was removed in migration 0017.
  */
-export const ASSIGNEE_SOURCES = ['manual', 'client', 'default'] as const;
+export const ASSIGNEE_SOURCES = ['manual', 'default'] as const;
 export type AssigneeSource = (typeof ASSIGNEE_SOURCES)[number];
 
 export const ASSIGNEE_SOURCE_LABELS: Record<AssigneeSource, string> = {
   manual: 'Atribuída só nesta competência',
-  client: 'Responsável do cliente no departamento',
   default: 'Responsável padrão',
 };
 

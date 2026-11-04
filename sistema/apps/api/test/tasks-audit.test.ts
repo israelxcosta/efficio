@@ -28,7 +28,6 @@ describe('monthly audit', () => {
     const padaria = await createClient(ana, { tradeName: 'Padaria' });
     const clinica = await createClient(ana, { tradeName: 'Clínica' });
     const construtora = await createClient(ana, { tradeName: 'Construtora', taxRegime: 'presumed_profit' });
-    await ana.put('/tasks/client-responsibles', { clientId: padaria, departmentId: fiscal, userId: carla.userId });
     const das = await ana.post('/tasks/recurring', { name: 'DAS', departmentId: fiscal, assigneeId: ana.userId, dueDay: 20, regimes: ['simples_nacional'] });
     const dctf = await ana.post('/tasks/recurring', {
       name: 'DCTFWeb',
@@ -71,8 +70,11 @@ describe('monthly audit', () => {
       { department: { id: pessoal, name: 'Pessoal' }, total: 1, done: 0, overduePending: 0 },
     ]);
 
-    // The collaborator works the cells (any member): conclude Padaria's two cells.
+    // Padaria's cells go to Carla by hand (that competence only), then she works them (any member).
     const padariaCells = matrix.cells.filter((c: any) => c.clientId === padaria);
+    for (const cell of padariaCells) {
+      expect((await ana.patch(`/tasks/${cell.taskId}`, { assigneeId: carla.userId })).status).toBe(200);
+    }
     for (const cell of padariaCells) {
       const res = await carla.patch(`/tasks/${cell.taskId}/status`, { status: 'done' });
       expect(res.status).toBe(200);

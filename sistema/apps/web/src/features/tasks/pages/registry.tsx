@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { CircleAlert, Ellipsis, ListChecks, MailPlus, Pencil, Plus, Scale, SlidersHorizontal, Tags, Trash2, UsersRound, Building2, ShieldCheck } from 'lucide-react';
+import { CircleAlert, Ellipsis, ListChecks, MailPlus, Pencil, Plus, Scale, SlidersHorizontal, Tags, Trash2, UsersRound, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TaskCategory, TaskDepartment, TaskMember } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
@@ -175,12 +175,9 @@ function DepartmentsTab({
   onEdit: (d: TaskDepartment) => void;
 }) {
   const canDelete = usePermissions().can('deleteRegistry');
-  const options = useTaskOptions();
   const remove = useDeleteDepartment();
   const [toDelete, setToDelete] = useState<TaskDepartment | null>(null);
   const [blocked, setBlocked] = useState<{ department: TaskDepartment; message: string } | null>(null);
-  const active = (options.data?.clients ?? []).filter((c) => c.status === 'active');
-  const responsibles = options.data?.clientResponsibles ?? [];
 
   function askDelete(d: TaskDepartment) {
     const parts = [d.members.length ? pluralize(d.members.length, 'membro', 'membros') : null, d.taskCount ? pluralize(d.taskCount, 'tarefa', 'tarefas') : null].filter(Boolean);
@@ -197,7 +194,6 @@ function DepartmentsTab({
         <span className="hidden w-32 @2xl:block">Membros</span>
         <span className="w-28 text-right">Em aberto</span>
         <span className="hidden w-28 text-right @3xl:block">Recorrentes</span>
-        <span className="hidden w-36 text-right whitespace-nowrap @4xl:block">Com responsável</span>
         <span className="w-8" aria-hidden />
       </div>
       <div className="p-1.5">
@@ -221,7 +217,6 @@ function DepartmentsTab({
           />
         ) : (
           departments.data.map((d) => {
-            const covered = active.filter((c) => responsibles.some((r) => r.clientId === c.id && r.departmentId === d.id)).length;
             return (
               <div key={d.id} className={rowClass}>
                 <span className={neutralIcon} aria-hidden>
@@ -243,9 +238,6 @@ function DepartmentsTab({
                 <Link to={`/tarefas/recorrentes?departamento=${d.id}`} className="tabular hidden w-28 rounded-md text-right text-body-sm text-fg hover:underline @3xl:block" aria-label={`${d.name}: ${d.recurringCount} tarefas recorrentes ativas.`}>
                   {d.recurringCount}
                 </Link>
-                <span className={cn('tabular hidden w-36 text-right text-body-sm @4xl:block', covered < active.length ? 'text-warning' : 'text-fg')}>
-                  {covered}/{active.length}
-                </span>
                 {isAdmin ? (
                   <DropdownMenu>
                     <RowMenuButton label={`Ações de ${d.name}`} />
@@ -275,7 +267,7 @@ function DepartmentsTab({
         open={Boolean(toDelete)}
         onOpenChange={(o) => !o && setToDelete(null)}
         title={`Excluir o departamento ${toDelete?.name ?? ''}?`}
-        description="Os responsáveis de clientes neste departamento também saem. Esta ação não pode ser desfeita."
+        description="Esta ação não pode ser desfeita."
         confirmLabel="Excluir departamento"
         loading={remove.isPending}
         onConfirm={async () => {
@@ -456,7 +448,6 @@ function TeamTab() {
           <span className="flex-1">Pessoa</span>
           <span className="hidden w-32 @2xl:block">Papel</span>
           <span className="w-48">Departamento</span>
-          <span className="hidden w-28 @3xl:block">Carteira</span>
           <span className="hidden w-28 text-right @3xl:block">Em aberto</span>
           <span className="w-8" aria-hidden />
         </div>
@@ -480,7 +471,6 @@ function TeamTab() {
           ) : (
             rows.map((m) => {
               const email = people.data?.find((p) => p.userId === m.id)?.email;
-              const portfolio = new Set(o.clientResponsibles.filter((r) => r.user.id === m.id).map((r) => r.clientId)).size;
               const load = open.data?.summary.openByAssignee.find((r) => r.assignee?.id === m.id);
               return (
                 <div key={m.id} className={rowClass}>
@@ -517,9 +507,6 @@ function TeamTab() {
                       <span className={cn('block truncate text-body-sm', m.department ? 'text-fg' : 'text-subtle')}>{m.department?.name ?? 'Sem departamento'}</span>
                     )}
                   </span>
-                  <Link to={`/tarefas/clientes?responsavel=${m.id}`} className="hidden w-28 text-body-sm text-brand-text hover:underline @3xl:block">
-                    {pluralize(portfolio, 'cliente', 'clientes')}
-                  </Link>
                   <span className="hidden w-28 text-right @3xl:block">
                     <span className="tabular block text-body-sm font-semibold text-fg">{load?.open ?? 0}</span>
                     {load?.overdue ? <span className="tabular block text-mini text-danger">{pluralize(load.overdue, 'atrasada', 'atrasadas')}</span> : null}
@@ -529,9 +516,6 @@ function TeamTab() {
                     <DropdownMenuContent>
                       <DropdownMenuItem icon={<ListChecks />} onSelect={() => navigate(tasksHref({ scope: 'all', assignee: m.id }))}>
                         Ver tarefas
-                      </DropdownMenuItem>
-                      <DropdownMenuItem icon={<Building2 />} onSelect={() => navigate(`/tarefas/clientes?responsavel=${m.id}`)}>
-                        Ver clientes
                       </DropdownMenuItem>
                       {isOwner && !m.isYou && m.role !== 'owner' ? (
                         <>

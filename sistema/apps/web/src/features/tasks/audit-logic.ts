@@ -1,8 +1,10 @@
-// Monthly audit (spec §11): the URL of the page, the client × recurring task matrix with its filters,
-// the two accordions (by task, by client below 1024px), the cell cycle (A fazer → Em andamento →
-// Concluída) and the derived "mês concluído". Pure functions, tested in phase2-logic.test.ts.
+// Monthly audit (spec §11): the URL of the page, the client × recurring task data with its filters,
+// the client list ("Por cliente", every width) and the task accordion ("Por tarefa"), the cell cycle
+// (A fazer → Em andamento → Concluída) and the derived "mês concluído". Pure functions, tested in
+// phase2-logic.test.ts and audit-list.test.ts.
 
 import {
+  dateInTimeZone,
   diffInDays,
   monthKeySchema,
   TAX_REGIMES,
@@ -17,8 +19,8 @@ import {
   type TaxRegime,
 } from '@effinance/shared';
 import { isUuid } from '@/lib/safe-url';
-import { daysText, shortDate, type DueTone } from './due';
-import { occurrenceKey } from './occurrence';
+import { daysText, shortDate, shortName, type DueInfo, type DueTone } from './due';
+import { occurrenceKey, openDeadlineInfo } from './occurrence';
 
 // ---------------------------------------------------------------------------
 // URL (`competencia`, `visao`, `regime`, `departamento`, `responsavel`, `clientes`, `busca`, `recorrente`)
@@ -191,7 +193,7 @@ export interface AccordionClient {
   items: { column: AuditColumn; cell: OccurrenceCell }[];
 }
 
-/** "Por cliente" below 1024px: each client with its recurring tasks (the cells that exist). */
+/** "Por cliente": each client with its recurring tasks of the competence (the cells that exist). */
 export function accordionByClient(data: AuditMatrixResponse, f: Pick<AuditFilters, 'search' | 'clients' | 'view'>): AccordionClient[] {
   const index = indexCells(data.cells);
   return visibleClients(data, f).map((client) => ({
@@ -220,4 +222,67 @@ export function auditHeadline(summary: AuditMatrixResponse['summary'], monthLabe
       ? `${summary.overduePending} ${summary.overduePending === 1 ? 'pendência já passou' : 'pendências já passaram'} do prazo legal.`
       : 'Nenhuma pendência passou do prazo legal.';
   return `${monthLabel}: ${summary.done} de ${live} concluídas (${pct}%). ${late}`;
+}
+
+// ---------------------------------------------------------------------------
+// "Por cliente" as a list (every width): each client with its progress, opened to its obligations
+// ---------------------------------------------------------------------------
+
+/** Concluded of the client in the competence: "N de M" (canceled ones out) and the bar's proportion. */
+export function clientProgress(row: Pick<AuditClientRow, 'total' | 'done' | 'canceled'>): { done: number; live: number; ratio: number; text: string } {
+  const live = Math.max(0, row.total - row.canceled);
+  return { done: row.done, live, ratio: live ? row.done / live : 0, text: `${row.done} de ${live}` };
+}
+
+export type AuditListKeyAction = { type: 'focus'; index: number } | { type: 'expand' } | { type: 'collapse' } | null;
+
+/** Keys on a focused client row: ↑/↓, Home/End move the focus; → opens and ← closes (a tree's rule). */
+export function auditListKey(key: string, index: number, count: number, expanded: boolean): AuditListKeyAction {
+  if (count <= 0) return null;
+  const clamp = (i: number) => ({ type: 'focus' as const, index: Math.min(count - 1, Math.max(0, i)) });
+  switch (key) {
+    case 'ArrowDown':
+      return clamp(index + 1);
+    case 'ArrowUp':
+      return clamp(index - 1);
+    case 'Home':
+      return clamp(0);
+    case 'End':
+      return clamp(count - 1);
+    case 'ArrowRight':
+      return expanded ? null : { type: 'expand' };
+    case 'ArrowLeft':
+      return expanded ? { type: 'collapse' } : null;
+    default:
+      return null;
+  }
+}
+
+/** Clients opened on arrival: the only one of a search ("Ver na auditoria"), never a long list. */
+export function autoExpandedClients(clients: Pick<AuditClientRow, 'id'>[]): string[] {
+  return clients.length === 1 ? [clients[0]!.id] : [];
+}
+
+/** "Meta 15/10 · legal 20/10" (or "Legal 20/10") and, while pending, the delay or how long is left. */
+export function cellDeadlines(cell: Pick<OccurrenceCell, 'status' | 'targetDate' | 'legalDueDate'>, today: ISODate): { dates: string; status: DueInfo | null } {
+  const legal = shortDate(cell.legalDueDate, today);
+  const dates = cell.targetDate < cell.legalDueDate ? `Meta ${shortDate(cell.targetDate, today)} · legal ${legal}` : `Legal ${legal}`;
+  const pending = cell.status !== 'done' && cell.status !== 'canceled';
+  return { dates, status: pending ? openDeadlineInfo(cell, today, true) : null };
+}
+
+const SITUATION_TEXT: Record<TaskStatus, string> = {
+  todo: 'A fazer',
+  in_progress: 'Em andamento',
+  waiting_client: 'Aguardando cliente',
+  done: 'Concluída',
+  canceled: 'Cancelada',
+};
+
+/** "A fazer", "Em andamento", "Concluída por Marina S. em 27/10". */
+export function cellSituationText(cell: Pick<OccurrenceCell, 'status' | 'concludedBy' | 'concludedAt'>, today: ISODate): string {
+  if (cell.status !== 'done') return SITUATION_TEXT[cell.status];
+  const who = cell.concludedBy ? ` por ${shortName(cell.concludedBy.name)}` : '';
+  const day = cell.concludedAt ? ` em ${shortDate(dateInTimeZone(new Date(cell.concludedAt)), today)}` : '';
+  return `Concluída${who}${day}`;
 }

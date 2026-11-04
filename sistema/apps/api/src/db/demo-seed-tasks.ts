@@ -38,7 +38,7 @@ import { addAttachment } from '../modules/tasks/attachments';
 import { applyTemplate, createTemplate } from '../modules/tasks/flows';
 import { createNote } from '../modules/tasks/notes';
 import { createRecurring } from '../modules/tasks/recurring';
-import { createCategory, createDepartment, setClientResponsible } from '../modules/tasks/registry';
+import { createCategory, createDepartment } from '../modules/tasks/registry';
 import {
   addComment,
   addSubtask,
@@ -106,7 +106,7 @@ export async function seedTasks(
     });
     const admin = as('marina');
 
-    // --- departments, categories, responsibles per client -----------------------------------------
+    // --- departments and categories ----------------------------------------------------------------
     const fiscal = await createDepartment(admin, {
       name: 'Fiscal',
       memberIds: [ids.marina, ids.ana],
@@ -134,26 +134,8 @@ export async function seedTasks(
       .from(contacts)
       .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client')));
     const client = (name: string) => clientRows.find((c) => c.tradeName === name)?.id ?? null;
-    const active = clientRows.filter((c) => c.status === 'active');
-    const fiscalOf: Record<string, Who> = {
-      'Pão Quente': 'ana',
-      'Vida Saudável': 'ana',
-      'Sorriso Pleno': 'ana',
-      Tecnova: 'marina',
-      'Rota Sul': 'marina',
-      Alicerce: 'marina',
-      'Ju Prado Design': 'marina',
-    };
+    // Clients with employees (the payroll obligations apply only to them).
     const withStaff = new Set(['Pão Quente', 'Rota Sul', 'Sorriso Pleno', 'Tecnova']);
-    for (const c of active) {
-      const name = c.tradeName ?? '';
-      const set = (departmentId: string, who: Who) =>
-        setClientResponsible(admin, { clientId: c.id, departmentId, userId: ids[who] });
-      await set(fiscal.id, fiscalOf[name] ?? 'ana');
-      await set(contabil.id, 'bruno');
-      await set(societario.id, 'rafael');
-      if (withStaff.has(name)) await set(pessoal.id, 'juliana');
-    }
 
     // --- tasks -------------------------------------------------------------------------------------
     const task = async (who: Who, input: TaskInput & { by?: Who }) => {
