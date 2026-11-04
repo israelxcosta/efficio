@@ -137,3 +137,16 @@ export function sampleValues(office: Office | null | undefined): Record<string, 
   for (const [k, v] of Object.entries(values)) if (!v) delete values[k];
   return values;
 }
+
+/**
+ * The tab title of a client's contract (it goes to the browser history and becomes the PDF's name):
+ * "Contrato · Padaria Pão Dourado". An MEI's legal name may end with the owner's CPF ("João da Silva
+ * 12345678901"); a CPF-like run of 11 digits never reaches the title.
+ */
+export function contractDocumentTitle(name: string): string {
+  const clean = name
+    .replace(/(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return `Contrato · ${clean || 'Cliente'}`;
+}

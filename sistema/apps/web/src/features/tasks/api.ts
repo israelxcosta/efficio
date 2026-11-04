@@ -47,6 +47,7 @@ import type {
 import { api, apiDownload, saveBlob } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { isUuid } from '@/lib/safe-url';
+import { isOccurrenceRef } from './occurrence';
 
 // Hooks of the task module (Gestão de tarefas, phases 1 and 2). Every member reads and writes tasks; the
 // registries are written by administrators (the API answers 403 otherwise, and the screens hide those
@@ -518,7 +519,8 @@ export function useRecurringOccurrence(id: string | null, period: string | null)
   return useQuery({
     queryKey: qk.recurringOccurrence(id ?? '', period ?? ''),
     queryFn: () => api<RecurringOccurrenceDetail>(`/tasks/recurring/${id}/occurrences/${period}`),
-    enabled: isUuid(id) && Boolean(period),
+    // Both come from the URL: a period like `2026-10/comments` would reach another endpoint.
+    enabled: isOccurrenceRef(id, period),
     placeholderData: keepPreviousData,
   });
 }

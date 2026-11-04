@@ -4,8 +4,10 @@ import {
   PERMISSION_KEYS,
   PERMISSION_LABELS,
   effectivePermissions,
+  grantedPermissions,
   normalizePermissionOverrides,
   rolePermissions,
+  type MemberPermissions,
   type MemberRole,
   type PermissionKey,
   type PermissionMap,
@@ -52,6 +54,25 @@ export function resetDraftKey(draft: PermissionDraft, key: PermissionKey): Permi
  */
 export function setDraftRole(draft: PermissionDraft, role: AdjustableRole): PermissionDraft {
   return { ...draft, role };
+}
+
+/**
+ * Keys a draft would grant (off when stored, on in the draft) that the editor cannot grant: changing the
+ * role to Administrador turns on every default of the role, so it is refused in the sheet when any of
+ * them is outside `grantable` (the API answers 403 anyway: nobody grants what they do not have).
+ */
+export function ungrantableKeys(stored: { role: MemberRole; overrides: PermissionOverrides }, draft: PermissionDraft, grantable: readonly PermissionKey[]): PermissionKey[] {
+  const allowed = new Set(grantable);
+  return grantedPermissions(effectivePermissions(stored.role, stored.overrides), draftEffective(draft)).filter((k) => !allowed.has(k));
+}
+
+/**
+ * Whether the sheet may change this person's permissions: the API says so (`editable`) and it is
+ * neither the owner nor the signed-in person (nobody adjusts the owner nor gives themselves anything),
+ * checked here too so a wrong answer never opens the switches.
+ */
+export function canEditMemberAccess(data: Pick<MemberPermissions, 'userId' | 'role' | 'editable'>, meId: string | null | undefined): boolean {
+  return data.editable && data.role !== 'owner' && Boolean(meId) && data.userId !== meId;
 }
 
 /** Keys whose value differs from the role's default (the "Ajustado" badge). */

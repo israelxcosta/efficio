@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { useRecurringOccurrence, useTaskOptions, useUpdateTask } from '../api';
 import { isPendingCell } from '../audit-logic';
 import { DUE_TONE_CLASS, firstName, shortDate, shortName } from '../due';
-import { auditHref, competenceName, groupDeadlineInfo, occurrenceTitle, periodLabel, referenceLabel } from '../occurrence';
+import { auditHref, competenceName, groupDeadlineInfo, isOccurrenceRef, occurrenceTitle, periodLabel, referenceLabel } from '../occurrence';
 import { withSheetParams } from '../task-links';
 import { useCellStatus } from '../use-cell-status';
 import { cellTip, OccurrenceCellControl } from './matrix-cell';
@@ -128,7 +128,8 @@ function RecurringOccurrenceSheet({ open, id, period, initialView, onClose, onOp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedKey]);
 
-  const notFound = detail.error instanceof ApiRequestError && (detail.error.status === 404 || detail.error.status === 400);
+  // A malformed `?recorrente=`/`?periodo=` is never requested: "não encontrada" instead of loading forever.
+  const notFound = !isOccurrenceRef(id, period) || (detail.error instanceof ApiRequestError && (detail.error.status === 404 || detail.error.status === 400));
   const cells = d ? occurrenceSheetCells(d, view, meId, search, assignee) : [];
   const deadline = d ? groupDeadlineInfo(d, today, true) : null;
   const isAdmin = usePermissions().can('reopenOthers');

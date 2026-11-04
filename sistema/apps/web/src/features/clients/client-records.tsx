@@ -117,7 +117,8 @@ export function CredentialField({ clientId, clientName, field, stored }: { clien
   return (
     <span className="flex flex-col gap-1">
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="w-full font-mono text-sm break-all text-fg sm:w-auto" data-sensitive>
+        {/* `translate="no"`: the browser's page translation would send the value to an outside service. */}
+        <span className="notranslate w-full font-mono text-sm break-all text-fg sm:w-auto" data-sensitive translate="no">
           {value}
         </span>
         <span className="flex items-center gap-1">

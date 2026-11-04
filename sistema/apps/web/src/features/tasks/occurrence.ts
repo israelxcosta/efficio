@@ -8,6 +8,7 @@ import {
   diffInDays,
   dueBucketOf,
   formatMonthKey,
+  OCCURRENCE_PERIOD_RE,
   TASK_DUE_BUCKETS,
   type ISODate,
   type MonthKey,
@@ -16,6 +17,7 @@ import {
   type TaskDueBucket,
   type TaskStatus,
 } from '@effinance/shared';
+import { isUuid } from '@/lib/safe-url';
 import { daysText, shortDate, shortName, type DueInfo } from './due';
 
 /** "ref. 09/2026". */
@@ -214,6 +216,14 @@ export function occurrenceCards(occurrences: RecurringOccurrence[]): OccurrenceC
     }
   }
   return out;
+}
+
+/**
+ * Whether `?recorrente=&periodo=` name an occurrence: a recurring task id and a period key (`2026-10`
+ * or, weekly, `2026-10-05`). Anything else never reaches the API path and shows "não encontrada".
+ */
+export function isOccurrenceRef(id: string | null, period: string | null): boolean {
+  return isUuid(id) && typeof period === 'string' && OCCURRENCE_PERIOD_RE.test(period);
 }
 
 /** `?recorrente=<id>&periodo=<key>` (the occurrence sheet over any Gestão page). */

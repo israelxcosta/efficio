@@ -1,4 +1,4 @@
-import type { ApiError } from '@effinance/shared';
+import { sanitizeFileName, type ApiError } from '@effinance/shared';
 import { isSafeApiPath } from './safe-url';
 
 /**
@@ -242,9 +242,14 @@ export async function apiDownload(
     throw new ApiRequestError(400, { error: 'invalid_path', message: 'Endereço inválido.' });
   }
   let response = await send(path, options);
-  if (response.status === 401 && (await refreshSession())) {
-    void response.body?.cancel().catch(() => {});
-    response = await send(path, options);
+  if (response.status === 401) {
+    if (await refreshSession()) {
+      void response.body?.cancel().catch(() => {});
+      response = await send(path, options);
+    } else {
+      // Same as `api`: the session is gone, so the screen (and its cached data) goes too.
+      unauthorizedHandler?.();
+    }
   }
   if (!response.ok) {
     let data: Partial<ApiError> | null = null;
@@ -256,17 +261,31 @@ export async function apiDownload(
     const error = new ApiRequestError(response.status, data);
     // Background loads (profile photos) fail quietly: the initials stay.
     if (response.status === 403 && !silent) accessErrorHandler?.('forbidden', error);
+    else if (error.code === 'workspace_mismatch') accessErrorHandler?.('workspace_mismatch', error);
     throw error;
   }
   return { blob: await response.blob(), fileName: fileNameFromDisposition(response.headers.get('content-disposition'), fallbackName) };
 }
 
+/**
+ * Types a browser would render as a document (scripts included) if the blob were ever opened instead
+ * of saved: an object URL has the app's origin, so these go out as plain bytes.
+ */
+const ACTIVE_CONTENT = /^(?:text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml|application\/[\w.+-]*\+xml|text\/javascript|application\/javascript)\b/i;
+
+/** What `saveBlob` hands to the browser: a safe file name and a type that is never rendered inline. */
+export function downloadable(blob: Blob, fileName: string): { blob: Blob; fileName: string } {
+  const safe = ACTIVE_CONTENT.test(blob.type) ? new Blob([blob], { type: 'application/octet-stream' }) : blob;
+  return { blob: safe, fileName: sanitizeFileName(fileName) };
+}
+
 /** Hands a blob to the browser as a download (never opened inside the app). */
 export function saveBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
+  const file = downloadable(blob, fileName);
+  const url = URL.createObjectURL(file.blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = fileName;
+  a.download = file.fileName;
   a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();

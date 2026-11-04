@@ -17,19 +17,23 @@ import { Sheet } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip } from '@/components/ui/tooltip';
+import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions } from '@/features/auth/permissions';
 import { ROLE_HINTS, ROLE_LABELS } from '@/features/auth/roles';
 import { useMemberPermissions, useSaveMemberPermissions } from '@/features/workspaces/api';
 import { toastError } from '@/lib/notify';
+import { isUuid } from '@/lib/safe-url';
 import { cn } from '@/lib/utils';
 import {
   adjustedKeys,
+  canEditMemberAccess,
   defaultHint,
   draftChanged,
   draftEffective,
   resetDraftKey,
   setDraftKey,
   setDraftRole,
+  ungrantableKeys,
   type AdjustableRole,
   type PermissionDraft,
 } from './member-access';
@@ -38,8 +42,9 @@ import {
 export function useMemberAccessParam() {
   const [params, setParams] = useSearchParams();
   const { can } = usePermissions();
-  // Without `members` the param is ignored (spec §13.10).
-  const userId = can('members') ? params.get('pessoa') : null;
+  // Without `members` the param is ignored (spec §13.10), and so is anything that is not a person's id.
+  const raw = params.get('pessoa');
+  const userId = can('members') && isUuid(raw) ? raw : null;
   const set = (id: string | null) =>
     setParams(
       (p) => {
@@ -63,6 +68,8 @@ export function MemberAccessSheet({ userId, onClose }: { userId: string | null; 
   const [draft, setDraft] = useState<PermissionDraft | null>(null);
   const save = useSaveMemberPermissions();
   const { subscriptionActive } = usePermissions();
+  const { user } = useAuth();
+  const allowed = data ? canEditMemberAccess(data, user?.id) : false;
 
   // A new person (or a fresh answer after saving) starts a new draft.
   useEffect(() => {
@@ -71,12 +78,24 @@ export function MemberAccessSheet({ userId, onClose }: { userId: string | null; 
   }, [data]);
 
   const firstName = data?.name.split(' ')[0] ?? '';
-  const editable = Boolean(data?.editable && draft);
+  const editable = Boolean(allowed && draft);
   const changed = data && draft ? draftChanged(draft, data) : false;
   const adjusted = draft ? adjustedKeys(draft.role, draft.overrides) : [];
 
+  /** The role control: a role whose defaults include keys the editor does not have is refused. */
+  function changeRole(role: AdjustableRole) {
+    if (!editable || !data || !draft) return;
+    const next = setDraftRole(draft, role);
+    const blocked = ungrantableKeys(data, next, data.grantable);
+    if (blocked.length) {
+      toast.error(`Você não pode conceder uma permissão que não tem: ${blocked.map((k) => PERMISSION_LABELS[k]).join(', ')}.`, { id: 'member-access-role' });
+      return;
+    }
+    setDraft(next);
+  }
+
   async function submit() {
-    if (!data || !draft || !userId) return;
+    if (!data || !draft || !userId || !editable) return;
     try {
       await save.mutateAsync({
         userId,
@@ -105,7 +124,7 @@ export function MemberAccessSheet({ userId, onClose }: { userId: string | null; 
               size="sm"
               ariaLabel="Papel"
               value={draft.role}
-              onChange={(role: AdjustableRole) => editable && setDraft(setDraftRole(draft, role))}
+              onChange={changeRole}
               options={[
                 { value: 'editor' as const, label: ROLE_LABELS.editor },
                 { value: 'viewer' as const, label: ROLE_LABELS.viewer },
@@ -152,7 +171,7 @@ export function MemberAccessSheet({ userId, onClose }: { userId: string | null; 
         </div>
       ) : query.isError ? (
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
-      ) : data && (!data.editable || data.role === 'owner') ? (
+      ) : data && !allowed ? (
         <p className="text-body-sm text-muted">
           {data.role === 'owner'
             ? 'O proprietário tem todas as permissões, sempre.'

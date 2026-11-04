@@ -15,7 +15,7 @@ import type {
 import { api, ApiRequestError, onUnauthorized, setBearerToken, setExpectedWorkspace } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { announceSessionChange, onSessionChange } from '@/lib/session-sync';
-import { clearPhotoCache } from '@/lib/photo-cache';
+import { clearPhotoCache, photosBelongToAnotherSession } from '@/lib/photo-cache';
 
 /** Everything cached except the observed `me` query. */
 const notMe = { predicate: (q: Query) => q.queryKey[0] !== qk.me[0] };
@@ -67,11 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const applySession = useCallback(
     (session: MeResponse | null) => {
+      const previousUser = qc.getQueryData<MeResponse | null>(qk.me)?.user.id ?? null;
       void qc.cancelQueries(notMe);
       qc.removeQueries(notMe);
       qc.getMutationCache().clear();
-      // Signed out: the photos (personal data) go too.
-      if (!session) clearPhotoCache();
+      // Signed out, or another person signed in (from another tab): the photos (personal data) go too.
+      if (photosBelongToAnotherSession(previousUser, session)) clearPhotoCache();
       qc.setQueryData(qk.me, session);
     },
     [qc],

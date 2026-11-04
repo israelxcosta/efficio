@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
 import { CircleCheck, Copy, Ellipsis, Link2, ListChecks, Pencil, Plus, RotateCcw, Send, Trash2, X, CircleX } from 'lucide-react';
-import { ASSIGNEE_SOURCE_LABELS, formatDateBR, type OpenTaskStatus, type TaskLockedField } from '@effinance/shared';
+import { ASSIGNEE_SOURCE_LABELS, formatDateBR, isoDateSchema, type OpenTaskStatus, type TaskLockedField } from '@effinance/shared';
 import { toast } from 'sonner';
 import {
   daysOverdue,
@@ -995,7 +995,8 @@ export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsRes
   const today = options?.today ?? todayISO();
   const appointment = params.get('horario') === '1';
   const day = params.get('prazo');
-  const dueDay = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+  // A real calendar day (the API's own schema): `prazo=2026-02-31` would only fail on "Criar tarefa".
+  const dueDay = day && isoDateSchema.safeParse(day).success ? day : null;
   const dept = params.get('departamento');
   const client = params.get('para-cliente') ?? params.get('cliente');
   const escopo = params.get('escopo');

@@ -8,6 +8,23 @@ import { cn } from '@/lib/utils';
 type Mode = 'stored' | 'editing' | 'removing';
 
 /**
+ * The access is the client's, not the user's: `new-password` keeps the browser from filling in the
+ * user's own saved Efficio password (which would then be stored and revealed to others as the
+ * client's access) — browsers ignore `autocomplete="off"` on password fields. The `data-*` flags ask
+ * password-manager extensions to leave it alone; no spell check, autocorrect or keyboard learning.
+ */
+export const SECRET_INPUT_ATTRS = {
+  autoComplete: 'new-password',
+  spellCheck: false,
+  autoCorrect: 'off',
+  autoCapitalize: 'off',
+  'data-1p-ignore': 'true',
+  'data-lpignore': 'true',
+  'data-bwignore': 'true',
+  'data-form-type': 'other',
+} as const;
+
+/**
  * An encrypted access of a client in the finance form (spec §13.8.1). Never prefilled: a stored value
  * shows "•••••••• cadastrado" with "Alterar" (an empty field) and "Remover" ("Será removido ao
  * salvar." with "Desfazer"). The form sends `{ action: 'keep' | 'set' | 'clear' }`, so the stored
@@ -97,8 +114,7 @@ export function SecretInput({
           <Input
             id={id}
             type={visible ? 'text' : 'password'}
-            autoComplete="off"
-            spellCheck={false}
+            {...SECRET_INPUT_ATTRS}
             disabled={disabled}
             className={cn('pr-11', visible && 'font-mono')}
             value={typed}

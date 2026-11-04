@@ -7,6 +7,8 @@ import { apiDownload } from './api';
 
 const cache = new Map<string, Promise<string | null>>();
 const latest = new Map<string, string>();
+/** Bumped by `clearPhotoCache`: a download that started before it never lands in the new session. */
+let generation = 0;
 
 function keyOf(userId: string, version: string) {
   return `${userId}:${version}`;
@@ -17,8 +19,11 @@ export function loadPhoto(userId: string, version: string): Promise<string | nul
   const key = keyOf(userId, version);
   let entry = cache.get(key);
   if (!entry) {
+    const started = generation;
     entry = apiDownload(`/profile/photos/${userId}`, { query: { v: version } }, 'foto', { silent: true })
       .then(({ blob }) => {
+        // Signed out (or another person signed in) meanwhile: nothing of the old session is kept.
+        if (started !== generation) return null;
         const url = URL.createObjectURL(blob);
         const previous = latest.get(userId);
         latest.set(userId, key);
@@ -30,7 +35,7 @@ export function loadPhoto(userId: string, version: string): Promise<string | nul
         return url;
       })
       .catch(() => {
-        cache.delete(key);
+        if (started === generation) cache.delete(key);
         return null;
       });
     cache.set(key, entry);
@@ -38,10 +43,18 @@ export function loadPhoto(userId: string, version: string): Promise<string | nul
   return entry;
 }
 
-/** Drops every cached photo (sign out). */
+/**
+ * Whether the cached photos must go when a session is applied: signing out, or a session of another
+ * person (signed in from another tab). Switching workspaces keeps them (same person, same access).
+ */
+export function photosBelongToAnotherSession(previousUserId: string | null, session: { user: { id: string } } | null): boolean {
+  return !session || (previousUserId !== null && previousUserId !== session.user.id);
+}
+
+/** Drops every cached photo (sign out, another person signed in). */
 export function clearPhotoCache() {
+  generation++;
   for (const entry of cache.values()) void entry.then((u) => u && URL.revokeObjectURL(u));
   cache.clear();
   latest.clear();
 }
-

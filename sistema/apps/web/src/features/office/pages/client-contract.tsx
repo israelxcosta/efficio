@@ -12,6 +12,7 @@ import { isUuid } from '@/lib/safe-url';
 import { usePrintInLight } from '@/lib/print';
 import { recordContractIssue, useClientContract } from '../api';
 import { ContractPages, ContractPrintFlow } from '../components/contract-preview';
+import { contractDocumentTitle } from '../contract-editor-logic';
 
 /**
  * The contract of a client (spec §13.9, finance): generated on the fly with the current data, never
@@ -30,7 +31,7 @@ export default function ClientContractPage() {
   useEffect(() => {
     if (!data) return;
     const previous = document.title;
-    document.title = `Contrato · ${name}`;
+    document.title = contractDocumentTitle(name);
     return () => {
       document.title = previous;
     };
