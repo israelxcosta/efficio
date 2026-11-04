@@ -1193,7 +1193,12 @@ criada (`recurringTask`, `applied`), `missing` e todas as recorrentes do espaço
 cria as que faltam (competência atual, sem responsável padrão = fila do departamento, `catalog_key`
 gravada), acrescenta o regime à recorrente comum já criada para outro regime (`regimeAdded`, com
 ressincronização), não mexe nas que já o têm (`unchanged`) e informa as encerradas (`ended`). Aplicar de
-novo não duplica (chave única `recurring_tasks_catalog_key_uq`; corrida → 409 amigável).
+novo não duplica (chave única `recurring_tasks_catalog_key_uq`; corrida → 409 amigável). Item cujo nome
+(`normalizeRecurringName`: sem acento, caixa e pontuação — "DAS-MEI" = "das mei") já existe numa
+recorrente **feita à mão**, ativa e do mesmo regime, não é criado nem ganha o regime: volta em `skipped`
+(`reason: 'handmade'`, com a recorrente existente), salvo se a chave vier em `force`. Na listagem, cada
+item traz `state` (`applied`, `handmade` — "Já existe (feita à mão)", com `handmade` —, `ended`,
+`missing`; `missing` conta só os que faltam).
 `keys` restringe os itens; `departments` escolhe o departamento de cada sugestão — sem ele, um existente
 com nome compatível, senão é criado com o nome sugerido (`departmentsCreated`); escritório sem
 departamentos recebe recorrentes sem departamento. Depois disso as recorrentes geram todo mês para cada

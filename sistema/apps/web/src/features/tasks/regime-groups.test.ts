@@ -17,7 +17,9 @@ const item = (patch: Partial<RegimeGroupItemView> = {}): RegimeGroupItemView => 
   referenceOffset: 1,
   department: { key: 'fiscal', name: 'Fiscal', match: { id: 'f', name: 'Fiscal' } },
   recurringTask: null,
+  handmade: null,
   applied: false,
+  state: 'missing',
   ...patch,
 });
 const ref = (patch: Partial<NonNullable<RegimeGroupItemView['recurringTask']>> = {}) => ({
@@ -94,6 +96,7 @@ describe('applying a group', () => {
       created: 0,
       regimeAdded: 0,
       unchanged: 0,
+      skipped: [],
       ended: 0,
       items: [],
       departmentsCreated: [],

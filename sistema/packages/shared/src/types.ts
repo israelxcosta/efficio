@@ -44,7 +44,13 @@ import type {
   TransferKind,
 } from './constants';
 import type { TransactionOrigin } from './integrations';
-import type { RegimeGroupApplyResult, RegimeGroupRegime, SuggestedDepartment } from './regime-groups';
+import type {
+  RegimeGroupApplyResult,
+  RegimeGroupItemState,
+  RegimeGroupRegime,
+  RegimeGroupSkipReason,
+  SuggestedDepartment,
+} from './regime-groups';
 import type { PermissionMap, PermissionOverrides } from './permissions';
 import type { MemberRole } from './saas';
 import type { ContractBlock } from './utils/contract';
@@ -1350,8 +1356,11 @@ export interface RegimeGroupItemView {
   department: { key: SuggestedDepartment; name: string; match: TaskRef | null };
   /** The recurring task created from this item (any regime), if any. */
   recurringTask: RegimeGroupRecurringRef | null;
-  /** The recurring task exists, is active and includes this regime. */
+  /** A recurring task made by hand with the same name (normalized), active and of this regime. */
+  handmade: RegimeGroupRecurringRef | null;
+  /** The catalog recurring task exists, is active and includes this regime (`state = 'applied'`). */
   applied: boolean;
+  state: RegimeGroupItemState;
 }
 
 export interface RegimeGroup {
@@ -1360,7 +1369,7 @@ export interface RegimeGroup {
   /** Active clients of the regime in the current competence (they get the occurrences). */
   clientCount: number;
   items: RegimeGroupItemView[];
-  /** Items not applied yet. */
+  /** Items in the `missing` state (applying creates them or adds the regime). */
   missing: number;
   /** Every recurring task of the office that applies to the regime (catalog or made by hand). */
   recurring: RegimeGroupRecurringRef[];
@@ -1384,6 +1393,8 @@ export interface RegimeGroupApplyResponse {
   /** Existing but ended (not reopened: edit "Encerra em" to bring it back). */
   ended: number;
   items: { key: string; recurringTaskId: string; name: string; result: RegimeGroupApplyResult }[];
+  /** Not applied: a recurring task made by hand already covers it (send the key in `force` to create anyway). */
+  skipped: { key: string; name: string; reason: RegimeGroupSkipReason; existing: { id: string; name: string } }[];
   /** Departments created for the suggested ones that had no match. */
   departmentsCreated: TaskRef[];
 }

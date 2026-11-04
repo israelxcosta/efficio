@@ -124,6 +124,40 @@ describe('regime groups', () => {
     expect(again.body).toMatchObject({ created: 1, ended: 1 });
   });
 
+  it('a recurring task made by hand with the same name (active, same regime) is not duplicated unless forced', async () => {
+    const { ana, fiscal } = await office(app);
+    const ws = await workspaceOf(ana);
+    await createClient(ana, { tradeName: 'MEI do João', taxRegime: 'mei' });
+    // Made by hand before the catalog: "das mei" (case, accents and punctuation do not matter).
+    const handmade = await ana.post('/tasks/recurring', { name: 'das mei', departmentId: fiscal, dueDay: 20, regimes: ['mei'] });
+    expect(handmade.status).toBe(201);
+    // Same name but ended, or of another regime: does not count.
+    await ana.post('/tasks/recurring', { name: 'DASN-SIMEI', departmentId: fiscal, dueDay: 31, dueMonth: 5, period: 'annual', regimes: ['simples_nacional'] });
+
+    const listed = (await ana.get('/tasks/regime-groups')).body.groups.find((g: any) => g.regime === 'mei');
+    const dasMei = listed.items.find((i: any) => i.key === 'das_mei');
+    expect(dasMei).toMatchObject({ state: 'handmade', applied: false, recurringTask: null, handmade: { id: handmade.body.id, name: 'das mei', catalogKey: null } });
+    expect(listed.items.find((i: any) => i.key === 'dasn_simei')).toMatchObject({ state: 'missing', handmade: null });
+    expect(listed.missing).toBe(1);
+
+    const applied = await ana.post('/tasks/regime-groups/mei/apply', {});
+    expect(applied.status, JSON.stringify(applied.body)).toBe(200);
+    expect(applied.body).toMatchObject({ created: 1, skipped: [{ key: 'das_mei', name: 'DAS-MEI', reason: 'handmade', existing: { id: handmade.body.id, name: 'das mei' } }] });
+    expect(applied.body.items.map((i: any) => i.key)).toEqual(['dasn_simei']);
+    const names = async () =>
+      (await rows<{ name: string }>(sql`select name from recurring_tasks where workspace_id = ${ws} and 'mei' = any(regimes) order by lower(name)`)).map((r) => r.name);
+    expect(await names()).toEqual(['das mei', 'DASN-SIMEI']);
+    // Applying again: still skipped, nothing new.
+    expect((await ana.post('/tasks/regime-groups/mei/apply', {})).body).toMatchObject({ created: 0, unchanged: 1, skipped: [{ key: 'das_mei' }] });
+
+    // Forced: created even so.
+    const forced = await ana.post('/tasks/regime-groups/mei/apply', { force: ['das_mei'] });
+    expect(forced.body).toMatchObject({ created: 1, skipped: [] });
+    expect(await names()).toEqual(['das mei', 'DAS-MEI', 'DASN-SIMEI']);
+    const after = (await ana.get('/tasks/regime-groups')).body.groups.find((g: any) => g.regime === 'mei');
+    expect(after.items.find((i: any) => i.key === 'das_mei')).toMatchObject({ state: 'applied', applied: true });
+  });
+
   it('an office without departments gets recurring tasks without one', async () => {
     const ana = await registerUser(app, 'Ana Sem Departamentos');
     const ws = await workspaceOf(ana);

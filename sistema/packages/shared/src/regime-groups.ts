@@ -281,6 +281,35 @@ export const REGIME_GROUP_ITEMS: readonly RegimeGroupItem[] = [
   },
 ];
 
+/**
+ * State of an item in a regime's group: its catalog recurring task is active and includes the regime;
+ * a recurring task made by hand with the same name (active, of the regime) already covers it — applying
+ * skips it unless forced (Effy offices created them by hand before the catalog); its catalog recurring
+ * task ended; or missing (applying creates it or adds the regime).
+ */
+export const REGIME_GROUP_ITEM_STATES = ['applied', 'handmade', 'ended', 'missing'] as const;
+export type RegimeGroupItemState = (typeof REGIME_GROUP_ITEM_STATES)[number];
+
+export const REGIME_GROUP_ITEM_STATE_LABELS: Record<RegimeGroupItemState, string> = {
+  applied: 'Aplicada',
+  handmade: 'Já existe (feita à mão)',
+  ended: 'Encerrada',
+  missing: 'Falta aplicar',
+};
+
+/** Why applying skipped an item (`force` creates it anyway). */
+export const REGIME_GROUP_SKIP_REASONS = ['handmade'] as const;
+export type RegimeGroupSkipReason = (typeof REGIME_GROUP_SKIP_REASONS)[number];
+
+export const REGIME_GROUP_SKIP_REASON_LABELS: Record<RegimeGroupSkipReason, string> = {
+  handmade: 'Já existe uma tarefa recorrente com este nome para o regime',
+};
+
+/** Name compared with the catalog: no accents, case or punctuation ("DAS-MEI" = "das mei"). */
+export function normalizeRecurringName(name: string): string {
+  return normalize(name).replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
 /** What applying a group did with each item. */
 export const REGIME_GROUP_APPLY_RESULTS = ['created', 'regimeAdded', 'unchanged', 'ended'] as const;
 export type RegimeGroupApplyResult = (typeof REGIME_GROUP_APPLY_RESULTS)[number];

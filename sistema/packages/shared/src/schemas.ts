@@ -1082,13 +1082,16 @@ export const regimeGroupParamsSchema = z.object({ regime: z.enum(REGIME_GROUP_RE
  * POST /tasks/regime-groups/:regime/apply. `keys`: only these items of the group (default: all of it).
  * `departments`: the department of each suggested one; without it, an existing department whose name
  * matches (`matchSuggestedDepartment`), else one is created with the suggested name (only in offices
- * that use departments).
+ * that use departments). An item whose name (`normalizeRecurringName`) matches an active recurring task
+ * made by hand for the regime is skipped (`skipped`) unless its key is in `force`.
  */
 export const regimeGroupApplySchema = z.object({
   keys: z.array(z.enum(REGIME_GROUP_KEYS)).min(1, { message: 'Escolha ao menos uma tarefa do grupo' }).max(REGIME_GROUP_KEYS.length).optional(),
   departments: z
     .object({ fiscal: idSchema.optional(), personnel: idSchema.optional(), accounting: idSchema.optional() })
     .default({}),
+  /** Items to create even when a recurring task made by hand with the same name covers them. */
+  force: z.array(z.enum(REGIME_GROUP_KEYS)).max(REGIME_GROUP_KEYS.length).default([]),
 });
 export type RegimeGroupApplyInput = z.input<typeof regimeGroupApplySchema>;
 

@@ -4,12 +4,15 @@
 // (`registry`) creates the missing items as recurring tasks of the regime — found again by their catalog
 // key, so applying twice changes nothing — and a common obligation that already exists for another
 // regime gains this one (one recurring task with several regimes, as in Effy). The recurring tasks then
-// generate every month for every active client of the regime: a new client joins on its own.
+// generate every month for every active client of the regime: a new client joins on its own. An item
+// whose name matches an active recurring task made by hand for the regime is skipped unless forced (the
+// office may have created "DAS-MEI" by hand before the catalog).
 
 import { and, eq } from 'drizzle-orm';
 import {
   matchSuggestedDepartment,
   monthKey,
+  normalizeRecurringName,
   recurringMonths,
   recurringTaskInputSchema,
   REGIME_GROUP_REGIMES,
@@ -19,6 +22,7 @@ import {
   taskDepartmentInputSchema,
   type regimeGroupApplySchema,
   type RegimeGroupApplyResponse,
+  type RegimeGroupItemState,
   type RegimeGroupRecurringRef,
   type RegimeGroupRegime,
   type RegimeGroupsResponse,
@@ -51,6 +55,17 @@ function recurringRef(def: GenDef, departments: Map<string, string>, current: st
   };
 }
 
+/** Active recurring tasks made by hand (no catalog key) of the regime, by normalized name. */
+function handmadeByName(defs: GenDef[], regime: RegimeGroupRegime, current: string): Map<string, GenDef> {
+  const out = new Map<string, GenDef>();
+  for (const def of defs) {
+    if (def.row.catalogKey || !isActive(def, current) || !def.row.regimes.includes(regime)) continue;
+    const key = normalizeRecurringName(def.row.name);
+    if (!out.has(key)) out.set(key, def);
+  }
+  return out;
+}
+
 /** The office's department for each suggested one (first by name), when its name matches. */
 function matchedDepartments(departments: Map<string, string>): Map<SuggestedDepartment, TaskRef> {
   const out = new Map<SuggestedDepartment, TaskRef>();
@@ -69,8 +84,12 @@ export async function listRegimeGroups(ctx: TaskContext): Promise<RegimeGroupsRe
   const matched = matchedDepartments(departments);
   const byKey = new Map(defs.filter((d) => d.row.catalogKey).map((d) => [d.row.catalogKey!, d]));
   const groups = REGIME_GROUP_REGIMES.map((regime) => {
+    const handmade = handmadeByName(defs, regime, current);
     const items = regimeGroupItems(regime).map((item) => {
       const def = byKey.get(item.key);
+      const twin = handmade.get(normalizeRecurringName(item.name));
+      const applied = Boolean(def && isActive(def, current) && def.row.regimes.includes(regime));
+      const state: RegimeGroupItemState = applied ? 'applied' : twin ? 'handmade' : def && !isActive(def, current) ? 'ended' : 'missing';
       return {
         key: item.key,
         name: item.name,
@@ -84,7 +103,9 @@ export async function listRegimeGroups(ctx: TaskContext): Promise<RegimeGroupsRe
         referenceOffset: item.referenceOffset,
         department: { key: item.department, name: SUGGESTED_DEPARTMENT_NAMES[item.department], match: matched.get(item.department) ?? null },
         recurringTask: def ? recurringRef(def, departments, current) : null,
-        applied: Boolean(def && isActive(def, current) && def.row.regimes.includes(regime)),
+        handmade: twin ? recurringRef(twin, departments, current) : null,
+        applied,
+        state,
       };
     });
     return {
@@ -92,7 +113,7 @@ export async function listRegimeGroups(ctx: TaskContext): Promise<RegimeGroupsRe
       label: TAX_REGIME_LABELS[regime],
       clientCount: clients.filter((c) => c.taxRegime === regime && clientActiveIn(c, current)).length,
       items,
-      missing: items.filter((i) => !i.applied).length,
+      missing: items.filter((i) => i.state === 'missing').length,
       recurring: defs.filter((d) => d.row.regimes.includes(regime)).map((d) => recurringRef(d, departments, current)),
     };
   });
@@ -114,6 +135,8 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
   const matched = matchedDepartments(departments);
   const defs = await loadDefs(ctx);
   const byKey = new Map(defs.filter((d) => d.row.catalogKey).map((d) => [d.row.catalogKey!, d]));
+  const handmade = handmadeByName(defs, regime, current);
+  const skipped: RegimeGroupApplyResponse['skipped'] = [];
 
   const departmentsCreated: TaskRef[] = [];
   const chosen = new Map<SuggestedDepartment, string | null>();
@@ -135,6 +158,13 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
   const createdIds: string[] = [];
   for (const item of items) {
     const def = byKey.get(item.key);
+    const covered = !def || !isActive(def, current) || !def.row.regimes.includes(regime);
+    const twin = covered ? handmade.get(normalizeRecurringName(item.name)) : undefined;
+    if (twin && !(def && !isActive(def, current)) && !input.force.includes(item.key)) {
+      // A recurring task made by hand already does this for the regime: no twin unless forced.
+      skipped.push({ key: item.key, name: item.name, reason: 'handmade', existing: { id: twin.row.id, name: twin.row.name } });
+      continue;
+    }
     if (def) {
       if (!isActive(def, current)) {
         out.push({ key: item.key, recurringTaskId: def.row.id, name: def.row.name, result: 'ended' });
@@ -179,6 +209,7 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
     unchanged: count('unchanged'),
     ended: count('ended'),
     items: out,
+    skipped,
     departmentsCreated,
   };
 }
