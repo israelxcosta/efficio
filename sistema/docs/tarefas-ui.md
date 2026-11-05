@@ -1074,9 +1074,9 @@ margem):
   `categoria · cliente`; o subtítulo passa a aparecer mesmo sem categoria. Nada de selo: a regra é
   informação, não estado; a regra inteira está no detalhe.
 - **Várias ocorrências da mesma série num grupo futuro** (revisão 4; a API já mostra uma série diária
-  ou semanal só até hoje + 7 dias): em **Próximos 7 dias** e **Mais tarde**, as linhas seguidas com o
-  mesmo `occurrence.recurringTaskId` viram a primeira delas com "+3 até 12/11" no fim do subtítulo
-  (`text-subtle`); o cabeçalho do grupo continua com a contagem toda. Em **Atrasadas** e **Hoje**, cada
+  ou semanal só até hoje + 7 dias): em **Próximos 7 dias** e **Mais tarde**, todas as ocorrências com o
+  mesmo `occurrence.recurringTaskId` naquele grupo viram uma linha só, a da mais próxima, com "+3 até
+  12/11" no fim do subtítulo (`text-subtle`), mesmo que outras tarefas fiquem entre elas; o cabeçalho do grupo continua com a contagem toda. Em **Atrasadas** e **Hoje**, cada
   ocorrência tem a sua linha, porque cada uma pede ação.
 - **Linha do prazo** (abaixo de `@xl`): `TaskDueLabel` inline e, abaixo de `@sm`,
   ` · Ana` em `text-muted`.
@@ -1839,8 +1839,8 @@ ao ligar) e abre abaixo um bloco `flex flex-col gap-3 rounded-lg border border-b
 | Dia não útil | Diária e Semanal: `Switch` **Só em dias úteis** (ligado = `skip`, o padrão; desligado = `keep`). Mensal a Anual: `SegmentedControl size="sm"` **Antecipar** · **Postergar** · **Manter** (padrão Antecipar), com as dicas de §10.3 no `title` de cada opção | considera fins de semana e feriados nacionais, como nas recorrentes |
 | Termina | `SegmentedControl size="sm"` **Nunca** · **Em** · **Após**; "Em" mostra `Input type="date"`; "Após", `Input type="number"` de 64px com o sufixo "vezes" | erros: "Informe a data de término.", "O término deve ser depois do início.", "Use de 1 a 500 vezes." |
 | Meta e referência | recolhido atrás de `link sm` **Meta e referência** (já aberto quando algum valor não é o padrão): **Meta interna** (`Input type="number"`, 0 a 30, 0 a 6 na Semanal, sufixo "dias antes"; some na Diária) e **Competência de referência** (`Select` "Mesmo mês", o padrão, "Mês anterior", "2 meses antes"…; só Mensal a Anual) | é o "prazo legal e meta" das recorrentes: com meta, cada ocorrência mostra "Meta 15/10 · prazo legal 20/10" e pode cair em "Fora da meta". Repetição não entra na auditoria |
-| Resumo | uma linha `text-caption text-muted`, `aria-live="polite"` | "Toda semana na segunda e na quarta · próximas: 10/11, 12/11 e 17/11 · 12 vezes." Ao criar ou editar, calculado no navegador pela agenda do contrato (`firstScheduledOccurrence` e `occurrencesInCompetence`, com feriados), a mesma da API; numa série salva, as datas vêm de `recurrence.upcoming` |
-| Aviso de data | uma linha `text-caption text-warning`, só quando a primeira data da regra não é o "Começa em" | "Esta tarefa passa a vencer em 12/11 (qua), o primeiro dia da regra." |
+| Resumo | uma linha `text-caption text-muted`, `aria-live="polite"` | "Toda semana na segunda e na quarta · próximas: 11/11, 16/11 e 18/11 · 12 vezes." Ao criar ou editar, calculado no navegador pela agenda do contrato (`firstScheduledOccurrence` e `occurrencesInCompetence`, com feriados), a mesma da API; numa série salva, as datas vêm de `recurrence.upcoming` |
+| Aviso de data | uma linha `text-caption text-warning`, só quando a primeira data da regra não é o "Começa em" | "Esta tarefa passa a vencer em 11/11 (qua), o primeiro dia da regra." |
 
 - Para quem tem `registry`, no fim do bloco, `link sm` **Recorrente para vários clientes** (abre o
   `RecurringTaskSheet` do cadastro): é o caminho para obrigações de regime e para a auditoria.
@@ -3379,7 +3379,7 @@ nenhum item do trilho fica ativo e o avatar fica com o anel `ring-primary` (§2.
 1. **Cabeçalho** (`PageHeader`):
    - `h1`: a saudação pela hora do escritório (`America/Sao_Paulo`): "Bom dia, Marina" (até 11:59),
      "Boa tarde, Marina" (12:00 a 17:59), "Boa noite, Marina" (18:00 em diante); o primeiro nome.
-   - descrição: "Quarta-feira, 5 de novembro · Colaborador · Fiscal · atualizado às 14:32" (o papel por
+   - descrição: "Quinta-feira, 5 de novembro · Colaborador · Fiscal · atualizado às 14:32" (o papel por
      `features/auth/roles.ts`; sem departamento, sem esse trecho; o "atualizado" do `useUpdatedLabel`).
    - `actions`: `ghost` **Editar perfil** (`UserRoundCog`, leva a `/configuracoes?aba=perfil`) e o
      **menu de conta** (`AccountMenu`): botão `outline` com o ícone do tipo de espaço
@@ -3459,7 +3459,7 @@ pendências" (escopo Minhas); o segmentado do Calendário some; a média de Seu 
 - **Marca do dia**: um ponto de 5px embaixo do número: `bg-danger` se há algo em aberto e atrasado
   nesse dia; senão `bg-data` se há algo em aberto; senão `bg-border-strong` se só há concluídas. Sem
   legenda: a contagem está no tooltip ("3 tarefas, 1 atrasada") e no `aria-label`.
-- **Clique ou Enter num dia** abre um `Popover` (`w-72`, `shadow-lg`): o título "Quinta, 6 de
+- **Clique ou Enter num dia** abre um `Popover` (`w-72`, `shadow-lg`): o título "Sexta, 6 de
   novembro" (com o feriado, se houver), até 5 itens (glifo de estado, título que abre a tarefa, horário
   ou meta à direita), "+ 3 no calendário" (link para a visão Calendário naquele mês) e `outline sm`
   **Novo compromisso** (abre `?nova=1&horario=1&prazo=2026-11-06`; `WriteGate scope="tasks"`). Dia sem
@@ -3514,7 +3514,7 @@ Sem rolagem lateral em nenhuma largura; nenhuma lista com rolagem interna (corta
 | Hub de tarefas (revisão 4) | Ver: `nav aria-label="Páginas de tarefas"`, `Link`s com `aria-label` (o nome da tabela de §2.9) e `aria-current="page"` no ativo, ícones `aria-hidden`; Criar: `div role="group" aria-label="Criar"` com `button`s nomeados; tooltips que abrem também no foco; Tab na ordem visual |
 | Repetição (revisão 4) | `SegmentedControl` "Repetição" (`radiogroup`); dias da semana como `button aria-pressed` com o nome inteiro ("Segunda-feira"); o resumo em `aria-live="polite"`; erros em `role="alert"` ligados ao campo; "Aplicar alterações a" é outro `radiogroup`, e o carimbo diz o alcance ("Salvo nesta e nas próximas") |
 | Menu de conta (revisão 4) | `button` com `aria-label="Conta e espaço: {espaço}"` e `aria-haspopup="menu"`; itens Radix (setas, Esc); "Sair" com o texto, não só a cor |
-| Minicalendário (revisão 4) | `role="grid"` com `aria-label="Calendário de novembro de 2026"`, `columnheader` dos dias, um `tabIndex=0` itinerante (setas, Home, End, PageUp, PageDown); cada dia é `button` com `aria-label` "6 de novembro, quinta-feira: 3 tarefas, 1 atrasada" (e ", feriado: Finados"); hoje com `aria-current="date"`; o popover é `role="dialog"` com o dia no título |
+| Minicalendário (revisão 4) | `role="grid"` com `aria-label="Calendário de novembro de 2026"`, `columnheader` dos dias, um `tabIndex=0` itinerante (setas, Home, End, PageUp, PageDown); cada dia é `button` com `aria-label` "6 de novembro, sexta-feira: 3 tarefas, 1 atrasada" (e ", feriado: Finados"); hoje com `aria-current="date"`; o popover é `role="dialog"` com o dia no título |
 | Para você (revisão 4) | lista (`ul`) de links com o texto da API como nome; o tom vem no texto ("venceu", "atrasadas"), a cor do ícone só reforça |
 | Botão de troca de área | `Link` com `aria-label="Ir para o financeiro"` (ou "…para a gestão de tarefas"), fora da `nav` da área; nunca `aria-current` |
 | Seção Área do "Mais" (celular) | lista de dois links; a área atual com `aria-current="true"` e o texto "(atual)" em `sr-only` |

@@ -106,7 +106,7 @@
   - com `views` só do grupo `views`, não há `data-hub-divider`.
 - [ ] **Step 2: Rodar e ver falhar:** `pnpm --filter @effinance/web exec vitest run src/features/tasks/components/tasks-hub.test.tsx` → FAIL.
 - [ ] **Step 3: Implementar** conforme §2.9 (trilho `rounded-md bg-bg-subtle p-1`, ativo `bg-surface text-fg shadow-xs`, filete `data-hub-divider`; Criar com `WriteGate`, Novo processo como `DropdownMenu w-72 align="end"` com os dois itens e as descrições da spec). Em Tarefas: `PageHeader actions={<TasksHub currentView={filters.view} onViewChosen={(v) => writeTaskView(viewKey, { scope: filters.scope, view: v })} />} actionsClassName="max-sm:w-full"`; links de visão em `/tarefas` com `replace`. Aplicar "O que sai dos cabeçalhos" de §2.9 nas outras três páginas.
-- [ ] **Step 4: Verificar:** o teste PASS; typecheck; `rg -n "TaskCreateHub|Ver no calendário\" |Criar processo avulso" apps/web/src/features/tasks/pages` sem resultado em cabeçalhos; no demo (`pnpm --filter @effinance/web dev:demo`), trocar entre as 4 páginas pelo hub em 1440 e 375 (Ver em largura total, sem Criar).
+- [ ] **Step 4: Verificar:** o teste PASS; typecheck; `rg -n "TaskCreateHub" apps/web/src` sem resultado; no demo (`pnpm --filter @effinance/web dev:demo`), trocar entre as 4 páginas pelo hub em 1440 e 375 (Ver em largura total, sem Criar).
 - [ ] **Step 5: Commit** (quando autorizado): `git commit -m "Tarefas: hub de ícones nos cabeçalhos de Tarefas, Auditoria, Recorrentes e Processos"`.
 
 ### Task 4: Auditoria enxuta — funções puras
@@ -242,7 +242,7 @@
 - [ ] **Step 1: Escrever os testes que falham:**
   - `patchFor('occurrence', 'series', { priority: 'high' })` → `{ priority: 'high' }`; `patchFor('occurrence', 'series', { title: 'X' })` → `null`; `patchFor('series', 'series', { title: 'X' })` → `{ title: 'X', applyTo: 'series' }`; `patchFor('series', 'convert', { title: 'X' })` → `{ title: 'X' }`.
   - `seriesLockedFields('occurrence').has('title')` → `true`; `seriesLockedFields('series').has('title')` → `false`, `.has('dueDate')` → `true`.
-  - Em `tasks-logic.test.ts`: `groupListItems` com 4 ocorrências da mesma série (`occurrence.origin: 'task'`, mesmo `recurringTaskId`) em 07, 10, 11 e 12/11 (hoje 05/11) e uma avulsa entre elas: no grupo `next7Days`, a série vira 1 item com `more: { count: 3, until: '2026-11-12' }` quando as linhas são seguidas, e a avulsa fica; duas da mesma série em `overdue` continuam 2 itens.
+  - Em `tasks-logic.test.ts`: `groupListItems` com 4 ocorrências da mesma série (`occurrence.origin: 'task'`, mesmo `recurringTaskId`) em 07, 10, 11 e 12/11 e uma avulsa em 09/11 (hoje 05/11): o grupo `next7Days` tem 2 itens, a ocorrência de 07/11 com `more: { count: 3, until: '2026-11-12' }` e a avulsa; duas da mesma série em `overdue` continuam 2 itens; ocorrências de origem `registry` não são juntadas aqui (já vêm agregadas).
 - [ ] **Step 2: Rodar e ver falhar:** `pnpm --filter @effinance/web exec vitest run src/features/tasks/repeat-rules.test.ts src/features/tasks/tasks-logic.test.ts` → FAIL.
 - [ ] **Step 3: Implementar** a tabela "Detalhe" e o "Só esta ou esta e as próximas" de §9.4: `convert` e `ended` (bloco + **Repetir**/**Cancelar**; toast com **Desfazer** que envia `recurrence: null`), `series` (linha da regra, **Editar repetição** com **Salvar repetição**, "Não se repete" com o `ConfirmDialog` da spec), `registry` (desabilitado com "Vem da tarefa recorrente."), `hidden`. O segmentado de escopo só em `series` com `canEdit`; o autosave passa por `patchFor`; o `SavedStamp` diz "Salvo nesta e nas próximas" no escopo `series`. Na `TaskRow`, `Repeat` 12px e `RECURRENCE_FREQUENCY_LABELS[occurrence.period].toLowerCase()` quando `occurrence?.origin === 'task'`, e "+3 até 12/11" (`text-subtle`) com `more`.
 - [ ] **Step 4: Verificar:** testes PASS; typecheck; no demo: repetir uma avulsa (e desfazer), editar a regra de uma série, mudar a prioridade "só esta" e o nome "esta e as próximas", parar de repetir; uma ocorrência de DCTFWeb mostra o controle desabilitado.
@@ -284,13 +284,13 @@ Depende do item 23 de §18 (`GET /tasks/recurring` com `origin`). Sem ele, faça
   - `MY_AREA_ITEM: NavItem = { to: '/minha-area', label: 'Minha área', icon: CircleUserRound, keywords: 'perfil eu meu painel anotacoes calendario conta sair tema' }`.
   - `hostsTaskSheets(pathname: string): boolean` — `areaOf(pathname) === 'gestao'` ou o caminho de rota é `/minha-area`.
   - `AvatarLink({ name, userId, photoVersion, active, badge }: { name: string; userId: string; photoVersion: string | null; active: boolean; badge: ReactNode })` em `sidebar.tsx`, exportado.
-  - `AccountMenuView({ name, email, workspace, kindLabel, themeLabel, onTheme, onSettings, onLogout, workspaceItems }: …)` sem hooks, e `AccountMenu()` que liga `useAuth`, `useTheme` e `WorkspaceMenuItems`.
+  - `AccountMenuTrigger({ workspace }: { workspace: { name: string; kind: WorkspaceKind } })` e `AccountMenuHeader({ name, email, workspace, kindLabel }: { name: string; email: string; workspace: string; kindLabel: string })`, sem hooks; `AccountMenu()` liga `useAuth`, `useTheme`, `WorkspaceMenuItems` e o `WorkspaceSheet`.
 
 - [ ] **Step 1: Escrever os testes que falham:**
   - `areaOf('/minha-area')` → `'common'`; `hostsTaskSheets('/minha-area')`, `('/Minha-Area')` e `('/tarefas/auditoria')` → `true`; `('/configuracoes')` e `('/extrato')` → `false`.
   - Em `routes.test.tsx`: o grupo do `GestaoLayout` contém `'minha-area'`.
   - `renderToStaticMarkup(<MemoryRouter><TooltipProvider><AvatarLink name="Marina Costa" … active /></TooltipProvider></MemoryRouter>)` contém `href="/minha-area"`, `aria-label="Minha área — Marina Costa"` e `aria-current="page"`; com `active: false`, sem `aria-current`.
-  - `AccountMenuView` aberto (`defaultOpen` no `DropdownMenu`, ou o conteúdo renderizado à parte): contém "Conta", o e-mail, "Espaço atual:", "Nova empresa", "Tema escuro", "Configurações" e "Sair"; o gatilho tem `aria-label="Conta e espaço: Efficio Contabilidade"`.
+  - O conteúdo do Radix fica num portal, que `renderToStaticMarkup` não desenha; por isso o teste cobre as duas partes sem portal: `AccountMenuTrigger({ workspace })` tem `aria-label="Conta e espaço: Efficio Contabilidade"` e o nome do espaço; `AccountMenuHeader({ name, email, workspace, kindLabel })` contém o nome, o e-mail e "Espaço atual: Efficio Contabilidade · Empresarial". Os itens (Nova empresa, Tema, Configurações, Sair) são conferidos no demo (Step 4).
 - [ ] **Step 2: Rodar e ver falhar:** `pnpm --filter @effinance/web exec vitest run src/components/layout src/app/routes.test.tsx` → FAIL.
 - [ ] **Step 3: Implementar** §2.2 (avatar), §2.4 (linha do "Mais"), §2.8 (⌘K) e o cabeçalho de §15.4 (saudação provisória "Olá, Marina" até a Task 11; **Editar perfil**; `AccountMenu`); `document.title` "Minha área · Efficio".
 - [ ] **Step 4: Verificar:** testes PASS; typecheck; no demo, como administrador no Financeiro: clicar no avatar abre Minha área com o trilho do Financeiro; trocar de espaço, tema e sair pelo menu de conta; no celular, a linha Minha área no "Mais".
@@ -319,7 +319,7 @@ Depende do item 23 de §18 (`GET /tasks/recurring` com `origin`). Sem ele, faça
 - [ ] **Step 1: Escrever os testes que falham:**
   - `greeting(11, 'Marina Costa')` → `'Bom dia, Marina'`; `(12, …)` → `'Boa tarde, Marina'`; `(18, …)` → `'Boa noite, Marina'`.
   - `officeHour(new Date('2026-11-05T02:30:00Z'))` → `23`.
-  - `myAreaDescription('2026-11-05', 'Colaborador', 'Fiscal', 'atualizado às 14:32')` → `'Quarta-feira, 5 de novembro · Colaborador · Fiscal · atualizado às 14:32'`; sem departamento, sem o trecho.
+  - `myAreaDescription('2026-11-05', 'Colaborador', 'Fiscal', 'atualizado às 14:32')` → `'Quinta-feira, 5 de novembro · Colaborador · Fiscal · atualizado às 14:32'`; sem departamento, sem o trecho.
   - `myMetricCells(makeOverview({ open: { overdue: 2, oldestOverdue: { …, dueDate: '2026-10-30' }, dueToday: 3, next7Days: 8, … }, productivity: { concluded: 12, onTimeRate: 92, trend: [..., { month: '2026-10', concluded: 18, … }, { month: '2026-11', … }] } }), { count: 2, next: '14:00' })`: rótulos `['Atrasadas', 'Hoje', 'Próximos 7 dias', 'Concluídas em novembro']`; rodapés `'a mais antiga venceu há 6 dias'`, `'2 compromissos · próximo às 14:00'`, `'até 12/11'`, `'92% no prazo · outubro: 18'`; `href` da primeira `'/tarefas?escopo=minhas&situacao=atrasadas'`; sem atrasadas, rodapé `'nada atrasado'` e sem `tone`.
   - `insightHref({ situation: 'waiting' })` → `'/tarefas?escopo=minhas&situacao=aguardando'`; `({ dueDate: '2026-11-06' })` → `'/tarefas?escopo=minhas&vencimento=2026-11-06'`; `({ dueBucket: 'overdue' })` → `'/tarefas?escopo=minhas&situacao=atrasadas'`; `({ dueBucket: 'next7Days' })` → `'/tarefas?escopo=minhas'`; `null` → `null`.
   - `insightsFinding` com tons `danger`, `warning`, `info` → `'2 pedem atenção'`; só `success` → `'Tudo em dia'`.
@@ -363,7 +363,7 @@ Depende do item 23 de §18 (`GET /tasks/recurring` com `origin`). Sem ele, faça
 - Consumes: `calendarWeeks`, `itemsByDay`, `CalendarItem` (`./calendar-logic`); `nationalHolidayName`, `isTaskOverdue` (`@effinance/shared`); `useTaskCalendar`.
 - Produces:
   - `type DayMarker = 'none' | 'open' | 'overdue' | 'done'`; `dayMarker(items: CalendarItem[], today: ISODate): DayMarker`.
-  - `dayLabel(date: ISODate, items: CalendarItem[], today: ISODate): string` — "6 de novembro, quinta-feira: 3 tarefas, 1 atrasada" e ", feriado: Finados".
+  - `dayLabel(date: ISODate, items: CalendarItem[], today: ISODate): string` — "6 de novembro, sexta-feira: 3 tarefas, 1 atrasada" e ", feriado: Finados".
   - `miniCalendarMove(key: string, index: number, total: number): { index: number } | { month: -1 | 1 } | null` — ← → ±1, ↑ ↓ ±7, Home/End início/fim da semana (linha de 7), PageUp/PageDown mês.
   - `MiniCalendar({ month, scope, today, onMonth }: { month: MonthKey; scope: 'mine' | 'department'; today: ISODate; onMonth: (m: MonthKey) => void })`.
 
