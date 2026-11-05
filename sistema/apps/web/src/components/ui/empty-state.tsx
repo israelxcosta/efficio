@@ -8,9 +8,24 @@ interface EmptyStateProps {
   action?: ReactNode;
   className?: string;
   compact?: boolean;
+  /**
+   * Dashed frame and icon tile (pages, drop targets). Inside a card the card already is the frame:
+   * `framed={false}` draws only a 20px subtle icon, a 14px title and a 12.5px description.
+   */
+  framed?: boolean;
 }
 
-export function EmptyState({ icon, title, description, action, className, compact }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, className, compact, framed = true }: EmptyStateProps) {
+  if (!framed) {
+    return (
+      <div className={cn('flex flex-col items-center justify-center gap-1 px-4 text-center', className)}>
+        {icon ? <div className="mb-1 text-subtle [&_svg]:size-5">{icon}</div> : null}
+        <p className="text-body-sm font-semibold text-fg">{title}</p>
+        {description ? <p className="max-w-sm text-caption text-muted">{description}</p> : null}
+        {action ? <div className="mt-2">{action}</div> : null}
+      </div>
+    );
+  }
   return (
     <div
       className={cn(

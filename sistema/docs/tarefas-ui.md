@@ -927,6 +927,12 @@ lugar do menu. A frase fica em caixa normal, sem caixa alta.
 
 ## 6. Início (`/`)
 
+> **Atualização (nov/2026):** cards, faixa de topo, tamanhos e cores do Início seguem
+> `docs/dashboards-redesign.md` (§8) e `docs/design-system.md` §6: faixa `MetricStrip`, grade de
+> 12/2/1 colunas com alturas S/M/L (`DashSlot`), StatusCards com barra empilhada no lugar das roscas,
+> linha do achado em todo card e "atualizado às…" na descrição. Onde esta seção divergir, valem
+> aqueles documentos.
+
 **Pergunta da tela:** "Como está o trabalho do meu departamento, e o que eu faço primeiro?"
 **Achado:** as atrasadas do departamento (quantas, a mais antiga e com quem ela está), na célula
 principal do resumo.

@@ -26,6 +26,7 @@ import {
   setWidgetVisible,
   showAllWidgets,
   snapResize,
+  specOnBoard,
   withBoard,
 } from './layout';
 import { SPEC_BY_ID, WIDGET_GROUPS, WIDGET_SPECS } from './specs';
@@ -74,11 +75,23 @@ describe('sizes', () => {
     expect(heightForRows(3, 2)).toBe(3 * 88 + 2 * 16);
   });
 
-  it('limits the displayed span to the grid columns and keeps the desktop width on narrow grids', () => {
+  it('keeps proportions on 2 columns: 1/4 and 1/2 become 1/2, 3/4 and 1 become the full width', () => {
+    expect(displaySpan(2, 2)).toBe(1);
+    expect(displaySpan(1, 2)).toBe(1);
+    expect(displaySpan(3, 2)).toBe(2);
     expect(displaySpan(4, 2)).toBe(2);
+    expect(displaySpan(4, 1)).toBe(1);
+    expect(displaySpan(3, 4)).toBe(3);
     expect(displaySpan(1, 4)).toBe(1);
-    expect(commitCols(4, 2, 2)).toBe(4);
-    expect(commitCols(4, 2, 1)).toBe(1);
+  });
+
+  it('stores the proportional 4-column width after a resize on 2 columns, and keeps it when the shown width did not change', () => {
+    expect(commitCols(4, 2, 2, 2)).toBe(4);
+    expect(commitCols(4, 2, 1, 2)).toBe(2);
+    expect(commitCols(3, 2, 1, 2)).toBe(2);
+    // Review focus: from 1 to 2 shown columns stores 4, never 2 (2 would show as 1 again).
+    expect(commitCols(2, 1, 2, 2)).toBe(4);
+    expect(commitCols(2, 2, 3, 4)).toBe(3);
   });
 
   it('snaps a drag to whole cells', () => {
@@ -114,35 +127,113 @@ describe('visibility', () => {
 });
 
 describe('default board', () => {
-  it('starts with fees and collection, then cash, clients, analyses and recurring entries', () => {
+  it('lays the business board in rows: collection, fees, due dates, cash, clients, analyses, recurring', () => {
     const items = board(emptyLayout());
-    expect(items.map((i) => i.id)).toEqual([
-      'inadimplencia',
-      'clientes-devedores',
-      'proximos-vencimentos',
-      'fluxo-caixa',
-      'saldo-contas',
-      'projecao-caixa',
-      'insights',
-      'honorarios-mes',
-      'carteira-clientes',
-      'vigencias-honorarios',
-      'resumo-periodo',
-      'despesas-categoria',
-      'resultado-mensal',
-      'gastos-fixos',
-      'receitas-fixas',
-    ]);
-    expect(cellOf(items, 'clientes-devedores')).toEqual({ x: 2, y: 0 });
-    expect(cellOf(items, 'fluxo-caixa')).toEqual({ x: 0, y: 6 });
+    const cells = Object.fromEntries(items.map((i) => [i.id, { x: i.x, y: i.y }]));
+    expect(cells).toEqual({
+      inadimplencia: { x: 0, y: 0 },
+      'clientes-devedores': { x: 2, y: 0 },
+      'honorarios-mes': { x: 0, y: 3 },
+      'proximos-vencimentos': { x: 0, y: 5 },
+      'fluxo-caixa': { x: 0, y: 8 },
+      'saldo-contas': { x: 2, y: 8 },
+      'projecao-caixa': { x: 0, y: 12 },
+      insights: { x: 0, y: 16 },
+      'carteira-clientes': { x: 0, y: 18 },
+      'vigencias-honorarios': { x: 2, y: 18 },
+      'resumo-periodo': { x: 0, y: 22 },
+      'despesas-categoria': { x: 2, y: 22 },
+      'gastos-fixos': { x: 0, y: 26 },
+      'receitas-fixas': { x: 2, y: 26 },
+    });
+    expect(items.some((i) => i.id === 'resultado-mensal')).toBe(false);
+    expect(items.find((i) => i.id === 'honorarios-mes')).toMatchObject({ c: 4, r: 2 });
   });
 
-  it('packs with no holes at 4 columns in every workspace kind', () => {
+  it('lays the personal board without the client cards', () => {
+    const items = resolveBoard(emptyLayout(), WIDGET_SPECS, 'personal', 4);
+    const cells = Object.fromEntries(items.map((i) => [i.id, { x: i.x, y: i.y }]));
+    expect(cells).toMatchObject({
+      'proximos-vencimentos': { x: 0, y: 3 },
+      'fluxo-caixa': { x: 0, y: 6 },
+      'projecao-caixa': { x: 0, y: 10 },
+      insights: { x: 0, y: 14 },
+      'resumo-periodo': { x: 0, y: 16 },
+      'gastos-fixos': { x: 0, y: 20 },
+      'receitas-fixas': { x: 2, y: 20 },
+    });
+    expect(items.some((i) => i.id === 'honorarios-mes' || i.id === 'carteira-clientes')).toBe(false);
+  });
+
+  it('packs with no holes at 4 and 2 columns in every workspace kind', () => {
     for (const kind of ['business', 'personal'] as const) {
       const items = resolveBoard(emptyLayout(), WIDGET_SPECS, kind, 4);
       expectValid(items, 4);
       expect(holes(items, 4), kind).toBe(0);
+      const medium = resolveBoard(emptyLayout(), WIDGET_SPECS, kind, 2);
+      expectValid(medium, 2);
+      expect(holes(medium, 2), `${kind} at 2 columns`).toBe(0);
     }
+  });
+
+  it('puts half-width cards side by side on 2 columns', () => {
+    const medium = board(emptyLayout(), 2);
+    expect(medium.find((i) => i.id === 'clientes-devedores')).toMatchObject({ x: 1, y: 0, c: 1 });
+    expect(medium.find((i) => i.id === 'proximos-vencimentos')).toMatchObject({ c: 2 });
+  });
+
+  it('resolves a layout saved before the redesign without overlaps (Resultado hidden unless turned on)', () => {
+    const saved = {
+      v: 2,
+      sizes: {},
+      cells: { 4: { 'proximos-vencimentos': { x: 0, y: 3 }, 'fluxo-caixa': { x: 0, y: 6 }, 'resultado-mensal': { x: 0, y: 20 } } },
+      visible: {},
+      prefs: {},
+    };
+    const items = board(sanitizeLayout(saved, WIDGET_SPECS, 'business'));
+    expectValid(items, 4);
+    expect(items.some((i) => i.id === 'resultado-mensal')).toBe(false);
+
+    const turnedOn = board(sanitizeLayout({ ...saved, visible: { 'resultado-mensal': true } }, WIDGET_SPECS, 'business'));
+    expectValid(turnedOn, 4);
+    expect(turnedOn.find((i) => i.id === 'resultado-mensal')).toEqual({ id: 'resultado-mensal', x: 0, y: 20, c: 2, r: 4 });
+  });
+
+  it('offers "Organizar" when the old Resultado space is left empty', () => {
+    const old = withBoard(emptyLayout(), 4, [
+      item('inadimplencia', 0, 0, 2, 3),
+      item('clientes-devedores', 2, 0, 2, 3),
+      item('resultado-mensal', 0, 3, 4, 3),
+      item('proximos-vencimentos', 0, 6, 4, 3),
+    ]);
+    const items = board(sanitizeLayout(JSON.parse(JSON.stringify(old)), WIDGET_SPECS, 'business'));
+    expectValid(items, 4);
+    expect(items.some((i) => i.id === 'resultado-mensal')).toBe(false);
+    expect(canArrange(items, 4)).toBe(true);
+  });
+
+  it('previews a resize on 2 columns in shown columns (2 = the full width)', () => {
+    const medium = board(emptyLayout(), 2);
+    const next = resizeItem(medium, 'inadimplencia', { c: 2, r: 3 }, 2);
+    expect(next.find((i) => i.id === 'inadimplencia')).toMatchObject({ x: 0, y: 0, c: 2 });
+    expectValid(next, 2);
+  });
+
+  it('limits the corner handle in shown columns on 2 columns', () => {
+    const m = { colW: 440, rowPx: 88, gap: 16, cols: 2 };
+    // Fluxo (min 2 of 4 columns) shows as 1 of 2: a small drag must not jump to the full width.
+    expect(specOnBoard(fluxo, 2).min.c).toBe(1);
+    expect(snapResize({ c: 1, r: 4 }, 10, 0, m, specOnBoard(fluxo, 2))).toEqual({ c: 1, r: 4 });
+    expect(snapResize({ c: 1, r: 4 }, 460, 0, m, specOnBoard(fluxo, 2))).toEqual({ c: 2, r: 4 });
+    // Saldo (max 2 of 4) never takes the full width of 2 columns.
+    expect(specOnBoard(SPEC_BY_ID['saldo-contas'], 2).max.c).toBe(1);
+    expect(specOnBoard(fluxo, 4)).toBe(fluxo);
+  });
+
+  it('shows an odd stored width (3) as the full width on 2 columns', () => {
+    const layout = { ...emptyLayout(), sizes: { 'fluxo-caixa': { c: 3, r: 4 } } };
+    expect(board(layout, 2).find((i) => i.id === 'fluxo-caixa')).toMatchObject({ c: 2 });
+    expect(board(layout, 4).find((i) => i.id === 'fluxo-caixa')).toMatchObject({ c: 3 });
   });
 
   it('derives narrower boards from the reading order of the wider one', () => {
@@ -170,7 +261,7 @@ describe('free placement', () => {
   });
 
   it('pushes the cards it lands on down, and those below them in turn', () => {
-    // Saldo (2×4 at 2,6) dropped on Clientes devedores (2×3 at 2,0).
+    // Saldo (2×4 at 2,8) dropped on Clientes devedores (2×3 at 2,0).
     const next = moveItem(start, 'saldo-contas', { x: 2, y: 0 }, 4);
     expect(cellOf(next, 'saldo-contas')).toEqual({ x: 2, y: 0 });
     expect(cellOf(next, 'clientes-devedores')).toEqual({ x: 2, y: 4 });
@@ -187,19 +278,20 @@ describe('free placement', () => {
   it('pushes down what a resized card now covers', () => {
     const next = resizeItem(start, 'inadimplencia', { c: 2, r: 5 }, 4);
     expect(next.find((i) => i.id === 'inadimplencia')!.r).toBe(5);
-    expect(cellOf(next, 'proximos-vencimentos')).toEqual({ x: 0, y: 5 });
+    expect(cellOf(next, 'honorarios-mes')).toEqual({ x: 0, y: 5 });
+    expect(cellOf(next, 'proximos-vencimentos')).toEqual({ x: 0, y: 7 });
     expectValid(next, 4);
   });
 
   it('"Organizar" moves cards up to close the gaps, keeping their columns', () => {
-    // Insights (4×2 at row 14) goes to the bottom: rows 14–15 stay empty until "Organizar".
+    // Insights (4×2 at row 16) goes to the bottom: rows 16–17 stay empty until "Organizar".
     const gapped = moveItem(start, 'insights', { x: 0, y: boardBottom(start) }, 4);
     expect(canArrange(gapped, 4)).toBe(true);
-    expect(cellOf(gapped, 'honorarios-mes')).toEqual({ x: 0, y: 16 });
+    expect(cellOf(gapped, 'carteira-clientes')).toEqual({ x: 0, y: 18 });
     const arranged = arrange(gapped, 4);
     expect(canArrange(arranged, 4)).toBe(false);
     expect(holes(arranged, 4)).toBe(0);
-    expect(cellOf(arranged, 'honorarios-mes')).toEqual({ x: 0, y: 14 });
+    expect(cellOf(arranged, 'carteira-clientes')).toEqual({ x: 0, y: 16 });
     expect(cellOf(arranged, 'insights')).toEqual({ x: 0, y: boardBottom(start) - 2 });
     expectValid(arranged, 4);
     // Rising in its own columns only would leave this space next to vencimentos (4×3) empty.
@@ -220,7 +312,7 @@ describe('free placement', () => {
     const arranged = arrange(gapped, 4);
     expect(cellOf(arranged, 'saldo-contas')).toEqual({ x: 0, y: 0 });
     expect(cellOf(arranged, 'inadimplencia')).toEqual({ x: 2, y: 0 });
-    expect(cellOf(arranged, 'proximos-vencimentos')).toEqual({ x: 0, y: 4 });
+    expect(cellOf(arranged, 'honorarios-mes')).toEqual({ x: 0, y: 4 });
     expect(holes(arranged, 4)).toBeLessThan(holes(gapped, 4));
     expect(canArrange(arranged, 4)).toBe(false);
     expectValid(arranged, 4);

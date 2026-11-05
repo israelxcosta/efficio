@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CategorySeries } from '@effinance/shared';
 import {
+  OTHERS_KEY,
   averageWithData,
   changeRatio,
   changeText,
@@ -10,9 +11,9 @@ import {
   groupSeries,
   maxAbsIndex,
   monthWindow,
-  OTHERS_KEY,
   resultStats,
   shortMonth,
+  summaryBar,
   topConcentration,
   trendSegment,
 } from './trend-math';
@@ -171,5 +172,19 @@ describe('resultStats', () => {
       best: { month: '2026-08', value: 300 },
       worst: { month: '2026-09', value: -100 },
     });
+  });
+});
+
+describe('summaryBar', () => {
+  it('scales paid and open to the larger of this month and the previous one, with a mark on the previous total', () => {
+    const bar = summaryBar(1792360, 535860, 1493600);
+    expect(bar.paid).toBeCloseTo(0.299, 3);
+    expect(bar.open).toBeCloseTo(0.701, 3);
+    expect(bar.marker).toBeCloseTo(0.833, 3);
+  });
+
+  it('leaves room when the previous month was larger and has no mark without a previous total', () => {
+    expect(summaryBar(100, 100, 400)).toEqual({ paid: 0.25, open: 0, marker: 1 });
+    expect(summaryBar(0, 0, 0)).toEqual({ paid: 0, open: 0, marker: null });
   });
 });

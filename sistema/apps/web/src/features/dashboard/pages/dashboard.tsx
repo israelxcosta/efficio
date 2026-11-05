@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
-import { ArrowUpToLine, ChevronLeft, ChevronRight, LayoutGrid, Percent, SlidersHorizontal, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowUpToLine, Check, ChevronLeft, ChevronRight, LayoutGrid, SlidersHorizontal, Sparkles } from 'lucide-react';
 import {
   MONTH_NAMES,
   addMonthKey,
   formatBRL,
   formatMonthKey,
-  formatPercent,
   monthKey,
   percentChange,
   todayISO,
@@ -16,17 +15,19 @@ import {
   type WorkspaceKind,
 } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
-import { KpiCard } from '@/components/ui/kpi-card';
+import { MetricStrip, type MetricCell } from '@/components/ui/metric-strip';
 import { ErrorState } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useActiveMonth } from '@/lib/active-month';
 import { useElementSize } from '@/lib/use-element-size';
+import { useUpdatedLabel } from '@/lib/updated-label';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
 import { useDashboard } from '../api';
 import { InsightsTab } from '../components/insights-tab';
+import { changeParts, marginText, monthlySeries, netWorthText, type ChangeParts } from '../kpi-logic';
 import { monthFinding, overdueFinding } from '../layout/finding';
 import { useMonthReceivables, useOverdueReceivables } from '../widgets/data';
 import { useDashboardAlerts } from '../layout/alerts';
@@ -49,6 +50,9 @@ export default function DashboardPage() {
   const d = dashboard.data;
   const layoutApi = useDashboardLayout();
   const [customizing, setCustomizing] = useState(false);
+  // "Personalizar" mode: the cards get their grip, hide button and corner handle.
+  const [editing, setEditing] = useState(false);
+  const [modeMessage, setModeMessage] = useState('');
   const hidden = hiddenCount(layoutApi.layout, WIDGET_SPECS, kind);
   // The board spans the page, so the page's width picks its columns (also for "Organizar").
   const { ref, width } = useElementSize();
@@ -65,6 +69,32 @@ export default function DashboardPage() {
     requestAnimationFrame(() => document.getElementById(CUSTOMIZE_BUTTON_ID)?.focus());
     toast('Cards organizados.', { action: { label: 'Desfazer', onClick: () => layoutApi.restore(before) } });
   }
+
+  function startEditing(openCards = false) {
+    setEditing(true);
+    if (openCards) setCustomizing(true);
+    setModeMessage('Modo de personalização. Use a alça de cada card para mover.');
+  }
+
+  function stopEditing() {
+    setEditing(false);
+    setCustomizing(false);
+    setModeMessage('');
+    // "Concluir" goes away: the focus goes back to "Personalizar" (same id).
+    requestAnimationFrame(() => document.getElementById(CUSTOMIZE_BUTTON_ID)?.focus());
+  }
+
+  // Escape leaves the mode, unless it closed a sheet/menu or cancelled a drag (those prevent it).
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || customizing) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
+      stopEditing();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [editing, customizing]);
 
   function update(patch: Record<string, string | null>) {
     const next = new URLSearchParams(params);
@@ -83,11 +113,11 @@ export default function DashboardPage() {
     update({ mes: null });
   }, [linkedMonth]);
 
-  // `?personalizar=1` (link in Configurações) opens the customize sheet.
+  // `?personalizar=1` (link in Configurações) enters the mode with the list of cards open.
   const openCustomize = params.get('personalizar');
   useEffect(() => {
     if (!openCustomize) return;
-    setCustomizing(true);
+    startEditing(true);
     update({ personalizar: null, aba: null });
   }, [openCustomize]);
 
@@ -102,13 +132,16 @@ export default function DashboardPage() {
       <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
           <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-fg">Painel financeiro</h1>
-          <FindingLine month={month} />
+          <FindingLine month={month} updatedAt={dashboard.dataUpdatedAt} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl
             ariaLabel="Visão"
             value={tab}
-            onChange={(t) => update({ aba: t === 'dashboard' ? null : t })}
+            onChange={(t) => {
+              if (t !== 'dashboard' && editing) stopEditing();
+              update({ aba: t === 'dashboard' ? null : t });
+            }}
             options={[
               { value: 'dashboard', label: 'Visão geral', icon: <LayoutGrid /> },
               { value: 'insights', label: 'Dashboard inteligente', icon: <Sparkles /> },
@@ -136,22 +169,29 @@ export default function DashboardPage() {
               <ChevronRight />
             </Button>
           </div>
-          {tab === 'dashboard' ? (
-            <Button id={CUSTOMIZE_BUTTON_ID} variant="outline" size="sm" onClick={() => setCustomizing(true)}>
+          {tab === 'dashboard' && !editing ? (
+            <Button id={CUSTOMIZE_BUTTON_ID} variant="outline" size="sm" onClick={() => startEditing()}>
               <SlidersHorizontal /> Personalizar
-              {hidden > 0 ? (
-                <span className="tabular rounded-full bg-bg-subtle px-1.5 text-mini font-semibold text-muted">
-                  {hidden === 1 ? '1 oculto' : `${hidden} ocultos`}
-                </span>
-              ) : null}
+              <HiddenBadge count={hidden} />
             </Button>
           ) : null}
-          {tab === 'dashboard' && hasGaps ? (
-            <Tooltip content="Sobe os cards para fechar os espaços vazios do painel">
-              <Button variant="outline" size="sm" onClick={arrange}>
-                <ArrowUpToLine /> Organizar
+          {tab === 'dashboard' && editing ? (
+            <>
+              <Button id={CUSTOMIZE_BUTTON_ID} variant="outline" size="sm" onClick={() => setCustomizing(true)}>
+                <LayoutGrid /> Cards
+                <HiddenBadge count={hidden} />
               </Button>
-            </Tooltip>
+              {hasGaps ? (
+                <Tooltip content="Sobe os cards para fechar os espaços vazios do painel">
+                  <Button variant="outline" size="sm" onClick={arrange}>
+                    <ArrowUpToLine /> Organizar
+                  </Button>
+                </Tooltip>
+              ) : null}
+              <Button variant="primary" size="sm" onClick={stopEditing}>
+                <Check /> Concluir
+              </Button>
+            </>
           ) : null}
         </div>
       </header>
@@ -161,9 +201,12 @@ export default function DashboardPage() {
       ) : tab === 'insights' ? (
         <InsightsTab month={month} dashboard={d} loading={dashboard.isPending} />
       ) : (
-        <Overview d={d} loading={dashboard.isPending} month={month} kind={kind} width={width} onCustomize={() => setCustomizing(true)} />
+        <Overview d={d} loading={dashboard.isPending} month={month} kind={kind} width={width} editing={editing} onCustomize={() => startEditing(true)} />
       )}
       <CustomizeSheet open={customizing} onOpenChange={setCustomizing} kind={kind} />
+      <p aria-live="polite" className="sr-only">
+        {modeMessage}
+      </p>
     </div>
   );
 }
@@ -174,10 +217,17 @@ interface OverviewProps {
   month: string;
   kind: WorkspaceKind | undefined;
   width: number;
+  editing: boolean;
   onCustomize: () => void;
 }
 
-function Overview({ d, loading, month, kind, width, onCustomize }: OverviewProps) {
+/** "N ocultos" on "Personalizar" / "Cards". */
+function HiddenBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return <span className="tabular rounded-full bg-bg-subtle px-1.5 text-mini font-semibold text-muted">{count === 1 ? '1 oculto' : `${count} ocultos`}</span>;
+}
+
+function Overview({ d, loading, month, kind, width, editing, onCustomize }: OverviewProps) {
   const { layout, prefs } = useDashboardLayout();
   const alerts = useDashboardAlerts({ d, kind, layout, prefs });
   return (
@@ -192,6 +242,7 @@ function Overview({ d, loading, month, kind, width, onCustomize }: OverviewProps
         components={WIDGET_COMPONENTS}
         alerts={alerts}
         onCustomize={onCustomize}
+        editing={editing}
       />
     </>
   );
@@ -202,7 +253,8 @@ function Overview({ d, loading, month, kind, width, onCustomize }: OverviewProps
  * on it. The current month shows everything overdue today; another month, its own receivables
  * (still overdue, still to come, or all received).
  */
-function FindingLine({ month }: { month: MonthKey }) {
+function FindingLine({ month, updatedAt }: { month: MonthKey; updatedAt: number }) {
+  const updated = useUpdatedLabel(updatedAt);
   const today = todayISO();
   const current = month === monthKey(today);
   const overdue = useOverdueReceivables(current);
@@ -216,7 +268,9 @@ function FindingLine({ month }: { month: MonthKey }) {
       : null;
   const href = current ? '/relatorios?aba=inadimplencia' : `/contas-a-receber?data=${month}-01&status=overdue`;
   return (
-    <p className="mt-1 text-sm text-muted" aria-live="polite">
+    <p className="mt-1 text-sm text-muted">
+      {/* Only the finding is announced; the minute-by-minute "atualizado" stays out of the live region. */}
+      <span aria-live="polite">
       {formatMonthKey(month)}
       {finding ? (
         finding.alert ? (
@@ -232,62 +286,85 @@ function FindingLine({ month }: { month: MonthKey }) {
           ` · ${finding.text}`
         )
       ) : null}
+      </span>
+      {updated ? <span className="text-subtle">{` · ${updated}`}</span> : null}
     </p>
   );
 }
 
-/** Fixed strip above the grid: income, expenses, margin and net worth (same breakpoints as the grid). */
+const CHANGE_TONE = { success: 'text-success', danger: 'text-danger', muted: 'text-muted' } as const;
+
+/** "+20,0% vs mês anterior" with the change coloured by whether it is good (plain text for the tooltip). */
+function changeFooter(parts: ChangeParts | null): { footer: ReactNode; footerTitle: string } {
+  if (!parts) return { footer: 'Sem base de comparação', footerTitle: 'Sem base de comparação' };
+  return {
+    footer: (
+      <>
+        <span className={cn('tabular font-semibold', CHANGE_TONE[parts.tone])}>{parts.text}</span> vs mês anterior
+      </>
+    ),
+    footerTitle: `${parts.text} vs mês anterior`,
+  };
+}
+
+/**
+ * Number strip above the board (docs/dashboards-redesign.md §7.1): income, expenses, result (with
+ * the margin as context) and net worth, each with its comparison and a 6-month sparkline.
+ */
 function DashboardKpis({ d, loading }: { d: DashboardResponse | undefined; loading: boolean }) {
   const s = d?.summary;
   const p = d?.previous;
-  const money = (v: number | undefined) => (loading || v === undefined ? <Skeleton className="ml-auto h-7 w-32" /> : formatBRL(v));
-
-  return (
-    <div className="grid grid-cols-2 gap-4 @[1000px]:grid-cols-4">
-      <KpiCard
-        compact
-        icon={<TrendingUp />}
-        label="Receitas"
-        info="Receitas do mês pela competência (recebidas + a receber)"
-        value={money(s?.income)}
-        change={s && p ? percentChange(s.income, p.income) : undefined}
-        href="/contas-a-receber"
-      />
-      <KpiCard
-        compact
-        icon={<TrendingDown />}
-        label="Despesas"
-        info="Despesas do mês pela competência, incluindo compras no cartão"
-        value={money(s?.expense)}
-        change={s && p ? percentChange(s.expense, p.expense) : undefined}
-        invert
-        href="/contas-a-pagar"
-      />
-      <KpiCard
-        compact
-        icon={<Percent />}
-        label="Margem"
-        info="Resultado do mês (receitas − despesas) sobre as receitas. A variação é em pontos percentuais."
-        value={s ? formatPercent(s.savingsRate ?? 0, 1) : <Skeleton className="ml-auto h-7 w-20" />}
-        change={s && p && s.savingsRate !== null && p.savingsRate !== null ? s.savingsRate - p.savingsRate : undefined}
-        changeUnit="pp"
-        href="/relatorios"
-      />
-      <KpiCard
-        compact
-        icon={<Wallet />}
-        label="Patrimônio"
-        info="Saldo em contas + investimentos − dívida de cartão"
-        value={money(d?.balances.netWorth)}
-        footerContent={
-          d ? (
-            <span>
-              Investido: <span className="tabular font-semibold text-fg">{formatBRL(d.balances.investments)}</span>
-            </span>
-          ) : undefined
-        }
-        href="/contas"
-      />
-    </div>
-  );
+  const busy = loading || !d;
+  const monthly = d?.monthly ?? [];
+  const margin = s && p ? marginText(s, p) : '';
+  const worth = d ? netWorthText(d.balances) : '';
+  const cells: MetricCell[] = [
+    {
+      key: 'receitas',
+      label: 'Receitas',
+      info: 'Receitas do mês pela competência (recebidas + a receber). Linha: últimos 6 meses.',
+      value: s ? formatBRL(s.income) : null,
+      ...changeFooter(s && p ? changeParts(percentChange(s.income, p.income), 'percent') : null),
+      spark: { values: monthlySeries(monthly, 'income'), tone: 'data' },
+      href: '/contas-a-receber',
+      aria: s ? `Receitas: ${formatBRL(s.income)}. Ver contas a receber.` : 'Receitas',
+      loading: busy,
+    },
+    {
+      key: 'despesas',
+      label: 'Despesas',
+      info: 'Despesas do mês pela competência, incluindo compras no cartão. Linha: últimos 6 meses.',
+      value: s ? formatBRL(s.expense) : null,
+      ...changeFooter(s && p ? changeParts(percentChange(s.expense, p.expense), 'percent', true) : null),
+      spark: { values: monthlySeries(monthly, 'expense'), tone: 'neutral' },
+      href: '/contas-a-pagar',
+      aria: s ? `Despesas: ${formatBRL(s.expense)}. Ver contas a pagar.` : 'Despesas',
+      loading: busy,
+    },
+    {
+      key: 'resultado',
+      label: 'Resultado',
+      info: 'Receitas − despesas do mês. Margem = resultado sobre as receitas; a variação é em pontos percentuais.',
+      value: s ? formatBRL(s.net) : null,
+      tone: s && s.net < 0 ? 'danger' : undefined,
+      footer: margin,
+      footerTitle: margin,
+      spark: { values: monthlySeries(monthly, 'net'), tone: 'data' },
+      href: '/relatorios',
+      aria: s ? `Resultado: ${formatBRL(s.net)}, ${margin}. Ver relatórios.` : 'Resultado',
+      loading: busy,
+    },
+    {
+      key: 'patrimonio',
+      label: 'Patrimônio',
+      info: 'Saldo em contas + investimentos − dívida de cartão. Sem histórico de saldo para comparar.',
+      value: d ? formatBRL(d.balances.netWorth) : null,
+      footer: worth,
+      footerTitle: worth,
+      href: '/contas',
+      aria: d ? `Patrimônio: ${formatBRL(d.balances.netWorth)}. ${worth}. Ver contas.` : 'Patrimônio',
+      loading: busy,
+    },
+  ];
+  return <MetricStrip cells={cells} medium={2} />;
 }

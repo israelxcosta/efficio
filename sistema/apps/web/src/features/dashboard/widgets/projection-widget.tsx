@@ -1,4 +1,4 @@
-import { useId, useMemo, type ComponentProps } from 'react';
+import { useMemo, type ComponentProps } from 'react';
 import { Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts';
 import { TriangleAlert } from 'lucide-react';
 import { formatBRL, formatDateBR, type ISODate } from '@effinance/shared';
@@ -6,11 +6,12 @@ import { ErrorState } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { axisProps, CHART_COLORS, CHART_TEXT, ChartBox, moneyAxisFormatter, MoneyTooltip } from '@/components/charts/chart-utils';
-import { summarizeProjection, yAxisWidth } from '@/components/charts/chart-scale';
+import { niceDomain, projectionTiles, summarizeProjection, yAxisWidth } from '@/components/charts/chart-scale';
 import { cn } from '@/lib/utils';
 import type { DashboardPrefs, WidgetProps } from '../layout/types';
 import { useWidgetResizing, WidgetCard } from '../layout/widget-card';
 import { useOverduePayables, useOverdueReceivables, useProjection } from './data';
+import { projectionInsight } from './insight-lines';
 
 type Horizon = DashboardPrefs['projecaoDias'];
 
@@ -42,7 +43,7 @@ function DateTick({ x = 0, y = 0, index = 0, visibleTicksCount = 1, payload }: {
   );
 }
 
-/** MoneyTooltip with the line color on the dot (the area's own fill is a gradient). */
+/** MoneyTooltip with the line color on the dot (the area's own fill is translucent). */
 function BalanceTooltip({ color, payload, ...props }: ComponentProps<typeof MoneyTooltip> & { color: string }) {
   return (
     <MoneyTooltip
@@ -61,7 +62,6 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
   const receivables = useOverdueReceivables();
   const payables = useOverduePayables();
   const resizing = useWidgetResizing();
-  const gradientId = `proj-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   const overdueIn = receivables.data?.summary.overdue ?? 0;
   const overdueOut = payables.data?.summary.overdue ?? 0;
@@ -72,6 +72,9 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
   );
 
   const failed = [projection, receivables, payables].filter((q) => q.isError);
+  // The sentence carries its own window ("hoje … em 90 dias"); only the alert is red.
+  const insight = summary ? projectionInsight(summary) : null;
+  const finding = insight && summary?.negativeFrom ? <span className="text-danger">{insight}</span> : insight;
   const color = summary?.negativeFrom ? 'var(--app-danger)' : 'var(--app-data)';
 
   const action = (
@@ -113,25 +116,24 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
       </div>
     );
   } else {
-    const { points, worst, milestones, negativeFrom } = summary;
+    const { points, worst, negativeFrom } = summary;
+    const tiles = projectionTiles(summary);
+    const axis = niceDomain([...points.map((p) => p.saldo), summary.today], 4);
     const first = points[0]?.date;
     const last = points[points.length - 1]?.date;
     const middle = points[Math.floor((points.length - 1) / 2)]?.date;
     const ticks = [first, middle, last].filter((t, i, all): t is ISODate => Boolean(t) && all.indexOf(t) === i);
-    const yWidth = yAxisWidth([...points.map((p) => p.saldo), 0]);
+    const yWidth = yAxisWidth(axis.ticks);
     body = (
       <>
         <div className="flex shrink-0 flex-wrap gap-2">
-          {worst ? <Tile label="Pior dia do período" saldo={worst.saldo} date={worst.date} danger={worst.saldo < 0} /> : null}
-          {milestones.map((m) => (
-            <Tile
-              key={m.dias}
-              label={`Em ${m.dias} dias`}
-              saldo={m.saldo}
-              date={m.date}
-              className={m.dias === dias ? undefined : 'hidden @lg:flex'}
-            />
-          ))}
+          {tiles.map((t) =>
+            t.key === 'worst' ? (
+              <Tile key="worst" label="Pior dia do período" saldo={t.saldo} date={t.date} danger={t.saldo < 0} />
+            ) : (
+              <Tile key={t.key} label={`Em ${t.key} dias`} saldo={t.saldo} date={t.date} className={t.key === dias ? undefined : 'hidden @lg:flex'} />
+            ),
+          )}
         </div>
         {negativeFrom ? (
           <p className="mt-2 flex shrink-0 items-start gap-1.5 text-caption text-fg">
@@ -144,25 +146,21 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
         ) : null}
         <div
           role="img"
-          aria-label={`Saldo projetado para os próximos ${dias} dias.${worst ? ` Pior dia: ${formatDateBR(worst.date)}, ${formatBRL(worst.saldo)}.` : ''}`}
+          aria-label={`${insight ? `${insight}. ` : ''}Saldo projetado para os próximos ${dias} dias, a partir de ${formatBRL(summary.today)} hoje.${worst ? ` Pior dia: ${formatDateBR(worst.date)}, ${formatBRL(worst.saldo)}.` : ''}`}
           className="mt-2 flex min-h-0 flex-1 flex-col"
         >
           <ChartBox>
             <AreaChart data={points} margin={{ top: 6, right: 2, bottom: 0, left: 0 }} accessibilityLayer={false}>
-              <defs>
-                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.14 }} />
-                  <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
-                </linearGradient>
-              </defs>
               <CartesianGrid vertical={false} stroke="var(--app-chart-grid)" strokeDasharray="4 4" />
               <XAxis dataKey="date" ticks={ticks} interval={0} tickLine={false} axisLine={false} tick={<DateTick />} />
-              <YAxis {...axisProps} width={yWidth} tickCount={3} tickFormatter={moneyAxisFormatter} />
+              <YAxis {...axisProps} width={yWidth} domain={axis.domain} ticks={axis.ticks} interval={0} tickFormatter={moneyAxisFormatter} />
               <Tooltip
                 cursor={{ stroke: 'var(--app-border-strong)', strokeDasharray: '3 3' }}
                 content={<BalanceTooltip color={color} />}
               />
-              <ReferenceLine y={0} stroke="var(--app-border-strong)" />
+              {axis.domain[0] < 0 ? <ReferenceLine y={0} stroke="var(--app-border-strong)" /> : null}
+              {/* Today's balance as the reference the line moves away from. */}
+              <ReferenceLine y={summary.today} stroke="var(--app-border-strong)" strokeDasharray="4 3" />
               {worst ? <ReferenceLine x={worst.date} stroke={CHART_COLORS.axis} strokeDasharray="3 3" strokeOpacity={0.45} /> : null}
               <Area
                 type="linear"
@@ -170,7 +168,8 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
                 name="saldo"
                 stroke={color}
                 strokeWidth={2}
-                fill={`url(#${gradientId})`}
+                fill={color}
+                fillOpacity={0.08}
                 activeDot={{ r: 4, fill: color, stroke: 'var(--app-surface)', strokeWidth: 2 }}
                 isAnimationActive={!resizing}
               />
@@ -192,7 +191,7 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
   return (
     <WidgetCard
       alert={alert}
-      subtitle={summary ? `Saldo hoje ${formatBRL(summary.today)} · o que está em aberto até ${dias} dias` : 'Saldo previsto com o que está em aberto'}
+      subtitle={finding ?? 'Saldo previsto com o que está em aberto'}
       info="Saldo das contas somado ao que está para entrar e sair (lançamentos em aberto e faturas de cartão pelo vencimento). O que já venceu e segue em aberto entra hoje."
       action={action}
       footer={footer}

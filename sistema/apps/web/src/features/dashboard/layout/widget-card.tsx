@@ -29,6 +29,11 @@ export interface WidgetChrome {
   gripProps: ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement> };
   /** The corner handle is being dragged (charts skip their animations meanwhile). */
   resizing: boolean;
+  /**
+   * "Personalizar" mode: grip, hide button, move cursor and the corner handle exist only then. Out
+   * of it the context is still provided (for `useWidgetResizing`) but the card is a plain card.
+   */
+  editing: boolean;
 }
 
 export const WidgetChromeContext = createContext<WidgetChrome | null>(null);
@@ -38,9 +43,9 @@ export function useWidgetResizing(): boolean {
   return useContext(WidgetChromeContext)?.resizing ?? false;
 }
 
-/** Controls revealed on hover/focus (always visible on touch screens). */
+/** Controls of the "Personalizar" mode (always shown there; full strength on hover/focus). */
 const chromeButton =
-  'flex size-6 items-center justify-center rounded-md text-muted opacity-0 transition-opacity group-hover/widget:opacity-60 group-focus-within/widget:opacity-100 hover:!opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-70 [&_svg]:size-3.5';
+  'flex size-6 items-center justify-center rounded-md text-muted opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 [&_svg]:size-3.5';
 
 function ChromeButtons({ chrome, onDark }: { chrome: WidgetChrome; onDark: boolean }) {
   const { ref, className, ...grip } = chrome.gripProps;
@@ -91,22 +96,27 @@ interface WidgetCardProps {
 
 /**
  * Card of a dashboard widget: fixed header and footer, body taking the remaining height so
- * charts and lists grow with the card. Small text: title 14px, subtitle 11.5px.
+ * charts and lists grow with the card. Title 16px; under it the finding line (12.5px, one line,
+ * full text in `title`).
  */
 export function WidgetCard({ title, subtitle, info, action, alert, footer, children, bodyClassName, className, variant = 'default' }: WidgetCardProps) {
   const chrome = useContext(WidgetChromeContext);
   const heading = title ?? chrome?.title;
   const hero = variant === 'hero';
+  const editing = chrome?.editing === true;
   return (
     <section
       className={cn(
         '@container relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border p-5',
-        hero ? 'border-transparent bg-hero-from text-white' : 'border-border bg-surface',
+        hero ? 'border-transparent bg-hero-from text-white' : editing ? 'border-border-strong bg-surface' : 'border-border bg-surface',
         className,
       )}
       aria-label={typeof heading === 'string' ? heading : undefined}
     >
-      <header {...chrome?.headerProps} className={cn('flex shrink-0 flex-wrap items-start gap-x-2 gap-y-2', chrome && 'cursor-grab active:cursor-grabbing')}>
+      <header
+        {...(editing ? chrome?.headerProps : undefined)}
+        className={cn('flex shrink-0 flex-wrap items-start gap-x-2 gap-y-2', editing && 'cursor-grab active:cursor-grabbing')}
+      >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {alert ? <span className="size-1.5 shrink-0 rounded-full bg-danger" aria-hidden /> : null}
@@ -119,10 +129,17 @@ export function WidgetCard({ title, subtitle, info, action, alert, footer, child
               </Tooltip>
             ) : null}
           </div>
-          {subtitle ? <p className={cn('mt-0.5 truncate text-caption', hero ? 'text-white/65' : 'text-muted')}>{subtitle}</p> : null}
+          {subtitle ? (
+            <p
+              title={typeof subtitle === 'string' ? subtitle : undefined}
+              className={cn('mt-0.5 truncate text-caption', hero ? 'text-white/65' : 'text-muted')}
+            >
+              {subtitle}
+            </p>
+          ) : null}
         </div>
         {action ? <div className="order-last flex basis-full items-center gap-1 @sm:order-none @sm:basis-auto @sm:shrink-0">{action}</div> : null}
-        {chrome ? <ChromeButtons chrome={chrome} onDark={hero} /> : null}
+        {chrome && editing ? <ChromeButtons chrome={chrome} onDark={hero} /> : null}
       </header>
       <div className={cn('mt-3.5 flex min-h-0 flex-1 flex-col', bodyClassName)}>{children}</div>
       {footer ? <div className="mt-3 shrink-0">{footer}</div> : null}
@@ -146,6 +163,8 @@ interface FitListProps<T> {
   className?: string;
   /** Changes in row content that keep the same count but may change heights. */
   contentKey?: string;
+  /** Show the "+ N …" line (false when the card footer already has "Ver todos"). */
+  showMore?: boolean;
 }
 
 /**
@@ -153,7 +172,7 @@ interface FitListProps<T> {
  * Rows may have different heights (each one is measured). A "+ N …" line replaces what was cut.
  * Takes `flex-1` of a column flex parent (the card body).
  */
-export function FitList<T>({ items, getKey, renderItem, total, moreLabel, moreHref, className, contentKey = '' }: FitListProps<T>) {
+export function FitList<T>({ items, getKey, renderItem, total, moreLabel, moreHref, className, contentKey = '', showMore = true }: FitListProps<T>) {
   const box = useElementSize();
   const listRef = useRef<HTMLDivElement>(null);
   const [count, setCount] = useState(items.length);
@@ -174,9 +193,9 @@ export function FitList<T>({ items, getKey, renderItem, total, moreLabel, moreHr
     const next = fitCount(
       rows.map((row) => row.offsetHeight),
       box.height,
-      MORE_LINE_PX,
+      showMore ? MORE_LINE_PX : 0,
       gap,
-      realTotal > items.length,
+      showMore && realTotal > items.length,
     );
     if (next !== count) setCount(next);
   });
@@ -192,7 +211,7 @@ export function FitList<T>({ items, getKey, renderItem, total, moreLabel, moreHr
           </div>
         ))}
       </div>
-      {hidden > 0 ? (
+      {hidden > 0 && showMore ? (
         <p className="absolute inset-x-0 bottom-0 flex h-5 items-end px-1 text-caption text-muted">
           {moreHref ? (
             <Link to={moreHref} className="font-medium text-brand-text hover:underline">

@@ -12,17 +12,21 @@ import {
   type TaskOptionsResponse,
 } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
+import { StackBar } from '@/components/charts/stack-bar';
 import { Card } from '@/components/ui/card';
+import { MetricStrip, type MetricCell } from '@/components/ui/metric-strip';
 import { MemberAvatar } from '@/components/ui/member-avatar';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
 import { BodyEmpty, ListSkeleton } from '@/features/dashboard/widgets/shared';
 import { FitList, WidgetCard } from '@/features/dashboard/layout/widget-card';
+import { columnsForWidth } from '@/features/dashboard/layout/layout';
+import { useElementSize } from '@/lib/use-element-size';
+import { useUpdatedLabel } from '@/lib/updated-label';
 import { cn, pluralize } from '@/lib/utils';
 import { useRecurringTasks, useTaskDashboard, useTaskHome, useTaskOptions, useTasks } from '../api';
 import { AgendaCard, ClientsOverviewCard, DocumentsCard, FeesCard, FiscalCard, FlowCard, IncompleteCard, ProcessesCard, TaskStatusCard, ConventionsCard } from '../components/dashboard-cards';
@@ -32,11 +36,13 @@ import { TaskRow } from '../components/task-row';
 import { TaskStatusGlyph } from '../components/task-status';
 import { RecurringOccurrenceRow } from '../components/occurrence-row';
 import { occurrenceBucket, taskBucket } from '../occurrence';
-import { monthName, SummaryLabel } from '../components/tasks-summary';
+import { monthName } from '../components/tasks-summary';
+import { DashColsContext, DashSlot, dashGridClass, useDashCols } from '../components/dash-slot';
 import { daysText, shortDate, shortName } from '../due';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
 import { canPickDepartment, resolveHomeDepartment } from '../home-view';
+import { assigneeInsight } from '../dashboard-logic';
 import { homeDepartmentKey, readHomeDepartment, tasksHref, writeHomeDepartment, type TaskFilterPatch } from '../url-state';
 import { useOfficeBranding } from '@/features/office/api';
 
@@ -66,6 +72,10 @@ export default function TaskHomePage() {
   const { newTask } = useTaskSheetLinks();
   const today = o?.today ?? todayISO();
   const h = home.data;
+  // The page width picks the columns of the card grid (same bands as the financial board).
+  const page = useElementSize();
+  const updated = useUpdatedLabel(home.dataUpdatedAt);
+  const cols = columnsForWidth(page.width || 1280);
 
   function chooseDepartment(value: string) {
     writeHomeDepartment(storeKey, value);
@@ -91,10 +101,10 @@ export default function TaskHomePage() {
       : `${longDay(today)} · suas tarefas`;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div ref={page.ref} className="flex flex-col gap-6">
       <PageHeader
         title="Início"
-        description={description}
+        description={updated ? `${description} · ${updated}` : description}
         actionsClassName="max-sm:w-full"
         actions={
           <>
@@ -125,69 +135,73 @@ export default function TaskHomePage() {
 
       {o && canPickDepartment(o) ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
 
-      <Section title="Tarefas">
-        <div className="h-[29rem] lg:col-span-7 lg:h-[26rem]">
-          <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
-        </div>
-        <div className="h-[19rem] lg:col-span-5 lg:h-[26rem]">
-          <TaskStatusCard {...cards} base={h ? listBase(h) : {}} />
-        </div>
-        <div className="h-[19rem] lg:col-span-6 lg:h-[20rem]">
-          <FlowCard {...cards} base={h ? listBase(h) : {}} />
-        </div>
-        <div className="h-[17rem] lg:col-span-6 lg:h-[20rem]">
-          <ProcessesCard {...cards} />
-        </div>
-        <div className="h-[24rem] lg:col-span-6 lg:h-[22rem]">
-          <AgendaCard {...cards} />
-        </div>
-        <div className="h-[22rem] lg:col-span-6">
-          <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
-        </div>
-      </Section>
+      <DashColsContext.Provider value={cols}>
+        <Section title="Tarefas">
+          <DashSlot rows={4} span={{ wide: 8, medium: 2 }}>
+            <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
+          </DashSlot>
+          <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }}>
+            <TaskStatusCard {...cards} base={h ? listBase(h) : {}} />
+          </DashSlot>
+          <DashSlot rows={3} span={{ wide: 6, medium: 1 }}>
+            <FlowCard {...cards} base={h ? listBase(h) : {}} />
+          </DashSlot>
+          <DashSlot rows={3} phoneRows={4} span={{ wide: 6, medium: 1 }}>
+            <AgendaCard {...cards} />
+          </DashSlot>
+          <DashSlot rows={3} phoneRows={4} span={{ wide: 6, medium: 1 }}>
+            <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
+          </DashSlot>
+          <DashSlot rows={3} span={{ wide: 6, medium: 1 }}>
+            <ProcessesCard {...cards} />
+          </DashSlot>
+        </Section>
 
-      <Section title="Vencimentos">
-        <div className={cn('h-[17rem]', showFees ? 'lg:col-span-3' : 'lg:col-span-4')}>
-          <DocumentsCard {...cards} kind="certificates" onList={setList} />
-        </div>
-        <div className={cn('h-[17rem]', showFees ? 'lg:col-span-3' : 'lg:col-span-4')}>
-          <DocumentsCard {...cards} kind="documents" onList={setList} />
-        </div>
-        <div className={cn('h-[19rem]', showFees ? 'lg:col-span-3' : 'lg:col-span-4')}>
-          <ConventionsCard {...cards} />
-        </div>
-        {showFees ? (
-          <div className="h-[17rem] lg:col-span-3">
-            <FeesCard {...cards} onList={setList} />
-          </div>
-        ) : null}
-      </Section>
+        <Section title="Vencimentos">
+          <DashSlot rows={3} span={{ wide: showFees ? 3 : 4, medium: 1 }}>
+            <DocumentsCard {...cards} kind="certificates" onList={setList} />
+          </DashSlot>
+          <DashSlot rows={3} span={{ wide: showFees ? 3 : 4, medium: 1 }}>
+            <DocumentsCard {...cards} kind="documents" onList={setList} />
+          </DashSlot>
+          {/* Five bands in 32px rows at 320px, 28px rows at 296px (below 4 columns): always M. */}
+          <DashSlot rows={3} span={{ wide: showFees ? 3 : 4, medium: showFees ? 1 : 2 }}>
+            <ConventionsCard {...cards} />
+          </DashSlot>
+          {showFees ? (
+            <DashSlot rows={3} span={{ wide: 3, medium: 1 }}>
+              <FeesCard {...cards} onList={setList} />
+            </DashSlot>
+          ) : null}
+        </Section>
 
-      <Section title="Obrigações e clientes">
-        <div className="h-[30rem] lg:col-span-7 lg:h-[24rem]">
-          <FiscalCard {...cards} />
-        </div>
-        <div className="h-[19rem] lg:col-span-5 lg:h-[24rem]">
-          <ClientsOverviewCard {...cards} onList={setList} />
-        </div>
-        {showIncomplete ? (
-          <div className="h-[24rem] lg:col-span-12 lg:h-[20rem]">
-            <IncompleteCard {...cards} onList={setList} canFinance={can('finance')} />
-          </div>
-        ) : null}
-      </Section>
+        <Section title="Obrigações e clientes">
+          <DashSlot rows={4} span={{ wide: 8, medium: 2 }}>
+            <FiscalCard {...cards} />
+          </DashSlot>
+          <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }}>
+            <ClientsOverviewCard {...cards} onList={setList} />
+          </DashSlot>
+          {showIncomplete ? (
+            <DashSlot rows={3} phoneRows={4} span={{ wide: 12, medium: 2 }}>
+              <IncompleteCard {...cards} onList={setList} canFinance={can('finance')} />
+            </DashSlot>
+          ) : null}
+        </Section>
+      </DashColsContext.Provider>
 
       <DashboardListSheet list={list} data={dash.data} onChange={setList} />
     </div>
   );
 }
 
-/** A block of the start page: a quiet heading over a 12-column grid of cards. */
+/** A block of the start page: a quiet heading over the card grid (12, 2 or 1 columns by width). */
 function Section({ title, children }: { title: string; children: ReactNode }) {
+  const cols = useDashCols();
   return (
     <section aria-label={title} className="flex flex-col gap-3">
       <h2 className="text-title-sm font-semibold tracking-tight text-fg">{title}</h2>
-      <div className="grid gap-5 lg:grid-cols-12">{children}</div>
+      <div className={dashGridClass(cols)}>{children}</div>
     </section>
   );
 }
@@ -218,64 +232,12 @@ function DepartmentSwitcher({ value, options, onChange }: { value: string; optio
 // takes its cell)
 // ---------------------------------------------------------------------------
 
-function Cell({
-  className,
-  label,
-  info,
-  value,
-  big,
-  tone,
-  href,
-  aria,
-  footer,
-  loading,
-}: {
-  className?: string;
-  label: string;
-  info?: string;
-  value: number;
-  big?: boolean;
-  tone?: 'danger' | 'warning';
-  href: string;
-  aria: string;
-  footer?: ReactNode;
-  loading: boolean;
-}) {
-  return (
-    <div className={cn('min-w-0 border-border p-4 sm:p-5', className)}>
-      <Link
-        to={href}
-        aria-label={aria}
-        className="-m-2 block rounded-md p-2 transition-colors duration-150 hover:bg-surface-muted"
-      >
-        <SummaryLabel info={info}>{label}</SummaryLabel>
-        {loading ? (
-          <span className="mt-1 flex h-10 items-center">
-            <Skeleton className={big ? 'h-8 w-16' : 'h-6 w-10'} />
-          </span>
-        ) : (
-          <span
-            className={cn(
-              'tabular mt-1 block leading-10 font-semibold tracking-tight',
-              big ? 'text-[32px] lg:text-[28px] xl:text-[32px]' : 'text-kpi',
-              tone === 'danger' && value > 0 ? 'text-danger' : tone === 'warning' && value > 0 ? 'text-warning' : 'text-fg',
-            )}
-          >
-            {value}
-          </span>
-        )}
-      </Link>
-      {loading ? (
-        <span className="mt-1 flex h-5 items-center">
-          <Skeleton className="h-3.5 w-28 max-w-full" />
-        </span>
-      ) : footer ? (
-        <div className="mt-1 text-body-sm text-muted">{footer}</div>
-      ) : null}
-    </div>
-  );
-}
+const linkInText = 'font-medium text-brand-text underline decoration-border-strong underline-offset-4 hover:decoration-current';
 
+/**
+ * Number strip of the Início (docs/dashboards-redesign.md §8.1): the shared `MetricStrip`, six cells
+ * ("Atrasadas" wider, with the 32px number), footers on one line with the full text as tooltip.
+ */
 function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; today: string }) {
   const { openTask } = useTaskSheetLinks();
   const base = home ? listBase(home) : {};
@@ -288,131 +250,137 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
   const noRecurring = home ? home.obligations.total === 0 && t!.recurring === 0 : false;
   const legalIn = t?.targetMissedNextLegalDate ? diffInDays(t.targetMissedNextLegalDate, today) : null;
 
+  const oldestText =
+    t && t.overdue > 0 && oldest
+      ? `A mais antiga venceu há ${daysText(oldest.daysOverdue)}: ${oldest.title}${oldest.kind === 'recurring' && oldest.client ? ` · ${oldest.client.name}` : ''}${oldest.assignee ? ` · com ${shortName(oldest.assignee.name)}` : ' · sem responsável'}`
+      : t && t.overdue === 0
+        ? `Nada atrasado${where}.`
+        : '';
+  const targetText = t
+    ? noRecurring
+      ? `nenhuma recorrente${where}`
+      : t.targetMissed > 0
+        ? legalIn !== null
+          ? legalIn <= 0
+            ? 'prazo legal hoje'
+            : `prazo legal em até ${daysText(legalIn)}`
+          : 'dentro do prazo legal'
+        : 'nada fora da meta'
+    : '';
+  const todayText = t ? (t.appointmentsToday ? `${t.appointmentsToday} ${t.appointmentsToday === 1 ? 'compromisso' : 'compromissos'}` : t.dueToday ? 'até o fim do dia' : 'nada para hoje') : '';
+  const openText = t ? `${t.byStatus.in_progress} em andamento${t.waitingClient > 0 ? ` · ${t.waitingClient} aguardando cliente` : ''}` : '';
+  const onTime = done > 0 && t ? Math.round((t.doneOnTime / done) * 100) : null;
+  const doneText = t ? (onTime === null ? 'nenhuma concluída ainda' : `${onTime}% no prazo · ${t.doneLate} com atraso`) : '';
+
+  const cells: MetricCell[] = [
+    {
+      key: 'overdue',
+      hero: true,
+      label: 'Atrasadas',
+      info: 'Abertas depois do prazo: o vencimento, nas avulsas, ou o prazo legal, nas recorrentes. Conta todas as abertas; a Situação das tarefas conta só as da competência.',
+      value: t?.overdue ?? 0,
+      tone: t && t.overdue > 0 ? 'danger' : undefined,
+      href: tasksHref({ ...base, situation: 'overdue' }),
+      aria: `Atrasadas${where}: ${t?.overdue ?? 0}. Ver na lista de tarefas.`,
+      footerTitle: oldestText,
+      footer:
+        t && t.overdue > 0 && oldest ? (
+          <>
+            A mais antiga venceu há {daysText(oldest.daysOverdue)}:{' '}
+            <button type="button" onClick={() => openTask(oldest.id)} className={cn('inline text-left', linkInText)}>
+              {oldest.title}
+            </button>
+            {oldest.kind === 'recurring' && oldest.client ? ` · ${oldest.client.name}` : ''}
+            {oldest.assignee ? ` · com ${shortName(oldest.assignee.name)}` : ' · sem responsável'}
+          </>
+        ) : (
+          oldestText
+        ),
+      loading,
+    },
+    {
+      key: 'target',
+      label: 'Fora da meta',
+      info: 'Recorrentes abertas depois da meta interna, ainda dentro do prazo legal.',
+      value: t?.targetMissed ?? 0,
+      tone: t && t.targetMissed > 0 ? 'warning' : undefined,
+      href: tasksHref({ ...base, kind: 'recurring' }),
+      aria: `Fora da meta${where}: ${t?.targetMissed ?? 0}. Ver na lista de tarefas.`,
+      footer: targetText,
+      footerTitle: targetText,
+      loading,
+    },
+    {
+      key: 'today',
+      label: 'Vencem hoje',
+      info: 'Avulsas com vencimento hoje e recorrentes com meta hoje.',
+      value: t?.dueToday ?? 0,
+      href: tasksHref({ ...base, dueDate: today as never }),
+      aria: `Vencem hoje${where}: ${t?.dueToday ?? 0}. Ver na lista de tarefas.`,
+      footer: todayText,
+      footerTitle: todayText,
+      loading,
+    },
+    {
+      key: 'next7',
+      label: 'Próximos 7 dias',
+      value: t?.dueNext7Days ?? 0,
+      href: tasksHref({ ...base }),
+      aria: `Vencem nos próximos 7 dias${where}: ${t?.dueNext7Days ?? 0}. Ver na lista de tarefas.`,
+      footer: `até ${shortDate(addDays(today, 7), today)}`,
+      loading,
+    },
+    {
+      key: 'open',
+      label: 'Em aberto',
+      value: t?.open ?? 0,
+      href: tasksHref({ ...base }),
+      aria: `Em aberto${where}: ${t?.open ?? 0}. Ver na lista de tarefas.`,
+      footerTitle: openText,
+      footer: t ? (
+        <>
+          {t.byStatus.in_progress} em andamento
+          {t.waitingClient > 0 ? (
+            <>
+              {' · '}
+              <Link to={tasksHref({ ...base, situation: 'waiting' })} className={linkInText}>
+                {t.waitingClient} aguardando cliente
+              </Link>
+            </>
+          ) : null}
+        </>
+      ) : null,
+      loading,
+    },
+    {
+      key: 'done',
+      label: `Concluídas em ${month}`,
+      info: 'No prazo: concluídas até o prazo legal (ou o vencimento, nas avulsas; sem vencimento contam no prazo). Canceladas não entram. A meta é 100% no prazo.',
+      value: done,
+      href: tasksHref({ ...base, situation: 'done', month: (home?.month ?? '') as never }),
+      aria: `Concluídas em ${month}${where}: ${done}${onTime !== null ? `, ${onTime}% no prazo` : ''}. Ver na lista de tarefas.`,
+      footerTitle: doneText,
+      footer: t ? (
+        <span className="flex min-w-0 items-center gap-2">
+          {done > 0 ? (
+            <StackBar
+              size="sm"
+              className="w-12 shrink-0"
+              segments={[
+                { value: t.doneOnTime, className: 'bg-data' },
+                { value: t.doneLate, className: 'bg-danger' },
+              ]}
+            />
+          ) : null}
+          <span className="tabular truncate">{doneText}</span>
+        </span>
+      ) : null,
+      loading,
+    },
+  ];
   return (
-    <section aria-label="Resumo do departamento" aria-busy={loading || undefined} className="overflow-hidden rounded-xl border border-border bg-surface">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,0.75fr))_minmax(0,1.3fr)]">
-        <Cell
-          className="col-span-2 md:col-span-1"
-          big
-          tone="danger"
-          label="Atrasadas"
-          info="Abertas depois do prazo: o vencimento, nas avulsas, ou o prazo legal, nas recorrentes."
-          value={t?.overdue ?? 0}
-          loading={loading}
-          href={tasksHref({ ...base, situation: 'overdue' })}
-          aria={`Atrasadas${where}: ${t?.overdue ?? 0}. Ver na lista de tarefas.`}
-          footer={
-            t && t.overdue > 0 && oldest ? (
-              <>
-                A mais antiga venceu há {daysText(oldest.daysOverdue)}:{' '}
-                <button
-                  type="button"
-                  onClick={() => openTask(oldest.id)}
-                  className="inline text-left font-semibold text-brand-text underline decoration-border-strong underline-offset-4 hover:decoration-current"
-                >
-                  {oldest.title}
-                </button>
-                {oldest.kind === 'recurring' && oldest.client ? ` · ${oldest.client.name}` : ''}
-                {oldest.assignee ? ` · com ${shortName(oldest.assignee.name)}` : ' · sem responsável'}
-              </>
-            ) : t && t.overdue === 0 ? (
-              `Nada atrasado${where}.`
-            ) : null
-          }
-        />
-        <Cell
-          className="border-t md:border-t-0 md:border-l"
-          label="Fora da meta"
-          info="Recorrentes abertas depois da meta interna, ainda dentro do prazo legal."
-          value={t?.targetMissed ?? 0}
-          tone="warning"
-          loading={loading}
-          href={tasksHref({ ...base, kind: 'recurring' })}
-          aria={`Fora da meta${where}: ${t?.targetMissed ?? 0}. Ver na lista de tarefas.`}
-          footer={
-            t
-              ? noRecurring
-                ? `nenhuma recorrente${where}`
-                : t.targetMissed > 0
-                  ? legalIn !== null
-                    ? legalIn <= 0
-                      ? 'prazo legal hoje'
-                      : `prazo legal em até ${daysText(legalIn)}`
-                    : 'dentro do prazo legal'
-                  : 'nada fora da meta'
-              : null
-          }
-        />
-        <Cell
-          className="border-t border-l md:border-t-0"
-          label="Vencem hoje"
-          info="Avulsas com vencimento hoje e recorrentes com meta hoje."
-          value={t?.dueToday ?? 0}
-          loading={loading}
-          href={tasksHref({ ...base, dueDate: today as never })}
-          aria={`Vencem hoje${where}: ${t?.dueToday ?? 0}. Ver na lista de tarefas.`}
-          footer={t ? (t.appointmentsToday ? `${t.appointmentsToday} ${t.appointmentsToday === 1 ? 'compromisso' : 'compromissos'}` : t.dueToday ? 'até o fim do dia' : 'nada para hoje') : null}
-        />
-        <Cell
-          className="border-t md:border-l-0 lg:border-t-0 lg:border-l"
-          label="Próximos 7 dias"
-          value={t?.dueNext7Days ?? 0}
-          loading={loading}
-          href={tasksHref({ ...base })}
-          aria={`Vencem nos próximos 7 dias${where}: ${t?.dueNext7Days ?? 0}. Ver na lista de tarefas.`}
-          footer={`até ${shortDate(addDays(today, 7), today)}`}
-        />
-        <Cell
-          className="border-t border-l lg:border-t-0"
-          label="Em aberto"
-          value={t?.open ?? 0}
-          loading={loading}
-          href={tasksHref({ ...base })}
-          aria={`Em aberto${where}: ${t?.open ?? 0}. Ver na lista de tarefas.`}
-          footer={
-            t ? (
-              <>
-                {t.byStatus.in_progress} em andamento
-                {t.waitingClient > 0 ? (
-                  <>
-                    {' · '}
-                    <Link
-                      to={tasksHref({ ...base, situation: 'waiting' })}
-                      className="font-medium text-brand-text underline decoration-border-strong underline-offset-4 hover:decoration-current"
-                    >
-                      {t.waitingClient} aguardando cliente
-                    </Link>
-                  </>
-                ) : null}
-              </>
-            ) : null
-          }
-        />
-        <Cell
-          className="col-span-2 border-t md:col-span-1 md:border-l lg:border-t-0"
-          label={`Concluídas em ${month}`}
-          info="No prazo: concluídas até o prazo legal (ou o vencimento, nas avulsas; sem vencimento contam no prazo). Canceladas não entram."
-          value={done}
-          loading={loading}
-          href={tasksHref({ ...base, situation: 'done', month: (home?.month ?? '') as never })}
-          aria={`Concluídas em ${month}${where}: ${done}. Ver na lista de tarefas.`}
-          footer={
-            t ? (
-              <div className="flex flex-col gap-1.5">
-                {done > 0 ? (
-                  <span className="flex h-1.5 w-full gap-0.5 overflow-hidden" aria-hidden>
-                    {t.doneOnTime ? <span className="h-full rounded-full bg-data" style={{ width: `${(t.doneOnTime / done) * 100}%` }} /> : null}
-                    {t.doneLate ? <span className="h-full rounded-full bg-danger" style={{ width: `${(t.doneLate / done) * 100}%` }} /> : null}
-                  </span>
-                ) : null}
-                <span className="tabular">
-                  {t.doneOnTime} no prazo · {t.doneLate} com atraso
-                </span>
-              </div>
-            ) : null
-          }
-        />
-      </div>
+    <section aria-label="Resumo do departamento" aria-busy={loading || undefined}>
+      <MetricStrip cells={cells} medium={3} />
     </section>
   );
 }
@@ -568,7 +536,8 @@ function ByAssignee({ home, people, where, loading }: { home: TaskHomeResponse |
   return (
     <WidgetCard
       title="Por responsável"
-      subtitle={`Em aberto ${where}`}
+      subtitle={assigneeInsight(rows.map((r) => ({ label: r.label, open: r.open, overdue: r.overdue, unassigned: r.key === 'none' }))) ?? `Em aberto ${where}`}
+      info={`Tarefas em aberto ${where} por responsável (atrasadas em vermelho). A porcentagem é a parte de cada pessoa no total em aberto.`}
       action={
         <Button variant="ghost" size="sm" asChild>
           <Link to="/tarefas/cadastros?aba=equipe">Ver equipe</Link>

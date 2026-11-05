@@ -66,17 +66,36 @@ export function clampSize(size: Partial<WidgetSize> | undefined, spec: WidgetSpe
   };
 }
 
-/** Columns a widget spans on a grid with `cols` columns. */
+/**
+ * Columns a widget spans on a grid with `cols` columns, keeping its share of the width: on 2
+ * columns 1/4 and 1/2 become half (1) and 3/4 and the full width become the full width (2).
+ */
 export function displaySpan(c: number, cols: number): number {
+  if (cols === 1) return 1;
+  if (cols === 2) return c <= 2 ? 1 : 2;
   return Math.min(c, cols);
 }
 
 /**
- * Width to store after a resize on a narrow grid: when the drag did not change the displayed
- * width, keep the stored (desktop) width instead of overwriting it with the narrow one.
+ * Width to store after a resize: when the drag did not change the displayed width, the stored
+ * (desktop) width survives; on 2 columns the new width is stored in 4-column terms (1 → 2, 2 → 4).
  */
-export function commitCols(stored: number, displayed: number, next: number): number {
-  return next === displayed ? stored : next;
+export function commitCols(stored: number, displayed: number, next: number, cols: BoardCols): number {
+  if (next === displayed) return stored;
+  return cols === 2 ? next * 2 : next;
+}
+
+/**
+ * The spec with its width limits in shown columns of a board (the corner handle and the arrow
+ * keys work in shown columns): on 2 columns, a 2-of-4 minimum is 1 and a 2-of-4 maximum is 1.
+ */
+export function specOnBoard(spec: WidgetSpec, cols: BoardCols): WidgetSpec {
+  if (cols === 4) return spec;
+  return {
+    ...spec,
+    min: { ...spec.min, c: displaySpan(spec.min.c, cols) },
+    max: { ...spec.max, c: displaySpan(spec.max.c, cols) },
+  };
 }
 
 export interface GridMetrics {
@@ -233,9 +252,12 @@ export function moveItem(items: readonly BoardItem[], id: WidgetId, cell: GridCe
   return settle(items.map((i) => (i.id === id ? { ...i, x: cell.x, y: cell.y } : i)), cols, [id]);
 }
 
-/** Corner handle: the card keeps its cell and pushes down the cards it now covers. */
+/**
+ * Corner handle: the card keeps its cell and pushes down the cards it now covers. `size` is in
+ * shown columns (what the handle snapped to on this board), not the stored 4-column width.
+ */
 export function resizeItem(items: readonly BoardItem[], id: WidgetId, size: WidgetSize, cols: number): BoardItem[] {
-  const next = settle(items.map((i) => (i.id === id ? { ...i, c: displaySpan(size.c, cols), r: size.r } : i)), cols, [id]);
+  const next = settle(items.map((i) => (i.id === id ? { ...i, c: clamp(size.c, 1, cols), r: size.r } : i)), cols, [id]);
   return cols === 1 ? compact(next) : next;
 }
 

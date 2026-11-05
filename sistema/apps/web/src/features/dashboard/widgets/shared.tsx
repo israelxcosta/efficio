@@ -16,7 +16,7 @@ export function ListSkeleton({ rowClassName = 'h-10' }: { rowClassName?: string 
   );
 }
 
-/** Compact empty state that takes the card body. */
+/** Empty state that takes the card body, without a second frame (the card already is one). */
 export function BodyEmpty(props: Parameters<typeof EmptyState>[0]) {
-  return <EmptyState {...props} compact className={cn('min-h-0 flex-1 overflow-hidden py-3', props.className)} />;
+  return <EmptyState {...props} compact framed={false} className={cn('min-h-0 flex-1 overflow-hidden py-3', props.className)} />;
 }

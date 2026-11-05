@@ -13,6 +13,7 @@ import { fitCount } from '../layout/layout';
 import type { WidgetProps } from '../layout/types';
 import { FitList, WidgetCard } from '../layout/widget-card';
 import { TransactionRow } from '@/features/transactions/components/transaction-row';
+import { fixedInsight } from './insight-lines';
 import { BodyEmpty, ListSkeleton } from './shared';
 
 const headerLink = 'text-caption font-medium whitespace-nowrap text-brand-text hover:underline';
@@ -86,7 +87,7 @@ function FixedWidget({ type, d, loading, month, size, alert }: WidgetProps & { t
             <ProgressBar
               value={share}
               size="sm"
-              tone="success"
+              color="var(--app-data)"
               className="mt-1"
               label={`${copy.settled} ${Math.round(share * 100)}% dos lançamentos fixos do mês`}
             />
@@ -98,7 +99,7 @@ function FixedWidget({ type, d, loading, month, size, alert }: WidgetProps & { t
           moreLabel="lançamento(s)"
           moreHref={href}
           className="flex flex-col"
-          renderItem={(tx) => <TransactionRow tx={tx} density="compact" />}
+          renderItem={(tx) => <TransactionRow tx={tx} density="line" />}
         />
       </>
     );
@@ -107,7 +108,12 @@ function FixedWidget({ type, d, loading, month, size, alert }: WidgetProps & { t
   return (
     <WidgetCard
       alert={alert}
-      subtitle={items.length ? `${pluralize(items.length, 'lançamento', 'lançamentos')} · ${formatBRL(total)}/mês` : 'Lançamentos fixos do mês'}
+      subtitle={fixedInsight(settled, total, type === 'expense' ? 'pago' : 'recebido') ?? 'Lançamentos fixos do mês'}
+      info={
+        items.length
+          ? `${pluralize(items.length, 'lançamento fixo', 'lançamentos fixos')} no mês, somando ${formatBRL(total)}. Os em aberto vêm primeiro.`
+          : 'Lançamentos recorrentes do mês.'
+      }
       action={
         <Link to={href} className={headerLink}>
           Ver todos →

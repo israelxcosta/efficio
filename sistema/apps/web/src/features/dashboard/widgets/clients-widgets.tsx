@@ -30,6 +30,8 @@ import { REGIME_COLORS } from '@/features/clients/clients-summary';
 import { useContactReport } from '@/features/reports/api';
 import type { WidgetProps } from '../layout/types';
 import { FitList, WidgetCard } from '../layout/widget-card';
+import { feesMonthInsight, portfolioInsight } from './insight-lines';
+import { StackBar } from '@/components/charts/stack-bar';
 import {
   billableClients,
   clientIncome,
@@ -283,13 +285,18 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
 
   return (
     <WidgetCard
-      subtitle={summary ? `${pluralize(summary.active + summary.inactive, 'empresa', 'empresas')} na carteira` : 'Clientes ativos, inativos e honorários'}
+      subtitle={(summary && portfolioInsight(summary.active, summary.averageFee || null)) ?? 'Clientes ativos, inativos e honorários'}
       info="Honorário fixo: soma dos honorários mensais vigentes hoje dos clientes ativos (sem a taxa por empregado). O gráfico divide esse total por regime tributário; entre parênteses, os clientes ativos de cada regime."
       alert={alert}
-      action={
-        <Link to="/clientes" className="text-caption font-medium whitespace-nowrap text-brand-text hover:underline">
-          Ver clientes →
-        </Link>
+      footer={
+        summary ? (
+          <div className="flex items-center justify-between gap-3">
+            <p className="min-w-0 truncate text-caption text-muted">{pluralize(summary.active + summary.inactive, 'empresa', 'empresas')} na carteira</p>
+            <Link to="/clientes" className="shrink-0 text-caption font-medium whitespace-nowrap text-brand-text hover:underline">
+              Ver clientes →
+            </Link>
+          </div>
+        ) : undefined
       }
     >
       {body}
@@ -461,44 +468,44 @@ function useMonthIncome(month: MonthKey) {
   });
 }
 
-interface FeeBar {
-  key: string;
+const share = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
+
+/** One step of the fees strip: label, amount and, when there is a reference, its bullet and share. */
+function FeeStep({
+  label,
+  value,
+  hint,
+  bar,
+}: {
   label: string;
   value: number;
   hint?: string;
-  /** Token class of the fill. */
-  fill: string;
-}
-
-const pct = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
-
-/** Horizontal bars on one scale: label (and hint) left, bar, amount right. Bars thicken with the card. */
-function FeeBars({ rows }: { rows: FeeBar[] }) {
-  const box = useElementSize<HTMLUListElement>();
-  const max = Math.max(1, ...rows.map((r) => r.value));
-  const thickness = Math.round(Math.min(22, Math.max(8, (box.height / rows.length) * 0.2)));
+  /** Bullet against a reference: filled share (0–1 of the scale), mark of the reference, text. */
+  bar?: { fill: number; mark: number; className: string; text: string };
+}) {
   return (
-    <ul ref={box.ref} className="flex min-h-0 flex-1 flex-col justify-evenly gap-2">
-      {rows.map((r) => (
-        <li
-          key={r.key}
-          className={cn(
-            'grid items-center gap-x-3',
-            "grid-cols-[minmax(0,1fr)_auto] [grid-template-areas:'label_value'_'bar_bar']",
-            "@md:grid-cols-[9.5rem_minmax(0,1fr)_7rem] @md:[grid-template-areas:'label_bar_value'] @2xl:grid-cols-[11rem_minmax(0,1fr)_7rem]",
-          )}
-        >
-          <span className="min-w-0 [grid-area:label]">
-            <span className="block truncate text-caption font-medium text-fg">{r.label}</span>
-            {r.hint ? <span className="hidden truncate text-micro text-muted @md:block">{r.hint}</span> : null}
-          </span>
-          <span className="mt-1 block overflow-hidden rounded-full bg-bg-subtle [grid-area:bar] @md:mt-0" style={{ height: thickness }} aria-hidden>
-            <span className={cn('block h-full rounded-full', r.value > 0 && 'min-w-1', r.fill)} style={{ width: `${(r.value / max) * 100}%` }} />
-          </span>
-          <span className="text-right text-body-sm font-semibold text-fg tabular [grid-area:value]">{formatBRL(r.value)}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] items-center gap-x-3 @lg:flex @lg:flex-col @lg:items-stretch @lg:justify-center @lg:gap-0.5">
+      <p className="truncate text-caption text-muted">{label}</p>
+      <p className="order-last text-right text-body-sm font-semibold whitespace-nowrap text-fg tabular @lg:order-none @lg:text-left @lg:text-[18px] @lg:leading-6">
+        {formatBRL(value)}
+      </p>
+      {bar ? (
+        <div className="flex min-w-0 items-center gap-2 @lg:mt-1">
+          <StackBar
+            size="sm"
+            className="min-w-0 flex-1"
+            segments={[
+              { value: bar.fill, className: bar.className },
+              { value: Math.max(0, 1 - bar.fill), className: 'bg-transparent' },
+            ]}
+            marker={bar.mark < 1 ? { at: bar.mark, label: '' } : undefined}
+          />
+          <span className="shrink-0 text-micro font-semibold text-fg tabular">{bar.text}</span>
+        </div>
+      ) : (
+        <p className="truncate text-micro text-muted">{hint}</p>
+      )}
+    </div>
   );
 }
 
@@ -507,7 +514,7 @@ function FeeBars({ rows }: { rows: FeeBar[] }) {
  * received and open for the competence due this month, and the clients still without one.
  * Older APIs: income of clients in the month from the contacts report.
  */
-export function FeesMonthWidget({ month, d, loading, size, alert }: WidgetProps) {
+export function FeesMonthWidget({ month, d, loading, alert }: WidgetProps) {
   const today = todayISO();
   const clients = useOfficeClients();
   const income = useMonthIncome(month);
@@ -575,104 +582,75 @@ export function FeesMonthWidget({ month, d, loading, size, alert }: WidgetProps)
   } else {
     const { summary } = data;
     const withFee = summary.active - (summary.withoutCurrentFee ?? 0);
-    const bars: FeeBar[] = [
-      {
-        key: 'expected',
-        label: 'Honorário fixo previsto',
-        value: summary.monthlyFees ?? 0,
-        hint: `${pluralize(withFee, 'cliente', 'clientes')} com vigência`,
-        fill: 'bg-[var(--app-chart-neutral)]',
-      },
-      {
-        key: 'billed',
-        label: billedLabel,
-        value: view.billed,
-        hint:
-          (summary.monthlyFees ?? 0) > 0
-            ? `${pct(view.billed, summary.monthlyFees ?? 0)} do previsto${feeAware ? ` · ${pluralize(view.count, 'lançamento', 'lançamentos')}` : ''}`
-            : undefined,
-        fill: 'bg-[var(--app-chart-3)]',
-      },
-      {
-        key: 'received',
-        label: 'Recebido',
-        value: view.received,
-        hint: view.billed > 0 ? `${pct(view.received, view.billed)} do ${billedLabel.toLowerCase()}` : undefined,
-        fill: 'bg-data',
-      },
-    ];
+    const planned = summary.monthlyFees ?? 0;
+    // Generated against planned (mark on 100% when it went past it); received against generated.
+    const genScale = Math.max(planned, view.billed, 1);
     const missing = view.missing.length;
-    const tileHint = (text: string) => <span className="hidden @md:inline">{text}</span>;
     body = (
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 @2xl:grid @2xl:grid-cols-[minmax(0,1fr)_15rem] @2xl:gap-x-6">
-        <FeeBars rows={bars} />
-        <div className="flex min-h-0 flex-col gap-2 @2xl:justify-center">
-          <div className="grid shrink-0 grid-cols-2 gap-2 @2xl:grid-cols-1">
-            <StatTile
-              label="Em aberto"
-              value={formatBRL(view.open)}
-              hint={
-                view.overdue > 0
-                  ? tileHint(`${formatBRL(view.overdue)} vencido`)
-                  : view.billed > 0
-                    ? tileHint(view.open > 0 ? 'nada vencido' : `tudo ${feeAware ? 'recebido' : 'quitado'}`)
-                    : undefined
-              }
-              tone={view.overdue > 0 ? 'danger' : undefined}
-            />
-            <StatTile
-              label={feeAware ? 'Sem honorário gerado' : 'Sem lançamento no mês'}
-              value={missing}
-              hint={tileHint(feeAware ? `de ${pluralize(view.base, 'cliente', 'clientes')} com vigência` : `de ${pluralize(view.base, 'cliente ativo', 'clientes ativos')}`)}
-              tone={missing > 0 ? 'warning' : undefined}
-            />
+      <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 @lg:grid @lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,13rem)] @lg:gap-x-6">
+        <FeeStep label="Previsto" value={planned} hint={pluralize(withFee, 'cliente com vigência', 'clientes com vigência')} />
+        <FeeStep
+          label={billedLabel}
+          value={view.billed}
+          bar={
+            planned > 0
+              ? { fill: view.billed / genScale, mark: planned / genScale, className: 'bg-[var(--app-chart-3)]', text: `${share(view.billed, planned)}%` }
+              : undefined
+          }
+          hint={planned > 0 ? undefined : 'nada previsto'}
+        />
+        <FeeStep
+          label="Recebido"
+          value={view.received}
+          bar={view.billed > 0 ? { fill: Math.min(1, view.received / view.billed), mark: 1, className: 'bg-data', text: `${share(view.received, view.billed)}%` } : undefined}
+          hint={view.billed > 0 ? undefined : `nada ${billedLabel.toLowerCase()}`}
+        />
+        <dl className="hidden min-w-0 flex-col justify-center gap-1 border-l border-border pl-5 text-caption @lg:flex">
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="truncate text-muted">Em aberto</dt>
+            <dd className={cn('font-semibold whitespace-nowrap tabular', view.overdue > 0 ? 'text-danger' : 'text-fg')}>{formatBRL(view.open)}</dd>
           </div>
-          {feeAware && missing > 0 ? (
-            <p className="shrink-0 truncate text-micro text-muted">
-              Gere em{' '}
-              <Link to="/contas-a-receber" className="font-medium text-brand-text hover:underline">
-                Contas a receber → Gerar honorários
-              </Link>
-            </p>
-          ) : null}
-          {missing > 0 && size.r >= 4 ? (
-            <div className="hidden min-h-0 flex-1 flex-col @2xl:flex">
-              <FitList
-                items={view.missing}
-                getKey={(c: Client) => c.id}
-                moreLabel="cliente(s)"
-                moreHref="/clientes"
-                className="flex flex-col"
-                renderItem={(c: Client) => (
-                  <Link to={clientHref(c.id)} className="block truncate rounded-md px-1.5 py-0.5 text-[12px] text-fg transition-colors hover:bg-surface-muted" title={c.name}>
-                    {c.name}
-                  </Link>
-                )}
-              />
-            </div>
-          ) : null}
-        </div>
+          {view.overdue > 0 ? <p className="-mt-1 text-right text-micro text-danger">{formatBRL(view.overdue)} vencido</p> : null}
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="truncate text-muted">{feeAware ? 'Sem honorário gerado' : 'Sem lançamento'}</dt>
+            <dd className={cn('font-semibold tabular', missing > 0 ? 'text-warning' : 'text-fg')}>{missing}</dd>
+          </div>
+        </dl>
       </div>
     );
   }
 
-  const zero = Boolean(view && view.billed === 0);
+  const insight = view && data && !pending && !failed ? feesMonthInsight(data.summary.monthlyFees ?? 0, view.billed, view.received) : null;
+  const finding = insight && feeAware ? `Competência ${compLabel} · ${insight.charAt(0).toLowerCase()}${insight.slice(1)}` : insight;
   return (
     <WidgetCard
-      subtitle={feeAware ? `Competência ${compLabel} · vencimento em ${monthLabel}` : `Lançamentos de clientes em ${monthLabel}`}
+      subtitle={finding ?? (feeAware ? `Competência ${compLabel} · vencimento em ${monthLabel}` : `Lançamentos de clientes em ${monthLabel}`)}
       info={
         feeAware
-          ? 'Honorários gerados em Contas a receber para a competência (mês do serviço), que vencem no mês seguinte. Recebido e em aberto contam só esses lançamentos.'
-          : 'Receitas lançadas para clientes no mês, pela data de vencimento.'
+          ? `Honorários gerados em Contas a receber para a competência ${compLabel} (mês do serviço), que vencem em ${monthLabel}. Recebido e em aberto contam só esses lançamentos. O previsto não inclui a taxa por empregado.${income.data?.truncated ? ` Calculado sobre os ${MONTH_ROWS_LIMIT.toLocaleString('pt-BR')} primeiros lançamentos do mês.` : ''}`
+          : `Receitas lançadas para clientes em ${monthLabel}, pela data de vencimento. Lançamentos sem cliente vinculado não entram nesta conta. O previsto não inclui a taxa por empregado.`
       }
       alert={alert}
       footer={
-        view ? (
-          <p className="truncate text-micro text-muted">
-            Previsto não inclui a taxa por empregado.
-            {!feeAware && zero ? ' Lançamentos sem cliente vinculado não entram nesta conta.' : ''}
-            {income.data?.truncated ? ` Calculado sobre os ${MONTH_ROWS_LIMIT.toLocaleString('pt-BR')} primeiros lançamentos do mês.` : ''}
-          </p>
+        view && data && data.items.length > 0 && !pending && !failed ? (
+          <div className="flex items-center justify-between gap-3 text-caption text-muted">
+            <p className="min-w-0 truncate">
+              <span className="@lg:hidden">
+                Em aberto <span className={cn('font-semibold tabular', view.overdue > 0 ? 'text-danger' : 'text-fg')}>{formatBRL(view.open)}</span>
+                {' · '}
+              </span>
+              {view.missing.length > 0
+                ? `${pluralize(view.missing.length, 'cliente', 'clientes')} sem ${feeAware ? 'honorário gerado' : 'lançamento no mês'}`
+                : feeAware
+                  ? 'Todos os clientes com honorário gerado'
+                  : 'Todos os clientes com lançamento'}
+            </p>
+            {feeAware && view.missing.length > 0 ? (
+              <Link to="/contas-a-receber" className="shrink-0 font-medium whitespace-nowrap text-brand-text hover:underline">
+                Gerar honorários →
+              </Link>
+            ) : null}
+          </div>
         ) : undefined
       }
     >

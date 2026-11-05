@@ -14,7 +14,6 @@ import {
   type Granularity,
   type ISODate,
 } from '@effinance/shared';
-import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,13 +26,15 @@ import {
   moneyAxisFormatter,
   MoneyTooltip,
 } from '@/components/charts/chart-utils';
-import { yAxisWidth } from '@/components/charts/chart-scale';
+import { niceDomain, yAxisWidth } from '@/components/charts/chart-scale';
 import { useCashflowReport } from '@/features/reports/api';
 import { periodLabel, type PeriodMode } from '@/lib/period';
 import { useElementSize } from '@/lib/use-element-size';
 import { cn } from '@/lib/utils';
 import type { DashboardPrefs, WidgetProps } from '../layout/types';
 import { useWidgetResizing, WidgetCard } from '../layout/widget-card';
+import { cashflowInsight } from '../widgets/insight-lines';
+import { BodyEmpty } from '../widgets/shared';
 
 type Mode = DashboardPrefs['fluxoModo'];
 
@@ -43,11 +44,11 @@ const RANGES: Record<Exclude<Mode, 'M'>, { granularity: Granularity; from: (t: I
   A: { granularity: 'year', from: (t) => `${Number(t.slice(0, 4)) - 3}-01-01`, to: (t) => `${t.slice(0, 4)}-12-31` },
 };
 
-const MODES: { value: Mode; label: string; title: string; range: string }[] = [
-  { value: 'D', label: 'D', title: 'Últimos 14 dias', range: 'dos últimos 14 dias' },
-  { value: 'S', label: 'S', title: 'Últimas 8 semanas', range: 'das últimas 8 semanas' },
-  { value: 'M', label: 'M', title: 'Últimos 6 meses', range: 'dos últimos 6 meses' },
-  { value: 'A', label: 'A', title: 'Últimos 4 anos', range: 'dos últimos 4 anos' },
+const MODES: { value: Mode; label: string; title: string; range: string; many: string }[] = [
+  { value: 'D', label: 'D', title: 'Últimos 14 dias', range: 'dos últimos 14 dias', many: 'dias' },
+  { value: 'S', label: 'S', title: 'Últimas 8 semanas', range: 'das últimas 8 semanas', many: 'semanas' },
+  { value: 'M', label: 'M', title: 'Últimos 6 meses', range: 'dos últimos 6 meses', many: 'meses' },
+  { value: 'A', label: 'A', title: 'Últimos 4 anos', range: 'dos últimos 4 anos', many: 'anos' },
 ];
 
 const PERIOD_MODE: Record<Mode, PeriodMode> = { D: 'day', S: 'week', M: 'month', A: 'year' };
@@ -152,8 +153,10 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
   const failed = mode !== 'M' && cashflow.isError;
   const empty = !isLoading && !failed && rows.every((r) => r.receita === 0 && r.despesa === 0);
   const current = MODES.find((m) => m.value === mode) ?? MODES[2]!;
+  const finding = isLoading || failed ? null : cashflowInsight(rows, current);
 
-  const yWidth = yAxisWidth(rows.flatMap((r) => [r.receita, r.despesa]));
+  const axis = niceDomain(rows.flatMap((r) => [r.receita, r.despesa]));
+  const yWidth = yAxisWidth(axis.ticks);
   const ticks = labelTicks(rows, box.width - yWidth - 8);
 
   function openPeriod(index: unknown) {
@@ -168,9 +171,7 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
     body = <ErrorState error={cashflow.error} onRetry={() => void cashflow.refetch()} className="flex-1 justify-center" />;
   } else if (empty) {
     body = (
-      <EmptyState
-        compact
-        className="min-h-0 flex-1"
+      <BodyEmpty
         icon={<ChartColumn />}
         title="Sem movimentações no período"
         description="Adicione lançamentos para ver o fluxo de caixa aqui."
@@ -192,7 +193,7 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
         <div
           ref={box.ref}
           role="img"
-          aria-label={`Receitas e despesas ${current.range}: receitas ${formatBRL(totals.receita)}, despesas ${formatBRL(totals.despesa)}.`}
+          aria-label={`${finding ? `${finding}. ` : ''}Receitas e despesas ${current.range}: receitas ${formatBRL(totals.receita)}, despesas ${formatBRL(totals.despesa)}.`}
           className="mt-2 flex min-h-0 flex-1 flex-col"
         >
           <ChartBox className="cursor-pointer">
@@ -213,7 +214,7 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
                 ticks={ticks}
                 interval={ticks ? 0 : 'preserveStartEnd'}
               />
-              <YAxis {...axisProps} width={yWidth} tickCount={4} tickFormatter={moneyAxisFormatter} />
+              <YAxis {...axisProps} width={yWidth} domain={axis.domain} ticks={axis.ticks} interval={0} tickFormatter={moneyAxisFormatter} />
               <Tooltip cursor={{ fill: 'var(--app-bg-subtle)', radius: 8 }} content={<CashflowTooltip mode={mode} />} />
               <Bar
                 dataKey="receita"
@@ -241,7 +242,7 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
   return (
     <WidgetCard
       alert={alert}
-      subtitle={mode === 'M' ? 'Receita vs despesa mensal' : 'Entradas vs saídas nas contas'}
+      subtitle={finding ?? (mode === 'M' ? 'Receita vs despesa mensal' : 'Entradas vs saídas nas contas')}
       info="Mensal (M) usa a competência dos lançamentos. D, S e A mostram o dinheiro que entrou e saiu das contas. Clique numa barra para abrir o extrato do período."
       action={
         <SegmentedControl

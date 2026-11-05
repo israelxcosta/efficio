@@ -143,3 +143,113 @@ export function summarizeProjection(
   }
   return { today, points, worst, milestones, negativeFrom };
 }
+
+/** A value axis with round steps (`m × 10ⁿ`, m ∈ 1, 2, 2,5, 5): the domain and its tick marks. */
+export interface NiceDomain {
+  domain: [number, number];
+  ticks: number[];
+}
+
+const NICE_MANTISSAS = [1, 2, 2.5, 5] as const;
+
+/**
+ * The tightest round axis that holds the data (and zero) with 3 to `maxTicks` marks; on a tie, the
+ * one with more marks. A negative smaller than ¼ of the step only stretches the domain
+ * (`min × 1,25`) without a negative mark, so a −R$ 30 month does not open a −2,5k band.
+ * No data (or all zeros) → 0–100.
+ */
+export function niceDomain(values: readonly number[], maxTicks = 5): NiceDomain {
+  const finite = values.filter((v) => Number.isFinite(v));
+  const min = Math.min(0, ...finite);
+  const max = Math.max(0, ...finite);
+  if (min === 0 && max === 0) return { domain: [0, 100], ticks: [0, 100] };
+  const span = max - min;
+  const top = Math.floor(Math.log10(span));
+  let best: (NiceDomain & { size: number }) | null = null;
+  for (let n = top - 3; n <= top + 1; n++) {
+    for (const m of NICE_MANTISSAS) {
+      const step = m * 10 ** n;
+      // Cents: steps under 1 only show up for spans under 4 cents; skip the float noise.
+      if (step < 1 && span >= 4) continue;
+      const hiIndex = Math.ceil(max / step - 1e-9);
+      const smallNegative = min < 0 && -min < step / 4;
+      const loIndex = smallNegative ? 0 : Math.floor(min / step + 1e-9);
+      const count = hiIndex - loIndex + 1;
+      if (count < 3 || count > maxTicks) continue;
+      const hi = round(hiIndex * step);
+      const lo = smallNegative ? round(min * 1.25) : round(loIndex * step);
+      const ticks = Array.from({ length: count }, (_, i) => round((loIndex + i) * step));
+      const size = hi - lo;
+      if (!best || size < best.size || (size === best.size && ticks.length > best.ticks.length)) {
+        best = { domain: [lo, hi], ticks, size };
+      }
+    }
+  }
+  if (!best) return { domain: [min, max], ticks: [min, max] };
+  return { domain: best.domain, ticks: best.ticks };
+}
+
+/** Rounds away float noise from `m × 10ⁿ` products (cents never need more than 6 decimals). */
+function round(v: number): number {
+  const r = Math.round(v * 1e6) / 1e6;
+  return r === 0 ? 0 : r;
+}
+
+/**
+ * Stacked-bar segments: `width` is each value's exact share (0–1); `pct` are whole percentages
+ * that add up to 100 by the largest remainder (ties go to the first). A zero total → all zeros.
+ */
+export function stackSegments(values: readonly number[]): { width: number; pct: number }[] {
+  const safe = values.map((v) => (Number.isFinite(v) && v > 0 ? v : 0));
+  const total = safe.reduce((a, v) => a + v, 0);
+  if (total <= 0) return safe.map(() => ({ width: 0, pct: 0 }));
+  const raw = safe.map((v) => (v * 100) / total);
+  const pct = raw.map((r) => Math.floor(r));
+  let left = 100 - pct.reduce((a, v) => a + v, 0);
+  const order = raw
+    .map((r, i) => ({ i, rest: r - Math.floor(r) }))
+    .filter((o) => safe[o.i]! > 0)
+    .sort((a, b) => b.rest - a.rest || a.i - b.i);
+  for (const o of order) {
+    if (left <= 0) break;
+    pct[o.i]! += 1;
+    left -= 1;
+  }
+  return safe.map((v, i) => ({ width: v / total, pct: pct[i]! }));
+}
+
+/**
+ * SVG path ("M x y L x y …", at most 1 decimal) of a sparkline inside `width × height` with `pad`
+ * of breathing room; a flat series sits at mid height. Fewer than 2 points → ''.
+ */
+export function sparkPath(values: readonly number[], width: number, height: number, pad = 2): string {
+  const pts = values.filter((v) => Number.isFinite(v));
+  if (pts.length < 2) return '';
+  const min = Math.min(...pts);
+  const max = Math.max(...pts);
+  const innerW = width - pad * 2;
+  const innerH = height - pad * 2;
+  const fmt = (n: number) => String(Math.round(n * 10) / 10);
+  return pts
+    .map((v, i) => {
+      const x = pad + (innerW * i) / (pts.length - 1);
+      const y = max === min ? height / 2 : pad + (1 - (v - min) / (max - min)) * innerH;
+      return `${i === 0 ? 'M' : 'L'}${fmt(x)} ${fmt(y)}`;
+    })
+    .join(' ');
+}
+
+export type ProjectionTile = { key: 'worst' | 30 | 60 | 90; date: ISODate; saldo: number };
+
+/**
+ * Tiles above the projection chart: the 30/60/90-day milestones and, before them, the worst day
+ * only when its date or balance differs from the last milestone's (otherwise it repeats it).
+ */
+export function projectionTiles(s: Pick<ProjectionSummary, 'worst' | 'milestones'>): ProjectionTile[] {
+  const tiles: ProjectionTile[] = s.milestones.map((m) => ({ key: m.dias, date: m.date, saldo: m.saldo }));
+  const last = s.milestones[s.milestones.length - 1];
+  if (s.worst && (!last || last.date !== s.worst.date || last.saldo !== s.worst.saldo)) {
+    tiles.unshift({ key: 'worst', date: s.worst.date, saldo: s.worst.saldo });
+  }
+  return tiles;
+}

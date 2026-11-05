@@ -1,10 +1,16 @@
 // Catalog of dashboard widgets: default sizes, limits and the presets offered in "Personalizar".
 // The array order is the default arrangement of the board: each card takes the first free space
-// at 4 columns, which packs the default board with no holes (checked in tests).
+// at 4 columns, which packs the default board with no holes in both workspace kinds (checked in
+// tests). Default sizes are only S/M/L (2, 3 or 4 rows) and every row of the default board has
+// cards of one height (docs/dashboards-redesign.md §7.2):
 //
-// Default order follows the office's month: first the fees to receive (who paid the competence, who
-// is late, what falls due), then cash, clients, the month's analyses and recurring entries. Widgets
-// of personal finance (health score, card invoice, goals) start hidden; "Personalizar" turns them on.
+//   inadimplência 2×3 | devedores 2×3 · honorários do mês 4×2 · próximos vencimentos 4×3 ·
+//   fluxo 2×4 | saldo 2×4 · projeção 4×4 · insights 4×2 · carteira 2×4 | vigências 2×4 ·
+//   resumo 2×4 | despesas por categoria 2×4 · gastos fixos 2×4 | receitas fixas 2×4
+//
+// Personal workspaces drop honorários, carteira and vigências and still pack with no holes.
+// Hidden by default (turned on in "Cards"): fatura, saúde, cadastro incompleto, resultado mês a
+// mês, receitas por categoria, evolução, composição and metas.
 
 import type { WidgetGroupSpec, WidgetSize, WidgetSpec } from './types';
 
@@ -20,7 +26,8 @@ export const WIDGET_GROUPS: WidgetGroupSpec[] = [
 ];
 
 export const WIDGET_SPECS: WidgetSpec[] = [
-  // Honorários e cobrança: inadimplência | devedores (2×3), vencimentos (4×3). Card invoice starts hidden.
+  // Row 1 (M): inadimplência | devedores (2×3). Row 2 (S): honorários do mês (4×2). Row 3 (M): vencimentos (4×3).
+  // Card invoice starts hidden.
   {
     id: 'inadimplencia',
     group: 'receber-pagar',
@@ -42,6 +49,17 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     presets: [s(2, 3), s(2, 4), s(2, 5)],
   },
   {
+    id: 'honorarios-mes',
+    group: 'clientes',
+    title: 'Honorários do mês',
+    description: 'Previsto pelas vigências × faturado × recebido no mês.',
+    defaultSize: s(4, 2),
+    min: s(2, 2),
+    max: s(4, 5),
+    presets: [s(4, 2), s(2, 3)],
+    defaultFor: 'business',
+  },
+  {
     id: 'proximos-vencimentos',
     group: 'receber-pagar',
     title: 'Próximos vencimentos',
@@ -49,7 +67,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultSize: s(4, 3),
     min: s(2, 3),
     max: s(4, 7),
-    presets: [s(2, 4), s(4, 3), s(4, 4)],
+    presets: [s(4, 3), s(4, 4), s(2, 4)],
   },
   {
     id: 'fatura-cartao',
@@ -63,7 +81,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultHidden: true,
   },
 
-  // Caixa: fluxo (2×4) | saldo (2×4), then projeção (4×4) and insights (4×2). Saúde starts hidden.
+  // Row 4 (L): fluxo | saldo (2×4). Row 5 (L): projeção (4×4). Row 6 (S): insights (4×2). Saúde starts hidden.
   {
     id: 'fluxo-caixa',
     group: 'visao-geral',
@@ -72,7 +90,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultSize: s(2, 4),
     min: s(2, 3),
     max: s(4, 7),
-    presets: [s(2, 4), s(2, 5), s(4, 5), s(4, 6)],
+    presets: [s(2, 4), s(2, 5), s(4, 5)],
   },
   {
     id: 'saude',
@@ -116,18 +134,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     presets: [s(1, 2), s(2, 2), s(4, 2)],
   },
 
-  // Clientes: honorários do mês (4×3), carteira | vigências (2×4). Visible by default in business workspaces.
-  {
-    id: 'honorarios-mes',
-    group: 'clientes',
-    title: 'Honorários do mês',
-    description: 'Previsto pelas vigências × faturado × recebido no mês.',
-    defaultSize: s(4, 3),
-    min: s(2, 3),
-    max: s(4, 5),
-    presets: [s(2, 3), s(4, 3)],
-    defaultFor: 'business',
-  },
+  // Row 7 (L): carteira | vigências (2×4), business workspaces only. Cadastro incompleto starts hidden.
   {
     id: 'carteira-clientes',
     group: 'clientes',
@@ -163,7 +170,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultFor: 'business',
   },
 
-  // Análises do mês: resumo | despesas (2×4), resultado (4×3). Trends and income start hidden.
+  // Row 8 (L): resumo | despesas por categoria (2×4). Resultado (repeats the cash flow), trends and income start hidden.
   {
     id: 'resumo-periodo',
     group: 'analises',
@@ -172,7 +179,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultSize: s(2, 4),
     min: s(2, 3),
     max: s(4, 5),
-    presets: [s(2, 4), s(4, 3)],
+    presets: [s(2, 3), s(2, 4)],
   },
   {
     id: 'despesas-categoria',
@@ -189,10 +196,11 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     group: 'analises',
     title: 'Resultado mês a mês',
     description: 'Saldo (receitas − despesas) dos últimos 6 meses.',
-    defaultSize: s(4, 3),
-    min: s(1, 3),
+    defaultSize: s(2, 4),
+    min: s(2, 3),
     max: s(4, 6),
-    presets: [s(2, 4), s(4, 3), s(4, 4)],
+    presets: [s(2, 4), s(4, 3)],
+    defaultHidden: true,
   },
   {
     id: 'receitas-categoria',
@@ -228,7 +236,7 @@ export const WIDGET_SPECS: WidgetSpec[] = [
     defaultHidden: true,
   },
 
-  // Recorrentes e metas: gastos | receitas fixas (2×4). Metas start hidden.
+  // Row 9 (L): gastos | receitas fixas (2×4). Metas start hidden.
   {
     id: 'gastos-fixos',
     group: 'planejamento',

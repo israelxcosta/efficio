@@ -252,3 +252,17 @@ export function donutMaxItems(count: number, size: { c: number; r: number }, wid
   const rows = Math.max(2, Math.min(wanted + 1, room));
   return count <= rows ? count : rows - 1;
 }
+
+/**
+ * Bullet of one side of "Resumo do período": paid and open as shares of the larger of this month's
+ * total and the previous month's (so both fit), and the mark of the previous total (null without one).
+ */
+export function summaryBar(total: number, paid: number, previousTotal: number): { paid: number; open: number; marker: number | null } {
+  const scale = Math.max(total, previousTotal, 1);
+  const done = Math.max(0, Math.min(paid, total));
+  return {
+    paid: done / scale,
+    open: Math.max(0, total - done) / scale,
+    marker: previousTotal > 0 ? previousTotal / scale : null,
+  };
+}

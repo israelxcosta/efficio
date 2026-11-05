@@ -7,21 +7,36 @@ import { BodyEmpty, ListSkeleton } from '@/features/dashboard/widgets/shared';
 import { FitList, WidgetCard } from '@/features/dashboard/layout/widget-card';
 import { cn, pluralize } from '@/lib/utils';
 import {
+  agendaInsight,
+  BAND_DOT,
   conventionBands,
+  conventionsInsight,
   documentBands,
+  documentsInsight,
   feeBands,
+  feesInsight,
+  fiscalInsight,
   flowDays,
+  flowInsight,
   incompleteText,
+  monthElapsed,
   overviewBands,
+  overviewInsight,
+  processInsight,
   processRows,
+  progressHeadline,
+  progressSegments,
+  severityHeadline,
   taskStatusBands,
+  type Band,
   type ConventionBandKey,
 } from '../dashboard-logic';
 import { DUE_TONE_CLASS, shortDate } from '../due';
 import { auditHref, groupDeadlineInfo } from '../occurrence';
 import { useTaskActions } from '../task-actions';
 import { tasksHref, type TaskFilterPatch } from '../url-state';
-import { BandList, MiniDonut, SegmentBar } from './band-list';
+import { BandList, SegmentBar, StatusSummary } from './band-list';
+import { useDashCols } from './dash-slot';
 import type { DashboardList } from './dashboard-list-sheet';
 import { useOccurrenceSheetLinks } from './occurrence-row';
 import { monthName } from './tasks-summary';
@@ -41,29 +56,67 @@ function Body({ data, loading, error, onRetry, children }: CardProps & { childre
   return <>{children(data)}</>;
 }
 
+/** One-line "Ver todos" at the foot of a card (text link: the footer stays one 18px line). */
+function SeeAll({ onClick, to, children = 'Ver todos' }: { onClick?: () => void; to?: string; children?: ReactNode }) {
+  const cls = 'text-caption font-medium text-brand-text hover:underline';
+  return to ? (
+    <Link to={to} className={cls}>
+      {children} →
+    </Link>
+  ) : (
+    <button type="button" onClick={onClick} className={cls}>
+      {children} →
+    </button>
+  );
+}
+
+/** "Today" mark on a progress bar of the competence: only while the month is running. */
+function todayMark(today: string, month: string): { at: number; label: string } | undefined {
+  const at = monthElapsed(today, month);
+  return at > 0 && at < 1 ? { at, label: `dia ${Number(today.slice(8, 10))}` } : undefined;
+}
+
 const SITUATION = { overdue: 'overdue', pending: 'open', concluded: 'done' } as const;
 
-/** "Situação das tarefas" (Effy's taskhub): the ring and the bands, each one the filtered list. */
+/**
+ * "Situação das tarefas": StatusCard L (hero with the share concluded, progress bar with the "today"
+ * mark, then the bands with their share), each band the filtered list.
+ */
 export function TaskStatusCard(p: CardProps & { base: TaskFilterPatch }) {
   const navigate = useNavigate();
   const s = p.data ? taskStatusBands(p.data.taskStatus) : null;
+  const ts = p.data?.taskStatus;
   return (
     <WidgetCard
       title="Situação das tarefas"
-      subtitle={p.data && s ? `${monthName(p.data.month)} · ${s.percent}% concluídas` : 'Recorrentes e avulsas do mês'}
-      info="Obrigações recorrentes da competência e tarefas avulsas que vencem no mês. Atrasadas: abertas depois do prazo."
+      subtitle={
+        p.data && ts ? (
+          <>
+            Competência de {monthName(p.data.month)} ·{' '}
+            {ts.overdue ? <span className="text-danger">{pluralize(ts.overdue, 'atrasada', 'atrasadas')}</span> : 'nenhuma atrasada'}
+          </>
+        ) : (
+          'Recorrentes e avulsas do mês'
+        )
+      }
+      info="Obrigações recorrentes da competência e tarefas avulsas que vencem no mês. Aqui, Atrasadas conta só as da competência; o número do topo conta todas as abertas depois do prazo. A marca na barra é o dia de hoje no mês."
     >
       <Body {...p}>
         {(d) =>
           d.taskStatus.total === 0 ? (
             <BodyEmpty title="Nenhuma tarefa no mês" />
           ) : (
-            <div className="flex min-h-0 flex-1 items-center gap-4 @sm:gap-6">
-              <MiniDonut segments={s!.bands.map((b) => ({ value: b.count, tone: b.tone }))} center={String(d.taskStatus.total)} caption="tarefas" size={100} />
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
+              <StatusSummary
+                hero={progressHeadline(d.taskStatus.concluded, d.taskStatus.total)}
+                segments={progressSegments({ done: d.taskStatus.concluded, overdue: d.taskStatus.overdue, pending: d.taskStatus.pending })}
+                marker={todayMark(d.today, d.month)}
+              />
               <BandList
-                className="min-w-0 flex-1"
+                className="min-w-0"
                 ariaLabel="Situação das tarefas (abre a lista)"
                 bands={s!.bands}
+                total={d.taskStatus.total}
                 onSelect={(k) => navigate(tasksHref({ ...p.base, situation: SITUATION[k], ...(k === 'concluded' ? { month: d.month } : {}) }))}
               />
             </div>
@@ -77,7 +130,11 @@ export function TaskStatusCard(p: CardProps & { base: TaskFilterPatch }) {
 /** "Fluxo de tarefas por dia": open work per work date, today and the next 6 days. */
 export function FlowCard(p: CardProps & { base: TaskFilterPatch }) {
   return (
-    <WidgetCard title="Fluxo de tarefas por dia" subtitle="Em aberto, pela data de trabalho, nos próximos 7 dias">
+    <WidgetCard
+      title="Fluxo de tarefas por dia"
+      subtitle={p.data ? flowInsight(flowDays(p.data.flow, p.data.today)) : 'Em aberto, pela data de trabalho, nos próximos 7 dias'}
+      info="Tarefas em aberto pela data de trabalho (a meta interna, nas recorrentes), hoje e nos próximos 6 dias. Clique num dia para ver a lista."
+    >
       <Body {...p}>
         {(d) => {
           const days = flowDays(d.flow, d.today);
@@ -93,14 +150,19 @@ export function FlowCard(p: CardProps & { base: TaskFilterPatch }) {
                       className="group/day flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-0.5 pt-1 transition-colors hover:bg-surface-muted"
                     >
                       <span className="tabular text-caption font-semibold text-fg">{x.total || ''}</span>
-                      <span className="flex w-full max-w-9 min-h-0 flex-1 flex-col justify-end">
+                      <span className="flex w-full max-w-10 min-h-0 flex-1 flex-col justify-end">
                         <span className="flex w-full flex-col overflow-hidden rounded-t-md" style={{ height: `${(x.total / max) * 100}%` }}>
                           {x.standalone ? <span className="w-full bg-data/45" style={{ flexGrow: x.standalone }} /> : null}
                           {x.recurring ? <span className="w-full bg-data" style={{ flexGrow: x.recurring }} /> : null}
                         </span>
                         <span className="h-px w-full bg-border" />
                       </span>
-                      <span className={cn('flex flex-col items-center pb-1 text-caption leading-tight', x.label === 'Hoje' ? 'font-semibold text-fg' : 'text-muted')}>
+                      <span
+                        className={cn(
+                          'flex flex-col items-center pb-1 text-caption leading-tight',
+                          x.label === 'Hoje' ? 'font-semibold text-fg' : WEEKEND.test(x.label) ? 'text-subtle' : 'text-muted',
+                        )}
+                      >
                         <span>{x.label.split(' ')[0]}</span>
                         <span className="tabular">{x.date.slice(8, 10)}</span>
                       </span>
@@ -124,6 +186,8 @@ export function FlowCard(p: CardProps & { base: TaskFilterPatch }) {
   );
 }
 
+const WEEKEND = /^(sáb|dom) /;
+
 function Legend({ items }: { items: { label: string; className: string }[] }) {
   return (
     <p className="mt-2 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-caption text-muted">
@@ -139,7 +203,11 @@ function Legend({ items }: { items: { label: string; className: string }[] }) {
 /** "Processos por departamento": the competence's obligations per department (done, pending, overdue). */
 export function ProcessesCard(p: CardProps) {
   return (
-    <WidgetCard title="Processos por departamento" subtitle={p.data ? `Obrigações de ${monthName(p.data.month)}` : 'Obrigações do mês'}>
+    <WidgetCard
+      title="Processos por departamento"
+      subtitle={(p.data && processInsight(p.data.processes)) ?? (p.data ? `Obrigações de ${monthName(p.data.month)}` : 'Obrigações do mês')}
+      info="Obrigações recorrentes da competência por departamento: concluídas, atrasadas e pendentes. Clique para abrir na auditoria."
+    >
       <Body {...p}>
         {(d) => {
           const rows = processRows(d.processes);
@@ -166,11 +234,7 @@ export function ProcessesCard(p: CardProps) {
                       </span>
                       <SegmentBar
                         className="col-span-2 row-start-2 mt-1 @md:col-span-1 @md:row-start-auto @md:mt-0"
-                        segments={[
-                          { value: r.done, tone: 'success' },
-                          { value: r.pending, tone: 'data' },
-                          { value: r.overdue, tone: 'danger' },
-                        ]}
+                        segments={progressSegments({ done: r.done, overdue: r.overdue, pending: r.pending })}
                       />
                       <span className="flex flex-col items-end leading-tight @md:row-start-auto">
                         <span className="tabular text-body-sm font-semibold text-fg">
@@ -184,9 +248,9 @@ export function ProcessesCard(p: CardProps) {
               />
               <Legend
                 items={[
-                  { label: 'Concluídas', className: 'bg-success' },
-                  { label: 'Pendentes', className: 'bg-data' },
-                  { label: 'Atrasadas', className: 'bg-danger' },
+                  { label: 'Concluídas', className: BAND_DOT.data },
+                  { label: 'Atrasadas', className: BAND_DOT.danger },
+                  { label: 'Pendentes', className: BAND_DOT.muted },
                 ]}
               />
             </div>
@@ -207,7 +271,8 @@ export function AgendaCard(p: CardProps) {
   return (
     <WidgetCard
       title="Agenda"
-      subtitle={past ? 'Vencidas neste mês, com pendências' : 'Prazos legais dos próximos 7 dias'}
+      subtitle={past ? 'Vencidas neste mês, com pendências' : p.data ? agendaInsight(p.data.agenda.upcoming, p.data.today) : 'Prazos legais dos próximos 7 dias'}
+      info="Prazos legais das obrigações recorrentes nos próximos 7 dias (hoje incluído). O botão de vencidas mostra as deste mês que ainda têm pendências."
       action={
         overdueCount ? (
           <Button variant="ghost" size="sm" aria-pressed={past} onClick={() => setPast((v) => !v)} className={cn('h-7', past && 'bg-bg-subtle text-fg')}>
@@ -264,7 +329,8 @@ export function FiscalCard(p: CardProps) {
   return (
     <WidgetCard
       title="Pendências fiscais"
-      subtitle={p.data ? `Obrigações de ${monthName(p.data.month)}, atrasadas primeiro` : 'Obrigações do mês'}
+      subtitle={p.data ? (p.data.fiscal.totals.total ? fiscalInsight(p.data.fiscal.totals) : `Obrigações de ${monthName(p.data.month)}`) : 'Obrigações do mês'}
+      info="Obrigações fiscais da competência, atrasadas primeiro. A barra é o progresso da competência; a marca, o dia de hoje no mês."
       action={
         <Button variant="ghost" size="sm" asChild className="h-7">
           <Link to="/tarefas/auditoria">Auditoria</Link>
@@ -277,19 +343,22 @@ export function FiscalCard(p: CardProps) {
           if (!t.total) return <BodyEmpty title="Nenhuma obrigação na competência" />;
           const bands = [
             { key: 'overdue' as const, label: 'Atrasadas', count: t.overdue, tone: 'danger' as const },
-            { key: 'pending' as const, label: 'Pendentes', count: t.pending, tone: 'data' as const },
-            { key: 'done' as const, label: 'Concluídas', count: t.done, tone: 'success' as const },
+            { key: 'pending' as const, label: 'Pendentes', count: t.pending, tone: 'muted' as const },
+            { key: 'done' as const, label: 'Concluídas', count: t.done, tone: 'data' as const },
           ];
           return (
             <div className="flex min-h-0 flex-1 gap-5 @max-md:flex-col">
-              <div className="flex shrink-0 items-center gap-4 @md:w-52 @md:flex-col @md:items-stretch">
-                <div className="flex justify-center">
-                  <MiniDonut segments={bands.map((b) => ({ value: b.count, tone: b.tone }))} center={`${Math.round((t.done / t.total) * 100)}%`} caption="geral" />
-                </div>
+              <div className="flex shrink-0 flex-col gap-3 @md:w-56">
+                <StatusSummary
+                  hero={progressHeadline(t.done, t.total)}
+                  segments={progressSegments({ done: t.done, overdue: t.overdue, pending: t.pending })}
+                  marker={todayMark(d.today, d.month)}
+                />
                 <BandList
-                  className="min-w-0 flex-1"
+                  className="min-w-0"
                   ariaLabel="Pendências fiscais (abre a auditoria)"
                   bands={bands}
+                  total={t.total}
                   onSelect={(k) => navigate(`/tarefas/auditoria?${new URLSearchParams({ competencia: d.month, ...(k === 'done' ? {} : { clientes: 'pendentes' }) })}`)}
                 />
               </div>
@@ -314,8 +383,8 @@ export function FiscalCard(p: CardProps) {
                         </span>
                         <SegmentBar
                           segments={[
-                            { value: o.done, tone: 'success' },
-                            { value: o.pending, tone: o.overdue ? 'danger' : 'data' },
+                            { value: o.done, tone: 'data' },
+                            { value: o.pending, tone: o.overdue ? 'danger' : 'muted' },
                           ]}
                         />
                       </Link>
@@ -334,16 +403,22 @@ export function FiscalCard(p: CardProps) {
 /** "Visão geral dos clientes": Atenção, Pendências, Em dia — each band lists the clients. */
 export function ClientsOverviewCard(p: CardProps & { onList: (l: DashboardList) => void }) {
   return (
-    <WidgetCard title="Visão geral dos clientes" subtitle={p.data ? `Clientes ativos em ${monthName(p.data.month)}` : 'Clientes ativos'}>
+    <WidgetCard
+      title="Visão geral dos clientes"
+      subtitle={p.data ? overviewInsight(p.data.clientsOverview.counts) : 'Clientes ativos'}
+      info={p.data ? `Clientes ativos em ${monthName(p.data.month)}, pela situação das obrigações da competência.` : undefined}
+    >
       <Body {...p}>
         {(d) => {
           const bands = overviewBands(d.clientsOverview.counts);
           const total = bands.reduce((s, b) => s + b.count, 0);
           if (!total) return <BodyEmpty title="Nenhum cliente ativo" />;
+          const head = severityHeadline(bands);
+          const hero = { ...head, label: head.tone === 'danger' ? 'em atenção' : head.tone === 'warning' ? 'com pendências' : head.label };
           return (
-            <div className="flex min-h-0 flex-1 items-center gap-4 @sm:gap-6">
-              <MiniDonut segments={bands.map((b) => ({ value: b.count, tone: b.tone }))} center={String(total)} caption="clientes" size={100} />
-              <BandList className="min-w-0 flex-1" ariaLabel="Clientes por situação (abre a lista)" bands={bands} onSelect={(k) => p.onList({ kind: 'clients', band: k })} />
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
+              <StatusSummary hero={hero} segments={bands.map((b) => ({ value: b.count, tone: b.tone }))} />
+              <BandList className="min-w-0" ariaLabel="Clientes por situação (abre a lista)" bands={bands} total={total} onSelect={(k) => p.onList({ kind: 'clients', band: k })} />
             </div>
           );
         }}
@@ -359,22 +434,16 @@ export function DocumentsCard(p: CardProps & { kind: 'certificates' | 'documents
   return (
     <WidgetCard
       title={title}
-      subtitle={docs ? `${pluralize(docs.total, 'cadastrado', 'cadastrados')} nos clientes ativos` : 'Clientes ativos'}
-      info={p.kind === 'certificates' ? 'Certificados digitais (e-CNPJ) cadastrados no financeiro.' : 'Certidões, alvarás, licenças e demais documentos com validade, cadastrados no financeiro.'}
-      footer={
-        docs?.total ? (
-          <Button variant="link" size="sm" className="text-caption" onClick={() => p.onList({ kind: p.kind, band: null })}>
-            Ver todos
-          </Button>
-        ) : null
-      }
+      subtitle={docs ? (docs.total ? documentsInsight(documentBands(docs)) : 'Nenhum cadastrado') : 'Clientes ativos'}
+      info={`${p.kind === 'certificates' ? 'Certificados digitais (e-CNPJ) cadastrados no financeiro.' : 'Certidões, alvarás, licenças e demais documentos com validade, cadastrados no financeiro.'}${docs ? ` ${pluralize(docs.total, 'cadastrado', 'cadastrados')} nos clientes ativos.` : ''}`}
+      footer={docs?.total ? <SeeAll onClick={() => p.onList({ kind: p.kind, band: null })} /> : null}
     >
       <Body {...p}>
         {() =>
           !docs || docs.total === 0 ? (
             <BodyEmpty title={p.kind === 'certificates' ? 'Nenhum certificado cadastrado' : 'Nenhum laudo cadastrado'} description="Cadastre no cliente, no financeiro." />
           ) : (
-            <BandList ariaLabel={`${title} por situação (abre a lista)`} bands={documentBands(docs)} onSelect={(k) => p.onList({ kind: p.kind, band: k })} />
+            <StatusBands bands={documentBands(docs)} ariaLabel={`${title} por situação (abre a lista)`} onSelect={(k) => p.onList({ kind: p.kind, band: k })} />
           )
         }
       </Body>
@@ -382,14 +451,31 @@ export function DocumentsCard(p: CardProps & { kind: 'certificates' | 'documents
   );
 }
 
+/** StatusCard M: the distribution bar over the bands (each with its share); dense bands go in 2 columns on wide cards. */
+function StatusBands<K extends string>({ bands, ariaLabel, onSelect, dense }: { bands: Band<K>[]; ariaLabel: string; onSelect: (k: K) => void; dense?: boolean | 'tight' }) {
+  const total = bands.reduce((a, b) => a + b.count, 0);
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <StatusSummary segments={bands.map((b) => ({ value: b.count, tone: b.tone }))} />
+      <BandList className={cn('min-w-0', dense && '@lg:grid @lg:grid-cols-2 @lg:gap-x-6')} ariaLabel={ariaLabel} bands={bands} total={total} dense={dense} onSelect={onSelect} />
+    </div>
+  );
+}
+
 const CONVENTION_GROUP: Partial<Record<ConventionBandKey, 'overdue' | 'within30' | 'within60'>> = { overdue: 'overdue', within30: 'within30', within60: 'within60' };
 
 /** "Convenções coletivas": base dates of the unions; the bands open the conventions of the deadlines sheet. */
 export function ConventionsCard(p: CardProps) {
+  const cols = useDashCols();
   const { openDeadlines } = useTaskActions();
   const navigate = useNavigate();
   return (
-    <WidgetCard title="Convenções coletivas" subtitle={p.data ? `${pluralize(p.data.conventions.total, 'sindicato ativo', 'sindicatos ativos')}` : 'Sindicatos'}>
+    <WidgetCard
+      title="Convenções coletivas"
+      subtitle={p.data ? (p.data.conventions.total ? conventionsInsight(conventionBands(p.data.conventions)) : 'Nenhum sindicato') : 'Sindicatos'}
+      info={p.data ? `Datas-base das convenções de ${pluralize(p.data.conventions.total, 'sindicato ativo', 'sindicatos ativos')}.` : undefined}
+      footer={p.data?.conventions.total ? <SeeAll to="/tarefas/cadastros?aba=sindicatos" /> : null}
+    >
       <Body {...p}>
         {(d) =>
           d.conventions.total === 0 ? (
@@ -402,7 +488,8 @@ export function ConventionsCard(p: CardProps) {
               }
             />
           ) : (
-            <BandList
+            <StatusBands
+              dense={cols === 4 ? true : 'tight'}
               ariaLabel="Convenções por data-base (abre a lista)"
               bands={conventionBands(d.conventions)}
               onSelect={(k) => (k === 'noDate' ? navigate('/tarefas/cadastros?aba=sindicatos') : openDeadlines('conventions', CONVENTION_GROUP[k]))}
@@ -418,13 +505,18 @@ export function ConventionsCard(p: CardProps) {
 export function FeesCard(p: CardProps & { onList: (l: DashboardList) => void }) {
   const fees = p.data?.fees;
   return (
-    <WidgetCard title="Honorários próximos de vencer" subtitle="Vigência anual dos contratos" info="Vigências que terminam em até 60 dias ou já terminaram sem uma nova. Só para quem acessa o financeiro.">
+    <WidgetCard
+      title="Honorários próximos de vencer"
+      subtitle={fees ? feesInsight(feeBands(fees)) : 'Vigência anual dos contratos'}
+      info="Vigências anuais dos contratos que terminam em até 60 dias ou já terminaram sem uma nova. Só para quem acessa o financeiro."
+      footer={fees && fees.within30.length + fees.within60.length > 0 ? <SeeAll onClick={() => p.onList({ kind: 'fees', band: null })} /> : null}
+    >
       <Body {...p}>
         {() =>
           !fees ? null : fees.within30.length + fees.within60.length === 0 ? (
             <BodyEmpty title="Nenhuma vigência termina em 60 dias" />
           ) : (
-            <BandList ariaLabel="Honorários por vencimento (abre a lista)" bands={feeBands(fees)} onSelect={(k) => p.onList({ kind: 'fees', band: k })} />
+            <StatusBands ariaLabel="Honorários por vencimento (abre a lista)" bands={feeBands(fees)} onSelect={(k) => p.onList({ kind: 'fees', band: k })} />
           )
         }
       </Body>
@@ -440,13 +532,7 @@ export function IncompleteCard(p: CardProps & { onList: (l: DashboardList) => vo
       title="Cadastro incompleto"
       subtitle={inc ? (inc.count ? `${pluralize(inc.count, 'cliente', 'clientes')} · média de ${inc.averagePercent}% preenchido` : 'Todos os cadastros completos') : 'Clientes ativos'}
       info="Inscrições, senha do contador, código de acesso e anexo do Simples (quando se aplicam ao regime) e certificado digital."
-      footer={
-        inc?.count ? (
-          <Button variant="link" size="sm" className="text-caption" onClick={() => p.onList({ kind: 'incomplete' })}>
-            Ver todos ({inc.count})
-          </Button>
-        ) : null
-      }
+      footer={inc?.count ? <SeeAll onClick={() => p.onList({ kind: 'incomplete' })}>{`Ver todos (${inc.count})`}</SeeAll> : null}
     >
       <Body {...p}>
         {() =>
@@ -456,6 +542,7 @@ export function IncompleteCard(p: CardProps & { onList: (l: DashboardList) => vo
             <FitList
               items={inc.items}
               total={inc.count}
+              showMore={false}
               getKey={(c) => c.client.id}
               moreLabel="clientes"
               className="flex flex-col gap-0.5"

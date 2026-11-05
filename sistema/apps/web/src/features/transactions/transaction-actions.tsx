@@ -52,6 +52,9 @@ interface TransactionActions {
 
 const Ctx = createContext<TransactionActions | null>(null);
 
+/** The actions context itself (tests render rows with a stub). */
+export const TransactionActionsContext = Ctx;
+
 const CLOSED_TX: TransactionSheetState = { open: false, mode: 'create', type: 'expense' };
 const CLOSED_TRANSFER: TransferSheetState = { open: false, mode: 'transfer' };
 

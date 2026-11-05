@@ -15,6 +15,7 @@ import { HEALTH_INFO, HEALTH_TONE } from '../components/health-card';
 import { INSIGHT_LABELS } from '../components/insight-card';
 import type { WidgetProps } from '../layout/types';
 import { FitList, WidgetCard } from '../layout/widget-card';
+import { balancesInsight, withWindow } from './insight-lines';
 import { BodyEmpty, ListSkeleton } from './shared';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -235,7 +236,8 @@ export function BalancesWidget({ d, loading, size, alert }: WidgetProps) {
   return (
     <WidgetCard
       alert={alert}
-      subtitle="Saldo de hoje em cada conta"
+      subtitle={(d && withWindow('Hoje', balancesInsight(d.balances.accounts, accounts.length))) ?? 'Saldo de hoje em cada conta'}
+      info="Saldo de hoje em cada conta e o previsto para o fim do mês. Patrimônio = contas + investimentos − cartões em aberto."
       footer={
         // At 3 rows the "+ N conta(s)" line already leads to /contas: the room goes to a second account.
         roomy && accounts.length > 0 && !loading ? (

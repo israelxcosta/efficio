@@ -30,6 +30,7 @@ import {
   rowPxFor,
   sameBoard,
   snapResize,
+  specOnBoard,
   type NudgeDirection,
 } from './layout';
 import { useDashboardLayout } from './layout-store';
@@ -52,6 +53,8 @@ interface BoardProps {
   components: WidgetComponents;
   alerts: Partial<Record<WidgetId, WidgetAlert>>;
   onCustomize: () => void;
+  /** "Personalizar" mode: drag, resize and hide exist only then. */
+  editing: boolean;
 }
 
 /** Pixel geometry of a board. */
@@ -112,7 +115,7 @@ interface Preview {
  * The dashboard board: one free grid where each card sits on any cell. Dropping a card on others
  * pushes them down; nothing rises on its own ("Organizar", in the page header, closes the gaps).
  */
-export function DashboardBoard({ width, month, d, loading, kind, components, alerts, onCustomize }: BoardProps) {
+export function DashboardBoard({ width, month, d, loading, kind, components, alerts, onCustomize, editing }: BoardProps) {
   const api = useDashboardLayout();
   const g = useMemo(() => geometryFor(width), [width]);
   const { cols } = g;
@@ -192,7 +195,7 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onCancel);
-        window.removeEventListener('keydown', onKey);
+        window.removeEventListener('keydown', onKey, true);
         cancelAnimationFrame(frame);
         document.body.style.userSelect = '';
         // With the transition back on, the card glides from where it was dropped to its cell.
@@ -208,13 +211,16 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
       };
       const onUp = () => end(true);
       const onCancel = () => end(false);
+      // Capture + preventDefault: Escape cancels the drag without also leaving "Personalizar".
       const onKey = (ev: globalThis.KeyboardEvent) => {
-        if (ev.key === 'Escape') end(false);
+        if (ev.key !== 'Escape') return;
+        ev.preventDefault();
+        end(false);
       };
       window.addEventListener('pointermove', onMove, { passive: false });
       window.addEventListener('pointerup', onUp);
       window.addEventListener('pointercancel', onCancel);
-      window.addEventListener('keydown', onKey);
+      window.addEventListener('keydown', onKey, true);
     },
     [api, base, cols, g, describe],
   );
@@ -243,7 +249,7 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
   const commitResize = (spec: WidgetSpec, displayed: WidgetSize, startCols: number) => {
     const stored = clampSize(api.layout.sizes[spec.id] ?? spec.defaultSize, spec);
     // On narrow boards the stored (desktop) width survives a drag that did not change the shown one.
-    const size = { c: commitCols(stored.c, startCols, displayed.c), r: displayed.r };
+    const size = { c: commitCols(stored.c, startCols, displayed.c, cols), r: displayed.r };
     if (size.c !== stored.c || size.r !== stored.r) api.resize(cols, spec.id, size, resizeItem(base, spec.id, displayed, cols));
     setPreview(null);
     setAnnouncement(`${spec.title}: ${displayed.c} × ${displayed.r}`);
@@ -306,6 +312,7 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
             geometry={g}
             dragging={dragging}
             resizing={preview?.mode === 'resize' && preview.id === spec.id}
+            editing={editing}
             Body={components[spec.id]}
             widgetProps={widgetProps}
             alert={alerts[spec.id]}
@@ -315,6 +322,7 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
               id: spec.id,
               title: spec.title,
               resizing: false,
+              editing,
               onHide: () => hide(spec),
               headerProps: { onPointerDown: (e) => beginDrag(e, spec.id, false) },
               gripProps: {
@@ -358,6 +366,7 @@ interface FrameProps {
   geometry: Geometry;
   dragging: boolean;
   resizing: boolean;
+  editing: boolean;
   Body: ComponentType<WidgetProps>;
   widgetProps: Omit<WidgetProps, 'size' | 'alert'>;
   alert: WidgetAlert | undefined;
@@ -367,11 +376,13 @@ interface FrameProps {
 }
 
 /** Positioned card: its box on the board and the corner resize handle (pointer drag or arrow keys). */
-function WidgetFrame({ spec, item, geometry, dragging, resizing, Body, widgetProps, alert, chrome, onResizePreview, onResizeCommit }: FrameProps) {
+function WidgetFrame({ spec, item, geometry, dragging, resizing, editing, Body, widgetProps, alert, chrome, onResizePreview, onResizeCommit }: FrameProps) {
   const { cols } = geometry;
   const box = boxOf(item, geometry);
   const size = useMemo(() => ({ c: item.c, r: item.r }), [item.c, item.r]);
   const chromeValue = useMemo(() => ({ ...chrome, resizing }), [chrome, resizing]);
+  // Limits in shown columns (on 2 columns the stored 4-column width shows halved).
+  const limits = useMemo(() => specOnBoard(spec, cols), [spec, cols]);
   // The corner handle grows the card to the right edge of the board, never past it.
   const room = cols - item.x;
 
@@ -386,7 +397,7 @@ function WidgetFrame({ spec, item, geometry, dragging, resizing, Body, widgetPro
     let latest = start.size;
     let done = false;
     const onMove = (ev: PointerEvent) => {
-      const next = snapResize(start.size, ev.clientX - start.x, ev.clientY - start.y, metrics, spec);
+      const next = snapResize(start.size, ev.clientX - start.x, ev.clientY - start.y, metrics, limits);
       if (next.c === latest.c && next.r === latest.r) return;
       latest = next;
       onResizePreview(next);
@@ -397,7 +408,7 @@ function WidgetFrame({ spec, item, geometry, dragging, resizing, Body, widgetPro
       handle.removeEventListener('pointermove', onMove);
       handle.removeEventListener('pointerup', onUp);
       handle.removeEventListener('lostpointercapture', onLost);
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, true);
       if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
       if (save && (latest.c !== start.size.c || latest.r !== start.size.r)) onResizeCommit(latest, start.size.c);
       else onResizePreview(null);
@@ -406,19 +417,21 @@ function WidgetFrame({ spec, item, geometry, dragging, resizing, Body, widgetPro
     const onLost = () => finish(false);
     // Escape puts the card (and the cards it pushed) back as they were before the drag.
     const onKey = (ev: globalThis.KeyboardEvent) => {
-      if (ev.key === 'Escape') finish(false);
+      if (ev.key !== 'Escape') return;
+      ev.preventDefault();
+      finish(false);
     };
     handle.addEventListener('pointermove', onMove);
     handle.addEventListener('pointerup', onUp);
     handle.addEventListener('lostpointercapture', onLost);
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
   };
 
   const onResizeKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key] as [number, number] | undefined;
     if (!step) return;
     e.preventDefault();
-    const next = clampSize({ c: Math.min(item.c + step[0], room), r: item.r + step[1] }, spec);
+    const next = clampSize({ c: Math.min(item.c + step[0], room), r: item.r + step[1] }, limits);
     const shown = { c: Math.min(next.c, room), r: next.r };
     if (shown.c !== item.c || shown.r !== item.r) onResizeCommit(shown, item.c);
   };
@@ -445,20 +458,22 @@ function WidgetFrame({ spec, item, geometry, dragging, resizing, Body, widgetPro
           {item.c} × {item.r}
         </span>
       ) : null}
-      <button
-        type="button"
-        onPointerDown={onResizeStart}
-        onKeyDown={onResizeKey}
-        aria-label={`Redimensionar ${spec.title}`}
-        title="Arraste para redimensionar (ou use as setas)"
-        className={cn(
-          'absolute right-1 bottom-1 z-10 flex size-[18px] cursor-nwse-resize touch-none items-center justify-center rounded text-muted transition-opacity',
-          'opacity-0 group-hover/widget:opacity-60 hover:!opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-70',
-          resizing && 'opacity-100',
-        )}
-      >
-        <MoveDiagonal2 className="size-3.5" aria-hidden />
-      </button>
+      {editing ? (
+        <button
+          type="button"
+          onPointerDown={onResizeStart}
+          onKeyDown={onResizeKey}
+          aria-label={`Redimensionar ${spec.title}`}
+          title="Arraste para redimensionar (ou use as setas)"
+          className={cn(
+            'absolute right-1 bottom-1 z-10 flex size-[18px] cursor-nwse-resize touch-none items-center justify-center rounded text-muted transition-opacity',
+            'opacity-70 hover:opacity-100 focus-visible:opacity-100',
+            resizing && 'opacity-100',
+          )}
+        >
+          <MoveDiagonal2 className="size-3.5" aria-hidden />
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -132,7 +132,10 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 | Button             | variantes `primary` (brand-800), `soft` (brand-100/brand-800), `outline` (surface + border), `ghost`, `danger`; tamanhos sm 32 / md 40 / lg 44; raio md |
 | SegmentedControl   | trilho `bg-subtle` raio md, item ativo `surface` + sombra xs; variante `solid` com ativo `brand-800` texto branco (abas principais) |
 | Card               | `surface`, borda, raio xl, padding 20–24; header com título H2 + subtítulo small muted + ação à direita |
-| KpiCard            | rótulo small + ícone info; valor Display; rodapé `surface-muted` com seta (TrendingUp/Down) colorida, "% vs mês anterior" e chevron |
+| KpiCard            | rótulo small + ícone info; valor Display; rodapé `surface-muted` com seta (TrendingUp/Down) colorida, "% vs mês anterior" e chevron (cor e texto da variação por `changeParts`, `features/dashboard/kpi-logic.ts`); fora dos dashboards (relatórios, aba inteligente) |
+| MetricStrip        | faixa de números do topo dos dois dashboards (`components/ui/metric-strip.tsx`): um `Card` com células separadas por divisores de 1px; célula = rótulo 12,5 muted + (i), valor `text-kpi` à esquerda (32px na célula `hero`, que tem 1,3 fração), minigráfico opcional à direita e rodapé de uma linha (truncado, texto inteiro em `footerTitle`); ≥ 1000px de faixa uma fileira, 560–999px `medium` (2 ou 3) por fileira, abaixo cada célula vira linha com o valor inteiro à direita (20px, sem `truncate`); a célula inteira é link (camada por cima), e botões/links do rodapé ficam acima dela |
+| StackBar           | barra empilhada proporcional (`components/charts/stack-bar.tsx`): 6px (`sm`) ou 10px (`md`), raio cheio, 2px entre segmentos, larguras exatas e % inteiros pelo maior resto (`stackSegments`); segmento hachurado (`hatch`) para o que está em aberto; marca opcional de 2px com rótulo `text-micro` ("dia 5", "mês anterior"); `aria-hidden` |
+| Sparkline          | linha SVG de 1,5px sem eixos (`components/charts/sparkline.tsx`, 96×32), `--app-data` ou cinza (`--app-chart-expense-strong`) para despesas, ponto no último valor, comprime na horizontal em célula estreita; `aria-hidden` |
 | Input / Select     | altura 44, raio md, borda `border`, foco: borda `brand-500` + anel 3px `brand-500/15` |
 | CategoryPicker     | campo único de categoria: lista com busca no topo, categorias como títulos de grupo e só subcategorias selecionáveis (rádio circular); categoria sem subcategorias é selecionável; rodapé "+ Nova categoria" |
 | SplitEditor        | "Dividir" no campo Categoria: linhas categoria + valor (2–10), "Dividir igualmente", "+ Adicionar categoria" (já com o valor que falta) e faixa de conferência (Falta / Excede / Valores conferem) |
@@ -141,7 +144,7 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 | Sheet (lateral)    | 440px, raio 2xl à esquerda, header (título H2 + subtítulo muted + X), corpo rolável, rodapé fixo com `Cancelar` (ghost) e `Salvar` (primary) |
 | PaidToggle         | botão 👍/👎: pendente (padrão) = `ThumbsDown` em `danger-soft`/`danger`; pago = `ThumbsUp` em `success-soft`/`success`; animação de "pop" ao alternar |
 | Badge              | pílula 11–12px: `brand`, `success`, `danger`, `warning`, `neutral` (soft) |
-| EmptyState         | caixa com borda tracejada raio lg, ícone em quadrado `bg-subtle`, título 14/600, descrição muted, botão outline |
+| EmptyState         | caixa com borda tracejada raio lg, ícone em quadrado `bg-subtle`, título 14/600, descrição muted, botão outline (estados vazios de página); `framed={false}` dentro de cards (o card já é a moldura): ícone 20px `text-subtle`, título 14/600, descrição 12,5 muted, centrado — é o `BodyEmpty` dos widgets |
 | ProgressBar        | trilho `brand-100`, preenchimento `brand-800` (metas) ou `success`/`danger` (limite) |
 | InsightCard        | gradiente `brand-700 → brand-900`, texto branco, cartão interno vidro (`white/8`, borda `white/12`), chip overline |
 | BankLogo           | círculo com cor oficial aproximada do banco e sigla (Nu, Itaú, BB, Cx...) — sem marcas registradas |
@@ -150,20 +153,37 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 | TaskStatusButton   | botão redondo de estado: glifo por forma (`TaskStatusGlyph`), só "Em andamento" (`primary-soft`) e "Concluída" (`success-soft`) com cor; hover mostra o ✓ de concluir; concluída reabre; "pop" ao mudar |
 | MemberAvatar       | iniciais em círculo `primary-soft` (sm 24, md 32, lg 40); sem responsável = círculo tracejado com `UserRound`; `AvatarStack` sobrepõe até N e "+N" |
 | SearchSelect       | lista do `Select` com campo de busca no topo (base de `ClientPicker` e `MemberPicker`); aceita grupos, dica à direita e gatilho próprio (célula de tabela) |
-| WidgetCard         | card de widget do dashboard (`features/dashboard/layout/widget-card.tsx`): cabeçalho fixo (título 14px, subtítulo 11.5px, ação à direita que desce para uma 2ª linha abaixo de 384px, alça de mover e olho "Ocultar card" que aparecem no hover/foco), corpo `flex-1` que ocupa a altura restante; variante `hero` (gradiente); com alerta, ponto vermelho no título e barra vermelha de 3px à esquerda |
-| FitList            | lista cortada às linhas que cabem no card (mede cada linha a cada redimensionamento) com a linha "+ N …"; aceita o total real do servidor |
+| WidgetCard         | card de widget dos dois dashboards (`features/dashboard/layout/widget-card.tsx`): título estável 16px + (i) com a descrição, abaixo a **linha do achado** (`subtitle`, 12,5px, uma linha, texto inteiro em `title`), ação encostada na borda direita (desce para uma 2ª linha abaixo de 384px), corpo `flex-1` e rodapé de uma linha; com alerta, ponto vermelho no título; alça de mover, olho "Ocultar card", cursor de mover e borda `border-strong` **só no modo Personalizar** (`WidgetChrome.editing`) |
+| StatusSummary      | topo dos StatusCards do Início (`features/tasks/components/band-list.tsx`): número-herói `text-kpi` opcional (cor só em `danger`/`warning`) + rótulo 12,5, depois `StackBar md` com a marca "dia N"; `BandList` abaixo com o % de cada faixa (`total`) e a variante `dense` (32px; `tight` 28px nos cards M de 296px) |
+| DashSlot           | célula da grade do Início (`features/tasks/components/dash-slot.tsx`): altura por `heightForRows` (S/M/L) e largura por faixa de contêiner (`span.wide` de 12, `span.medium` de 2, 1 no celular); `mediumRows`/`phoneRows` trocam a altura abaixo de 4 colunas; colunas por `DashColsContext` (a página mede a própria largura) |
+| FitList            | lista cortada às linhas que cabem no card (mede cada linha a cada redimensionamento) com a linha "+ N …" (`showMore={false}` quando o rodapé já tem "Ver todos"); aceita o total real do servidor |
+| TransactionRow `line` | densidade dos dashboards: uma linha de 40px (estado, descrição + contato na mesma linha, vencimento relativo, valor, "⋯"), sem o selo "+ Empregados" (fica no menu) e sem a coluna de conta |
 | ChartBox           | envolve um gráfico Recharts e ocupa a altura restante do card (mínimo 96px), para o gráfico crescer junto |
 | DonutChart `fill`  | rosca que se dimensiona pelo espaço (legenda ao lado a partir de 448px, embaixo antes), número central ajustado ao furo, cauda agrupada em "Outras (N)" |
 
 ## 4. Padrões de tela
 
 - **Dashboard**: abas (Dashboard / Dashboard inteligente), navegação ‹ mês/ano › e botão
-  "Personalizar" (com o selo "N ocultos"). Faixa fixa de KPIs (Receitas, Despesas, Margem,
-  Patrimônio) e, abaixo, **um quadro único de cards, sem seções**:
+  "Personalizar" (com o selo "N ocultos"); a linha sob o título termina com "· atualizado às 14:32"
+  (`updatedLabel`). Faixa de números (`MetricStrip`: Receitas, Despesas e Resultado com minigráfico
+  de 6 meses e comparação; Patrimônio com a composição) e, abaixo, **um quadro único de cards, sem
+  seções**:
   - grade de 4 colunas (2 abaixo de 1000px de largura, 1 abaixo de 560px), linhas de 96px (88px
-    abaixo de 4 colunas), gap 16px; cada card tem célula (coluna × linha) e tamanho C × R entre o
-    mínimo e o máximo do catálogo (`layout/specs.ts`); os cards são posicionados em absoluto e
-    deslizam (200ms, sem animação com `prefers-reduced-motion`) quando outros os empurram;
+    abaixo de 4 colunas), gap 16px; tamanhos padrão só S/M/L (2, 3 ou 4 linhas = 208/320/432px;
+    192/296/400px abaixo de 4 colunas) e, no arranjo padrão, a mesma altura em cada fileira; cada
+    card tem célula (coluna × linha) e tamanho C × R entre o mínimo e o máximo do catálogo
+    (`layout/specs.ts`); os cards são posicionados em absoluto e deslizam (200ms, sem animação com
+    `prefers-reduced-motion`) quando outros os empurram;
+  - **largura proporcional em 2 colunas** (`displaySpan`): 1/4 e 1/2 viram meia largura, 3/4 e 1 a
+    largura toda; redimensionar em 2 colunas grava a largura de 4 colunas (1 → 2, 2 → 4) e mantém a
+    gravada quando a exibida não muda (`commitCols`); os limites do canto valem em colunas exibidas
+    (`specOnBoard`);
+  - **modo Personalizar**: na visualização os cards não têm alça, olho nem canto e o cabeçalho não
+    arrasta; "Personalizar" entra no modo (aviso ao leitor de tela "Modo de personalização. Use a
+    alça de cada card para mover."), o cabeçalho troca para **Cards** (a lista de cards, mesmo selo),
+    **Organizar** (só com vãos) e **Concluir**; Esc ou Concluir saem e devolvem o foco a
+    "Personalizar"; `?personalizar=1` entra no modo com "Cards" aberto; a aba "Dashboard
+    inteligente" sai do modo;
   - posição livre: arrastar pelo cabeçalho ou pela alça (toque só pela alça) solta o card em
     qualquer célula, inclusive mais abaixo deixando espaço vazio; o destino aparece tracejado e os
     cards cobertos descem (prévia ao vivo); nada sobe sozinho; Esc cancela;
@@ -180,8 +200,11 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
   - ocultar pelo olho (deixa o espaço vazio; aviso com "Desfazer"); ligar um card em
     "Personalizar" (lista agrupada por assunto, só para organizar) o coloca no primeiro espaço livre
     onde ele cabe; "Restaurar layout padrão" volta posições, tamanhos, ocultos e opções dos cards;
-  - arranjo padrão: Honorários e cobrança, Caixa, Clientes, Análises do mês, Recorrentes e metas,
-    empacotados sem buracos;
+  - arranjo padrão por fileiras (cobrança → caixa → clientes → análises → recorrentes): Inadimplência
+    | Devedores (M), Honorários do mês (S), Próximos vencimentos (M), Fluxo | Saldo (L), Projeção (L),
+    Insights (S), Carteira | Vigências (L), Resumo | Despesas por categoria (L), Gastos | Receitas
+    fixas (L), empacotados sem buracos em 4 e 2 colunas; "Resultado mês a mês" fica oculto por padrão
+    (repete o Fluxo) e continua em "Cards";
   - o layout fica no navegador, por espaço e usuário (`effinance.dashboardLayout.v1:<espaço>:<usuário>`,
     objeto `v: 2`), e é sempre validado ao ler; layouts `v: 1` (com seções) viram posições;
   - os cards de clientes aparecem por padrão só em espaços empresariais (nos outros, ficam em
@@ -216,3 +239,29 @@ Prevalece sobre os itens acima quando houver conflito.
 - **Checagem:** `node ~/.claude/skills/design-taste-frontend/scripts/lint.mjs --app src/...` (0 FAIL) e
   `inspect.mjs --app` nas telas. Falsos positivos conhecidos: o `<span>` de medição do Recharts encostado na
   borda e o texto dentro do logo do banco.
+
+## 6. Proporção dos painéis (nov/2026)
+
+Resumo de `docs/dashboards-redesign.md` (a spec completa, com a auditoria e o card a card). Vale para o
+Painel financeiro e o Início da Gestão.
+
+- **Tamanhos:** linha de 96px (88px abaixo de 4 colunas), espaço de 16px; padrão só S (2 linhas), M (3) e
+  L (4), por `heightForRows`; a mesma altura em cada fileira do arranjo padrão. Colunas pela largura do
+  contêiner: ≥ 1000px = 4 (financeiro) ou 12 (Início, `DashSlot`); 560–999px = 2; abaixo = 1.
+- **Faixa de números única** (`MetricStrip`) no topo dos dois painéis; todo número de topo tem comparação
+  (mês anterior, meta implícita da competência, % no prazo); Patrimônio mostra a composição e diz no (i) que
+  não há histórico.
+- **Card:** título estável + linha do achado (funções puras testadas: `widgets/insight-lines.ts` e
+  `tasks/dashboard-logic.ts`); janelas diferentes do mês entram como prefixo ("Hoje · ", "Próximos 15 dias ·
+  ", "Competência 10/2026 · "); só o número de alerta fica vermelho; vazio sem moldura dupla.
+- **Status como barra empilhada** (`StackBar`, `StatusSummary`), nunca rosca: progresso = concluído (data) →
+  atrasado (danger) → pendente (cinza); distribuição na ordem das faixas. Tons (`BandTone`): `danger`,
+  `warning`, `data`, `dataSoft` (`bg-data/45`, 31–60 dias) e `muted`; verde só em variação e resultado
+  positivos.
+- **Gráficos:** eixo Y por `niceDomain` (3 a 5 marcas em passos 1/2/2,5/5 × 10ⁿ, começa em zero; negativo
+  menor que ¼ do passo só estica o domínio); projeção sem repetir o pior dia (`projectionTiles`) e com a
+  linha do saldo de hoje; sem degradê na área.
+- **Listas:** linhas de uma altura (`TransactionRow density="line"`), cortadas com "+ N …"; nada rola dentro
+  de card nem na horizontal em 375/1024/1440.
+- **Layouts salvos:** o formato continua `v: 2`; cards que passaram a ficar ocultos por padrão perdem a
+  célula só se o usuário não os ligou, e o vão que sobra é fechado por "Organizar" no modo Personalizar.

@@ -1,6 +1,6 @@
 # Dashboards: redesenho de cards e gráficos
 
-> Dono: `ui-saas-designer`. Status: **proposta** (05/11/2026), a implementar pelo plano
+> Dono: `ui-saas-designer`. Status: **implementada** (05/11/2026) pelo plano
 > `docs/superpowers/plans/2026-11-05-dashboards-redesign.md`.
 > Escopo: **Painel financeiro** (`/financeiro`, `apps/web/src/features/dashboard/**`) e **Início da
 > Gestão** (`/`, `features/tasks/pages/home.tsx`, `components/dashboard-cards.tsx`, `band-list.tsx`,
@@ -412,12 +412,13 @@ hora), do `dataUpdatedAt` da consulta principal (`useDashboard` / `useTaskHome`)
 
 ## 12. Checklist da skill (passo 7) depois da implementação
 
-- [ ] Todo card tem a linha do achado; todo gráfico tem `aria-label` com ela.
-- [ ] Todo número de topo tem comparação (Patrimônio: composição, com o motivo no (i)).
-- [ ] Cores: data / cinza / danger / warning; verde só em variação e resultado positivos.
-- [ ] Período do painel claro (mês no cabeçalho) e janelas diferentes ditas na linha do achado.
-- [ ] Valores formatados (R$ inteiros nas faixas e listas; "R$ 64,7 mil" só em eixos e frases).
-- [ ] "Atualizado às…" visível.
-- [ ] 1440, 1024 e 375 conferidos por captura; `design-taste-frontend` lint com 0 FAIL.
-- [ ] `docs/design-system.md` (§3 componentes, §4 dashboard, nova §6 "Proporção dos painéis") e
+- [x] Todo card tem a linha do achado; todo gráfico tem `aria-label` com ela.
+- [x] Todo número de topo tem comparação (Patrimônio: composição, com o motivo no (i)).
+- [x] Cores: data / cinza / danger / warning; verde só em variação e resultado positivos.
+- [x] Período do painel claro (mês no cabeçalho) e janelas diferentes ditas na linha do achado.
+- [x] Valores formatados (R$ inteiros nas faixas e listas; "R$ 64,7 mil" só em eixos e frases).
+- [x] "Atualizado às…" visível.
+- [x] 1440, 1024 e 375 conferidos por captura; `design-taste-frontend` lint sem FAIL novo (o único FAIL é o
+      ✓ de `matrix-cell.test.tsx`, anterior a este trabalho).
+- [x] `docs/design-system.md` (§3 componentes, §4 dashboard, nova §6 "Proporção dos painéis") e
       `docs/tarefas-ui.md` §6 atualizados.

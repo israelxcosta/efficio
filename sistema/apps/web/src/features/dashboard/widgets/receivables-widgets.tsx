@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { CalendarClock, CreditCard, HandCoins, Users } from 'lucide-react';
 import { formatBRL, formatDateBR, todayISO, type DashboardResponse } from '@effinance/shared';
-import { agingBuckets, rankDebtors, type AgingBucket } from '@/components/charts/chart-scale';
+import { agingBuckets, rankDebtors, stackSegments, type AgingBucket } from '@/components/charts/chart-scale';
 import { BankLogo } from '@/components/ui/bank-logo';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/misc';
@@ -16,6 +16,7 @@ import type { DashboardPrefs, WidgetProps } from '../layout/types';
 import { FitList, WidgetCard } from '../layout/widget-card';
 import { OVERDUE_LIST_LIMIT, useOpenReceivables, useOverdueReceivables } from './data';
 import { TransactionRow } from '@/features/transactions/components/transaction-row';
+import { agingInsight, debtorsInsight, upcomingInsight, withWindow } from './insight-lines';
 import { BodyEmpty, ListSkeleton } from './shared';
 
 const LIMIT_LABEL = OVERDUE_LIST_LIMIT.toLocaleString('pt-BR');
@@ -155,7 +156,8 @@ export function OverdueWidget({ alert }: WidgetProps) {
 
   return (
     <WidgetCard
-      subtitle="Recebimentos vencidos e ainda em aberto"
+      subtitle={withWindow('Hoje', agingInsight(buckets)) ?? 'Recebimentos vencidos e ainda em aberto'}
+      info="Recebimentos vencidos e ainda em aberto hoje, por faixa de atraso (contada do vencimento)."
       alert={alert}
       footer={
         data?.truncated ? (
@@ -178,6 +180,8 @@ export function DebtorsWidget({ alert }: WidgetProps) {
   const data = overdue.data;
   const debtors = useMemo(() => (data ? rankDebtors(data.items) : []), [data]);
   const max = debtors[0]?.amount ?? 0;
+  const owed = debtors.reduce((a, d) => a + d.amount, 0);
+  const shares = useMemo(() => stackSegments(debtors.map((d) => d.amount)), [debtors]);
 
   let body;
   if (overdue.isPending) {
@@ -200,14 +204,17 @@ export function DebtorsWidget({ alert }: WidgetProps) {
             className={cn(
               'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-1.5 py-0.5 transition-colors hover:bg-surface-muted',
               "[grid-template-areas:'name_value'_'bar_bar'_'meta_meta']",
-              "@2xl:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_7.5rem] @2xl:gap-x-5 @2xl:[grid-template-areas:'name_bar_value'_'meta_bar_value']",
+              "@2xl:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_9.5rem] @2xl:gap-x-5 @2xl:[grid-template-areas:'name_bar_value'_'meta_bar_value']",
             )}
           >
             <span className="flex min-w-0 items-baseline gap-1 [grid-area:name]" title={debtor.name}>
               <span className="shrink-0 text-micro text-subtle tabular">{i + 1}.</span>
               <span className={cn('truncate text-[12px] font-semibold', debtor.contactId ? 'text-fg' : 'text-muted')}>{debtor.name}</span>
             </span>
-            <span className="text-right text-body-sm font-semibold text-danger tabular [grid-area:value]">{formatBRL(debtor.amount)}</span>
+            <span className="flex items-baseline justify-end gap-2 [grid-area:value]">
+              <span className="text-micro text-muted tabular">{shares[i]?.pct ?? 0}%</span>
+              <span className="text-right text-body-sm font-semibold whitespace-nowrap text-danger tabular">{formatBRL(debtor.amount)}</span>
+            </span>
             <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-bg-subtle [grid-area:bar] @2xl:mt-0 @2xl:h-2" aria-hidden>
               <span className="block h-full min-w-0.5 rounded-full bg-danger" style={{ width: `${max > 0 ? (debtor.amount / max) * 100 : 0}%` }} />
             </span>
@@ -222,11 +229,16 @@ export function DebtorsWidget({ alert }: WidgetProps) {
 
   return (
     <WidgetCard
-      subtitle="Ranking por valor vencido em aberto"
+      subtitle={debtorsInsight(debtors) ?? 'Ranking por valor vencido em aberto'}
+      info="Clientes com recebimentos vencidos em aberto hoje, do maior valor ao menor."
       alert={alert}
       footer={
         data?.truncated ? (
-          <p className="text-micro text-muted">Ranking calculado sobre os {LIMIT_LABEL} títulos mais antigos.</p>
+          <p className="truncate text-micro text-muted">Ranking calculado sobre os {LIMIT_LABEL} títulos mais antigos.</p>
+        ) : debtors.length > 0 ? (
+          <p className="truncate text-caption text-muted">
+            {pluralize(debtors.length, 'cliente', 'clientes')} · <span className="font-semibold text-fg tabular">{formatBRL(owed)}</span> vencido
+          </p>
         ) : undefined
       }
     >
@@ -248,7 +260,7 @@ const FILTER_OPTIONS: { value: UpcomingFilter; label: string }[] = [
 ];
 
 /** Pending bills (no card purchases) overdue or due in the next 15 days, filtered by type. */
-export function UpcomingWidget({ d, loading, size, prefs, setPref, alert }: WidgetProps) {
+export function UpcomingWidget({ d, loading, prefs, setPref, alert }: WidgetProps) {
   const filter = prefs.proximosFiltro;
   const items = useMemo(
     () => (d?.upcoming ?? []).filter((t) => filter === 'todos' || t.type === (filter === 'pagar' ? 'expense' : 'income')),
@@ -258,14 +270,7 @@ export function UpcomingWidget({ d, loading, size, prefs, setPref, alert }: Widg
   const total = !totals ? items.length : filter === 'pagar' ? totals.expenseCount : filter === 'receber' ? totals.incomeCount : totals.expenseCount + totals.incomeCount;
   const moreHref = filter === 'receber' ? '/contas-a-receber' : '/contas-a-pagar';
 
-  // Overdue payables (the card's alert); plain text since the header is the drag handle.
-  const subtitle = d?.overdue.count ? (
-    <span className="text-danger">
-      {d.overdue.count} vencido(s) · {formatBRL(d.overdue.amount)}
-    </span>
-  ) : (
-    'Vencidos e próximos 15 dias'
-  );
+  const subtitle = (totals && withWindow('Próximos 15 dias', upcomingInsight(totals))) ?? 'Vencidos e próximos 15 dias';
 
   let body;
   if (loading || !d) {
@@ -287,12 +292,11 @@ export function UpcomingWidget({ d, loading, size, prefs, setPref, alert }: Widg
         moreHref={moreHref}
         className="flex flex-col"
         contentKey={filter}
-        renderItem={(tx) => <TransactionRow tx={tx} density="compact" />}
+        renderItem={(tx) => <TransactionRow tx={tx} density="line" />}
       />
     );
   }
 
-  const showTotals = Boolean(totals) && size.r >= 4 && !loading;
   return (
     <WidgetCard
       subtitle={subtitle}
@@ -306,23 +310,7 @@ export function UpcomingWidget({ d, loading, size, prefs, setPref, alert }: Widg
           options={FILTER_OPTIONS}
         />
       }
-      footer={
-        showTotals && totals && totals.expenseCount + totals.incomeCount > 0 ? (
-          <p className="truncate text-micro text-muted">
-            {filter !== 'receber' ? (
-              <>
-                A pagar <span className="font-semibold text-danger tabular">{formatBRL(totals.expense)}</span> ({totals.expenseCount})
-              </>
-            ) : null}
-            {filter === 'todos' ? ' · ' : null}
-            {filter !== 'pagar' ? (
-              <>
-                A receber <span className="font-semibold text-success tabular">{formatBRL(totals.income)}</span> ({totals.incomeCount})
-              </>
-            ) : null}
-          </p>
-        ) : undefined
-      }
+      info="Contas a pagar e a receber em aberto, vencidas e dos próximos 15 dias (sem compras no cartão). A linha acima soma tudo o que esta lista cobre."
     >
       {body}
     </WidgetCard>

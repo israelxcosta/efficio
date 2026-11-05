@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { ArrowRight, Info, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router';
-import { formatPercent } from '@effinance/shared';
+import { changeParts } from '@/features/dashboard/kpi-logic';
 import { cn } from '@/lib/utils';
 import { Tooltip } from './tooltip';
+
+const CHANGE_TONE = { success: 'text-success', danger: 'text-danger', muted: 'text-muted' } as const;
 
 interface KpiCardProps {
   label: string;
@@ -44,28 +46,19 @@ export function KpiCard({
   compact = false,
   children,
 }: KpiCardProps) {
-  const hasChange = change !== undefined;
-  const up = (change ?? 0) >= 0;
   // Colour says good or bad (an expense rise is bad); no change stays grey.
-  const flat = change === 0 || (change !== null && change !== undefined && Math.abs(change) < 0.0005);
-  const good = invert ? !up : up;
-  const tone = flat ? 'text-muted' : good ? 'text-success' : 'text-danger';
-  const Icon = up ? TrendingUp : TrendingDown;
-  const changeText =
-    change === null || change === undefined
-      ? ''
-      : changeUnit === 'pp'
-        ? `${up ? '+' : '−'}${Math.abs(change * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} p.p.`
-        : `${up ? '+' : ''}${formatPercent(change)}`;
+  const parts = changeParts(change, changeUnit, invert);
+  const tone = parts ? CHANGE_TONE[parts.tone] : 'text-muted';
+  const Icon = parts?.up === false ? TrendingDown : TrendingUp;
   const footer = (
     <div className={cn('flex items-center justify-between gap-2 border-t border-border bg-surface-muted text-muted', compact ? 'px-3.5 py-2 text-caption' : 'px-4 py-2.5 text-xs')}>
       <span className="flex min-w-0 items-center gap-1.5 truncate">
         {footerContent ? (
           footerContent
-        ) : hasChange && change !== null ? (
+        ) : parts ? (
           <>
-            {flat ? null : <Icon className={cn('size-3.5', tone)} aria-hidden />}
-            <span className={cn('tabular font-semibold', tone)}>{changeText}</span>
+            {parts.tone === 'muted' ? null : <Icon className={cn('size-3.5', tone)} aria-hidden />}
+            <span className={cn('tabular font-semibold', tone)}>{parts.text}</span>
             {footerLabel}
           </>
         ) : (

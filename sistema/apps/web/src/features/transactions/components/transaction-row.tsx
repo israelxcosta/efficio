@@ -219,12 +219,65 @@ interface TransactionRowProps {
   trailing?: React.ReactNode;
   showDue?: boolean;
   muted?: boolean;
-  /** `compact`: the same row with less padding and smaller status/icon, for dashboard cards. */
-  density?: 'default' | 'compact';
+  /**
+   * `compact`: the same row with less padding and smaller status/icon. `line`: one 40px line for
+   * dashboard lists (status, description + client, relative due date, amount, menu), without the
+   * "+ Empregados" chip (it stays in the menu) and without the account column.
+   */
+  density?: 'default' | 'compact' | 'line';
 }
 
 /** Responsive list row used across lists (payables, receivables, dashboard, statement). */
-export function TransactionRow({ tx, amount, trailing, showDue = true, muted, density = 'default' }: TransactionRowProps) {
+export function TransactionRow(props: TransactionRowProps) {
+  return props.density === 'line' ? <TransactionLine {...props} /> : <TransactionFullRow {...props} />;
+}
+
+/** One-line row of the dashboard lists (FitList cuts by row, so every row has the same height). */
+function TransactionLine({ tx, amount, muted }: TransactionRowProps) {
+  const actions = useTransactionActions();
+  const signed = amount ?? (tx.type === 'expense' ? -tx.amount : tx.amount);
+  const isCardPurchase = Boolean(tx.creditCardId) && tx.type !== 'transfer';
+  const readOnly = Boolean(actions.readOnlyReason);
+  const Main = readOnly ? 'div' : 'button';
+  const who = tx.contact?.name ?? tx.category?.name;
+  return (
+    <div className="@container">
+      <div className={cn('group flex h-10 items-center gap-2.5 rounded-lg px-1.5 transition-colors hover:bg-surface-muted', muted && 'opacity-70')}>
+        {isCardPurchase ? (
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-muted" title="Quitado ao pagar a fatura">
+            <CreditCard className="size-3.5" />
+          </span>
+        ) : (
+          <PaidToggle
+            size="sm"
+            paid={tx.paid}
+            kind={tx.type}
+            loading={actions.savingPaidId === tx.id}
+            disabled={readOnly || tx.type === 'transfer'}
+            disabledReason={actions.readOnlyReason ?? (tx.type === 'transfer' ? (tx.paid ? 'Efetivada' : 'Agendada') : undefined)}
+            onToggle={(paid) => actions.togglePaid(tx, paid)}
+          />
+        )}
+        <Main
+          {...(readOnly ? {} : { type: 'button' as const, onClick: () => actions.edit(tx) })}
+          className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left"
+          title={who ? `${tx.description} · ${who}` : tx.description}
+        >
+          <span className="min-w-0 shrink truncate text-body-sm font-semibold text-fg">{tx.description}</span>
+          {who ? <span className="hidden min-w-0 flex-1 truncate text-caption text-muted @md:inline">{who}</span> : null}
+        </Main>
+        {/* Auto widths on narrow cards (the description keeps the room); fixed columns from @xl align the rows. */}
+        <span className="hidden max-w-36 shrink-0 truncate text-right @sm:block @xl:w-36" title={formatDateBR(tx.date)}>
+          <DueLabel tx={tx} beside />
+        </span>
+        <Money value={signed} tone={tx.type === 'transfer' && amount === undefined ? 'neutral' : undefined} signed className="min-w-[5.5rem] shrink-0 text-right text-body-sm @xl:w-28" />
+        <RowMenu tx={tx} />
+      </div>
+    </div>
+  );
+}
+
+function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, density = 'default' }: TransactionRowProps) {
   const compact = density === 'compact';
   const detail = [tx.category ? `${tx.category.name}${tx.subcategory ? ` · ${tx.subcategory.name}` : ''}` : null, tx.contact?.name]
     .filter(Boolean)

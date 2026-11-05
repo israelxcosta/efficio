@@ -20,13 +20,10 @@ import {
   ChartBox,
   moneyAxisFormatter,
   MoneyTooltip,
-  StripeDefs,
-  stripeFill,
-  useStripeScope,
 } from '@/components/charts/chart-utils';
-import { yAxisWidth } from '@/components/charts/chart-scale';
+import { niceDomain, yAxisWidth } from '@/components/charts/chart-scale';
+import { StackBar } from '@/components/charts/stack-bar';
 import { Button } from '@/components/ui/button';
-import { StatPill } from '@/components/ui/misc';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WriteGate } from '@/features/auth/permissions';
 import { categoryListHref } from '@/features/transactions/links';
@@ -35,8 +32,10 @@ import { useElementSize } from '@/lib/use-element-size';
 import { cn, pluralize } from '@/lib/utils';
 import type { WidgetProps } from '../layout/types';
 import { useWidgetResizing, WidgetCard } from '../layout/widget-card';
+import { categoryInsight, summaryInsight } from './insight-lines';
 import { BodyEmpty } from './shared';
-import { averageWithData, donutMaxItems, fitTicks, maxAbsIndex, resultStats, shortMonth, topConcentration } from './trend-math';
+import { changeParts } from '../kpi-logic';
+import { donutMaxItems, fitTicks, maxAbsIndex, resultStats, shortMonth, summaryBar, topConcentration } from './trend-math';
 
 type Side = 'income' | 'expense';
 
@@ -47,183 +46,109 @@ const SIDE = {
 
 const linkClass = 'shrink-0 text-caption font-medium text-brand-text hover:underline';
 
-/** "+12,3% vs mês anterior" coloured by side (expenses going up are bad); null without a base. */
-function Comparison({ change, side }: { change: number | null; side: Side }) {
-  if (change === null) return <span className="text-subtle">Sem base de comparação</span>;
-  const up = change >= 0;
-  const good = side === 'expense' ? !up : up;
-  return (
-    <>
-      <span className={cn('font-semibold', change === 0 ? 'text-muted' : good ? 'text-success' : 'text-danger')}>
-        {up ? '+' : ''}
-        {formatPercent(change)}
-      </span>{' '}
-      <span className="text-muted">vs mês anterior</span>
-    </>
-  );
-}
+const CHANGE_TONE = { success: 'text-success', danger: 'text-danger', muted: 'text-muted' } as const;
 
 // ---------------------------------------------------------------------------
 // Resumo do período
 // ---------------------------------------------------------------------------
 
-/** Content heights (px) of a summary box, used to drop pills and footer before they overflow. */
-const BOX_HEAD_PX = 32;
-const BOX_GAP_PX = 8;
-const PILL_PX = 24;
-const BOX_FOOTER_PX = 25;
-/** Box content width from which the two pills sit side by side. */
-const PILLS_INLINE_PX = 300;
-/** The 6-month mini chart only shows up when this much height is left. */
-const MINI_CHART_PX = 56;
+/** Paid fill and open hatch of each side (receitas in the data blue, despesas in grey). */
+const SUMMARY_FILL = {
+  income: { paid: 'bg-data', hatch: 'var(--app-data)' },
+  expense: { paid: 'bg-[var(--app-chart-expense-strong)]', hatch: 'var(--app-chart-expense-strong)' },
+} as const;
 
-interface MiniRow {
-  month: MonthKey;
-  label: string;
-  pago: number;
-  aberto: number;
-}
-
-/** Paid and open amounts of one side over the last 6 months, the active month highlighted. */
-function SideMonths({ side, d }: { side: Side; d: DashboardResponse }) {
-  const box = useElementSize();
-  const scope = useStripeScope();
-  const resizing = useWidgetResizing();
-  const rows = useMemo<MiniRow[]>(
-    () =>
-      d.monthly.map((m) => ({
-        month: m.month,
-        label: shortMonth(m.month),
-        pago: side === 'income' ? m.paidIncome : m.paidExpense,
-        aberto: side === 'income' ? m.pendingIncome : m.pendingExpense,
-      })),
-    [d.monthly, side],
-  );
-  const meta = SIDE[side];
-  const show = box.height >= MINI_CHART_PX && rows.some((r) => r.pago + r.aberto > 0);
-  return (
-    <div ref={box.ref} className="flex min-h-0 flex-1 flex-col" aria-hidden={!show}>
-      {show ? (
-        <ChartBox minHeight={0}>
-          <BarChart data={rows} barCategoryGap="22%" margin={{ top: 2, right: 0, bottom: 0, left: 0 }} accessibilityLayer={false}>
-            <StripeDefs scope={scope} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} interval={0} height={16} tick={{ fill: CHART_COLORS.axis, fontSize: CHART_TEXT.category }} />
-            <Tooltip
-              cursor={{ fill: 'var(--app-bg-subtle)', radius: 6 }}
-              content={
-                <MoneyTooltip
-                  names={{ pago: meta.paid, aberto: 'Em aberto' }}
-                  total
-                  hideZero
-                  labelFormatter={(label) => {
-                    const row = rows.find((r) => r.label === label);
-                    return row ? formatMonthKey(row.month) : label;
-                  }}
-                />
-              }
-            />
-            <Bar dataKey="pago" name="pago" stackId="m" fill={meta.color} maxBarSize={40} isAnimationActive={!resizing}>
-              {rows.map((r) => (
-                <Cell key={r.month} fillOpacity={r.month === d.month ? 1 : 0.45} radius={r.aberto > 0 ? 0 : 4} />
-              ))}
-            </Bar>
-            <Bar dataKey="aberto" name="aberto" stackId="m" fill={stripeFill(side, scope)} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={!resizing}>
-              {rows.map((r) => (
-                <Cell key={r.month} fillOpacity={r.month === d.month ? 1 : 0.45} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ChartBox>
-      ) : null}
-    </div>
-  );
-}
-
-/** One side of the summary: total, comparison, paid / open pills, 6-month bars and a footer line. */
+/**
+ * One side of the summary as a bullet: total and change vs the previous month, then paid (solid)
+ * and open (hatched) on the scale of the larger month, with the previous month's total marked.
+ */
 function SummaryBox({ side, d, past }: { side: Side; d: DashboardResponse; past: boolean }) {
-  const box = useElementSize();
   const s = d.summary;
   const income = side === 'income';
   const meta = SIDE[side];
   const total = income ? s.income : s.expense;
   const paid = income ? s.paidIncome : s.paidExpense;
   const pending = income ? s.pendingIncome : s.pendingExpense;
-  const change = percentChange(total, income ? d.previous.income : d.previous.expense);
+  const previous = income ? d.previous.income : d.previous.expense;
+  const change = changeParts(percentChange(total, previous), 'percent', !income);
+  const bar = summaryBar(total, paid, previous);
+  const fill = SUMMARY_FILL[side];
   // In past months what is still unpaid is overdue, not "to receive".
   const pendingLabel = past ? 'Em aberto' : meta.pending;
-
-  // The box height comes from the grid, not from its content: drop pills, then the footer, to fit.
-  const measured = box.height > 0;
-  const inline = box.width >= PILLS_INLINE_PX;
-  const pillsPx = inline ? PILL_PX : PILL_PX * 2 + 4;
-  const showPills = !measured || box.height >= BOX_HEAD_PX + BOX_GAP_PX + pillsPx;
-  const showFooter = !measured || (showPills && box.height >= BOX_HEAD_PX + BOX_GAP_PX * 2 + pillsPx + BOX_FOOTER_PX);
-
-  const average = averageWithData(d.monthly.map((m) => m.expense));
-  const footer = income ? (
-    <>
-      Saldo do mês{' '}
-      <span className={cn('font-semibold tabular', s.net < 0 ? 'text-danger' : 'text-fg')}>{formatBRL(s.net)}</span>
-      {s.savingsRate !== null ? (
-        <>
-          {' · '}eficiência <span className="font-semibold text-fg tabular">{formatPercent(s.savingsRate, 0)}</span>
-        </>
-      ) : null}
-    </>
-  ) : (
-    <>
-      Média mensal (6 meses) <span className="font-semibold text-fg tabular">{formatBRL(average)}</span>
-    </>
-  );
+  const paidShare = total > 0 ? Math.round((paid / total) * 100) : 0;
 
   return (
-    <div ref={box.ref} className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-border p-3">
-      {/* Label and comparison on the left, total on the right. */}
-      <div className="flex shrink-0 items-start justify-between gap-3">
+    <div className="flex min-w-0 flex-col justify-center gap-2">
+      <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-caption font-medium text-muted">{meta.label}</p>
-          <p className="mt-0.5 truncate text-micro">
-            {showPills ? (
-              <Comparison change={change} side={side} />
-            ) : (
-              // No room for the pills: their numbers move to this line.
-              <span className="text-muted">
-                {meta.paid} <span className="font-semibold text-success tabular">{formatBRL(paid)}</span> · {pendingLabel}{' '}
-                <span className={cn('font-semibold tabular', pending > 0 ? 'text-danger' : 'text-fg')}>{formatBRL(pending)}</span>
-              </span>
-            )}
-          </p>
+          <p className="text-[18px] leading-6 font-semibold tracking-tight whitespace-nowrap text-fg tabular">{formatBRL(total)}</p>
         </div>
-        <p className="shrink-0 text-right text-[18px] leading-6 font-semibold tracking-tight text-fg tabular">{formatBRL(total)}</p>
+        <p className="min-w-0 truncate text-right text-caption">
+          {change ? (
+            <>
+              <span className={cn('font-semibold tabular', CHANGE_TONE[change.tone])}>{change.text}</span>{' '}
+              <span className="text-muted">vs mês anterior</span>
+            </>
+          ) : (
+            <span className="text-subtle">Sem base de comparação</span>
+          )}
+        </p>
       </div>
-      {showPills ? (
-        <div className={cn('mt-2 grid shrink-0 gap-1', inline && 'grid-cols-2 gap-1.5')}>
-          <StatPill label={meta.paid} value={formatBRL(paid)} tone="success" className="min-w-0 gap-2 px-2.5 py-1 text-caption" />
-          <StatPill label={pendingLabel} value={formatBRL(pending)} tone={pending > 0 ? 'danger' : 'neutral'} className="min-w-0 gap-2 px-2.5 py-1 text-caption" />
-        </div>
-      ) : null}
-      <SideMonths side={side} d={d} />
-      {showFooter ? <p className="mt-2 shrink-0 truncate border-t border-border pt-2 text-caption text-muted">{footer}</p> : null}
+      <StackBar
+        segments={[
+          { value: bar.paid, className: fill.paid, label: `${meta.paid} ${formatBRL(paid)}` },
+          { value: bar.open, hatch: fill.hatch, label: `${pendingLabel} ${formatBRL(pending)}` },
+          { value: Math.max(0, 1 - bar.paid - bar.open), className: 'bg-transparent' },
+        ]}
+        marker={bar.marker !== null ? { at: bar.marker, label: 'mês anterior' } : undefined}
+      />
+      <p className="flex min-w-0 flex-wrap gap-x-3 text-caption text-muted">
+        <span className="whitespace-nowrap">
+          {meta.paid} <span className="font-semibold text-fg tabular">{formatBRL(paid)}</span> · {paidShare}%
+        </span>
+        <span className="whitespace-nowrap">
+          {pendingLabel}{' '}
+          <span className={cn('font-semibold tabular', past && pending > 0 ? 'text-danger' : 'text-fg')}>{formatBRL(pending)}</span>
+        </span>
+      </p>
     </div>
   );
 }
 
-/** "Resumo do período": receitas and despesas of the month, paid and open, with the last 6 months. */
+/** "Resumo do período": receitas and despesas of the month, paid and open, against the previous month. */
 export function SummaryWidget({ month, d, alert }: WidgetProps) {
   const past = month < todayISO().slice(0, 7);
+  const s = d?.summary;
   return (
     <WidgetCard
       alert={alert}
-      subtitle={formatMonthKey(month)}
-      info="Receitas e despesas do mês pela data de competência (inclui compras no cartão), separadas entre pagas e em aberto. As barras mostram os últimos 6 meses."
+      subtitle={(d && summaryInsight(d.summary)) ?? formatMonthKey(month)}
+      info="Receitas e despesas do mês pela data de competência (inclui compras no cartão): o sólido é o que já foi pago ou recebido, o hachurado o que está em aberto. A marca na barra é o total do mês anterior."
+      footer={
+        s ? (
+          <p className="truncate text-caption text-muted">
+            Saldo do mês <span className={cn('font-semibold tabular', s.net < 0 ? 'text-danger' : 'text-fg')}>{formatBRL(s.net)}</span>
+            {s.savingsRate !== null ? (
+              <>
+                {' · '}eficiência <span className="font-semibold text-fg tabular">{formatPercent(s.savingsRate, 0)}</span>
+              </>
+            ) : null}
+          </p>
+        ) : undefined
+      }
     >
       {d ? (
-        <div className="grid min-h-0 flex-1 grid-rows-2 gap-2 @xl:grid-cols-2 @xl:grid-rows-1 @xl:gap-3">
-          <SummaryBox side="income" d={d} past={past} />
-          <SummaryBox side="expense" d={d} past={past} />
+        <div className="grid min-h-0 flex-1 grid-rows-2 divide-y divide-border @3xl:grid-cols-2 @3xl:grid-rows-1 @3xl:gap-8 @3xl:divide-y-0">
+          <div className="flex min-h-0 flex-col justify-center pb-3 @3xl:pb-0">
+            <SummaryBox side="income" d={d} past={past} />
+          </div>
+          <div className="flex min-h-0 flex-col justify-center pt-3 @3xl:pt-0">
+            <SummaryBox side="expense" d={d} past={past} />
+          </div>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-rows-2 gap-2 @xl:grid-cols-2 @xl:grid-rows-1 @xl:gap-3" aria-busy="true" aria-label="Carregando">
+        <div className="grid min-h-0 flex-1 grid-rows-2 gap-4 @3xl:grid-cols-2 @3xl:grid-rows-1" aria-busy="true" aria-label="Carregando">
           <Skeleton className="h-full" />
           <Skeleton className="h-full" />
         </div>
@@ -293,7 +218,7 @@ function CategoryWidget({ type, month, d, size, alert }: WidgetProps & { type: S
       <div
         ref={box.ref}
         role="group"
-        aria-label={`${SIDE[type].label} de ${formatMonthKey(month)} por categoria: total ${formatBRL(total)}`}
+        aria-label={`${categoryInsight(items, text.noun) ?? ''}. ${SIDE[type].label} de ${formatMonthKey(month)} por categoria: total ${formatBRL(total)}`}
         className="flex min-h-0 flex-1 flex-col"
       >
         <DonutChart
@@ -314,10 +239,8 @@ function CategoryWidget({ type, month, d, size, alert }: WidgetProps & { type: S
     d && total > 0 ? (
       <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 truncate text-caption text-muted">
-          {concentration
-            ? concentration.count === 1
-              ? `A maior categoria soma ${formatPercent(concentration.share, 0)}`
-              : `As ${concentration.count} maiores categorias somam ${formatPercent(concentration.share, 0)}`
+          {concentration && concentration.count > 1
+            ? `As ${concentration.count} maiores categorias somam ${formatPercent(concentration.share, 0)}`
             : pluralize(items.length, 'categoria no mês', 'categorias no mês')}
         </p>
         <Link to="/relatorios?aba=categories" className={linkClass}>
@@ -329,8 +252,8 @@ function CategoryWidget({ type, month, d, size, alert }: WidgetProps & { type: S
   return (
     <WidgetCard
       alert={alert}
-      subtitle={formatMonthKey(month)}
-      info={`Distribuição das ${text.noun} do mês por categoria. Clique numa categoria para ver os lançamentos.`}
+      subtitle={categoryInsight(items, text.noun) ?? formatMonthKey(month)}
+      info={`Distribuição das ${text.noun} de ${formatMonthKey(month)} por categoria. Clique numa categoria para ver os lançamentos.`}
       footer={footer}
     >
       {body}
@@ -448,7 +371,9 @@ export function MonthlyResultWidget({ d, alert }: WidgetProps) {
     content = <BodyEmpty icon={<Scale />} title="Sem movimentações nos últimos 6 meses." />;
   } else {
     const values = rows.map((r) => r.net);
-    const yWidth = yAxisWidth([...values, 0]);
+    // Round axis: a −R$ 30 month only stretches the domain, it does not open a −2,5k band.
+    const axis = niceDomain(values);
+    const yWidth = yAxisWidth(axis.ticks);
     const ticks = fitTicks(
       rows.map((r) => r.label),
       chart.width - yWidth - 8,
@@ -478,7 +403,7 @@ export function MonthlyResultWidget({ d, alert }: WidgetProps) {
         <div
           ref={chart.ref}
           role="img"
-          aria-label={`Resultado dos últimos ${rows.length} meses: ${pluralize(stats.positives, 'mês positivo', 'meses positivos')}, total ${formatBRL(stats.total)}.${stats.worst ? ` Pior mês: ${formatMonthKey(stats.worst.month)}, ${formatBRL(stats.worst.value)}.` : ''}`}
+          aria-label={`Resultado dos últimos ${rows.length} meses: ${pluralize(stats.positives, 'mês positivo', 'meses positivos')}, média ${formatBRL(stats.average)}, total ${formatBRL(stats.total)}.${stats.worst ? ` Pior mês: ${formatMonthKey(stats.worst.month)}, ${formatBRL(stats.worst.value)}.` : ''}`}
           className="mt-2 flex min-h-0 flex-1 flex-col"
         >
           <ChartBox>
@@ -492,7 +417,7 @@ export function MonthlyResultWidget({ d, alert }: WidgetProps) {
                 ticks={ticks}
                 interval={ticks ? 0 : 'preserveStartEnd'}
               />
-              <YAxis {...axisProps} width={yWidth} tickCount={4} tickFormatter={moneyAxisFormatter} />
+              <YAxis {...axisProps} width={yWidth} domain={axis.domain} ticks={axis.ticks} interval={0} tickFormatter={moneyAxisFormatter} />
               <Tooltip cursor={{ fill: 'var(--app-bg-subtle)', radius: 8 }} content={<ResultTooltip d={d} />} />
               <ReferenceLine y={0} stroke="var(--app-border-strong)" />
               <Bar dataKey="net" name="net" radius={[3, 3, 3, 3]} maxBarSize={44} isAnimationActive={!resizing}>
@@ -511,7 +436,7 @@ export function MonthlyResultWidget({ d, alert }: WidgetProps) {
   return (
     <WidgetCard
       alert={alert}
-      subtitle={d ? `Últimos ${rows.length} meses · ${stats.positives} de ${rows.length} positivos` : 'Últimos 6 meses'}
+      subtitle={d && !empty ? `${stats.positives} de ${pluralize(rows.length, 'mês positivo', 'meses positivos').replace(/^\d+ /, '')} · média ${formatBRL(stats.average)}` : 'Últimos 6 meses'}
       info="Receitas menos despesas de cada mês, pela data de competência. Acima de zero sobrou; abaixo, faltou."
     >
       {content}
