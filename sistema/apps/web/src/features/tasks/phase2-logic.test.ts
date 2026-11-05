@@ -95,7 +95,7 @@ describe('deadlines of a recurring occurrence (target and legal deadline)', () =
   });
 
   it('says when a concluded occurrence was late, and a complete group is just its dates', () => {
-    const occurrence = { recurringTaskId: 'r', period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-15', targetMissed: false, assigneeSource: 'default', situation: 'done_late' } as const;
+    const occurrence = { recurringTaskId: 'r', origin: 'registry', period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-15', targetMissed: false, assigneeSource: 'default', situation: 'done_late' } as const;
     const t = makeTask({ status: 'done', dueDate: '2026-10-20', completedAt: '2026-10-22T15:00:00Z', occurrence });
     expect(occurrenceTaskDueInfo(t, TODAY)).toEqual({ text: 'Concluída em 22/10, com atraso', tone: 'muted' });
     expect(occurrenceTaskDueInfo({ ...t, status: 'canceled' }, TODAY).text).toBe('Cancelada');
@@ -160,7 +160,7 @@ describe('grouped recurring rows', () => {
 });
 
 describe('the occurrence in the task sheet', () => {
-  const occurrence = { recurringTaskId: 'r', period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-15', targetMissed: false, assigneeSource: 'default', situation: 'not_started' } as const;
+  const occurrence = { recurringTaskId: 'r', origin: 'registry', period: 'monthly', periodKey: '2026-10', competence: '2026-10', referenceMonth: '2026-09', targetDate: '2026-10-15', targetMissed: false, assigneeSource: 'default', situation: 'not_started' } as const;
 
   it('describes it with the competence and the reference', () => {
     const t = makeDetail({ title: 'DCTFWeb', client: { id: 'c1', name: 'Padaria' }, department: FISCAL, occurrence });

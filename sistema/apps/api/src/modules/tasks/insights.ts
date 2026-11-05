@@ -43,7 +43,9 @@ import {
   OCCURRENCE_SQL,
   OPEN_SQL,
   priorityRank,
+  ROW_SQL,
   selectTasks,
+  TASK_SERIES_SQL,
 } from './task-rows';
 
 type ReportQuery = z.output<typeof taskReportQuerySchema>;
@@ -338,9 +340,9 @@ export async function exportTaskReport(ctx: TaskContext, q: ExportQuery): Promis
 // ---------------------------------------------------------------------------
 
 /**
- * Items by work date in a range (spec §7.6): standalone tasks and process steps by due date
- * (appointments first within a day), occurrences aggregated per recurring task and period on their
- * target ("DCTFWeb · 12/30").
+ * Items by work date in a range (spec §7.6): standalone tasks, process steps and the occurrences of
+ * tasks' recurrences by due date (appointments first within a day), occurrences of the registry
+ * aggregated per recurring task and period on their target ("DCTFWeb · 12/30").
  */
 export async function taskCalendar(ctx: TaskContext, q: CalendarQuery): Promise<TaskCalendarResponse> {
   const { min, max } = generationBounds(ctx.today);
@@ -361,27 +363,33 @@ export async function taskCalendar(ctx: TaskContext, q: CalendarQuery): Promise<
   if (q.departmentId) filters.push(eq(tasks.departmentId, q.departmentId));
   if (q.clientId) filters.push(q.clientId === 'internal' ? isNull(tasks.clientId) : eq(tasks.clientId, q.clientId));
   if (q.categoryId) filters.push(eq(tasks.categoryId, q.categoryId));
-  if (q.kind === 'flow') filters.push(IN_FLOW);
-  if (q.kind === 'standalone') filters.push(sql`not ${IN_FLOW}`);
-  const wantsTasks = q.kind !== 'recurring';
+  // Tasks: standalone ones, process steps and tasks' recurrences (by due date, one by one); occurrences
+  // of the registry are aggregated on their target.
+  const taskKind =
+    q.kind === 'recurring'
+      ? TASK_SERIES_SQL
+      : q.kind === 'flow'
+        ? and(NOT_OCCURRENCE_SQL, IN_FLOW)
+        : q.kind === 'standalone'
+          ? and(NOT_OCCURRENCE_SQL, sql`not ${IN_FLOW}`)
+          : ROW_SQL;
   const wantsOccurrences = q.kind !== 'standalone' && q.kind !== 'flow';
   const [list, occurrences, [noDue]] = await Promise.all([
-    wantsTasks
-      ? selectTasks(ctx, {
-          where: and(NOT_OCCURRENCE_SQL, gte(tasks.dueDate, q.from), lte(tasks.dueDate, q.to), ...filters),
-          orderBy: [asc(tasks.dueDate), sql`${tasks.startTime} asc nulls last`, sql`${priorityRank}`, sql`lower(${tasks.title})`, sql`${tasks.id}`],
-          limit: MAX_CALENDAR_TASKS + 1,
-        })
-      : Promise.resolve([] as Task[]),
+    selectTasks(ctx, {
+      where: and(taskKind, gte(tasks.dueDate, q.from), lte(tasks.dueDate, q.to), ...filters),
+      orderBy: [asc(tasks.dueDate), sql`${tasks.startTime} asc nulls last`, sql`${priorityRank}`, sql`lower(${tasks.title})`, sql`${tasks.id}`],
+      limit: MAX_CALENDAR_TASKS + 1,
+    }),
     wantsOccurrences
       ? aggregateOccurrences(ctx, and(gte(tasks.targetDate, q.from), lte(tasks.targetDate, q.to), ...filters))
       : Promise.resolve([]),
-    wantsTasks
-      ? ctx.db
+    // Every occurrence has a due date: only standalone tasks and process steps lack one.
+    q.kind === 'recurring'
+      ? Promise.resolve([{ n: 0 }])
+      : ctx.db
           .select({ n: count() })
           .from(tasks)
-          .where(and(eq(tasks.workspaceId, ctx.workspaceId), NOT_OCCURRENCE_SQL, OPEN_SQL, isNull(tasks.dueDate), ...filters))
-      : Promise.resolve([{ n: 0 }]),
+          .where(and(eq(tasks.workspaceId, ctx.workspaceId), NOT_OCCURRENCE_SQL, taskKind, OPEN_SQL, isNull(tasks.dueDate), ...filters)),
   ]);
   return {
     from: q.from,

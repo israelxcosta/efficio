@@ -44,6 +44,7 @@ export function makeDetail(patch: Partial<TaskDetail> = {}): TaskDetail {
     flowProgress: null,
     lockedFields: [],
     canReopen: false,
+    recurrence: null,
     ...patch,
   };
 }

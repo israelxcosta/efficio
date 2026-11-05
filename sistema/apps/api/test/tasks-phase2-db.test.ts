@@ -12,8 +12,8 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   ASSIGNEE_SOURCES,
-  NON_BUSINESS_DAY_RULES,
-  RECURRENCE_PERIODS,
+  RECURRENCE_NON_BUSINESS_DAY_RULES,
+  RECURRENCE_FREQUENCIES,
   TASK_ATTACHMENT_CONTENT_TYPES,
   TASK_EVENT_KINDS,
 } from '@effinance/shared';
@@ -129,8 +129,8 @@ describe('phase 2 tables: integrity', () => {
       select conname as name, pg_get_constraintdef(oid) as def from pg_constraint where contype = 'c' and connamespace = 'public'::regnamespace`);
     const values = (name: string) => [...defs.find((d) => d.name === name)!.def.matchAll(/'([^']*)'::text/g)].map((m) => m[1]).sort();
     const sorted = (list: readonly string[]) => [...list].sort();
-    expect(values('recurring_tasks_period_chk')).toEqual(sorted(RECURRENCE_PERIODS));
-    expect(values('recurring_tasks_rule_chk')).toEqual(sorted(NON_BUSINESS_DAY_RULES));
+    expect(values('recurring_tasks_period_chk')).toEqual(sorted(RECURRENCE_FREQUENCIES));
+    expect(values('recurring_tasks_rule_chk')).toEqual(sorted(RECURRENCE_NON_BUSINESS_DAY_RULES));
     expect(values('task_events_kind_chk')).toEqual(sorted(TASK_EVENT_KINDS));
     expect(values('task_attachments_type_chk')).toEqual(sorted(TASK_ATTACHMENT_CONTENT_TYPES));
     const occurrence = defs.find((d) => d.name === 'tasks_occurrence_chk')!.def;
@@ -229,8 +229,9 @@ describe('phase 2 tables: integrity', () => {
 
   it('the migration runs again over existing rows', async () => {
     const a = await seed();
-    // 0014 again, then 0017 (which narrows the occurrence CHECK 0014 re-adds): the schema ends as today.
-    for (const name of ['0014_tasks_phase2.sql', '0017_drop_client_responsibles.sql']) {
+    // 0014 again, then 0017 (which narrows the occurrence CHECK 0014 re-adds) and 0019 (which widens it
+    // and the schedule CHECKs for tasks' recurrences): the schema ends as today.
+    for (const name of ['0014_tasks_phase2.sql', '0017_drop_client_responsibles.sql', '0019_task_recurrence.sql']) {
       const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), `../drizzle/${name}`);
       const source = await readFile(file, 'utf8');
       await admin().transaction(async (tx) => {

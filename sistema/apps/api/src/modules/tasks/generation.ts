@@ -14,6 +14,10 @@
 // - deadlines come from the schedule (utils/tasks.ts: national holidays, non-business-day rule, target).
 // Generation is bounded: from 24 competences back to 2 ahead of the current one, and never for a
 // workspace whose subscription does not allow writing (reads keep showing what exists).
+// Tasks' recurrences (origin `task`, migration 0019) run on the same engine: one client (an `include`
+// link) or none (`internal`: one occurrence per period, client null); their occurrences carry
+// `occurrence_origin = 'task'`, the series' priority, time and description, and the rule's dates
+// (`start_date`/`end_date`, daily, weekdays, every N) come from the shared schedule.
 // Marker (migration 0018): each recurring task × competence generated is recorded with the workspace's
 // generation version (bumped by database triggers when a recurring task, its client links or a client's
 // regime/contract/status change) and the rules version of this code; the next reads skip those pairs, so
@@ -28,6 +32,7 @@ import {
   occurrencesInCompetence,
   type AssigneeSource,
   type MonthKey,
+  type RecurrenceOrigin,
   type RecurringSchedule,
   type ScheduledOccurrence,
   type TaskStatus,
@@ -47,6 +52,7 @@ import { now } from '../../lib/clock';
 import { appendTo, groupBy } from '../../lib/collections';
 import { inChunks } from '../../lib/sql';
 import type { TaskContext } from './access';
+import { decryptTaskText, encryptTaskText, RECURRING_DESCRIPTION, TASK_DESCRIPTION } from './encrypted-text';
 import { recordEvents, type EventInput } from './events';
 import { OPEN_SQL } from './task-rows';
 
@@ -90,7 +96,12 @@ export interface GenClient {
   inactivatedAt: string | null;
 }
 
-export function scheduleOf(row: Pick<RecurringTaskRow, 'period' | 'dueDay' | 'dueMonth' | 'targetDaysBefore' | 'nonBusinessDayRule' | 'referenceOffset'>): RecurringSchedule {
+export type ScheduleColumns = Pick<
+  RecurringTaskRow,
+  'period' | 'dueDay' | 'dueMonth' | 'targetDaysBefore' | 'nonBusinessDayRule' | 'referenceOffset' | 'repeatInterval' | 'weekdays' | 'startDate' | 'endDate'
+>;
+
+export function scheduleOf(row: ScheduleColumns): RecurringSchedule {
   return {
     period: row.period,
     dueDay: row.dueDay,
@@ -98,6 +109,10 @@ export function scheduleOf(row: Pick<RecurringTaskRow, 'period' | 'dueDay' | 'du
     targetDaysBefore: row.targetDaysBefore,
     nonBusinessDayRule: row.nonBusinessDayRule,
     referenceOffset: row.referenceOffset,
+    interval: row.repeatInterval,
+    weekdays: row.weekdays,
+    startDate: row.startDate,
+    endDate: row.endDate,
   };
 }
 
@@ -116,13 +131,24 @@ export function defActiveIn(row: Pick<RecurringTaskRow, 'startCompetence' | 'end
   return row.startCompetence <= competence && (row.endCompetence === null || competence <= row.endCompetence);
 }
 
-export async function loadDefs(ctx: Pick<TaskContext, 'db' | 'workspaceId'>, ids?: readonly string[]): Promise<GenDef[]> {
+/** Recurring tasks with their client links (all, or these ids; `origin`: only the registry's or the tasks'). */
+export async function loadDefs(
+  ctx: Pick<TaskContext, 'db' | 'workspaceId'>,
+  ids?: readonly string[],
+  opts: { origin?: RecurrenceOrigin } = {},
+): Promise<GenDef[]> {
   if (ids && ids.length === 0) return [];
   const [rows, links] = await Promise.all([
     ctx.db
       .select()
       .from(recurringTasks)
-      .where(and(eq(recurringTasks.workspaceId, ctx.workspaceId), ids ? inArray(recurringTasks.id, [...ids]) : undefined))
+      .where(
+        and(
+          eq(recurringTasks.workspaceId, ctx.workspaceId),
+          ids ? inArray(recurringTasks.id, [...ids]) : undefined,
+          opts.origin ? eq(recurringTasks.origin, opts.origin) : undefined,
+        ),
+      )
       .orderBy(sql`lower(${recurringTasks.name})`, asc(recurringTasks.id)),
     ctx.db
       .select({ id: recurringTaskClients.recurringTaskId, clientId: recurringTaskClients.clientId, mode: recurringTaskClients.mode })
@@ -173,7 +199,8 @@ export function resolveAssignee(
 
 export interface DesiredOccurrence {
   def: GenDef;
-  client: GenClient;
+  /** null: an internal occurrence (a task's recurrence without client). */
+  client: GenClient | null;
   scheduled: ScheduledOccurrence;
 }
 
@@ -185,6 +212,10 @@ export function desiredOccurrences(defs: readonly GenDef[], clients: readonly Ge
       if (!defActiveIn(def.row, competence)) continue;
       const scheduled = occurrencesInCompetence(scheduleOf(def.row), competence);
       if (scheduled.length === 0) continue;
+      if (def.row.internal) {
+        for (const s of scheduled) out.push({ def, client: null, scheduled: s });
+        continue;
+      }
       for (const client of clients) {
         if (!clientActiveIn(client, competence) || !appliesTo(def, client)) continue;
         for (const s of scheduled) out.push({ def, client, scheduled: s });
@@ -194,7 +225,24 @@ export function desiredOccurrences(defs: readonly GenDef[], clients: readonly Ge
   return out;
 }
 
-const keyOf = (defId: string, clientId: string, periodKey: string) => `${defId}:${clientId}:${periodKey}`;
+const keyOf = (defId: string, clientId: string | null, periodKey: string) => `${defId}:${clientId ?? ''}:${periodKey}`;
+
+/**
+ * The description each occurrence of a task's recurrence starts with (the series', re-encrypted for
+ * `tasks.description`); null for the registry's (its description lives on the recurring task).
+ */
+export async function occurrenceDescriptions(
+  ctx: Pick<TaskContext, 'cipher'>,
+  defs: readonly GenDef[],
+): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  for (const def of defs) {
+    if (def.row.origin !== 'task' || def.row.description === null) continue;
+    const text = await decryptTaskText(ctx.cipher, RECURRING_DESCRIPTION, def.row.description);
+    out.set(def.row.id, await encryptTaskText(ctx.cipher, TASK_DESCRIPTION, text));
+  }
+  return out;
+}
 
 /**
  * Generates the missing occurrences of these competences (all recurring tasks, or the given ones).
@@ -238,10 +286,15 @@ export async function ensureOccurrences(
         ),
       ),
   ]);
-  const existing = new Set(existingRows.map((r) => keyOf(r.defId!, r.clientId!, r.periodKey!)));
+  const existing = new Set(existingRows.map((r) => keyOf(r.defId!, r.clientId, r.periodKey!)));
   const missing = [...pending].flatMap(([competence, list]) =>
-    desiredOccurrences(list, clients, [competence]).filter((o) => !existing.has(keyOf(o.def.row.id, o.client.id, o.scheduled.periodKey))),
+    desiredOccurrences(list, clients, [competence]).filter((o) => !existing.has(keyOf(o.def.row.id, o.client?.id ?? null, o.scheduled.periodKey))),
   );
+  if (missing.length === 0) {
+    await writeMarks(ctx, [...pending].flatMap(([competence, list]) => list.map((d) => ({ recurringTaskId: d.row.id, competence }))), version);
+    return 0;
+  }
+  const descriptions = await occurrenceDescriptions(ctx, [...new Set(missing.map((m) => m.def))]);
 
   let created = 0;
   const createdAt = now();
@@ -254,16 +307,20 @@ export async function ensureOccurrences(
           return {
             workspaceId: ctx.workspaceId,
             title: def.row.name,
-            clientId: client.id,
+            description: descriptions.get(def.row.id) ?? null,
+            clientId: client?.id ?? null,
             categoryId: def.row.categoryId,
             departmentId: def.row.departmentId,
             assigneeId,
             assigneeSource: source,
-            priority: 'medium' as const,
+            priority: def.row.priority,
             status: 'todo' as const,
             dueDate: s.legalDueDate,
+            startTime: def.row.startTime,
+            endTime: def.row.endTime,
             targetDate: s.targetDate,
             recurringTaskId: def.row.id,
+            occurrenceOrigin: def.row.origin,
             competence: s.competence,
             periodKey: s.periodKey,
             referenceMonth: s.referenceMonth,
@@ -273,7 +330,9 @@ export async function ensureOccurrences(
           };
         }),
       )
-      .onConflictDoNothing({ target: [tasks.workspaceId, tasks.recurringTaskId, tasks.clientId, tasks.periodKey] })
+      // Any unique conflict means the occurrence exists: `tasks_occurrence_uq` (with client) or
+      // `tasks_internal_occurrence_uq` (internal, migration 0019).
+      .onConflictDoNothing()
       .returning({ id: tasks.id, title: tasks.title });
     created += inserted.length;
     await recordEvents(
@@ -337,6 +396,7 @@ type SyncRow = {
   clientId: string | null;
   periodKey: string | null;
   competence: string | null;
+  dueDate: string | null;
   status: TaskStatus;
   assigneeId: string | null;
   assigneeSource: AssigneeSource | null;
@@ -395,6 +455,7 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
         clientId: tasks.clientId,
         periodKey: tasks.periodKey,
         competence: tasks.competence,
+        dueDate: tasks.dueDate,
         status: tasks.status,
         assigneeId: tasks.assigneeId,
         assigneeSource: tasks.assigneeSource,
@@ -409,6 +470,7 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
         ),
       ),
   ]);
+  const forTask = def.row.origin === 'task';
   const clientById = new Map(clients.map((c) => [c.id, c]));
   const schedule = scheduleOf(def.row);
   // The periods each competence has now (none when the competence left the recurring task's window).
@@ -424,7 +486,10 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
     const competence = row.competence!;
     const scheduled = scheduledByCompetence.get(competence)?.get(row.periodKey!);
     const client = row.clientId ? clientById.get(row.clientId) : undefined;
-    const applies = Boolean(scheduled && client && clientActiveIn(client, competence) && appliesTo(def, client));
+    // Internal occurrences (a task's recurrence without client) apply while their period exists.
+    const applies = def.row.internal
+      ? Boolean(scheduled) && row.clientId === null
+      : Boolean(scheduled && client && clientActiveIn(client, competence) && appliesTo(def, client));
     if (row.status === 'canceled') {
       if (applies) restorable.push({ row, scheduled: scheduled! });
       continue;
@@ -433,11 +498,16 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
       notStarted.push({ row, scheduled: scheduled! });
       continue;
     }
+    const endedByDate = def.row.endDate !== null && row.dueDate !== null && row.dueDate > def.row.endDate;
     const note = !defActiveIn(def.row, competence)
       ? 'A tarefa recorrente foi encerrada antes desta competência'
-      : client && clientActiveIn(client, competence) && !appliesTo(def, client)
-        ? 'A tarefa recorrente deixou de se aplicar a este cliente (exceção ou regime)'
-        : 'A tarefa recorrente mudou e esta ocorrência deixou de existir';
+      : endedByDate
+        ? 'A recorrência foi encerrada antes desta data'
+        : !def.row.internal && client && clientActiveIn(client, competence) && !appliesTo(def, client)
+          ? forTask
+            ? 'A recorrência passou para outro cliente'
+            : 'A tarefa recorrente deixou de se aplicar a este cliente (exceção ou regime)'
+          : 'A tarefa recorrente mudou e esta ocorrência deixou de existir';
     stale.push({ row, note });
   }
   const systemCanceled = await canceledBySystem(
@@ -454,6 +524,16 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
     entry.ids.push(row.id);
     periods.set(scheduled.periodKey, entry);
   }
+  // A task's recurrence also hands down its priority, time and description (the registry's occurrences
+  // keep theirs: those are per occurrence there).
+  const seriesFields = forTask
+    ? {
+        priority: def.row.priority,
+        startTime: def.row.startTime,
+        endTime: def.row.endTime,
+        description: (await occurrenceDescriptions(ctx, [def])).get(def.row.id) ?? null,
+      }
+    : {};
   for (const { scheduled, ids } of periods.values()) {
     for (const chunk of inChunks(ids)) {
       await ctx.db
@@ -465,6 +545,7 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
           dueDate: scheduled.legalDueDate,
           targetDate: scheduled.targetDate,
           referenceMonth: scheduled.referenceMonth,
+          ...seriesFields,
         })
         .where(and(eq(tasks.workspaceId, ctx.workspaceId), inArray(tasks.id, chunk)));
     }
@@ -524,4 +605,31 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
   }
   await recordEvents(ctx, events);
   await ensureOccurrences(ctx, [0, 1, 2].map((n) => addMonthKey(current, n)), { recurringTaskIds: [recurringTaskId] });
+}
+
+/**
+ * Occurrences of a recurring task someone worked on: status other than "A fazer", assigned by hand,
+ * with comments, attachments or subtasks. Deleting the recurring task would erase them (refused).
+ */
+export async function workedOccurrenceCount(ctx: Pick<TaskContext, 'db' | 'workspaceId'>, recurringTaskId: string): Promise<number> {
+  const [worked] = await ctx.db
+    .select({ n: sql<number>`count(*)`.mapWith(Number) })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.workspaceId, ctx.workspaceId),
+        eq(tasks.recurringTaskId, recurringTaskId),
+        sql`(${tasks.status} <> 'todo' or ${tasks.assigneeSource} = 'manual'
+          or exists (select 1 from task_comments c where c.workspace_id = tasks.workspace_id and c.task_id = tasks.id)
+          or exists (select 1 from task_attachments a where a.workspace_id = tasks.workspace_id and a.task_id = tasks.id)
+          or exists (select 1 from task_subtasks s where s.workspace_id = tasks.workspace_id and s.task_id = tasks.id))`,
+      ),
+    );
+  return worked?.n ?? 0;
+}
+
+/** Removes a recurring task with its (untouched) occurrences; links and marks go by cascade. */
+export async function deleteSeriesRows(ctx: Pick<TaskContext, 'db' | 'workspaceId'>, recurringTaskId: string): Promise<void> {
+  await ctx.db.delete(tasks).where(and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.recurringTaskId, recurringTaskId)));
+  await ctx.db.delete(recurringTasks).where(and(eq(recurringTasks.workspaceId, ctx.workspaceId), eq(recurringTasks.id, recurringTaskId)));
 }

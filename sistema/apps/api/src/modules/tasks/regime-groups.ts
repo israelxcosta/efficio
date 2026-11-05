@@ -20,6 +20,7 @@ import {
   SUGGESTED_DEPARTMENT_NAMES,
   TAX_REGIME_LABELS,
   taskDepartmentInputSchema,
+  type RecurrencePeriod,
   type regimeGroupApplySchema,
   type RegimeGroupApplyResponse,
   type RegimeGroupItemState,
@@ -47,7 +48,8 @@ function recurringRef(def: GenDef, departments: Map<string, string>, current: st
   return {
     id: def.row.id,
     name: def.row.name,
-    period: def.row.period,
+    // Registry rows only (`loadDefs(…, { origin: 'registry' })`): never `daily` (recurring_tasks_origin_chk).
+    period: def.row.period as RecurrencePeriod,
     department: def.row.departmentId && departmentName ? { id: def.row.departmentId, name: departmentName } : null,
     active: isActive(def, current),
     regimes: def.row.regimes,
@@ -80,7 +82,7 @@ function matchedDepartments(departments: Map<string, string>): Map<SuggestedDepa
 /** GET /tasks/regime-groups (every member). */
 export async function listRegimeGroups(ctx: TaskContext): Promise<RegimeGroupsResponse> {
   const current = monthKey(ctx.today);
-  const [defs, clients, departments] = await Promise.all([loadDefs(ctx), loadClients(ctx), departmentNames(ctx.db, ctx.workspaceId)]);
+  const [defs, clients, departments] = await Promise.all([loadDefs(ctx, undefined, { origin: 'registry' }), loadClients(ctx), departmentNames(ctx.db, ctx.workspaceId)]);
   const matched = matchedDepartments(departments);
   const byKey = new Map(defs.filter((d) => d.row.catalogKey).map((d) => [d.row.catalogKey!, d]));
   const groups = REGIME_GROUP_REGIMES.map((regime) => {
@@ -133,7 +135,7 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
   const departments = await departmentNames(ctx.db, ctx.workspaceId);
   for (const id of Object.values(input.departments)) if (id) await getDepartmentOrThrow(ctx.db, ctx.workspaceId, id);
   const matched = matchedDepartments(departments);
-  const defs = await loadDefs(ctx);
+  const defs = await loadDefs(ctx, undefined, { origin: 'registry' });
   const byKey = new Map(defs.filter((d) => d.row.catalogKey).map((d) => [d.row.catalogKey!, d]));
   const handmade = handmadeByName(defs, regime, current);
   const skipped: RegimeGroupApplyResponse['skipped'] = [];

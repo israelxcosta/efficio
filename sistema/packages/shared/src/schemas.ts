@@ -25,12 +25,17 @@ import {
   MAX_CONTRACT_BLOCKS,
   MAX_CONTRACT_TOTAL_CHARS,
   MAX_OFFICE_IMAGE_BYTES,
+  MAX_RECURRENCE_COUNT,
+  MAX_RECURRENCE_INTERVAL,
   MAX_REFERENCE_OFFSET,
   MAX_UNION_CYCLES,
   NON_BUSINESS_DAY_RULES,
   PAYMENT_METHODS,
   PIX_KEY_TYPES,
+  RECURRENCE_ENDS,
+  RECURRENCE_FREQUENCIES,
   RECURRENCE_KINDS,
+  RECURRENCE_NON_BUSINESS_DAY_RULES,
   RECURRENCE_PERIODS,
   SERIES_SCOPES,
   SIMPLES_ACCESS_REGIMES,
@@ -39,6 +44,7 @@ import {
   TASK_DUE_BUCKETS,
   TASK_KINDS,
   TASK_PRIORITIES,
+  TASK_RECURRENCE_APPLY_TO,
   TASK_SCOPES,
   TASK_SITUATIONS,
   TASK_STATUSES,
@@ -821,6 +827,8 @@ interface TaskDatesShape {
   dueDate?: string | null;
   startTime?: string | null;
   endTime?: string | null;
+  /** With a recurrence the due date comes from the rule. */
+  recurrence?: unknown;
 }
 
 /** Start ≤ due; an appointment (time range) lives on the due date and ends after it starts. */
@@ -835,10 +843,81 @@ function refineTaskDates(v: TaskDatesShape, ctx: z.RefinementCtx) {
   if (v.startTime && v.endTime && v.endTime <= v.startTime) {
     ctx.addIssue({ code: 'custom', path: ['endTime'], message: 'A hora de término deve ser posterior à de início' });
   }
-  if ((v.startTime || v.endTime) && v.dueDate === null) {
+  if ((v.startTime || v.endTime) && v.dueDate === null && !v.recurrence) {
     ctx.addIssue({ code: 'custom', path: ['dueDate'], message: 'Informe o vencimento para definir o horário' });
   }
 }
+
+/** Daily and weekly recurrences: one occurrence per day/chosen weekday (identified by the date). */
+const DAY_BASED_FREQUENCIES = new Set(['daily', 'weekly']);
+/** "Every N": daily (days), weekly (weeks) and monthly (months) only. */
+const INTERVAL_FREQUENCIES = new Set(['daily', 'weekly', 'monthly']);
+/** Frequencies with an anchor month (`dueMonth`). */
+const ANCHORED_FREQUENCIES = new Set(['bimonthly', 'quarterly', 'semiannual', 'annual']);
+
+/**
+ * Recurrence of a task (`recurrence` on POST /tasks and PATCH /tasks/:id; docs/api.md → "Recorrência
+ * em qualquer tarefa"). The task becomes a recurring task of origin `task` (its client, or internal)
+ * whose occurrences are generated like the registry's. Defaults filled by the server: `startDate` = the
+ * task's due date (else today), `dueDay` = the day of `startDate`, `dueMonth` = its month. `interval`
+ * counts from the start ("a cada 2 semanas"); `ends`: never, on `endDate` (inclusive) or after `count`
+ * occurrences. Obligation-like rules as in the registry: internal target (`targetDaysBefore`),
+ * non-business days (`skip` only daily/weekly, their default; otherwise `anticipate`) and reference month.
+ */
+export const taskRecurrenceInputSchema = z
+  .object({
+    frequency: z.enum(RECURRENCE_FREQUENCIES, { message: 'Escolha a periodicidade' }),
+    interval: z
+      .int({ message: 'Informe de quanto em quanto tempo' })
+      .min(1, { message: `Use de 1 a ${MAX_RECURRENCE_INTERVAL}` })
+      .max(MAX_RECURRENCE_INTERVAL, { message: `Use de 1 a ${MAX_RECURRENCE_INTERVAL}` })
+      .default(1),
+    /** Weekly: ISO weekdays (1 = Monday … 7 = Sunday), one occurrence each. */
+    weekdays: z.array(z.int().min(1, { message: 'Dia da semana inválido' }).max(7, { message: 'Dia da semana inválido' })).max(7).default([]),
+    /** Monthly and longer: day of the legal deadline (31 → last day of short months). */
+    dueDay: dayOfMonth.nullish().transform((v) => v ?? null),
+    /** Bimonthly…annual: anchor month. */
+    dueMonth: z.int().min(1, { message: 'Mês inválido' }).max(12, { message: 'Mês inválido' }).nullish().transform((v) => v ?? null),
+    startDate: optionalDate(),
+    ends: z.enum(RECURRENCE_ENDS).default('never'),
+    endDate: optionalDate(),
+    count: z
+      .int({ message: 'Informe quantas vezes' })
+      .min(1, { message: `Use de 1 a ${MAX_RECURRENCE_COUNT} vezes` })
+      .max(MAX_RECURRENCE_COUNT, { message: `Use de 1 a ${MAX_RECURRENCE_COUNT} vezes` })
+      .nullish()
+      .transform((v) => v ?? null),
+    targetDaysBefore: z.int().min(0, { message: 'Use de 0 a 30 dias' }).max(30, { message: 'Use de 0 a 30 dias' }).default(0),
+    nonBusinessDayRule: z.enum(RECURRENCE_NON_BUSINESS_DAY_RULES).nullish().transform((v) => v ?? null),
+    referenceOffset: z
+      .int()
+      .min(0, { message: `Use de 0 a ${MAX_REFERENCE_OFFSET} meses` })
+      .max(MAX_REFERENCE_OFFSET, { message: `Use de 0 a ${MAX_REFERENCE_OFFSET} meses` })
+      .default(0),
+  })
+  .superRefine((v, ctx) => {
+    const issue = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
+    const dayBased = DAY_BASED_FREQUENCIES.has(v.frequency);
+    if (v.frequency === 'weekly' && v.weekdays.length === 0) issue('weekdays', 'Escolha ao menos um dia da semana');
+    if (v.interval > 1 && !INTERVAL_FREQUENCIES.has(v.frequency)) issue('interval', '"A cada N" vale só para a diária, a semanal e a mensal');
+    if (v.nonBusinessDayRule === 'skip' && !dayBased) issue('nonBusinessDayRule', 'Pular o dia não útil vale só para a diária e a semanal');
+    if (v.frequency === 'daily' && v.targetDaysBefore > 0) issue('targetDaysBefore', 'Na diária a meta é o próprio dia');
+    if (v.frequency === 'weekly' && v.targetDaysBefore > 6) issue('targetDaysBefore', 'Use de 0 a 6 dias');
+    if (dayBased && v.referenceOffset > 0) issue('referenceOffset', 'Na diária e na semanal a referência é o próprio período');
+    if (v.ends === 'date' && !v.endDate) issue('endDate', 'Informe a data de término');
+    if (v.ends === 'date' && v.endDate && v.startDate && v.endDate < v.startDate) issue('endDate', 'O término deve ser depois do início');
+    if (v.ends === 'count' && v.count === null) issue('count', 'Informe quantas vezes');
+  })
+  .transform((v) => ({
+    ...v,
+    weekdays: v.frequency === 'weekly' ? [...new Set(v.weekdays)].sort((a, b) => a - b) : [],
+    dueDay: DAY_BASED_FREQUENCIES.has(v.frequency) ? null : v.dueDay,
+    dueMonth: ANCHORED_FREQUENCIES.has(v.frequency) ? v.dueMonth : null,
+    nonBusinessDayRule: v.nonBusinessDayRule ?? (DAY_BASED_FREQUENCIES.has(v.frequency) ? ('skip' as const) : ('anticipate' as const)),
+    endDate: v.ends === 'date' ? v.endDate : null,
+    count: v.ends === 'count' ? v.count : null,
+  }));
+export type TaskRecurrenceInput = z.input<typeof taskRecurrenceInputSchema>;
 
 /**
  * New task. The department is never chosen for an assigned task: it is the assignee's department
@@ -861,6 +940,11 @@ export const taskInputSchema = z
     /** Appointment ("compromisso") on the due date: wall-clock "HH:MM", no time zone. */
     startTime: optionalTime(),
     endTime: optionalTime(),
+    /**
+     * Repeats the task (null = a single due date, as always). The task becomes the first occurrence of
+     * the series; its due date comes from the rule (and seeds `startDate`).
+     */
+    recurrence: taskRecurrenceInputSchema.nullish().transform((v) => v ?? null),
   })
   .superRefine(refineTaskDates);
 export type TaskInput = z.input<typeof taskInputSchema>;
@@ -883,6 +967,19 @@ export const taskUpdateSchema = z
     dueDate: isoDateSchema.nullable(),
     startTime: taskTimeSchema.nullable(),
     endTime: taskTimeSchema.nullable(),
+    /**
+     * A task without recurrence: starts one (the task becomes its first occurrence). An occurrence of a
+     * task's recurrence: replaces the rule (implies `applyTo: 'series'`); `null` ends the series at this
+     * occurrence. Occurrences of the registry ("Recorrentes") refuse it (422).
+     */
+    recurrence: taskRecurrenceInputSchema.nullable(),
+    /**
+     * Occurrence of a task's recurrence: `occurrence` (default) changes only this one (description,
+     * priority, responsible); `series` changes the series too — this occurrence and the not-started ones
+     * from the current competence on follow (title, client, category, responsible, priority, description,
+     * time). Ignored by other tasks.
+     */
+    applyTo: z.enum(TASK_RECURRENCE_APPLY_TO),
   })
   .partial()
   .superRefine(refineTaskDates);
@@ -1209,6 +1306,13 @@ export const taskHomeQuerySchema = z.object({
   month: monthKeySchema.optional(),
 });
 export type TaskHomeQuery = z.input<typeof taskHomeQuerySchema>;
+
+/**
+ * GET /tasks/me/overview (the personal area): `month` of the productivity block (default: current);
+ * everything else is about now.
+ */
+export const taskMyOverviewQuerySchema = z.object({ month: monthKeySchema.optional() });
+export type TaskMyOverviewQuery = z.input<typeof taskMyOverviewQuerySchema>;
 
 /** GET /tasks/dashboard: the same department rule as the start page (another one or `all`: `registry`). */
 export const taskDashboardQuerySchema = taskHomeQuerySchema;

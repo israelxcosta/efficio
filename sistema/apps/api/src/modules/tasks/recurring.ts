@@ -12,6 +12,8 @@ import {
   recurringMonths,
   type AssigneeSource,
   type MonthKey,
+  type NonBusinessDayRule,
+  type RecurrencePeriod,
   type RecurringGenerateResponse,
   type RecurringOccurrenceDetail,
   type RecurringTask,
@@ -32,6 +34,7 @@ import {
   clientActiveIn,
   defActiveIn,
   defaultWindow,
+  deleteSeriesRows,
   ensureOccurrences,
   generationBounds,
   loadClients,
@@ -39,6 +42,7 @@ import {
   resolveAssignee,
   scheduleOf,
   syncOpenOccurrences,
+  workedOccurrenceCount,
   type GenClient,
   type GenDef,
 } from './generation';
@@ -61,8 +65,12 @@ type RecurringQuery = z.output<typeof recurringTaskQuerySchema>;
 const count = (cond?: ReturnType<typeof sql>) =>
   (cond ? sql<number>`count(*) filter (where ${cond})` : sql<number>`count(*)`).mapWith(Number);
 
+/**
+ * A recurring task of the registry. A task's recurrence (origin `task`, migration 0019) is managed from
+ * its task (`recurrence` on PATCH /tasks/:id): here it is "not found", like an id of another office.
+ */
 async function getDefOrThrow(ctx: Pick<TaskContext, 'db' | 'workspaceId'>, id: string): Promise<GenDef> {
-  const [def] = await loadDefs(ctx, [id]);
+  const [def] = await loadDefs(ctx, [id], { origin: 'registry' });
   if (!def) throw new NotFoundError('Tarefa recorrente não encontrada');
   return def;
 }
@@ -131,12 +139,13 @@ function toRecurringTask(ctx: TaskContext, def: GenDef, month: MonthKey, shared:
     id: row.id,
     name: row.name,
     description: shared.descriptions.get(row.id) ?? null,
-    period: row.period,
+    // Registry rows only (getDefOrThrow / listRecurring): never `daily` nor `skip` (recurring_tasks_origin_chk).
+    period: row.period as RecurrencePeriod,
     dueDay: row.dueDay,
     dueMonth: row.dueMonth,
     months: recurringMonths(row),
     targetDaysBefore: row.targetDaysBefore,
-    nonBusinessDayRule: row.nonBusinessDayRule,
+    nonBusinessDayRule: row.nonBusinessDayRule as NonBusinessDayRule,
     referenceOffset: row.referenceOffset,
     department: row.departmentId && departmentName ? { id: row.departmentId, name: departmentName } : null,
     category: row.categoryId ? (shared.categories.get(row.categoryId) ?? null) : null,
@@ -196,7 +205,7 @@ export async function listRecurring(ctx: TaskContext, q: RecurringQuery): Promis
   const month = q.month ?? monthKey(ctx.today);
   if (inBounds(ctx, month)) await ensureOccurrences(ctx, [month]);
   const current = monthKey(ctx.today);
-  const all = await loadDefs(ctx);
+  const all = await loadDefs(ctx, undefined, { origin: 'registry' });
   const isActive = (d: GenDef) => d.row.endCompetence === null || d.row.endCompetence >= current;
   let assigneeDefs: Set<string> | null = null;
   if (q.assigneeId) {
@@ -349,28 +358,14 @@ export async function updateRecurring(ctx: TaskContext, id: string, input: Recur
  */
 export async function deleteRecurring(ctx: TaskContext, id: string): Promise<void> {
   await getDefOrThrow(ctx, id);
-  const mine = and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.recurringTaskId, id));
-  const [worked] = await ctx.db
-    .select({ n: count() })
-    .from(tasks)
-    .where(
-      and(
-        mine,
-        sql`(${tasks.status} <> 'todo' or ${tasks.assigneeSource} = 'manual'
-          or exists (select 1 from task_comments c where c.workspace_id = tasks.workspace_id and c.task_id = tasks.id)
-          or exists (select 1 from task_attachments a where a.workspace_id = tasks.workspace_id and a.task_id = tasks.id)
-          or exists (select 1 from task_subtasks s where s.workspace_id = tasks.workspace_id and s.task_id = tasks.id))`,
-      ),
-    );
-  const n = worked?.n ?? 0;
+  const n = await workedOccurrenceCount(ctx, id);
   if (n > 0) {
     throw new ConflictError(
       `Esta tarefa recorrente já tem histórico (${n} ${n === 1 ? 'ocorrência trabalhada' : 'ocorrências trabalhadas'}). Defina "Encerra em" para que ela saia das próximas competências; o histórico fica.`,
       { occurrences: n },
     );
   }
-  await ctx.db.delete(tasks).where(mine);
-  await ctx.db.delete(recurringTasks).where(and(eq(recurringTasks.workspaceId, ctx.workspaceId), eq(recurringTasks.id, id)));
+  await deleteSeriesRows(ctx, id);
 }
 
 /** GET /tasks/recurring/:id/occurrences/:period: every client of one occurrence (RecurringOccurrenceSheet). */

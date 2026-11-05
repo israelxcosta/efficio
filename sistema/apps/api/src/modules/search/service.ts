@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
-import { isTaskOverdue, onlyDigits, TASK_TIME_ZONE, type SearchResponse } from '@effinance/shared';
+import { isTaskOverdue, onlyDigits, TASK_TIME_ZONE, type RecurrencePeriod, type SearchResponse } from '@effinance/shared';
 import type { DbExecutor } from '../../db/client';
 import {
   accounts,
@@ -95,11 +95,20 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
         clientName: contacts.name,
         clientTradeName: contacts.tradeName,
         inFlow: sql<boolean>`${taskFlowSteps.id} is not null`,
+        series: sql<boolean>`${tasks.recurringTaskId} is not null`,
       })
       .from(tasks)
       .leftJoin(contacts, and(eq(contacts.workspaceId, tasks.workspaceId), eq(contacts.id, tasks.clientId)))
       .leftJoin(taskFlowSteps, and(eq(taskFlowSteps.workspaceId, tasks.workspaceId), eq(taskFlowSteps.taskId, tasks.id)))
-      .where(and(eq(tasks.workspaceId, workspaceId), sql`${tasks.recurringTaskId} is null`, ilike(tasks.title, pattern)))
+      // Registry occurrences are found through their recurring task; of a task's recurrence, only the next
+      // open occurrence of each series (a daily one would fill every slot).
+      .where(
+        and(
+          eq(tasks.workspaceId, workspaceId),
+          sql`(${tasks.recurringTaskId} is null or (${tasks.occurrenceOrigin} = 'task' and ${tasks.status} in ('todo', 'in_progress', 'waiting_client') and not exists (select 1 from tasks n where n.workspace_id = tasks.workspace_id and n.recurring_task_id = tasks.recurring_task_id and n.status in ('todo', 'in_progress', 'waiting_client') and (n.due_date, n.id) < (tasks.due_date, tasks.id))))`,
+          ilike(tasks.title, pattern),
+        ),
+      )
       // Open first, then the closest due date to today.
       .orderBy(
         sql`case when ${tasks.status} in ('todo', 'in_progress', 'waiting_client') then 0 else 1 end`,
@@ -108,9 +117,10 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
       )
       .limit(8),
     db
-      .select({ id: recurringTasks.id, name: recurringTasks.name, period: recurringTasks.period })
+      .select({ id: recurringTasks.id, name: recurringTasks.name, period: sql<RecurrencePeriod>`${recurringTasks.period}` })
       .from(recurringTasks)
-      .where(and(eq(recurringTasks.workspaceId, workspaceId), ilike(recurringTasks.name, pattern)))
+      // The registry's (they open in "Recorrentes"); a task's recurrence is found through its tasks.
+      .where(and(eq(recurringTasks.workspaceId, workspaceId), eq(recurringTasks.origin, 'registry'), ilike(recurringTasks.name, pattern)))
       .orderBy(sql`lower(${recurringTasks.name})`)
       .limit(5),
     // Unions (phase 3): public data of the entity, for every member. Name, acronym, category or CNPJ.
@@ -148,7 +158,7 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
     tasks: taskRows.map((t) => ({
       id: t.id,
       title: t.title,
-      kind: t.inFlow ? ('flow' as const) : ('standalone' as const),
+      kind: t.series ? ('recurring' as const) : t.inFlow ? ('flow' as const) : ('standalone' as const),
       status: t.status,
       dueDate: t.dueDate,
       overdue: isTaskOverdue(t, day),

@@ -1,6 +1,8 @@
 # Módulo Tarefas: especificação de UI
 
-> Dono: `ui-saas-designer`. Status: **revisão 3**. A **fase 1 está implementada e publicada** (duas
+> Dono: `ui-saas-designer`. Status: **revisão 4** (05/11/2026: hub de tarefas, trilho de 5 itens,
+> recorrência em toda tarefa, Minha área e Auditoria enxuta; plano em
+> `docs/superpowers/plans/2026-11-05-hub-recorrencia-area-usuario.md`). Até a revisão 3: a **fase 1 está implementada e publicada** (duas
 > áreas, Acesso restrito, Início, Tarefas em lista e quadro, detalhe da tarefa, Clientes e
 > Cadastros). Esta revisão descreve o que existe, corrige a especificação onde o código divergiu por
 > boa razão e completa a **fase 2** (recorrentes, auditoria, calendário, processos, relatórios,
@@ -23,6 +25,35 @@
 
 **Changelog**
 
+- **Revisão 4 (05/11/2026): hub de tarefas, recorrência em toda tarefa, Minha área e Auditoria
+  enxuta**, a pedido do usuário.
+  - **Trilho com 5 itens**: Início, Tarefas, Clientes, Relatórios e Cadastros. Auditoria,
+    Recorrentes (com Grupos por regime) e Processos saem do trilho e do "Mais" do celular e passam ao
+    **hub de tarefas**; o item Tarefas fica ativo nessas páginas e o ⌘K continua com todas (§2.2,
+    §2.4, §2.8).
+  - **Hub de tarefas** (`TasksHub`, §2.9): no cabeçalho de Tarefas, Auditoria, Recorrentes e
+    Processos, só ícones com tooltip, em dois grupos, **Ver** (Lista, Quadro, Calendário, Auditoria,
+    Recorrentes, Grupos por regime, Processos) e **Criar** (Nova tarefa, Novo compromisso, Nova
+    tarefa recorrente, Novo processo). Substitui o cartão "Criar" (`TaskCreateHub`), a Visualização
+    dos filtros de Tarefas (§7.3), o segmentado "Tarefas recorrentes / Grupos por regime" e os botões
+    de criar dos cabeçalhos de Recorrentes e Processos. Registra também o que os ajustes de 04/11
+    fizeram sem passar pela spec (o cartão "Criar" e a visão Grupos por regime).
+  - **Toda tarefa pode se repetir** (§9.4 e §10.6): "Não se repete / Repete" no formulário de nova
+    tarefa e no detalhe, com a regra do contrato do backend (`recurrence`: diária, semanal com dias,
+    mensal a bimestral a anual, "a cada N", dia não útil, meta, referência, termina nunca, numa data
+    ou após N vezes). Uma tarefa que se repete **é uma tarefa recorrente de origem "tarefa"** (um
+    cliente ou interna): mesma tabela, mesma agenda e mesma ocorrência-tarefa das recorrentes do
+    **cadastro**, mas listada como tarefa, editada na própria tarefa ("Só esta" ou "Esta e as
+    próximas") e fora da auditoria. Recorrentes lista as duas origens (filtro Tipo).
+  - **Minha área** (`/minha-area`, §15.4): o avatar abre a página da pessoa (os números dela, Minhas
+    tarefas, Para você, Calendário, Meu departamento, Anotações, Clientes com mais pendências e
+    Comentários recentes), como o `view-perfil` do Effy. Os itens do menu do avatar vão para o
+    **menu de conta** do cabeçalho dela, sem perder nenhum (tabela em §2.2).
+  - **Auditoria enxuta** (§11.8): sem a frase do cabeçalho nem a dica de teclado, um só cabeçalho de
+    colunas no topo do cartão, a linha do cliente na mesma grade das ocorrências, rótulo de situação
+    só nas exceções e vazios curtos.
+  - Decisões novas em §0 (itens 19 a 22), vocabulário (§1), acessibilidade (§16), feedback (§17),
+    pendências de API (§18, itens 20 a 27) e checklist (§19, "Revisão 4").
 - **Revisão 3 (30/10/2026): fase 1 conferida no código, fases 2 e 3 completas.**
   - **Alinhada ao que foi implementado** (código em `apps/web/src/features/tasks/**` e capturas da
     fase 1):
@@ -130,7 +161,8 @@
     vencido; âmbar só para "Urgente", "Vence hoje", "Fora da meta" e documentos ou convenções que
     vencem em até 30 dias. Categorias e tipos de documento usam ícone neutro.
 11. **"Minhas tarefas" é um escopo, não uma tela**: `Minhas | Meu departamento | Todas`, combinado
-    com a visualização `Lista | Quadro | Calendário` (o calendário entra na fase 2). O padrão é
+    com a visualização `Lista | Quadro | Calendário` (o calendário entra na fase 2; na revisão 4, a
+    visualização vai para o hub, §2.9). O padrão é
     Minhas + Lista, agrupada por prazo (Atrasadas, Fora da meta, Hoje, Próximos 7 dias, Mais tarde,
     Sem vencimento), como no Effy.
 12. **Auditoria mensal** (fase 2): duas listas em acordeão, **Por cliente** e **Por tarefa**, cujas
@@ -166,6 +198,27 @@
 18. **Acessos de clientes nunca aparecem em listas.** O código de acesso do Simples e a senha do
     contador ficam cifrados, mascarados na ficha e só se revelam por um clique de quem tem a
     permissão, com registro de quem viu (§13.8).
+19. **Trilho de 5 itens e hub de tarefas** (revisão 4). O trilho da Gestão tem Início, Tarefas,
+    Clientes, Relatórios e Cadastros. As páginas que são outro jeito de ver as tarefas (Auditoria por
+    competência, Recorrentes por série, Grupos por regime e Processos por etapa) ficam no **hub**, no
+    cabeçalho delas e de Tarefas, com o item Tarefas ativo no trilho. O hub separa **Ver**
+    (navegação) de **Criar** (ações) e só tem ícones: o nome fica no tooltip e no `aria-label` (§2.9).
+20. **Uma recorrência só** (revisão 4). "Repete", no formulário de tarefa, transforma a tarefa na
+    primeira ocorrência de uma **tarefa recorrente de origem "tarefa"**, com um alvo (o cliente da
+    tarefa ou Interna) e o responsável dela. O cadastro de Recorrentes cria as de **origem
+    "cadastro"** (regimes, vários clientes, grupos por regime). As duas usam a mesma tabela, a mesma
+    agenda (`occurrencesInCompetence`, com feriados) e a mesma ocorrência-tarefa; muda onde aparecem:
+    as do cadastro são **obrigações** (linha agrupada por cliente, auditoria, blocos de obrigações do
+    Início); as da tarefa são **repetições** (cada ocorrência é uma linha de tarefa, fora da
+    auditoria) e se editam na própria tarefa, com "Só esta" ou "Esta e as próximas" (§9.4 e §10.6).
+21. **Quem cria o quê** (revisão 4, regra da API). Qualquer membro cria, edita e encerra a repetição
+    de uma tarefa dele (responsável) ou do departamento dele; a de outro departamento pede
+    `registry`. Recorrentes do cadastro continuam só com `registry`. A tela não decide: usa o
+    `canEdit` que a API manda em cada série (§18, item 22).
+22. **O avatar abre Minha área** (revisão 4): `/minha-area`, rota comum como Configurações (o trilho
+    continua o da área atual). Lá ficam o trabalho da pessoa e o **menu de conta** (espaços, tema,
+    Configurações, Sair). O Início continua sendo o painel do departamento; Minha área é o da pessoa,
+    e as duas só repetem "Minhas tarefas" (§15.4).
 
 **Mapa das fases**
 
@@ -174,6 +227,7 @@
 | 1 (publicada) | Duas áreas, Acesso restrito, Início (resumo, Minhas tarefas, Por responsável, Por cliente, primeiros passos), Tarefas em lista e quadro, detalhe com subtarefas e comentários, Clientes com responsáveis, ficha e definição em lote, Cadastros (Departamentos, Categorias, Equipe) | §2, §5 a §9, §13.1 a §13.6 |
 | 2 | Tarefas recorrentes, Auditoria mensal, Calendário, Processos e modelos, Relatórios de tarefas, Fora da meta e Obrigações no Início, anexos e histórico na tarefa, Minhas anotações | §6.3, §6.5, §7.6, §9.1, §10 a §12, §14, §15.2 |
 | 3 | Sindicatos e convenções, dados fiscais, acessos e documentos do cliente, vencimentos no Início e no sino, Escritório e modelo de contrato, contrato do cliente, permissões por pessoa, foto no perfil | §6.10, §13.7 a §13.10, §15.3 |
+| Revisão 4 | Trilho de 5 itens, hub de tarefas, repetição em toda tarefa (e o filtro Tipo em Recorrentes), Minha área com menu de conta, Auditoria enxuta | §2.2, §2.9, §9.4, §10.6, §11.8, §15.4 |
 
 ---
 
@@ -181,7 +235,9 @@
 
 | Termo na tela | O que é | Origem (Effy) |
 | --- | --- | --- |
-| Gestão de tarefas (Gestão) | Área principal do app: Início, Tarefas, Auditoria, Recorrentes, Processos, Clientes, Relatórios e Cadastros. Visível para todos | o próprio Effy |
+| Gestão de tarefas (Gestão) | Área principal do app: Início, Tarefas (com Auditoria, Recorrentes, Grupos por regime e Processos no hub), Clientes, Relatórios e Cadastros. Visível para todos | o próprio Effy |
+| Hub de tarefas | Ícones no cabeçalho de Tarefas, Auditoria, Recorrentes e Processos: **Ver** (as visualizações e essas páginas) e **Criar** (§2.9) | novo |
+| Minha área | A página da pessoa, aberta pelo avatar: os números dela, as tarefas, o calendário, as anotações, o departamento dela, o que pede atenção e o menu de conta (§15.4) | `view-perfil` |
 | Financeiro | Área com o Efficio atual (contas, extrato, clientes com honorários…). Só administradores | — |
 | Administrador | Membro com papel `owner` (aparece como **Proprietário**) ou `editor` (aparece como **Administrador**). Acessa o financeiro e mantém os cadastros | perfil administrador |
 | Colaborador | Membro com papel `viewer`. Usa toda a Gestão; não vê o financeiro nem honorários | usuário comum |
@@ -191,6 +247,10 @@
 | Responsável do cliente | Para cada cliente e departamento, o membro que recebe as recorrentes daquele cliente e é sugerido nas tarefas avulsas dele (a "carteira" de cada um) | novo |
 | Concluída por / em | Quem clicou e quando (data e hora), que pode não ser o responsável | `concluidaPor/Em` |
 | Tarefa recorrente (obrigação) | Definição: nome, descrição, departamento, responsável padrão, periodicidade (Semanal, Mensal, Bimestral, Trimestral, Semestral, Anual), prazo legal (obrigatório), meta interna, regra de dia não útil, competência de referência, a quem se aplica (regimes e/ou clientes, com exceções), competência em que começa e, se for o caso, em que encerra, e categoria | `ObligationDef` |
+| Origem da recorrente (revisão 4) | **Cadastro**: criada em Recorrentes (regimes, vários clientes, grupos por regime), por quem tem `registry`; ocorrências agregadas por cliente e auditadas. **Tarefa**: criada pelo "Repete" de uma tarefa, para um cliente ou Interna; ocorrências listadas como tarefas, fora da auditoria | `recurring_tasks.origin` |
+| Obrigação | Tarefa recorrente do cadastro: prazo legal, meta, competência de referência, regra de dia não útil e coluna da auditoria | `ObligationDef` |
+| Repetição (tarefa que se repete) | Tarefa recorrente de origem tarefa. Cada ocorrência é uma tarefa com o vencimento que a regra dá (e, se houver, a meta antes dele); edita-se na tarefa, "só esta" ou "esta e as próximas" | novo |
+| Regra de repetição | Diária, Semanal (com os dias da semana), Mensal, Bimestral, Trimestral, Semestral ou Anual; "a cada N" dias, semanas ou meses; dia do mês e mês-âncora; dia não útil (pular, na diária e na semanal; antecipar, postergar ou manter); meta N dias antes; referência; termina nunca, numa data ou após N vezes. Começa no vencimento da tarefa | `taskRecurrenceInputSchema` |
 | Prazo legal | Data-limite da obrigação na competência, já ajustada pela regra de dia não útil (fins de semana e feriados nacionais) | data-base |
 | Meta | Data em que o escritório quer entregar: N dias corridos antes do prazo legal; se cair em dia não útil, antecipa. Com N = 0, a meta é o próprio prazo legal | novo |
 | Data de trabalho | A data que ordena e agrupa as listas: o vencimento (avulsa) ou a meta (ocorrência) | — |
@@ -239,8 +299,13 @@
   faixas a partir do dia 1º do mês da data-base (as faixas vêm calculadas da API, no fuso do
   escritório).
 - O estado da tarefa (avulsa, etapa ou ocorrência) tem 5 valores: A fazer, Em andamento, Aguardando
-  cliente, Concluída e Cancelada. A periodicidade tem 6: Semanal, Mensal, Bimestral, Trimestral,
-  Semestral e Anual (o eventual é tarefa avulsa ou processo).
+  cliente, Concluída e Cancelada. A periodicidade da obrigação tem 6: Semanal, Mensal, Bimestral,
+  Trimestral, Semestral e Anual (o eventual é tarefa avulsa ou processo). A repetição (revisão 4)
+  tem essas 6 e mais a Diária, vários dias na Semanal e "a cada N".
+- **Repetição** (revisão 4): a primeira ocorrência é a própria tarefa, na primeira data da regra a
+  partir do vencimento dela (uma tarefa de terça que passa a repetir às segundas e quartas vence na
+  quarta; a tela avisa antes de salvar). Uma regra que começa no passado não cria ocorrências
+  atrasadas retroativas: a tela pede à API que as seguintes comecem hoje (§18, item 21).
 
 **O que cada linha mostra** (o contrato fica em `packages/shared`, seção "Tasks", e ainda pode mudar
 de nome na fase 2; a tela depende dos dados, não dos nomes): título, tipo (avulsa, etapa de processo
@@ -287,43 +352,66 @@ cada um tem.
 ### 2.2 Trilho da Gestão (`GESTAO_NAV_ITEMS` em `components/layout/nav.ts`)
 
 O mesmo `Sidebar`: 76px, ícones de 20px em botões de 44px a cada 50px, tooltip à direita,
-`splitRail` e o botão "mais" com chevron quando a altura não basta. Os itens vão em ordem de uso,
-para que o "mais" leve primeiro o que é menos usado. **Hoje (fase 1)** o trilho tem Início, Tarefas,
-Clientes e Cadastros, nessa ordem. Na fase 2 os 4 itens novos entram nas posições abaixo, que são a
-**ordem final**. A fase 3 não acrescenta itens.
+`splitRail` e o botão "mais" com chevron quando a altura não basta. **Revisão 4: o trilho tem 5
+itens**, nesta ordem. Auditoria, Recorrentes e Processos (fase 2) continuam páginas da Gestão, com as
+mesmas rotas e chaves de página, mas saem do trilho e do "Mais" do celular: ficam no **hub de
+tarefas** (§2.9), e o item Tarefas fica ativo nelas.
 
-| # | Rótulo (tooltip, "mais" e ⌘K) | `short` | Rota | Ícone (lucide) | Barra do celular | Fase | `keywords` |
+| # | Rótulo (tooltip, "mais" e ⌘K) | `short` | Rota | Ícone (lucide) | Barra do celular | Ativo também em | `keywords` |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Início | Início | `/` (`end`) | `House` | 1ª | 1 | `painel resumo departamento hoje minhas` |
-| 2 | Tarefas | Tarefas | `/tarefas` (`end`: ativo só nela) | `ListChecks` | 2ª | 1 | `solicitacoes pedidos afazeres prazos kanban quadro agenda compromissos` (fase 2: mais `calendario`) |
-| 3 | Auditoria mensal | Auditoria | `/tarefas/auditoria` | `ClipboardCheck` | — | 2 | `competencia matriz obrigacoes entregas conclusao acompanhamento encerramento` |
-| 4 | Tarefas recorrentes | Recorrentes | `/tarefas/recorrentes` | `Repeat` | — | 2 | `obrigacoes prazo legal meta das dctfweb folha periodicidade calendario feriados` |
-| 5 | Processos | Processos | `/tarefas/processos` | `Workflow` | — | 2 | `fluxos modelos etapas roteiro abertura alteracao` |
-| 6 | Clientes | Clientes | `/tarefas/clientes` | `Building2` | 3ª | 1 | `empresas cnpj regime contatos responsaveis carteira` (fase 3: mais `documentos certificado certidoes alvara inscricao`) |
-| 7 | Relatórios de tarefas | Relatórios | `/tarefas/relatorios` | `ChartColumn` | — | 2 | `produtividade pontualidade entregas atrasos exportar csv pdf` |
-| 8 | Cadastros | Cadastros | `/tarefas/cadastros` | `FolderCog` | — | 1 | `departamentos categorias equipe usuarios membros` (fase 3: mais `sindicatos convencoes data-base permissoes`) |
+| 1 | Início | Início | `/` (`end`) | `House` | 1ª | — | `painel resumo departamento hoje minhas` |
+| 2 | Tarefas | Tarefas | `/tarefas` (`end`) | `ListChecks` | 2ª | `/tarefas/auditoria`, `/tarefas/recorrentes`, `/tarefas/processos` e os subcaminhos (`activeOn`) | `solicitacoes pedidos afazeres prazos kanban quadro agenda compromissos calendario` |
+| 3 | Clientes | Clientes | `/tarefas/clientes` | `Building2` | 3ª | — | `empresas cnpj regime contatos documentos certificado certidoes alvara inscricao` |
+| 4 | Relatórios de tarefas | Relatórios | `/tarefas/relatorios` | `ChartColumn` | — | — | `produtividade pontualidade entregas atrasos exportar csv pdf` |
+| 5 | Cadastros | Cadastros | `/tarefas/cadastros` | `FolderCog` | — | — | `departamentos categorias equipe usuarios membros sindicatos convencoes data-base permissoes` |
 
-- **Fase 3 sem itens novos**: Sindicatos é a 4ª aba de Cadastros (§13.7); Escritório, Perfil e
-  Membros ficam em Configurações, no rodapé do trilho; as permissões abrem do cadastro da pessoa
-  (§13.10). Os vencimentos chegam pelo Início e pelo sino (§6.10 e §2.8), não por uma página.
+**Páginas do hub** (continuam em `GESTAO_NAV_ITEMS`, com `place: 'hub'`, porque o ⌘K, o teste de
+rotas e `pagePermissionOf` precisam delas; `railItemsFor` as tira do trilho e do "Mais"):
+
+| Rótulo | Rota | Ícone | Chave de página | `keywords` |
+| --- | --- | --- | --- | --- |
+| Auditoria mensal | `/tarefas/auditoria` | `ClipboardCheck` | `page.audit` | `competencia matriz obrigacoes entregas conclusao acompanhamento encerramento` |
+| Tarefas recorrentes | `/tarefas/recorrentes` | `Repeat` | `page.recurring` | `obrigacoes repeticoes repete prazo legal meta das dctfweb folha periodicidade feriados grupos regime` |
+| Processos | `/tarefas/processos` | `Workflow` | `page.processes` | `fluxos modelos etapas roteiro abertura alteracao` |
+
+- **Por que estes 5.** Clientes e Relatórios são outros assuntos (o cadastro do cliente; a análise de
+  um período) e Cadastros é configuração. Auditoria, Recorrentes e Processos são as próprias tarefas
+  vistas de outro jeito (por competência, por série, por etapa), por isso moram com Tarefas e trocam
+  entre si pelo hub sem voltar ao trilho.
+- **Fase 3 sem itens novos** (continua valendo): Sindicatos é a 4ª aba de Cadastros (§13.7);
+  Escritório, Perfil e Membros ficam em Configurações; as permissões abrem do cadastro da pessoa
+  (§13.10); os vencimentos chegam pelo Início e pelo sino (§6.10 e §2.8).
 - **Páginas ocultas por pessoa** (fase 3): as páginas desligadas em "Páginas da gestão" (§13.10)
-  saem do trilho, do "Mais" e do ⌘K daquela pessoa. Início e Tarefas nunca saem.
-- **`NavItem` tem `end?: boolean`** (ativo só no caminho exato). O item Tarefas precisa disso,
-  porque as outras páginas da Gestão ficam sob `/tarefas/`.
+  saem do trilho, do hub, do "Mais" e do ⌘K daquela pessoa, e a URL mostra Acesso restrito
+  (`pagePermissionOf` continua cobrindo as páginas do hub). Início e Tarefas nunca saem.
+- **`NavItem`** tem `end?: boolean` (ativo só no caminho exato), `activeOn?: string[]` (caminhos que
+  também o ativam, com seus subcaminhos: `/tarefas/auditoriax` não conta) e `place?: 'rail' | 'hub'`.
 - **Rodapé do trilho** (fora da área medida, nunca vai para o "mais"), de cima para baixo: o filete
-  e o botão de troca de área (só administradores, §2.3), Configurações e o avatar. O menu do avatar
-  tem Perfil, tema, Configurações e Sair; a fase 2 acrescenta **Minhas anotações** (`NotebookPen`),
-  que abre o `NotesSheet` (§15.2), nas duas áreas.
-- **Altura**: os 8 itens ocupam 400px. Com logotipo e rodapé, tudo cabe a partir de cerca de 760px
-  de altura de janela; abaixo disso, Cadastros e Relatórios vão primeiro para o "mais". Início,
-  Tarefas e Auditoria ficam sempre visíveis.
+  e o botão de troca de área (só administradores, §2.3), Configurações e o **avatar, que é um link
+  para Minha área** (§15.4): tooltip "Minha área", `aria-label="Minha área — Marina Costa"`,
+  `aria-current="page"` em `/minha-area`, com o anel `ring-2 ring-primary` quando ativo (em repouso,
+  `ring-2 ring-surface`, como hoje). O selo do tipo de espaço continua no canto. O avatar **não abre
+  mais menu**; os itens do menu foram para estes lugares:
+
+  | Item do menu do avatar | Onde fica |
+  | --- | --- |
+  | Conta: nome e e-mail | rótulo do menu de conta de Minha área; o nome também está no `h1` ("Bom dia, Marina") |
+  | Espaço atual | o próprio botão do menu de conta (ícone do tipo de espaço e o nome) e a linha "Espaço atual: … · Empresarial" dentro dele |
+  | Empresas (trocar de espaço) e **Nova empresa** | menu de conta (`WorkspaceMenuItems`, o mesmo componente); no celular, a seção Espaço do "Mais", como hoje |
+  | Perfil | botão **Editar perfil** no cabeçalho de Minha área (`/configuracoes?aba=perfil`) |
+  | Minhas anotações | card Anotações de Minha área (com "Ver todas"); continua no ⌘K e no "Mais" do celular |
+  | Tema claro/escuro | menu de conta; continua em Configurações › Perfil › Aparência |
+  | Configurações | menu de conta; continua na engrenagem do rodapé do trilho |
+  | Sair | menu de conta, por último, em `danger`; continua no "Mais" do celular |
+
+- **Altura**: os 5 itens ocupam 250px; com logotipo e rodapé, tudo cabe a partir de cerca de 600px de
+  altura de janela, então o "mais" quase nunca aparece (continua existindo).
 - **Sem contadores no trilho**: as atrasadas e os vencimentos aparecem no sino e no Início.
 - A `nav` tem `aria-label="Navegação da gestão de tarefas"` (no Financeiro, "Navegação do
   financeiro"). O logotipo leva à página inicial da área atual (`aria-label` "Efficio — início da
   gestão" ou "Efficio — painel financeiro").
-- **Não há `TasksNav`**: cada página tem o próprio ícone no trilho. Ficam só as subdivisões que já
-  são controles da página: a visualização Lista, Quadro e Calendário em Tarefas e as abas de
-  Cadastros.
+- **Subnavegação de Tarefas é o hub** (§2.9), e não uma `TasksNav` de abas com texto. Cadastros
+  continua com as abas dele.
 
 ### 2.3 Troca de área: botões "Financeiro" e "Gestão de tarefas"
 
@@ -364,15 +452,25 @@ largos (quadro de tarefas, matriz) rolam dentro do próprio contêiner.
 - **Barra inferior da Gestão**: `Início · Tarefas · (+) · Clientes · Mais`. Os itens com `mobile`
   são Início, Tarefas e Clientes; o `slice` (2 antes do "+" e 1 depois) produz a ordem. Clientes
   fica na barra porque consultar o contato e o responsável de um cliente é o uso típico no celular;
-  a auditoria, que no celular é acordeão, fica no "Mais".
+  a auditoria, que no celular é acordeão, fica no "Mais". **Revisão 4**: Tarefas fica ativo também
+  em Auditoria, Recorrentes e Processos (`isActivePath` com `activeOn`, no lugar do `end` do
+  `NavLink`); essas páginas saem do "Mais" e se abrem pelo hub, que no celular ocupa a largura toda
+  (§2.9).
 - **"+" da Gestão** (`aria-label="Criar"`, `WriteGate scope="tasks"`): menu com **Tarefa**
   (`ListChecks`) e **Compromisso** (`CalendarClock`, que abre o `TaskSheet` com o horário
   09:00–10:00 de hoje). Fase 2: depois de um `DropdownMenuSeparator`, **Aplicar modelo de processo**
-  (`Workflow`).
+  (`Workflow`). **Revisão 4**: as mesmas opções do Criar do hub, com os mesmos ícones (Tarefa `Plus`,
+  Compromisso `CalendarPlus`, Tarefa recorrente `CalendarSync` para `registry`, separador, Aplicar
+  modelo de processo e Processo avulso); sai **Grupo por regime**, que é uma página (hub › Grupos por
+  regime, com o **Aplicar** de cada regime).
 - **Barra inferior do Financeiro** (administradores): com o "+" de Receita, Despesa, Transferência e
   Investimento.
 - **Menu "Mais"** (Sheet "Menu", com a descrição "Gestão de tarefas" ou "Financeiro"), de cima para
   baixo, como está implementado:
+  0. **Revisão 4: Minha área**, a primeira linha (56px): `MemberAvatar md`, o nome (`text-sm
+     font-semibold`) e "Minha área" embaixo (`text-caption text-muted`); leva a `/minha-area` e fecha
+     o menu; `aria-current="page"` quando é a página atual. É a porta do celular para a página que o
+     avatar do trilho abre no computador.
   1. **Espaço** (`WorkspaceList`, com "Nova empresa").
   2. **Área**, só para administradores: duas linhas de 48px, "Gestão de tarefas"
      (`BriefcaseBusiness`) e "Financeiro" (`Wallet`). A atual tem `bg-primary-soft
@@ -383,8 +481,8 @@ largos (quadro de tarefas, matriz) rolam dentro do próprio contêiner.
      **Contas vencidas** (`Bell`, só administradores). Fase 3: **Vencimentos** (`FileClock`, com a
      contagem de documentos e convenções vencidos), que abre o `DeadlinesSheet` (§6.10).
   4. Separador, os itens da área atual (a lista inteira do trilho, menos as páginas ocultas para a
-     pessoa) e **Configurações**. Fase 2: **Minhas anotações** (`NotebookPen`) depois de
-     Configurações.
+     pessoa; na revisão 4, os 5 itens de §2.2, sem as páginas do hub) e **Configurações**. Fase 2:
+     **Minhas anotações** (`NotebookPen`) depois de Configurações.
   5. **Sair**.
 
 ### 2.5 Rotas (`app/router.tsx`, páginas com `lazy`)
@@ -396,7 +494,7 @@ largos (quadro de tarefas, matriz) rolam dentro do próprio contêiner.
 | `/` | `home.tsx` | Início | 1 | `departamento=<id>\|todos` (só administradores escolhem) |
 | `/tarefas` | `tasks.tsx` | Tarefas | 1 | `escopo=minhas\|departamento\|todas`, `visao=lista\|quadro` (fase 2: `calendario`), `situacao=abertas\|atrasadas\|aguardando\|concluidas\|todas`, `busca`, `cliente` (id ou `interna`), `responsavel` (id ou `nenhum`), `departamento`, `categoria`, `prioridade`, `mes=AAAA-MM`, `vencimento=AAAA-MM-DD`, `pagina`; fase 2: `tipo=avulsas\|recorrentes\|processos` |
 | `/tarefas/auditoria` | `audit.tsx` | Auditoria mensal | 2 | `competencia=AAAA-MM`, `visao=cliente\|tarefa`, `regime`, `departamento`, `responsavel`, `clientes=pendentes\|concluidos`, `busca`, `recorrente` (abre a tarefa expandida) |
-| `/tarefas/recorrentes` | `recurring.tsx` | Tarefas recorrentes | 2 | `busca`, `periodicidade=semanal\|mensal\|bimestral\|trimestral\|semestral\|anual`, `departamento`, `responsavel`, `regime`, `situacao=ativas\|encerradas`, `recorrente=<id>` (abre o cadastro) |
+| `/tarefas/recorrentes` | `recurring.tsx` | Tarefas recorrentes (com `visao=regimes`: **Grupos por regime**) | 2 | `busca`, `periodicidade=semanal\|mensal\|bimestral\|trimestral\|semestral\|anual` (revisão 4: mais `diaria`), `departamento`, `responsavel`, `regime`, `situacao=ativas\|encerradas`, `recorrente=<id>` (abre o cadastro); `visao=regimes&regime=<regime>` (Grupos por regime, já implementado); revisão 4: `tipo=obrigacoes\|repeticoes` |
 | `/tarefas/processos` | `processes.tsx` | Processos | 2 | `aplicar=<modeloId>` (abre o diálogo), `modelo=<id>` (abre o editor), `processos=andamento\|concluidos` |
 | `/tarefas/clientes` | `clients.tsx` | Clientes | 1 | `busca`, `situacao=ativos\|inativos\|todos`, `regime`, `departamento`, `responsavel`, `sem-responsavel=1`, `cliente=<id>` (abre a ficha), `pagina`; fase 3: `documentos=vencidos\|30-dias` |
 | `/tarefas/relatorios` | `task-reports.tsx` | Relatórios de tarefas | 2 | `periodo`, `de`, `ate` (como em Relatórios), `departamento`, `responsavel`, `categoria`, `cliente`, `situacao`, `prioridade`, `tipo`, `pagina` |
@@ -408,7 +506,7 @@ largos (quadro de tarefas, matriz) rolam dentro do próprio contêiner.
 e `/relatorios/cliente/:id`. Fase 3: `/clientes/:id/contrato` (página de impressão do contrato,
 §13.9). Todas ficam dentro da rota de layout `{ element: <FinanceGate />, children: [...] }` (§2.7).
 
-**Comuns**: `/configuracoes` (`aba=perfil|seguranca|membros|assinatura|integracoes|privacidade`;
+**Comuns**: `/minha-area` (revisão 4, `pages/my-area.tsx` em `features/tasks`, montada dentro do `GestaoLayout` para hospedar o `TaskSheet` e o `RecurringOccurrenceSheet`, mas com `areaOf` = `common`: o trilho é o da última área; parâmetros: `calendario=AAAA-MM` e `calendario-escopo=departamento`), `/configuracoes` (`aba=perfil|seguranca|membros|assinatura|integracoes|privacidade`;
 fase 3: `aba=escritorio` e `pessoa=<id>` na aba Membros), `/configuracoes/contrato` (fase 3, editor
 do modelo de contrato, com o `RestrictedAccess` de §2.7 para quem não tem a permissão Escritório e
 contrato) e `*`.
@@ -424,7 +522,8 @@ páginas da Gestão ficam sob `/tarefas/` para nunca colidirem com as do finance
   `TaskSheet` por cima da página. `?nova=1` abre em modo criação, aceitando `&vencimento=`,
   `&cliente=`, `&departamento=`, `&horario=1` e `&duplicar=<id>`; a fase 3 acrescenta `&titulo=`
   (tarefa de renovação de documento e de reajuste de convenção). Fechar o Sheet remove o parâmetro
-  com `replace`.
+  com `replace`. **Revisão 4**: vale também em `/minha-area` (o teste é `hostsTaskSheets(pathname)`
+  em `nav.ts`, no lugar de `areaOf(pathname) === 'gestao'` em `task-links.ts` e `occurrence-row.tsx`).
 - **Recorrente num período** (fase 2): `?recorrente=<id>&periodo=AAAA-MM` (na semanal, a
   segunda-feira da semana, `AAAA-MM-DD`) abre o `RecurringOccurrenceSheet`. Uma ocorrência de um
   cliente é uma tarefa e abre com `?tarefa=<id>`.
@@ -462,6 +561,7 @@ tabela**, que é o comportamento de hoje.
 | Financeiro (qualquer página, inclusive leitura) | não: Acesso restrito (§2.7) | sim | `finance` |
 | Papéis, convites e permissões por pessoa | não | o proprietário, em Configurações › Membros | `members` |
 | Exportar relatórios de tarefas | sim | sim | — |
+| Repetir uma tarefa (criar, editar e encerrar a repetição), revisão 4 | as dele (responsável) e as do departamento dele | todas | `registry` para as de outro departamento (a API decide e manda `canEdit`) |
 
 - **`usePermissions()`** tem `isAdmin` (`owner` ou `editor`), `canAccessFinance` (o mesmo, espelho
   do `canAccessFinance` de `apps/api/src/lib/finance-access.ts`), `canWriteTasks` (assinatura ativa,
@@ -540,7 +640,11 @@ colaborador:
     financeiras (`Nova receita`…) só para administradores. As da área atual vêm primeiro.
   - **Ir para**: o grupo "Gestão de tarefas" (as páginas visíveis para a pessoa) e, só para quem tem
     o financeiro, o grupo "Financeiro" e "Ir para o financeiro" ou "Ir para a gestão de tarefas". A
-    área atual vem primeiro.
+    área atual vem primeiro. **Revisão 4**: o grupo da Gestão continua com **todas** as páginas,
+    inclusive as do hub (Auditoria mensal, Tarefas recorrentes, Processos), mais **Grupos por regime**
+    (`Layers`, `/tarefas/recorrentes?visao=regimes`, `keywords` "obrigacoes padrao regime simples
+    presumido real mei") e **Minha área** (`CircleUserRound`, nas duas áreas, `keywords` "perfil eu
+    meu painel anotacoes calendario conta sair tema").
   - **Busca** (fase 2): tarefas por título num grupo "Tarefas" (com o prazo e o cliente; abre o
     `TaskSheet`) e recorrentes por nome num grupo "Tarefas recorrentes" (abre o cadastro). Um
     cliente encontrado abre a ficha da Gestão (`/tarefas/clientes?cliente=<id>`) para o colaborador
@@ -560,6 +664,97 @@ colaborador:
     administradores) e, na fase 3, documentos e convenções **vencidos** (os que vencem em até 30 dias
     ficam fora do número, para ele continuar dizendo "já passou"). O `aria-label` separa:
     `Notificações (2 tarefas atrasadas, 3 contas vencidas, 1 documento vencido)`.
+
+### 2.9 Hub de tarefas (`TasksHub`, revisão 4)
+
+**Onde**: nas `actions` do `PageHeader` de **Tarefas**, **Auditoria mensal**, **Tarefas
+recorrentes** (e Grupos por regime) e **Processos**, sempre à direita do título e no mesmo lugar, para
+trocar de página sem procurar. Substitui o cartão "Criar" (`TaskCreateHub`, que sai), a Visualização
+dos filtros de Tarefas (§7.3), o segmentado "Tarefas recorrentes / Grupos por regime" e os botões dos
+cabeçalhos dessas páginas (o que eles faziam vai para o hub ou para a própria página; ver "O que sai dos
+cabeçalhos").
+
+```
+Auditoria mensal                        [ ≡  ▦  ▣ │ ☑  ⟳  ▤  ⑂ ]   [+] [▣+] [⟳] [⑂+]
+                                          Ver (nav, ícones)           Criar (ícones)
+```
+
+**Ver**: `nav aria-label="Páginas de tarefas"` com um trilho `inline-flex items-center gap-1
+rounded-md bg-bg-subtle p-1` (o do `SegmentedControl subtle`). Cada item é um `Link` de 36×36
+(`size-9`; 40×40 em `pointer-coarse`), `rounded-[10px]`, ícone de 16px; ativo `bg-surface text-fg
+shadow-xs` com `aria-current="page"`; em repouso `text-muted hover:text-fg`, transição de 150ms. Um
+filete (`mx-0.5 h-5 w-px bg-border`, `aria-hidden`) separa as visualizações das páginas.
+
+| # | Nome (tooltip e `aria-label`) | Ícone | Destino | Ativo quando | Aparece para |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Lista | `List` | `/tarefas?visao=lista` | `/tarefas` com a visão Lista | todos |
+| 2 | Quadro | `SquareKanban` | `/tarefas?visao=quadro` | `/tarefas` com a visão Quadro | todos |
+| 3 | Calendário | `CalendarDays` | `/tarefas?visao=calendario` | `/tarefas` com a visão Calendário | todos |
+| 4 | Auditoria mensal | `ClipboardCheck` | `/tarefas/auditoria` | o caminho | `page.audit` |
+| 5 | Tarefas recorrentes | `Repeat` | `/tarefas/recorrentes` | o caminho, sem `visao=regimes` | `page.recurring` |
+| 6 | Grupos por regime | `Layers` | `/tarefas/recorrentes?visao=regimes` | `visao=regimes` | `page.recurring` |
+| 7 | Processos | `Workflow` | `/tarefas/processos` | o caminho | `page.processes` |
+
+- **Em Tarefas**, os itens 1 a 3 trocam só `visao` (`writeTaskFilters`, com `replace`), mantêm os
+  filtros da URL, tiram os parâmetros de Sheet (`tarefa`, `nova`, `recorrente`, `periodo`) e gravam a
+  visão escolhida como a lembrada (`writeTaskView`). Nas outras páginas, levam a `/tarefas` com a visão
+  escolhida e o escopo lembrado.
+- Páginas ocultas para a pessoa (§13.10) não aparecem; se só sobram as visualizações, o filete some.
+
+**Criar**: `div role="group" aria-label="Criar"`, botões `Button size="icon"` de 36×36 (40 em
+`pointer-coarse`) com `gap-1.5`, a `gap-3` do Ver, sem rótulo "Criar" visível. Os ícones são outros
+que os do Ver (variações com "+" ou de calendário), para a mesma forma nunca querer dizer "ir" e
+"criar".
+
+| # | Nome (tooltip e `aria-label`) | Ícone | Variante | Ação | Aparece para |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Nova tarefa | `Plus` | `primary` | `TaskSheet` em criação (`?nova=1`), com "Não se repete / Repete" (§9.4) | todos (`WriteGate scope="tasks"`) |
+| 2 | Novo compromisso | `CalendarPlus` | `outline` | `?nova=1&horario=1` (09:00–10:00 de hoje) | todos (`tasks`) |
+| 3 | Nova tarefa recorrente | `CalendarSync` | `outline` | `RecurringTaskSheet` em criação, do cadastro (`/tarefas/recorrentes?recorrente=nova`) | `registry` e `page.recurring` (oculto para os outros) |
+| 4 | Novo processo | `GitBranchPlus` | `outline` | menu `w-72`, `align="end"`: **Aplicar modelo de processo** ("As etapas de um modelo para um cliente.") e **Processo avulso** ("Monte as etapas agora, sem modelo.") | todos (`tasks`) |
+
+- "Grupo por regime" sai do Criar: é a página 6 do Ver, onde cada regime tem o próprio **Aplicar**.
+- Assinatura inativa: os botões de Criar ficam desabilitados com o motivo no tooltip (`WriteGate`); o
+  Ver continua.
+
+**Tooltip**: o `Tooltip` do design system, `side="bottom"`, `delay={150}`, com o nome exato da tabela;
+abre também no foco do teclado. Sem atalhos de teclado próprios (o ⌘K continua).
+
+**Teclado e leitor de tela**: Tab passa por cada item (links e botões, na ordem visual); Enter ativa;
+o menu de Novo processo abre com Enter ou Espaço e navega com as setas. O nome de cada item é o
+`aria-label` (o ícone é `aria-hidden`); o item ativo diz "página atual" pelo `aria-current`. Foco com o
+anel global.
+
+**O que sai dos cabeçalhos** (cada página fica com o título, a descrição curta e o hub):
+
+| Página | Sai do cabeçalho | Vai para |
+| --- | --- | --- |
+| Tarefas | cartão "Criar" abaixo do cabeçalho | Criar do hub |
+| Tarefas | Visualização (Lista, Quadro, Calendário) da linha 1 dos filtros e da linha do celular | Ver do hub (itens 1 a 3) |
+| Auditoria | `PeriodNavigator` da competência | a barra de ferramentas da Auditoria, depois da Visão (§11.8) |
+| Recorrentes | segmentado "Tarefas recorrentes / Grupos por regime" | Ver do hub (itens 5 e 6); o `h1` acompanha: "Tarefas recorrentes" ou "Grupos por regime" |
+| Recorrentes | **Ver no calendário** e o `⋯` do celular | Ver › Calendário (e o menu de cada recorrente continua com "Ver no calendário") |
+| Recorrentes | **Nova tarefa recorrente** | Criar › Nova tarefa recorrente |
+| Processos | **Criar processo avulso** | Criar › Novo processo › Processo avulso |
+| Processos | **Novo modelo** (`registry`) | `action` do `CardHeader` "Modelos de processo" (`outline sm`, `Plus`) |
+
+**Larguras**
+
+| | ≥ 1024 | 768 | 375 |
+| --- | --- | --- | --- |
+| Posição | à direita do título, numa linha (cerca de 460px) | à direita do título quando cabe; senão, linha própria abaixo dele (`flex-wrap` do `PageHeader`) | linha própria abaixo do título (`actionsClassName="max-sm:w-full"`) |
+| Ver | 7 itens de 36px | 7 itens de 36px | largura total (343px), itens `flex-1` (cerca de 45px) e 40px de altura |
+| Criar | 4 botões | 4 botões | **oculto** (`max-sm:hidden`): criar é pelo "+" da barra inferior (§2.4), com as mesmas opções |
+
+**Abordagens consideradas**
+
+1. **Hub nas ações do cabeçalho (escolhida)**: nenhuma linha a mais, sempre no mesmo lugar, como o
+   painel financeiro (abas e período à direita do título). Custa mover o período da Auditoria para a
+   barra de ferramentas e o "Novo modelo" para o card de modelos.
+2. Faixa própria acima do título: estável, mas acrescenta uma linha em quatro páginas e funciona como
+   uma barra superior, que o app não tem.
+3. Manter o cartão "Criar" e acrescentar uma linha de navegação: duas faixas para uma intenção só, e
+   textos nos botões, o contrário do pedido.
 
 ---
 
@@ -873,6 +1068,16 @@ margem):
   subtítulo não aparece e a linha fica mais baixa. Não se usa a descrição no subtítulo. No escopo
   Todas, sem filtro de departamento, o departamento entra no fim: `categoria · cliente · Fiscal`
   (como está implementado: "Fechamento contábil · Contábil").
+- **Repetição** (revisão 4): a ocorrência de uma tarefa que se repete (`task.occurrence.origin ===
+  'task'`) abre o subtítulo com `Repeat` de 12px (`aria-hidden`) e a frequência em minúsculas
+  (`RECURRENCE_FREQUENCY_LABELS[occurrence.period]`: "semanal", "mensal", "diária") antes de
+  `categoria · cliente`; o subtítulo passa a aparecer mesmo sem categoria. Nada de selo: a regra é
+  informação, não estado; a regra inteira está no detalhe.
+- **Várias ocorrências da mesma série num grupo futuro** (revisão 4; a API já mostra uma série diária
+  ou semanal só até hoje + 7 dias): em **Próximos 7 dias** e **Mais tarde**, as linhas seguidas com o
+  mesmo `occurrence.recurringTaskId` viram a primeira delas com "+3 até 12/11" no fim do subtítulo
+  (`text-subtle`); o cabeçalho do grupo continua com a contagem toda. Em **Atrasadas** e **Hoje**, cada
+  ocorrência tem a sua linha, porque cada uma pede ação.
 - **Linha do prazo** (abaixo de `@xl`): `TaskDueLabel` inline e, abaixo de `@sm`,
   ` · Ana` em `text-muted`.
 
@@ -1223,9 +1428,10 @@ datas de documentos não são dado financeiro.
    - `title`: **Tarefas**.
    - `description`, sobre os dados: "Quinta-feira, 29 de outubro · atribuídas a você", "… ·
      departamento Fiscal" ou "… · todo o escritório".
-   - `actions`: `primary` **Nova tarefa** (`Plus`, `WriteGate scope="tasks"`). **Fase 2**: antes
-     dele, `outline` **Aplicar modelo de processo** (`Workflow`), que abre "Escolha o modelo" e
-     depois o `ApplyTemplateDialog` (§12.3). O colaborador usa os dois.
+   - `actions`: **revisão 4**, o hub de tarefas (`TasksHub`, §2.9), com `currentView` e
+     `onViewChosen` vindos da página; Nova tarefa, Novo compromisso e Novo processo (aplicar modelo
+     ou avulso) ficam no Criar dele. Sai o cartão "Criar" que ficava entre o cabeçalho e o resumo.
+     (Até a revisão 3: `primary` **Nova tarefa** e `outline` **Aplicar modelo de processo**.)
 2. `TasksSummary` (§7.2).
 3. `TaskFilters` num `Card className="p-4"` (§7.3).
 4. O conteúdo da visualização: Lista (§7.4), Quadro (§8) ou, na fase 2, Calendário (§7.6).
@@ -1258,8 +1464,8 @@ lista leva a primeira ação (como em Clientes).
 - à direita, o `SegmentedControl size="sm"` "Situação": `Abertas` · `Atrasadas` ·
   `Aguardando cliente` · `Concluídas` · `Todas`. No Quadro ele é trocado por
   `Switch` "Só atrasadas", porque as colunas já são os estados;
-- e o `SegmentedControl` "Visualização" só com ícones: `List` (Lista) e `SquareKanban` (Quadro); na
-  fase 2, `CalendarDays` (Calendário). O rótulo vai em `sr-only` e `title`.
+- ~~e o `SegmentedControl` "Visualização"~~: **revisão 4**, a Visualização (Lista, Quadro,
+  Calendário) sai dos filtros e vai para o Ver do hub (§2.9). A linha 1 fica com Escopo e Situação.
 
 **Linha 2** (`mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))_auto_auto]`):
 busca (`Search`, placeholder "Buscar pelo nome da tarefa", espera de 300ms), `ClientPicker` ("Todos
@@ -1272,7 +1478,8 @@ Avulsas, Recorrentes, Etapas de processo") e, se houver filtro, `ghost sm` **Lim
 controles têm 36px (`size_="sm"`, como em Contas a pagar).
 
 **Celular (375)**: linha 1 com o Escopo em largura total (3 opções cabem); linha 2 com a busca
-(`flex-1`), o botão `outline` **Filtros** (com "(N)") e a Visualização. "Filtros" abre um `Sheet`
+(`flex-1`) e o botão `outline` **Filtros** (com "(N)"); a Visualização está no hub, logo acima
+(revisão 4). "Filtros" abre um `Sheet`
 "Filtros" com Situação, Cliente, Responsável, Departamento, Categoria, Prioridade, Mês e, na fase 2,
 Tipo, e no rodapé `ghost` Limpar e `primary` **Ver 23 tarefas** (a contagem é atualizada ao vivo).
 
@@ -1363,9 +1570,9 @@ do escritório.
 
 | | 1440 (conteúdo de 1316px) | 1024 (900px) | 768 (720px, sem trilho) | 375 (343px) |
 | --- | --- | --- | --- | --- |
-| Cabeçalho | título à esquerda, ações à direita | igual | as ações descem para baixo do título | só **Nova tarefa**; "Aplicar modelo de processo" (fase 2) vai para um `⋯` ao lado |
+| Cabeçalho (revisão 4) | título à esquerda, hub à direita | igual | hub à direita se couber, senão abaixo do título | hub abaixo do título, só o Ver em largura total; criar pelo "+" da barra inferior |
 | Resumo | 4 células em linha | 4 células, com o número principal em 28px | 3 células e a lista por responsável embaixo | célula 1 inteira, depois 2 e 3; lista oculta |
-| Filtros | 2 linhas | linha 2 em 2 colunas | linha 2 em 2 colunas | escopo, busca, "Filtros (N)" e visualização |
+| Filtros | 2 linhas | linha 2 em 2 colunas | linha 2 em 2 colunas | escopo, busca e "Filtros (N)" (a visualização está no hub) |
 | Lista | todas as colunas | sem Situação | sem Cliente e sem Situação | estado, título, subtítulo e prazo em linha |
 | Quadro | §8.5 | §8.5 | §8.5 | §8.5 |
 | Calendário (fase 2) | grade (3 itens por dia) | grade (2 itens por dia) | agenda | agenda |
@@ -1476,6 +1683,7 @@ duas contagens de forma otimista.
      | Vencimento | `Input type="date"` | se vencida e aberta, dica em `danger`: "Venceu há 5 dias" |
      | Categoria | `Select` "Sem categoria" | opções com o `CategoryIcon` colorido (é o seletor) |
      | Horário | botão `ghost sm` **Definir horário**, que mostra dois `Input type="time"` ("das" e "às") e o botão **Remover horário** | erro: "A hora de término deve ser posterior à de início." |
+     | Repetição (revisão 4) | `RepeatField` (§9.4): **Não se repete** · **Repete**, numa linha inteira | em ocorrência de repetição, acima da grade aparece "Só esta · Esta e as próximas" (§9.4) |
      | Início | `Input type="date"`, opcional, recolhido em **Mais campos** (`link`) | o campo `startDate` existe, mas o Effy não o mostrava |
   2. **`FlowStepper`** (fase 2, só em etapa de processo): um bloco `rounded-lg bg-surface-muted p-3`
      com "Processo: **Abertura de empresa** · etapa 2 de 5" e a lista de etapas. Etapas feitas têm o
@@ -1584,6 +1792,8 @@ duas contagens de forma otimista.
   valores vindos da URL, do "+" da coluna ou do dia; o Departamento vem do responsável ou, sem ele,
   do Início ou do filtro ativo) e Descrição. Abaixo, a nota em `text-subtle` "Subtarefas e
   comentários ficam disponíveis depois de criar." (fase 2: "Subtarefas, anexos e comentários…").
+  **Revisão 4**: o `TaskProperties` traz a Repetição (§9.4); com "Repete", o Vencimento vira "Começa
+  em" e o envio leva `recurrence`.
 - Com `&titulo=` (fase 3: renovação de documento, reajuste de convenção), o Nome já vem preenchido e
   o foco vai para o Responsável.
 - Rodapé: `ghost` **Cancelar** e `primary` **Criar tarefa**.
@@ -1602,6 +1812,75 @@ duas contagens de forma otimista.
 | Excluir (`deleteTasks`) | `ConfirmDialog` "Excluir “Balancete de setembro”?", com "Subtarefas, comentários e anexos também serão excluídos. Esta ação não pode ser desfeita." e o botão **Excluir tarefa**. Depois fecha o Sheet e mostra o toast "Tarefa excluída." |
 | Larguras | `Sheet width="lg"` (620px); tela cheia abaixo de 640px, com as propriedades em 1 coluna e o rodapé fixo com o carimbo, o `⋯` e o botão principal |
 
+### 9.4 Repetição (`RepeatField`, revisão 4)
+
+**Para quê**: "toda tarefa cadastrada tem opção de recorrência". Uma tarefa que se repete é uma
+tarefa recorrente de **origem tarefa** (§0, item 20; §10.6): a tarefa vira a primeira ocorrência e as
+próximas são geradas pela mesma agenda das recorrentes do cadastro, com feriados. O contrato é o do
+backend (`recurrence` em `POST /tasks` e `PATCH /tasks/:id`, `taskRecurrenceInputSchema`).
+
+**Onde**: no `TaskProperties`, logo depois de Vencimento e Horário, numa linha inteira
+(`sm:col-span-2`), no formulário de nova tarefa (§9.2) e no detalhe (§9.1). Não aparece em etapa de
+processo.
+
+**Controle**: `SegmentedControl size="sm"` com `ariaLabel="Repetição"`: **Não se repete** ·
+**Repete** (padrão Não se repete). Com "Não se repete" nada mais aparece: o Vencimento é a única
+data. Com "Repete", o rótulo do Vencimento passa a **Começa em** (é o `startDate`; vazio, recebe hoje
+ao ligar) e abre abaixo um bloco `flex flex-col gap-3 rounded-lg border border-border p-3`, sem título
+(o segmentado já diz o que é):
+
+| Campo | Controle | Regra e texto |
+| --- | --- | --- |
+| Frequência | `Select` com `RECURRENCE_FREQUENCY_LABELS`: Diária, Semanal, Mensal, Bimestral, Trimestral, Semestral, Anual (padrão Mensal) | — |
+| A cada | `Input type="number"` de 64px, 1 a 99, com o sufixo de `RECURRENCE_INTERVAL_UNITS` ("dia"/"dias", "semana"/"semanas", "mês"/"meses") | só Diária, Semanal e Mensal, na mesma linha da Frequência (`grid grid-cols-[minmax(0,1fr)_auto] gap-2`); padrão 1; erro "Use de 1 a 99." |
+| Dias da semana | 7 botões de 36px (40 em `pointer-coarse`) com "S T Q Q S S D" (segunda a domingo), `aria-pressed` e `aria-label` com o nome inteiro ("Segunda-feira"); ligado `bg-primary-soft text-primary-soft-fg`, desligado `text-muted ring-1 ring-border` | só Semanal; padrão: o dia da semana do "Começa em"; erro "Escolha ao menos um dia da semana." |
+| Dia | `Select` "Dia 1" … "Dia 30" e "31 ou o último dia do mês" | Mensal a Anual; padrão: o dia do "Começa em"; em meses curtos o dia vira o último, e o resumo avisa ("em fevereiro, dia 28") |
+| Mês | `Select` de janeiro a dezembro, rotulado "1º mês" (Bimestral, Trimestral, Semestral) ou "Mês" (Anual) | padrão: o mês do "Começa em"; a dica calculada diz os meses ("jan, abr, jul e out") |
+| Dia não útil | Diária e Semanal: `Switch` **Só em dias úteis** (ligado = `skip`, o padrão; desligado = `keep`). Mensal a Anual: `SegmentedControl size="sm"` **Antecipar** · **Postergar** · **Manter** (padrão Antecipar), com as dicas de §10.3 no `title` de cada opção | considera fins de semana e feriados nacionais, como nas recorrentes |
+| Termina | `SegmentedControl size="sm"` **Nunca** · **Em** · **Após**; "Em" mostra `Input type="date"`; "Após", `Input type="number"` de 64px com o sufixo "vezes" | erros: "Informe a data de término.", "O término deve ser depois do início.", "Use de 1 a 500 vezes." |
+| Meta e referência | recolhido atrás de `link sm` **Meta e referência** (já aberto quando algum valor não é o padrão): **Meta interna** (`Input type="number"`, 0 a 30, 0 a 6 na Semanal, sufixo "dias antes"; some na Diária) e **Competência de referência** (`Select` "Mesmo mês", o padrão, "Mês anterior", "2 meses antes"…; só Mensal a Anual) | é o "prazo legal e meta" das recorrentes: com meta, cada ocorrência mostra "Meta 15/10 · prazo legal 20/10" e pode cair em "Fora da meta". Repetição não entra na auditoria |
+| Resumo | uma linha `text-caption text-muted`, `aria-live="polite"` | "Toda semana na segunda e na quarta · próximas: 10/11, 12/11 e 17/11 · 12 vezes." Ao criar ou editar, calculado no navegador pela agenda do contrato (`firstScheduledOccurrence` e `occurrencesInCompetence`, com feriados), a mesma da API; numa série salva, as datas vêm de `recurrence.upcoming` |
+| Aviso de data | uma linha `text-caption text-warning`, só quando a primeira data da regra não é o "Começa em" | "Esta tarefa passa a vencer em 12/11 (qua), o primeiro dia da regra." |
+
+- Para quem tem `registry`, no fim do bloco, `link sm` **Recorrente para vários clientes** (abre o
+  `RecurringTaskSheet` do cadastro): é o caminho para obrigações de regime e para a auditoria.
+- Com horário (compromisso), cada ocorrência leva o mesmo horário.
+- Trocar o "Começa em" atualiza o dia da semana, o dia e o mês **que ainda estavam no padrão**; o que a
+  pessoa escolheu fica.
+
+**Nova tarefa** (§9.2): o envio leva `recurrence` com `startDate` = "Começa em". O botão continua
+**Criar tarefa**; o toast diz "Tarefa criada. Repete toda segunda." e o Sheet continua aberto, já na
+primeira ocorrência.
+
+**Detalhe** (§9.1), por tipo de tarefa:
+
+| Tarefa | O controle mostra | Ao mudar |
+| --- | --- | --- |
+| Avulsa, sem repetição | Não se repete | "Repete" abre o bloco com os padrões do vencimento e, no fim, `primary sm` **Repetir** e `ghost sm` **Cancelar**. Não salva sozinho, como o resto do Sheet: criar uma série é uma decisão. Repetir envia `PATCH { recurrence }`; toast "Agora repete toda segunda." com **Desfazer** (que envia `recurrence: null`) |
+| Ocorrência de repetição | Repete, e no lugar do bloco uma linha com `Repeat` de 16px, o resumo da regra e `link sm` **Editar repetição** (só com `canEdit`) | **Editar repetição** abre o bloco com a regra atual e **Salvar repetição** / **Cancelar**, com a nota `text-caption text-subtle` "Vale para esta e as próximas ainda não iniciadas; as concluídas não mudam." "Não se repete" abre o `ConfirmDialog` "Parar de repetir “Reunião semanal”?", com "Esta tarefa continua. As próximas não serão criadas." e o botão **Parar de repetir** (`recurrence: null`); toast "Não repete mais." |
+| Ocorrência de recorrente do cadastro | Repete, desabilitado, com a dica "Vem da tarefa recorrente." e o `link` **Ver tarefa recorrente** de hoje | — |
+| Etapa de processo | não aparece | — |
+| Sem `canEdit` ou assinatura inativa | o estado atual, desabilitado, com a dica "Só o responsável, o departamento dele ou um administrador alteram a repetição." (ou o motivo da assinatura) | — |
+
+**Só esta ou esta e as próximas** (ocorrência de repetição com `canEdit`): no topo do
+`TaskProperties`, acima da grade, `SegmentedControl size="sm"` com `ariaLabel="Aplicar alterações
+a"`: **Só esta** · **Esta e as próximas** (padrão Só esta; volta ao padrão quando o Sheet fecha).
+
+- **Só esta**: Prioridade, Responsável e Descrição salvam só nesta ocorrência (`applyTo:
+  'occurrence'`); Nome, Cliente, Categoria e Horário ficam desabilitados com a dica "Mude em Esta e as
+  próximas.".
+- **Esta e as próximas**: os mesmos campos e mais Nome, Cliente, Categoria e Horário salvam com
+  `applyTo: 'series'`; o carimbo diz "Salvo nesta e nas próximas".
+- Sempre: a Situação vale só para esta; Vencimento e Início ficam travados ("Vem da repetição."). Sem
+  `canEdit`, o segmentado não aparece e tudo vale só para esta.
+- Por que um segmentado e não uma pergunta a cada campo: o Sheet salva sozinho a cada mudança; uma
+  pergunta por campo interromperia cada edição. O segmentado diz uma vez o alcance de tudo o que vem
+  depois.
+
+**Larguras**: a 375px o bloco ocupa a largura toda; Frequência e "A cada" dividem a linha; os 7 dias
+ficam em `grid grid-cols-7` (cerca de 42px cada); o segmentado de Termina e o campo dele empilham; o
+resumo quebra em até duas linhas.
+
 ---
 
 ## 10. Tarefas recorrentes (`/tarefas/recorrentes`, fase 2)
@@ -1615,23 +1894,29 @@ prazo, e como está o mês?"
 É o cadastro das obrigações (como o "Obrigações" do Onvio, do Tareffa e do Gestta). O colaborador vê
 tudo e não altera. O contrato está em `packages/shared` (provisório enquanto o backend da fase 2
 anda); o que a tela ainda pede além dele está em §18.
+**Revisão 4**: a página lista também as **repetições** (as recorrentes de origem tarefa, §10.6), com o
+filtro **Tipo**; o cadastro continua sendo só das obrigações (origem cadastro), e a repetição se edita
+na tarefa. O cabeçalho troca as ações pelo hub (§2.9).
 
 ### 10.1 Estrutura
 
-1. `PageHeader`: **Tarefas recorrentes**, com a descrição "14 ativas · outubro: 182 de 240
-   concluídas" (para quem não tem `registry`, mais " · Somente administradores alteram este
-   cadastro."). Ações: `outline` **Ver no calendário** (`CalendarDays`, leva a
-   `/tarefas?escopo=todas&tipo=recorrentes&visao=calendario`, o calendário de obrigações) e
-   `primary` **Nova tarefa recorrente** (`WriteGate scope="admin"`).
+1. `PageHeader`: **Tarefas recorrentes** (ou **Grupos por regime**, com `visao=regimes`), com a
+   descrição "14 ativas · outubro: 182 de 240 concluídas". **Revisão 4**: `actions` = hub (§2.9); saem
+   **Ver no calendário**, **Nova tarefa recorrente**, o `⋯` do celular, o segmentado "Tarefas
+   recorrentes / Grupos por regime" e, da descrição, " · Somente administradores alteram este
+   cadastro." (o motivo fica no rodapé do cadastro em leitura, como já está, e não ocupa o topo de
+   quem pode editar as próprias repetições).
 2. Filtros num `Card p-4`: busca ("Buscar tarefa recorrente"), `Select` Periodicidade ("Todas as
    periodicidades", Semanal, Mensal, Bimestral, Trimestral, Semestral, Anual), `Select` Departamento
    ("Todos os departamentos"), `MemberPicker` Responsável (padrão ou de algum cliente no mês),
-   `Select` Regime ("Todos os regimes"), `SegmentedControl size="sm"` **Ativas (14)** ·
-   **Encerradas (3)** e **Limpar**. Em 1440, uma linha; em 1024 e 768, duas; a 375px, a busca e
+   `Select` Regime ("Todos os regimes"), **revisão 4**: `Select` Tipo ("Todos os tipos",
+   **Obrigações**, **Repetições**; `tipo=obrigacoes|repeticoes`; aparece quando a API devolve as duas
+   origens, §18, item 23), `SegmentedControl size="sm"` **Ativas (14)** · **Encerradas (3)** e
+   **Limpar**. Em 1440, uma linha; em 1024 e 768, duas; a 375px, a busca e
    "Filtros (N)", que abre o Sheet com os outros.
 3. Lista num `Card @container` com cabeçalho (a partir de `@xl`): "Tarefa recorrente",
    "Departamento" (`@3xl`), "Aplica-se a" (`@4xl`), "Responsáveis" (`@2xl`), "Outubro" (o
-   progresso, `@xl`) e "Prazo legal e meta" (`text-right`). Ordem: por nome.
+   progresso, `@xl`) e "Prazo legal e meta" (`text-right`; revisão 4: "Prazo"). Ordem: por nome.
 
 ### 10.2 Linha (`RecurringRow`), no padrão de §5
 
@@ -1658,6 +1943,14 @@ anda); o que a tela ainda pede além dele está em §18.
   mai, jul, set, nov", "Dia 30 · jan, abr, jul, out", "Dia 31 · jan e jul", "31/05"); na 2ª (`text-xs
   text-muted`) a meta, a regra e a referência ("meta 5 dias antes · antecipa · ref. mês anterior",
   "meta no prazo · posterga").
+- **Linha de repetição** (revisão 4, origem tarefa): o mesmo esqueleto, com estas diferenças:
+  título sem selo de periodicidade e subtítulo com a regra em texto curto (`repeatShortText`: "toda
+  segunda", "todo dia 10"); **Aplica-se a** com o nome do cliente ou "Interna"; **Responsáveis** com o responsável da
+  série (avatar e nome curto); **Outubro** com as ocorrências do mês ("3 de 4"); **Prazo** com a regra
+  ("Toda segunda", "Dia 10") e, embaixo, "termina em 12/2026", "12 vezes" ou "meta 2 dias antes". O
+  clique abre a **próxima ocorrência em aberto** no `TaskSheet` (`?tarefa=<id>`), onde a repetição se
+  edita (§9.4); sem ocorrência em aberto, abre a última. O menu tem **Abrir tarefa**, **Ver no
+  calendário** e, com `canEdit`, **Parar de repetir** (o mesmo `ConfirmDialog` de §9.4).
 - O clique abre o `RecurringTaskSheet` (em leitura para quem não tem `registry`). O menu tem
   **Editar** (ou **Ver**), **Ver na auditoria**, **Ver no calendário** e, para `registry`,
   **Duplicar** e **Encerrar…** (nas encerradas, **Reativar**); **Excluir** só aparece para
@@ -1774,6 +2067,50 @@ quadro, pelo calendário e pelas obrigações do Início.
   o título com o selo, o subtítulo e, embaixo, "18 de 23 · Dia 20, meta 5 dias antes", e "Ver no
   calendário" vai para um `⋯` ao lado do botão principal.
 
+### 10.6 Uma recorrência só: repetição e obrigação (revisão 4)
+
+**O pedido**: toda tarefa pode se repetir, sem criar um segundo conceito ao lado das tarefas
+recorrentes, que geram uma tarefa por cliente e competência.
+
+**Como se ligam** (o modelo é o do contrato do backend, `RECURRENCE_ORIGINS`):
+
+| | Obrigação (origem **cadastro**) | Repetição (origem **tarefa**) |
+| --- | --- | --- |
+| Nasce em | Recorrentes › Nova tarefa recorrente, ou Grupos por regime › Aplicar | "Repete" no formulário de uma tarefa (nova ou existente) |
+| Para quem | regimes e/ou vários clientes, com exceções | o cliente da tarefa ou Interna |
+| Responsável | o padrão da recorrente (senão, a fila do departamento) | o da tarefa |
+| Regra | as 6 periodicidades, prazo legal, meta, dia não útil, referência, começa e encerra por competência | as mesmas 6 e mais Diária, vários dias na Semanal, "a cada N" e termina por data ou número de vezes |
+| Ocorrência | uma tarefa por cliente e período | uma tarefa por período |
+| Onde aparece | linha agrupada nas listas ("DCTFWeb · 8 de 12"), `RecurringOccurrenceSheet`, auditoria, obrigações do Início | como qualquer tarefa: uma linha por ocorrência, com a regra no subtítulo (§5.3); calendário, Início, relatórios e totais; **fora da auditoria** |
+| Edita-se em | `RecurringTaskSheet` (só `registry`) | na própria tarefa: "Só esta" ou "Esta e as próximas" e **Editar repetição** (§9.4) |
+| Quem altera | `registry` | o responsável, o departamento dele ou `registry` (`canEdit` da API) |
+| Página Recorrentes | linha de obrigação (§10.2) | linha de repetição (§10.2), filtro Tipo › Repetições |
+
+**O que é igual** (por isso é um conceito só): a mesma tabela (`recurring_tasks`), a mesma agenda e os
+mesmos feriados (`occurrencesInCompetence`), a ocorrência que é uma tarefa com subtarefas, anexos,
+comentários e histórico, a mesma regra de dia não útil e de meta, a mesma página para ver todas. Na
+tela, o verbo é um só: **repete**. "Obrigação" e "repetição" só aparecem onde a diferença importa (o
+filtro Tipo e a auditoria).
+
+**Peças compartilhadas na tela**: o `DueDayField`, o `AnchorMonthField`, as dicas de dia não útil e a
+prévia saem de `recurring-sheet.tsx` para `components/recurrence-fields.tsx` e servem ao
+`RecurringTaskSheet` (grupo Quando) e ao `RepeatField`; os textos ("Todo dia 20.", "jan, abr, jul e
+out") continuam em `recurring-rules.ts`.
+
+**Para depois** (fora desta revisão): transformar uma repetição de um cliente em obrigação do cadastro
+(para entrar na auditoria) e a regra "N-ésimo dia útil do mês" (o 5º dia útil da folha), que nenhuma das
+duas origens tem.
+
+**Abordagens consideradas**
+
+1. **A repetição é uma recorrente de origem tarefa (escolhida, e é o que o backend está fazendo)**: um
+   motor, uma página, um vocabulário; a tarefa continua sendo o lugar de editar o próprio trabalho.
+   Custa o "Só esta / Esta e as próximas" no detalhe e o filtro Tipo em Recorrentes.
+2. Séries de tarefas avulsas, à parte das recorrentes (como um calendário): simples de explicar, mas são
+   dois motores e duas palavras para "repete", exatamente o que o pedido proíbe.
+3. "Repete" só leva ao cadastro de Recorrentes: um conceito, mas o colaborador não cria (é `registry`)
+   e o formulário de obrigação é pesado para "reunião toda segunda".
+
 ---
 
 ## 11. Auditoria mensal (`/tarefas/auditoria`, fase 2)
@@ -1789,22 +2126,24 @@ estão com o mês concluído.
 
 1. `PageHeader`
    - **Auditoria mensal**.
-   - `description` com o achado: "Outubro de 2026: 182 de 240 concluídas (76%). 12 pendências já
-     passaram do prazo legal." (sem atraso: "… Nenhuma pendência passou do prazo legal.")
-   - `actions`: `PeriodNavigator modes={['month']}` (competência, `?competencia=`). O padrão é o
-     mês atual e "Hoje" volta a ele. Tooltip do rótulo: "Competência: mês em que o prazo legal
-     cai".
+   - **Revisão 4: sem `description`.** O resumo logo abaixo já diz "182 de 240" e as atrasadas; a
+     frase repetia os números em texto corrido (§11.8, A1).
+   - `actions`: o hub (§2.9). O `PeriodNavigator modes={['month']}` (competência, `?competencia=`;
+     padrão o mês atual; "Hoje" volta a ele; tooltip "Competência: mês em que o prazo legal cai") vai
+     para a barra de ferramentas (item 3).
 2. `AuditSummary` (como o `ClientsSummary`; vale para a competência inteira, como o resumo de
    Clientes):
 
    | Célula | Conteúdo | Clique |
    | --- | --- | --- |
-   | Concluídas (principal) | "182 de 240" em 32px, com "76% da competência" embaixo (as canceladas fora da conta; com elas, "· 3 canceladas") | — |
-   | Pendências atrasadas | "12", em `text-danger` se maior que 0, com "em 5 clientes · 7 fora da meta" embaixo (o segundo trecho em `text-warning`) | liga `clientes=pendentes` e ordena os clientes com pendência vencida primeiro |
-   | Clientes | "12 de 40 com o mês concluído" (`text-kpi` no "12"), com "**9 com pendências**" embaixo (o trecho alterna `clientes=pendentes`) | alterna `clientes=concluidos` |
+   | Concluídas (principal) | "182 de 240" em 32px, com "76%" embaixo (revisão 4: sai "da competência"; as canceladas fora da conta; com elas, "76% · 3 canceladas") | — |
+   | Atrasadas (revisão 4; era "Pendências atrasadas") | "12", em `text-danger` se maior que 0, com "em 5 clientes · 7 fora da meta" embaixo (o segundo trecho em `text-warning`) | liga `clientes=pendentes` e ordena os clientes com pendência vencida primeiro |
+   | Mês concluído (revisão 4; era "Clientes") | "12 de 40" (`text-kpi` no "12", "de 40" em `text-muted`), com "**9 com pendências**" embaixo (o trecho alterna `clientes=pendentes`) | alterna `clientes=concluidos` |
    | Por departamento | linhas: nome, barra `bg-data` (concluídas sobre o total do departamento) e "64/80" | filtra o departamento (`aria-pressed`) |
 3. Barra de ferramentas num `Card p-4`: `SegmentedControl` Visão **Por cliente** · **Por tarefa**,
-   busca ("Buscar cliente" ou "Buscar tarefa recorrente", conforme a visão), `Select` Regime
+   **revisão 4**: o `PeriodNavigator` da competência logo depois da Visão, busca (placeholder
+   "Buscar"; o `aria-label` continua "Buscar cliente" ou "Buscar tarefa recorrente", conforme a
+   visão), `Select` Regime
    ("Todos os regimes" e `TAX_REGIME_LABELS`), `Select` Departamento (vem com o departamento do
    Início quando se chega por ele), `MemberPicker` Responsável ("Só os meus" no topo), `Select`
    Clientes ("Todos os clientes", "Com pendências", "Mês concluído") e **Limpar**. Com Responsável,
@@ -1829,20 +2168,27 @@ textos empilhados na largura de desktop.
 | Departamento | o departamento da recorrente (`text-body-sm text-fg`, trunca com `title`); sem departamento, "Sem departamento" em `text-subtle` | `7rem` |
 | Responsável | `MemberAvatar sm` e o nome curto ("Juliana M.", `text-body-sm`); sem responsável, o círculo tracejado e "Sem responsável" em `text-subtle` (§3.6); tooltip com a origem (`assigneeSourceText`) | `8.5rem` |
 | Prazo | linha 1: a **meta** ("03/11", `text-[13px] font-medium tabular text-fg`, tooltip `deadlineTip`); linha 2: ver "Prazo, linha 2" | `9rem` |
-| Situação | o controle (`OccurrenceCellControl large`, 40px, §3.2) e, com `gap-2`, o rótulo em `text-[13px]` com a cor de `STATUS_TEXT_CLASS` (§3.1). Concluída: só "Concluída" (sai "Concluída por Marina S. em 27/10"); com atraso, "2 dias de atraso" embaixo do rótulo | `11rem` |
+| Situação | o controle (`OccurrenceCellControl large`, 40px, §3.2) e, com `gap-2`, **só nas exceções** (revisão 4), um rótulo em `text-[13px]`: "Aguardando" (`text-muted`), "Cancelada" (`text-subtle`) e, na concluída com atraso, "2 dias de atraso" (`text-xs font-medium text-warning`). A fazer, Em andamento e Concluída ficam só no glifo, que tem forma própria, tooltip e `aria-label` com o nome | `9rem` (era `11rem`) |
 | Data de conclusão | "05/11, 07:45" (`text-[13px] tabular text-fg`, fuso do escritório; fora do ano corrente, "05/11/25, 07:45"; tooltip "05/11/2026 às 07:45"). Vazia quando não concluída | `7.5rem` |
 | Concluída por | `MemberAvatar sm` e o nome curto de quem clicou (`text-body-sm text-fg`), que pode não ser o responsável. Vazia quando não concluída; concluída sem registro da pessoa, "—" em `text-subtle` | `8rem` |
 
 Linha: `flex items-center gap-3 rounded-lg px-2 py-1.5 min-h-13 hover:bg-surface @lg:px-3 @4xl:grid`, com
 opacidade de 70% quando o filtro Responsável é outra pessoa (como hoje). Colunas vazias ficam em
-branco, sem "—": a Situação já diz que está pendente.
+branco, sem "—": o glifo já diz que está pendente.
+
+**Grade da revisão 4** (`AUDIT_ROW_GRID`): Largo
+`@6xl:grid-cols-[minmax(0,1fr)_7rem_8.5rem_10.5rem_9rem_7rem_8rem]`; Médio
+`@4xl:grid-cols-[minmax(0,1fr)_8.5rem_10.5rem_9rem_6.5rem]`. A Situação mais estreita devolve 32px ao
+nome. A mesma grade vale para a linha-mãe das duas visões e para o cabeçalho único (§11.8, A8 e A9).
 
 **Prazo, linha 2** (`text-xs`, trunca; o tooltip tem o texto inteiro):
 
-- **Por cliente** (cada linha é uma obrigação diferente): pendente, `openDeadlineInfo(cell, today,
-  true)` com `DUE_TONE_CLASS` ("Meta em 3 dias · legal 05/11" em `muted`/`warning`, "Prazo legal
-  venceu há 2 dias" em `danger`); concluída ou cancelada, "legal 05/11" em `text-muted` quando a meta
-  é anterior ao prazo legal, senão nada.
+- **Por cliente** (cada linha é uma obrigação diferente). **Revisão 4** (`obligationDeadlineDetail`):
+  só o alerta ou o prazo legal, porque a linha 1 já é a data da meta. Pendente: "Prazo legal venceu há
+  2 dias" (`danger`), "Prazo legal hoje" (`warning-strong`), "Fora da meta · legal 05/11" (`warning`)
+  ou, sem alerta e com a meta antes do prazo legal, "legal 05/11" (`muted`); meta igual ao prazo legal
+  e sem alerta, nada. Concluída ou cancelada: "legal 05/11" (`muted`) quando a meta é anterior ao prazo
+  legal, senão nada. Sai "Meta em 3 dias".
 - **Por tarefa**: nada. O cabeçalho da tarefa, logo acima e no mesmo trilho, diz o prazo e o atraso
   uma vez (§3.2). Exceção: se as datas da ocorrência diferem das da tarefa, a linha 2 aparece como em
   Por cliente.
@@ -1859,23 +2205,28 @@ contêiner tem 1156px nas duas visões e cai no nível Largo.
 
 Linhas no nível Empilhado (todas `text-xs`, uma linha cada, truncando):
 
-- **Por tarefa**: (1) cliente e cadeado; (2) "Simples Nacional · Juliana M." (`text-muted`);
-  (3) a situação: pendente, o rótulo com a cor de §3.1; concluída, "Concluída em 05/11, 07:45 ·
-  Marina C." ("Concluída" em `text-success`, o resto em `text-muted`).
-- **Por cliente**: (1) obrigação e período; (2) "Pessoal/DP · Juliana M."; (3) "Meta 03/11 · legal
-  05/11" em `text-muted` e, quando o tom não é `muted`, " · Prazo legal venceu há 2 dias" na cor do
-  tom (como hoje); (4) a situação, como em Por tarefa.
+- **Revisão 4: no máximo 3 linhas** (`stackedMeta` e `cellConclusionLine`).
+- **Por tarefa**: (1) cliente e cadeado; (2) "Juliana M." (`text-muted`; sai o regime, que está na
+  ficha) e, se as datas diferem das da tarefa, " · " e o alerta; (3) só quando concluída ou numa
+  exceção: "Concluída em 05/11, 07:45 · Marina C." ("Concluída" em `text-success`, o resto em
+  `text-muted`), "Aguardando" ou "Cancelada". Pendente sem exceção não tem linha 3: o glifo diz.
+- **Por cliente**: (1) obrigação e período; (2) "Juliana M. · meta 03/11" (`text-muted`) e, com
+  alerta, " · Prazo legal venceu há 2 dias" na cor do tom; (3) como em Por tarefa. O departamento sai
+  do Empilhado (está no filtro e na ficha).
 - Com atraso, " · 2 dias de atraso" (`font-medium text-warning`) fecha a linha da situação e pode
   quebrar para a linha de baixo: é o único texto que não trunca.
 - **A 375px** (contêiner de cerca de 330px): a hora sai ("Concluída em 05/11 · Marina C."), a
   indentação some abaixo de `@lg` (o fundo `bg-surface-muted/50` da linha aberta já marca o
   aninhamento), sobram cerca de 250px para o texto e nada rola de lado.
 
-**Cabeçalho de colunas** (a partir de `@4xl`; abaixo, não aparece): primeira linha da região aberta,
-com a mesma grade e o mesmo padding da linha (`px-2 @lg:px-3 pt-1 pb-1.5`), `text-xs font-medium
-text-muted`, em caixa normal, `aria-hidden`. Rótulos: "Cliente" ou "Obrigação" (com `@lg:pl-10`),
-"Departamento" (só no Largo), "Responsável", "Prazo", "Situação" (alinhado com a borda do controle),
-"Data de conclusão" e "Concluída por" (Largo) ou "Conclusão" (Médio).
+**Cabeçalho de colunas** (a partir de `@4xl`; abaixo, não aparece). **Revisão 4: um só por cartão**,
+na barra do card, logo abaixo do "40 clientes · Expandir todos" (e não mais repetido no topo de cada
+região aberta), com a mesma grade e o mesmo padding das linhas (`px-2 @lg:px-3`, dentro de `px-1.5`
+para casar com a `ul p-1.5`), `text-xs font-medium text-muted`, em caixa normal, `aria-hidden`.
+Rótulos: **Cliente** (Por cliente) ou **Tarefa recorrente** (Por tarefa) na 1ª coluna, com `pl-9`
+para alinhar ao nome depois da seta; "Departamento" (só no Largo), "Responsável", "Prazo",
+"Situação" (alinhado com a borda do controle), "Data de conclusão" e "Concluída por" (Largo) ou
+"Conclusão" (Médio). Vale para a linha-mãe e para as linhas abertas, que ficam na mesma grade.
 
 **Estados da linha** (só tokens existentes):
 
@@ -1923,7 +2274,10 @@ e o resumo já conta as pendentes "fora da meta".
   à esquerda, a **seta** `ChevronRight` num quadrado de 28px que gira 90° ao abrir, igual à de Por
   cliente. Saem o ícone `Repeat` de 40px (tudo na auditoria é recorrente, então ele não informa) e o
   `ChevronDown` da direita. Depois, o nome, o selo de periodicidade e "semana de 02/11" (semanal) e,
-  no subtítulo, "Pessoal/DP · padrão: Juliana M." (`text-xs text-muted`).
+  no subtítulo, "Pessoal/DP" (`text-xs text-muted`; revisão 4: sai "· padrão: Juliana M.", porque o
+  responsável de cada cliente está nas linhas abertas).
+- **Barra do card** (revisão 4): "12 tarefas recorrentes" e **Expandir todas** / **Recolher todas**,
+  como em Por cliente, e o cabeçalho único de colunas logo abaixo (§11.2).
 - **Alinhamento** (a partir de `@4xl`): a linha da tarefa usa **a mesma grade e o mesmo padding
   lateral** das linhas de cliente, para os trilhos coincidirem:
   - seta, nome e subtítulo ocupam Cliente, Departamento e Responsável (`@6xl:col-span-3`,
@@ -1954,14 +2308,27 @@ e o resumo já conta as pendentes "fora da meta".
 
 ### 11.4 Por cliente (todas as larguras): `AuditClientList`
 
-- Barra do Card: "40 clientes", a dica de teclado (a partir de `@2xl`) e **Expandir todos** /
-  **Recolher todos**. Navegação nas linhas de cliente: ↑ ↓ Home End movem, → abre e ← fecha.
-- **Linha do cliente** (como está): seta de 28px, o nome com o cadeado do mês concluído, "Simples
-  Nacional · 12.345.678/0001-90" (o CNPJ a partir de `@md`), a barra com "7 de 9" (`w-28`,
-  `@md:w-44`, `@3xl:w-60`) e, a partir de `@3xl`, a nota à direita ("2 atrasadas" em `danger`, "1
-  fora da meta" em `warning`, "Mês concluído em 27/10" em `text-muted`).
-- **Aberta**: o cabeçalho de colunas e um `AuditOccurrenceRow lead="obligation"` por obrigação, com
-  as colunas de §11.2. Em relação a hoje: **ganha Data de conclusão e Concluída por**, a Situação
+- Barra do Card: "40 clientes" e **Expandir todos** / **Recolher todos**; abaixo, o cabeçalho único de
+  colunas (§11.2). **Revisão 4**: sai a dica de teclado visível ("↑ ↓ navegam · → abre · ← fecha"); a
+  `ul` ganha `aria-describedby` para um `span sr-only` "Use as setas para navegar entre os clientes;
+  seta para a direita abre e para a esquerda fecha." Navegação nas linhas de cliente: ↑ ↓ Home End
+  movem, → abre e ← fecha (como hoje).
+- **Linha do cliente**, revisão 4: **na mesma grade da linha da tarefa de Por tarefa** (a partir de
+  `@4xl`), para as duas visões terem a mesma hierarquia:
+  - seta de 28px, o nome com o cadeado do mês concluído e, embaixo, o regime (sai o CNPJ, que está na
+    ficha), ocupando Cliente, Departamento e Responsável (`@6xl:col-span-3`, `@4xl:col-span-2`);
+  - no trilho **Prazo**: a meta mais próxima entre as pendentes do cliente ("07/11",
+    `clientNextTarget`, `text-[13px] font-medium tabular`) e, embaixo, "2 atrasadas" (`danger`) ou "1
+    fora da meta" (`warning`) (`clientDeadlineNote`); sem pendentes, vazio;
+  - no trilho **Situação**: "7/9" (`text-[13px] font-medium tabular`) e a barra de `h-1.5` (`bg-data`;
+    `bg-success` em 100%), como a contagem da tarefa em Por tarefa;
+  - no trilho **Data de conclusão** (Largo) ou **Conclusão** (Médio): com o mês concluído, a data e a
+    hora da última conclusão ("27/10, 14:32"); senão, vazio;
+  - sai a nota "3 pendentes" (a barra já diz) e "Mês concluído em 27/10" vira a data na coluna.
+  - Abaixo de `@4xl`, `flex` como hoje: nome e regime (`flex-1`; com alerta, " · 2 atrasadas" no
+    subtítulo), "7/9" com a barra (`w-24`, `@sm:w-28`).
+- **Aberta**: um `AuditOccurrenceRow lead="obligation"` por obrigação, com as colunas de §11.2 (o
+  cabeçalho de colunas fica só no topo do cartão, revisão 4). Em relação a hoje: **ganha Data de conclusão e Concluída por**, a Situação
   fica só com o controle e o rótulo, e a região perde o `@lg:pl-10` (a indentação vai para a 1ª
   coluna, como em Por tarefa).
 - Tocar no nome da obrigação abre a ocorrência no `TaskSheet`.
@@ -2018,22 +2385,49 @@ se apaga.
 
 | Estado | Texto |
 | --- | --- |
-| Nenhuma recorrente cadastrada | `ClipboardCheck`, "A auditoria começa pelas tarefas recorrentes", "Cadastre as obrigações do escritório e a quais clientes se aplicam; elas viram as colunas desta tela." e, para `registry`, `outline` **Cadastrar tarefas recorrentes** (os outros leem "Os administradores cadastram as obrigações…" e não têm botão) |
+| Nenhuma recorrente cadastrada | `ClipboardCheck`, "A auditoria começa pelas tarefas recorrentes", "Cadastre as obrigações e a quais clientes se aplicam." (revisão 4) e, para `registry`, `outline` **Cadastrar tarefas recorrentes** (os outros leem "Os administradores cadastram as obrigações." e não têm botão) |
 | Nenhum cliente ativo | `Building2`, "Nenhum cliente ativo nesta competência" e `outline` **Ir para Clientes** (`/tarefas/clientes`; os clientes são cadastrados no financeiro) |
 | Filtros sem resultado | "Nenhum cliente encontrado para os filtros selecionados." e **Limpar filtros** |
 | Tudo concluído (com "Com pendências") | `CircleCheck`, "Nenhuma pendência em outubro" e "Todas as tarefas recorrentes da competência foram concluídas." |
-| Nenhum mês concluído (com "Mês concluído") | "Nenhum cliente com o mês concluído em outubro." e "O mês de um cliente fica concluído quando todas as tarefas recorrentes dele estão concluídas." |
+| Nenhum mês concluído (com "Mês concluído") | "Nenhum cliente com o mês concluído em outubro." (revisão 4: sem descrição) |
 | Carregando | `SkeletonRows` de 56px no Card (as linhas de tarefa ou de cliente) |
 | Erro | `ErrorState` dentro do Card |
 
 | | 1440 | 1024 | 768 | 375 |
 | --- | --- | --- | --- | --- |
 | Resumo | 4 células | 4 células | 3 células e departamentos embaixo | 2 × 2, departamentos ocultos |
-| Barra de ferramentas | 1 linha | 2 linhas | 2 linhas | Visão em largura total, depois busca e "Filtros (N)" |
-| Linhas de ocorrência (as duas visões, §11.2) | Largo: 7 colunas (1280 também) | Médio: Responsável, Prazo, Situação e Conclusão; Departamento sai da grade | Empilhado: 3 ou 4 linhas e o controle à direita | Empilhado, sem a hora da conclusão |
-| Linha da tarefa (Por tarefa) | na grade: Prazo e "1/3" em cima das colunas | na grade | `flex`, prazo à direita | `flex`, prazo como 3ª linha |
+| Barra de ferramentas | 1 linha (Visão, competência, busca e filtros) | 2 linhas | 2 linhas | Visão em largura total, competência em largura total, depois busca e "Filtros (N)" |
+| Linhas de ocorrência (as duas visões, §11.2) | Largo: 7 colunas (1280 também) | Médio: Responsável, Prazo, Situação e Conclusão; Departamento sai da grade | Empilhado: até 3 linhas e o controle à direita | Empilhado, sem a hora da conclusão |
+| Linha-mãe (tarefa ou cliente) | na grade: Prazo e "7/9" em cima das colunas | na grade | `flex`, prazo à direita | `flex`, alerta no subtítulo |
+| Cabeçalho de colunas | um, no topo do cartão | um, no topo do cartão | não aparece | não aparece |
 
 Nenhuma largura tem rolagem lateral: a grade só aparece onde cabe, e o resto trunca com `min-w-0`.
+
+### 11.8 Auditoria enxuta: o que muda e por quê (revisão 4)
+
+Pedido: "auditoria mais organizada, não precisa de muita legenda explicando". Regra aplicada: fica o
+dado e o controle; sai a frase que repete um número, a dica permanente e o rótulo que o glifo já diz.
+Esta tabela é a lista de ajustes (onde, o que, por quê); as seções acima já estão atualizadas.
+
+| # | Onde | Hoje | Passa a | Por quê |
+| --- | --- | --- | --- | --- |
+| A1 | Cabeçalho | `description` "Outubro de 2026: 182 de 240 concluídas (76%). 12 pendências já passaram do prazo legal." | sem descrição; `actions` = hub (§2.9) | o resumo, logo abaixo, tem os mesmos números; frase longa no topo |
+| A2 | Competência | `PeriodNavigator` no cabeçalho | na barra de ferramentas, depois da Visão (o tooltip fica) | o cabeçalho passa a ter o hub; competência é um filtro da tela |
+| A3 | Resumo › Concluídas | "76% da competência · 3 canceladas" | "76% · 3 canceladas" | "da competência" é o que a tela inteira já é |
+| A4 | Resumo › 2ª célula | rótulo "Pendências atrasadas" | "Atrasadas" | uma palavra, como no Início e em Tarefas |
+| A5 | Resumo › 3ª célula | rótulo "Clientes"; "12 de 40 com o mês concluído" | rótulo "Mês concluído"; "12 de 40"; embaixo, o link "9 com pendências" | o rótulo diz o que o número conta; sai a frase |
+| A6 | Barra de ferramentas | placeholders "Buscar cliente" / "Buscar tarefa recorrente"; Sheet de filtros com "Refine a auditoria da competência." | placeholder "Buscar" (o `aria-label` continua completo); Sheet sem descrição | a Visão ao lado já diz o que se busca |
+| A7 | Barra do card | "↑ ↓ navegam · → abre · ← fecha" visível a partir de `@2xl` | `sr-only` ligado por `aria-describedby` à lista | atalho de quem usa teclado; não precisa ocupar a tela de todos |
+| A8 | Cabeçalho de colunas | repetido no topo de cada cliente ou tarefa aberta (com "Expandir todos", 40 cabeçalhos iguais) | um só, no topo do cartão, nas duas visões | alinha tudo de uma vez e tira a repetição |
+| A9 | Linha do cliente (Por cliente) | `flex` com "Simples Nacional · CNPJ", barra "7 de 9" e nota à direita ("2 atrasadas", "3 pendentes", "Mês concluído em 27/10") | na grade: nome e regime; trilho Prazo com a meta mais próxima e o alerta; trilho Situação com "7/9" e a barra; trilho Conclusão com a data do mês concluído | as duas visões ganham a mesma hierarquia (linha-mãe e linhas abertas nos mesmos trilhos); "3 pendentes" repetia a barra; o CNPJ está na ficha |
+| A10 | Linha da tarefa (Por tarefa) | subtítulo "Pessoal/DP · padrão: Juliana M." | "Pessoal/DP" | o responsável de cada cliente está nas linhas abertas |
+| A11 | Linha de ocorrência › Situação | rótulo sempre ("A fazer", "Em andamento", "Concluída"…) ao lado do controle; trilho de 11rem | rótulo só nas exceções ("Aguardando", "Cancelada", "2 dias de atraso"); trilho de 9rem | o glifo tem forma própria, tooltip e `aria-label`; o mesmo rótulo em 40 linhas é ruído |
+| A12 | Linha de ocorrência › Prazo, linha 2 (Por cliente) | "Meta em 3 dias · legal 05/11" | só o alerta ou "legal 05/11" quando difere da meta | a linha 1 já é a data da meta |
+| A13 | Empilhado (< `@4xl`) | até 4 linhas, com regime, departamento e "A fazer" | no máximo 3: nome; responsável e meta (com alerta); conclusão ou exceção | o essencial cabe em 375px sem rolar |
+| A14 | Vazios | "Cadastre as obrigações do escritório e a quais clientes se aplicam; elas viram as colunas desta tela."; "O mês de um cliente fica concluído quando todas as tarefas recorrentes dele estão concluídas." | "Cadastre as obrigações e a quais clientes se aplicam." (os outros: "Os administradores cadastram as obrigações."); a segunda frase sai | o título já explica |
+
+**Acessibilidade que não muda**: o `aria-label` do controle continua dizendo o estado, quem concluiu e
+quando (e o atraso); os prefixos `sr-only` das colunas ficam; o glifo nunca depende só de cor.
 
 ---
 
@@ -2057,7 +2451,13 @@ responsável escolhe a fila do departamento.
    anterior é concluída. 3 modelos · 5 processos em andamento." As ações são `outline` **Criar
    processo avulso** (todos, `WriteGate scope="tasks"`) e `primary` **Novo modelo** (`registry`).
    Sem `registry`, a descrição termina em "Somente administradores alteram os modelos."
-2. **Modelos**: `Card` com `CardHeader` "Modelos de processo" e a lista.
+   **Revisão 4**: descrição curta, "3 modelos · 5 processos em andamento" (sai a explicação do que é
+   um processo e a frase de permissão, que fica no editor em leitura); `actions` = hub (§2.9);
+   **Criar processo avulso** vai para Criar › Novo processo; **Novo modelo** vai para o card de
+   modelos.
+2. **Modelos**: `Card` com `CardHeader` "Modelos de processo" e a lista. **Revisão 4**: a `action` do
+   `CardHeader` é `outline sm` **Novo modelo** (`Plus`, `WriteGate scope="admin"`; oculto sem
+   `registry`).
    - Linha (`FlowTemplateRow`): `CategoryIcon` neutro com `Workflow`; título com o selo "5 etapas";
      subtítulo com a descrição; coluna **Departamentos** (`w-36`, `@4xl`): os departamentos das
      etapas ("Societário e Fiscal"; "Sem departamento definido" em `text-subtle`);
@@ -2866,7 +3266,7 @@ como em `GET /tasks/reports`.
 
 ---
 
-## 15. Widgets, anotações e perfil
+## 15. Widgets, anotações, perfil e Minha área
 
 ### 15.1 Widgets: o Início e o painel financeiro
 
@@ -2885,7 +3285,8 @@ do Effy (`CARD_KEYS` de `permissions.js`) e de cada widget da versão anterior:
 | `w-fluxo`, `tarefas-por-dia` | o Calendário de Tarefas (§7.6) e a célula "Próximos 7 dias" do Início | 2 |
 | `w-agendamentos`, `agenda-tarefas` | Tarefas, visualização Calendário (agenda em lista abaixo de 1024px, §7.6) | 2 |
 | `w-processos`, `processos-departamento`, `w-fiscal` | Início, bloco Obrigações da competência (§6.5), e o resumo por departamento da Auditoria (§11.1) | 2 |
-| `anotacoes`, "Minhas anotações" | menu do avatar, "Mais" do celular e ⌘K (§15.2) | 2 |
+| `anotacoes`, "Minhas anotações" | menu do avatar, "Mais" do celular e ⌘K (§15.2); revisão 4: card Anotações de Minha área no lugar do menu do avatar | 2 |
+| `view-perfil` (a página inicial do usuário no Effy) | Minha área (§15.4) | revisão 4 |
 | `w-certificados`, `w-laudos` | faixa de vencimentos do Início, grupo do sino e `DeadlinesSheet` (§6.10) | 3 |
 | `w-convencoes` | os mesmos, na aba Convenções (§6.10) | 3 |
 | `w-clientes`, `w-visao` | Clientes do financeiro (resumo por regime) e Clientes da Gestão (§13.1) | já existe |
@@ -2903,7 +3304,9 @@ ação; sem alça de mover nem olho de ocultar, porque o Início não é persona
 ### 15.2 Minhas anotações (fase 2)
 
 Entradas: **Minhas anotações** (`NotebookPen`) no menu do avatar, nas duas áreas; o "Mais" do
-celular; e o ⌘K ("Minhas anotações" e "Nova anotação"). As anotações são **por pessoa e por
+celular; e o ⌘K ("Minhas anotações" e "Nova anotação"). **Revisão 4**: o menu do avatar sai; a
+entrada principal é o card **Anotações** de Minha área (§15.4: **+ Nova**, **Ver todas** e o clique
+numa anotação), e o `TaskActionsProvider` ganha `editNote(note)` para abrir uma anotação direto. As anotações são **por pessoa e por
 espaço**: ninguém mais as vê, nem administradores, e as de outro espaço não aparecem.
 
 - **`NotesSheet`** (`md`): título "Minhas anotações", descrição "Visíveis somente para você, neste
@@ -2946,6 +3349,160 @@ outra, quebraria a garantia de contraste dos dois temas (o escuro é uma escala 
 e faria cada captura de tela de suporte parecer outro produto. A preferência pessoal que faz
 sentido já existe: o tema **Claro**, **Escuro** ou **Sistema**, no mesmo cartão "Aparência".
 
+### 15.4 Minha área (`/minha-area`, revisão 4)
+
+**Pergunta da tela:** "O que é meu hoje e nesta semana, como estou indo e o que anotei?"
+**Achado:** as atrasadas da pessoa e o insight mais urgente ("DCTFWeb vence hoje").
+**Ação mais frequente:** abrir uma tarefa sua; marcar um compromisso num dia do calendário; abrir ou
+escrever uma anotação.
+**Quem e quando:** todo membro, várias vezes ao dia (operacional, pessoal). Os números são sempre os da
+pessoa e do departamento dela, nunca de "todos", inclusive para administradores: o painel do
+escritório é o Início.
+
+**Origem**: o `view-perfil` do Effy ("Bom dia, Marina", quatro números, Minhas tarefas com
+agrupamento, Tarefas do meu departamento, recorrentes próximas do vencimento, calendário com "+",
+notificações, clientes com mais pendências no departamento, anotações; "Editar perfil" e "Sair" no
+cabeçalho). As notificações do Effy viram **Para você** (insights da API) e **Comentários recentes**;
+o resto tem o mesmo lugar.
+
+**Relação com o Início** (um número, um lugar): o Início é o painel do departamento (ou de todos, para
+administradores), com carga por responsável, vencimentos de documentos e obrigações. Minha área é a
+pessoa. As duas só repetem "Minhas tarefas", que no Início é um atalho e aqui é a lista principal.
+
+**Rota e casca**: `/minha-area` é comum (como `/configuracoes`): o trilho continua o da última área,
+nenhum item do trilho fica ativo e o avatar fica com o anel `ring-primary` (§2.2). A rota fica dentro do
+`GestaoLayout` para o `?tarefa=` e o `?recorrente=&periodo=` abrirem por cima dela (`hostsTaskSheets`).
+`document.title` "Minha área · Efficio".
+
+#### Estrutura (de cima para baixo, `flex flex-col gap-6`)
+
+1. **Cabeçalho** (`PageHeader`):
+   - `h1`: a saudação pela hora do escritório (`America/Sao_Paulo`): "Bom dia, Marina" (até 11:59),
+     "Boa tarde, Marina" (12:00 a 17:59), "Boa noite, Marina" (18:00 em diante); o primeiro nome.
+   - descrição: "Quarta-feira, 5 de novembro · Colaborador · Fiscal · atualizado às 14:32" (o papel por
+     `features/auth/roles.ts`; sem departamento, sem esse trecho; o "atualizado" do `useUpdatedLabel`).
+   - `actions`: `ghost` **Editar perfil** (`UserRoundCog`, leva a `/configuracoes?aba=perfil`) e o
+     **menu de conta** (`AccountMenu`): botão `outline` com o ícone do tipo de espaço
+     (`WORKSPACE_KIND_ICONS`), o nome do espaço (trunca em `max-w-56`) e `ChevronDown`, com
+     `aria-label="Conta e espaço: Efficio Contabilidade"`. O menu (`w-72`, `align="end"`), de cima
+     para baixo: rótulo "Conta" com o nome (`text-sm font-semibold`), o e-mail (`text-xs text-muted`) e
+     "Espaço atual: **Efficio Contabilidade** · Empresarial"; separador; `WorkspaceMenuItems` (trocar de
+     espaço) e **Nova empresa** (abre o `WorkspaceSheet`); separador; **Tema escuro** ou **Tema claro**
+     (`Moon`/`Sun`); **Configurações** (`Settings`); separador; **Sair** (`LogOut`, `tone="danger"`).
+     É o conteúdo do antigo menu do avatar menos Perfil (virou o botão ao lado) e Minhas anotações
+     (virou um card).
+   - A 375px, as ações descem para uma linha própria: **Editar perfil** vira só o ícone (com
+     `aria-label`) e o menu de conta ocupa o resto da linha.
+2. **Faixa de números** (`MetricStrip`, 4 células; cada uma é link):
+
+   | Célula | Valor | Rodapé (comparação) | Destino |
+   | --- | --- | --- | --- |
+   | Atrasadas (`hero`) | as suas atrasadas, `tone="danger"` se > 0 | "a mais antiga venceu há 6 dias" (o título da tarefa no `footerTitle`); 0: "nada atrasado" | `/tarefas?escopo=minhas&situacao=atrasadas` |
+   | Hoje | vencem hoje (e metas de hoje) | "2 compromissos · próximo às 14:00"; sem compromisso: "nenhum compromisso" | `/tarefas?escopo=minhas&vencimento=<hoje>` |
+   | Próximos 7 dias | os seus de amanhã a hoje + 7 | "até 12/11" | `/tarefas?escopo=minhas` |
+   | Concluídas em novembro | as suas concluídas no mês | "92% no prazo · outubro: 18" (sem concluídas no mês: "outubro: 18"; sem nenhuma: "nenhuma ainda") | `/tarefas?escopo=minhas&situacao=concluidas&mes=2026-11` |
+
+   Tudo vem de `GET /tasks/me/overview` (`TaskMyOverviewResponse`): `open.overdue`, `open.oldestOverdue`,
+   `open.dueToday`, `open.next7Days`, `productivity.concluded`, `productivity.onTimeRate` e o mês
+   anterior em `productivity.trend`; os compromissos de hoje são as `upcoming.tasks` de hoje com
+   `startTime`.
+3. **Grade de cards** (`DashSlot`, linhas de 96px e espaço de 16px, como o Início; 12 colunas quando a
+   página tem 1000px ou mais, 2 colunas de 560 a 999px, 1 coluna abaixo):
+
+   ```
+   ≥ 1000px
+   ┌ Minhas tarefas · 8/12 · L ─────────────────┐┌ Para você · 4/12 · L ──────┐
+   ├ Calendário · 4/12 · L ┬ Seu ritmo · 4/12 · L ┬ Meu departamento · 4/12 · L ┤
+   ├ Anotações · 4/12 · M ─┼ Clientes com mais pendências · 4/12 · M ┼ Comentários recentes · 4/12 · M ┤
+   560–999px: Minhas tarefas (2/2, L); Para você + Calendário (L); Seu ritmo + Meu departamento (L);
+              Anotações + Clientes (M); Comentários recentes (2/2, M)
+   < 560px:   uma coluna, na ordem do DOM (a de cima)
+   ```
+
+#### Card a card (todos com `WidgetCard`: título, linha do achado, ação à direita, rodapé)
+
+| Card | Achado (exemplo) | Corpo | Ação e rodapé |
+| --- | --- | --- | --- |
+| **Minhas tarefas** | "1 atrasada · 3 para hoje" | à direita do título, `SegmentedControl size="sm"` **Prazo** · **Cliente**. Prazo: os grupos de §7.4 (Atrasadas, Fora da meta, Hoje, Próximos 7 dias, Mais tarde, Sem vencimento), só os que têm itens, com `TaskGroup` compacto. Cliente: um grupo por cliente (mais itens primeiro; "Interna" por último) e, no topo, "Obrigações" com as linhas agrupadas de recorrente (só as suas). Linhas `TaskRow` compactas (§5.5) e `RecurringOccurrenceRow`; `FitList` corta com "+ N tarefas" | rodapé **Ver todas (14)** → `/tarefas?escopo=minhas` |
+| **Para você** | "2 pedem atenção" (sem `danger`/`warning`: "Tudo em dia") | os `insights` da API (até 6, na ordem que vêm): ícone neutro de 16px pela chave (tabela abaixo), pintado só nos tons `danger` (`text-danger`), `warning` (`text-warning`) e `success` (`text-success`; `info` fica `text-muted`); o texto pronto da API em `text-body-sm text-fg`; com `link`, a linha é um `Link` de 44px para a lista "Minhas" com aquele filtro e tem `ChevronRight` | sem rodapé |
+| **Calendário** | "novembro · 6 dias com tarefas" | `MiniCalendar` (abaixo). À direita do título, `SegmentedControl size="sm"` **Minhas** · **Departamento** (`calendario-escopo`); sem departamento, sem o segmentado | rodapé **Abrir calendário** → `/tarefas?visao=calendario&escopo=minhas&mes=AAAA-MM` |
+| **Seu ritmo** | "novembro: 12 concluídas, 92% no prazo" (com `rateChange`: "· +4 p.p. sobre outubro") | barras de `productivity.trend` (6 meses; `onTime` em `bg-data` e `late` em `danger`, empilhadas; barras de até 44px, rótulo do valor no topo, mês embaixo, regras de §6 de `docs/dashboards-redesign.md`) e, embaixo, "Você: 92% no prazo · média do Fiscal: 86%" com `comparison.me` e `comparison.average` (sem média, com menos de 3 pessoas, a linha diz só "Você: 92% no prazo") | rodapé **Ver relatório** → `/tarefas/relatorios?responsavel=<eu>` |
+| **Meu departamento** | "Fiscal · 64 de 80 concluídas (80%)" | StatusCard (padrão de `dashboards-redesign.md` §5): herói "80%" com "64 de 80", `StackBar` de progresso (concluídas `data`, atrasadas `danger`, pendentes cinza) com a marca "hoje (dia 5)", e as faixas **Atrasadas**, **Fora da meta** e **Em aberto**, cada uma um link para `/tarefas?escopo=departamento&situacao=…` | rodapé com a obrigação do departamento de prazo legal mais próximo e pendências: "DCTFWeb · 12/30 · prazo 07/11" (abre o `RecurringOccurrenceSheet`) |
+| **Anotações** | "12 anotações · a última editada hoje" | `FitList` de linhas de 44px: o título (`text-body-sm font-medium`, trunca) e, à direita, "há 2 dias" (`text-caption text-subtle`); o clique abre o `NoteSheet` dela | ação `ghost sm` **+ Nova** (abre o `NoteSheet` vazio, `WriteGate scope="tasks"`); rodapé **Ver todas (12)** (abre o `NotesSheet`) |
+| **Clientes com mais pendências** | "no Fiscal · Pão Dourado lidera com 9" | ranking (`clientPendingRanking`): nome, barra proporcional com a parte atrasada em `danger`, "9" e "2 atr." (`text-danger`); "Internas" fica de fora, como em Tarefas | cada linha → `/tarefas?escopo=departamento&cliente=<id>` |
+| **Comentários recentes** | "3 nos últimos 5 dias" | linhas de `GET /tasks/activity`: `MemberAvatar sm`, "**Bruno C.** comentou em Balancete Pão Quente", o trecho em `text-caption text-muted` (uma linha) e "há 2 h" à direita | o clique abre a tarefa (`?tarefa=`) |
+
+**Ícone de cada insight** (por `TaskInsightKey`; o texto é sempre o da API): `overdue` `CircleAlert`,
+`dueToday` `CalendarClock`, `dueTomorrow` `CalendarDays`, `targetMissed` `Hourglass`, `waitingClient`
+`CirclePause`, `onTimeRate` e `rateTrend` `TrendingUp`, `department` `Users`, `busiestWeekday`
+`CalendarRange`, `allClear` `CircleCheck`.
+
+**Destino** (`insightHref(link, today)`): `/tarefas?escopo=minhas` mais o filtro do `link`: `situation`
+vira `situacao` (`overdue` → `atrasadas`, `waiting` → `aguardando`…), `dueDate` vira `vencimento`, e
+`dueBucket` `overdue` vira `situacao=atrasadas` (os outros grupos ficam na lista agrupada, sem filtro
+extra). Sem `link`, a linha não é link.
+
+**Sem departamento**: Meu departamento mostra o vazio de card "Você ainda não está em um
+departamento." e, para quem tem `registry`, `outline sm` **Definir em Cadastros**
+(`/tarefas/cadastros?aba=equipe`); Clientes com mais pendências passa a "Seus clientes com mais
+pendências" (escopo Minhas); o segmentado do Calendário some; a média de Seu ritmo não aparece.
+
+#### `MiniCalendar`
+
+- Cabeçalho do card: "‹ novembro de 2026 ›" (`icon-sm ghost` com `aria-label` "Mês anterior" e
+  "Próximo mês") e `ghost sm` **Hoje** quando o mês não é o atual (`calendario=AAAA-MM`).
+- Grade de 7 colunas, de segunda a domingo, com as iniciais dos dias como `columnheader`
+  (`text-micro text-muted`); cada dia é um `button` quadrado de no mínimo 40px: o número em
+  `text-body-sm tabular`; **hoje** com o número num círculo `bg-primary text-primary-fg` de 28px; dias
+  de fora do mês em `text-subtle`; fim de semana e feriado em `text-muted` (o feriado no tooltip e no
+  `aria-label`).
+- **Marca do dia**: um ponto de 5px embaixo do número: `bg-danger` se há algo em aberto e atrasado
+  nesse dia; senão `bg-data` se há algo em aberto; senão `bg-border-strong` se só há concluídas. Sem
+  legenda: a contagem está no tooltip ("3 tarefas, 1 atrasada") e no `aria-label`.
+- **Clique ou Enter num dia** abre um `Popover` (`w-72`, `shadow-lg`): o título "Quinta, 6 de
+  novembro" (com o feriado, se houver), até 5 itens (glifo de estado, título que abre a tarefa, horário
+  ou meta à direita), "+ 3 no calendário" (link para a visão Calendário naquele mês) e `outline sm`
+  **Novo compromisso** (abre `?nova=1&horario=1&prazo=2026-11-06`; `WriteGate scope="tasks"`). Dia sem
+  nada: "Nada neste dia." e o botão.
+- **Teclado** (como um seletor de data): o grid tem um só `tabIndex=0`; setas movem um dia (← →) ou uma
+  semana (↑ ↓), Home e End vão ao começo e ao fim da semana, PageUp e PageDown trocam o mês; Esc fecha
+  o popover e devolve o foco ao dia.
+- Dados: `GET /tasks/calendar` do mês visível (42 dias, dentro do limite de 62), com `escopo=minhas` ou
+  `departamento`. Carregando: a grade com os números e sem marcas. Erro: o `ErrorState` compacto no
+  lugar da grade.
+- A 375px a grade tem cerca de 43px por dia; a 1280px, 47px; entre 1000 e 1279px de página o card tem
+  4/12 e cerca de 40px por dia (nunca abaixo disso; abaixo de 1000px de página a grade passa a 2
+  colunas e o card a meia largura).
+
+#### Estados e larguras
+
+| Estado | O que aparece |
+| --- | --- |
+| Carregando | esqueleto da faixa e de cada card com a forma do conteúdo (linhas, barras, grade) |
+| Erro da faixa | `ErrorState` no lugar da faixa; cada card com o próprio erro compacto |
+| Nada atribuído | Minhas tarefas com "Nada atribuído a você" e `outline sm` **Nova tarefa**; Para você com o `allClear` |
+| Assinatura inativa | **+ Nova** (anotação), **Novo compromisso** e **Nova tarefa** desabilitados com o motivo; o menu de conta funciona |
+| Sem anotações | "Nenhuma anotação" e `outline sm` **Nova anotação** |
+| Sem comentários | "Nenhum comentário nos últimos 5 dias." |
+
+| | 1440 | 1024 | 768 | 375 |
+| --- | --- | --- | --- | --- |
+| Cabeçalho | saudação à esquerda, Editar perfil e menu de conta à direita | igual | igual | ações numa linha abaixo; Editar perfil só com ícone |
+| Faixa | 4 células numa linha | 2 × 2 | 2 × 2 | 4 linhas (rótulo à esquerda, valor à direita) |
+| Cards | 12 colunas (8 + 4, 4 + 4 + 4, 4 + 4 + 4) | 2 colunas | 2 colunas | 1 coluna |
+
+Sem rolagem lateral em nenhuma largura; nenhuma lista com rolagem interna (corta com "+ N").
+
+#### Abordagens consideradas
+
+1. **Rota comum `/minha-area` (escolhida)**: o administrador que está no Financeiro abre a página dele
+   (e o menu de conta: trocar de espaço, tema, sair) sem trocar de área. Custa o `hostsTaskSheets`, para
+   as tarefas abrirem por cima dela.
+2. Rota da Gestão (`/tarefas/minha-area`): sem ajuste de Sheets, mas clicar no avatar no Financeiro
+   troca o trilho, e sair ou trocar de espaço passaria por outra área.
+3. Manter o menu no avatar e pôr a página no menu: atende o "não perder itens", mas não o pedido
+   ("clicar no avatar abre a tela inicial do usuário").
+
 ---
 
 ## 16. Acessibilidade
@@ -2953,6 +3510,12 @@ sentido já existe: o tema **Claro**, **Escuro** ou **Sistema**, no mesmo cartã
 | Elemento | Semântica e teclado |
 | --- | --- |
 | Trilho de cada área | `nav` com `aria-label` da área ("Navegação da gestão de tarefas"), links com `aria-label` e `aria-current="page"`; Tab entre os itens; o "mais" é `button` com o número de itens no nome |
+| Avatar do trilho (revisão 4) | `Link` para Minha área com `aria-label="Minha área — Marina Costa"`, tooltip "Minha área" e `aria-current="page"` em `/minha-area`; fora da `nav` da área, como o botão de troca |
+| Hub de tarefas (revisão 4) | Ver: `nav aria-label="Páginas de tarefas"`, `Link`s com `aria-label` (o nome da tabela de §2.9) e `aria-current="page"` no ativo, ícones `aria-hidden`; Criar: `div role="group" aria-label="Criar"` com `button`s nomeados; tooltips que abrem também no foco; Tab na ordem visual |
+| Repetição (revisão 4) | `SegmentedControl` "Repetição" (`radiogroup`); dias da semana como `button aria-pressed` com o nome inteiro ("Segunda-feira"); o resumo em `aria-live="polite"`; erros em `role="alert"` ligados ao campo; "Aplicar alterações a" é outro `radiogroup`, e o carimbo diz o alcance ("Salvo nesta e nas próximas") |
+| Menu de conta (revisão 4) | `button` com `aria-label="Conta e espaço: {espaço}"` e `aria-haspopup="menu"`; itens Radix (setas, Esc); "Sair" com o texto, não só a cor |
+| Minicalendário (revisão 4) | `role="grid"` com `aria-label="Calendário de novembro de 2026"`, `columnheader` dos dias, um `tabIndex=0` itinerante (setas, Home, End, PageUp, PageDown); cada dia é `button` com `aria-label` "6 de novembro, quinta-feira: 3 tarefas, 1 atrasada" (e ", feriado: Finados"); hoje com `aria-current="date"`; o popover é `role="dialog"` com o dia no título |
+| Para você (revisão 4) | lista (`ul`) de links com o texto da API como nome; o tom vem no texto ("venceu", "atrasadas"), a cor do ícone só reforça |
 | Botão de troca de área | `Link` com `aria-label="Ir para o financeiro"` (ou "…para a gestão de tarefas"), fora da `nav` da área; nunca `aria-current` |
 | Seção Área do "Mais" (celular) | lista de dois links; a área atual com `aria-current="true"` e o texto "(atual)" em `sr-only` |
 | Acesso restrito | página com `h1` "Acesso restrito"; o foco vai para o `h1` ao abrir, como em qualquer navegação; os nomes dos administradores são texto, não links |
@@ -3026,6 +3589,13 @@ invalida as chaves de tarefas e o resumo. Os toasts com "Desfazer" duram 6s
 | Voltar ao modelo de fábrica | os blocos trocam pelos de fábrica | "Modelo de fábrica restaurado." |
 | Foto do perfil | o avatar troca em todos os lugares | "Foto atualizada." (remover: "Foto removida." com **Desfazer**) |
 | Trocar de área | a página da outra área abre e o trilho troca os ícones, sem animação | nenhum |
+| Criar tarefa que se repete (revisão 4) | o Sheet passa para a primeira ocorrência, com a regra no lugar do bloco | "Tarefa criada. Repete toda segunda." |
+| Repetir uma tarefa avulsa | o bloco fecha e vira a linha da regra; o vencimento muda se a regra pedir (o aviso já tinha dito) | "Agora repete toda segunda." com **Desfazer** |
+| Salvar repetição ("Editar repetição") | o bloco fecha; o carimbo diz "Salvo nesta e nas próximas" | nenhum |
+| Parar de repetir | a linha da regra some e o segmentado volta a "Não se repete" | "Não repete mais." |
+| Campo salvo em "Esta e as próximas" | `SavedStamp` com "Salvo nesta e nas próximas" | nenhum |
+| Trocar de página pelo hub | a página abre; o item ativo do hub muda, sem animação | nenhum |
+| Novo compromisso pelo minicalendário | o popover fecha e o `TaskSheet` abre com o dia e o horário 09:00–10:00 | "Tarefa criada." (o de sempre) |
 | Sem permissão | — | o toast global de acesso (`app-shell.tsx`), com a mensagem do servidor (§2.6) |
 
 **Outros detalhes:** o hover das linhas e cartões só troca o fundo ou a borda (sem elevação em
@@ -3144,6 +3714,38 @@ busca de tarefas e recorrentes e a troca de responsável em lote com a contagem 
     escritório concorda com Carnaval e Corpus Christi como dias não úteis nos prazos (o backend já os
     inclui, porque não há expediente bancário).
 
+**Revisão 4 (05/11/2026)**: hub, repetição e Minha área. Conferido com o contrato que o backend
+está escrevendo em paralelo (`taskRecurrenceInputSchema`, `RECURRENCE_ORIGINS`,
+`TASK_RECURRENCE_APPLY_TO`, `taskMyOverviewQuerySchema`, `TASK_INSIGHT_KEYS` e o plano
+`docs/superpowers/plans/2026-11-05-recorrencia-tarefas-e-visao-pessoal.md`). A tela usa esse contrato
+como está; estes itens são o que ela ainda lê dele ou pede além dele (lista completa, com os campos, no
+fim de `docs/superpowers/plans/2026-11-05-hub-recorrencia-area-usuario.md`).
+
+20. **A regra em cada ocorrência**: atendido pelo contrato (`TaskDetail.recurrence: TaskRecurrence`,
+    com `upcoming` e `canEdit`, e `TaskOccurrenceRef.origin`). A tela escolhe o bloco pelo
+    `occurrence.origin` e pela `recurrence`.
+21. **Sem retroativo** (pedido): uma regra que começa no passado não gera ocorrências passadas além da
+    primeira (a própria tarefa). A primeira data é a de `firstScheduledOccurrence` a partir do
+    vencimento (a tela avisa antes de salvar quando ela muda).
+22. **`canEdit` por série**: atendido no detalhe (`TaskRecurrence.canEdit`); falta nas linhas de
+    repetição de Recorrentes (item 23).
+23. **Recorrentes com as duas origens** (pedido): `GET /tasks/recurring` com `origin=registry|task|all`,
+    cada item com a origem, o alvo (cliente ou interna), o responsável, a regra (`interval`,
+    `weekdays`, `ends`, `endDate`, `count`), `canEdit` e a próxima ocorrência em aberto (senão a última)
+    para o clique abrir a tarefa; contagens por origem para o filtro Tipo. Sem isso, a página mostra só
+    o cadastro e o filtro Tipo não aparece.
+24. **Agrupar as ocorrências seguidas da mesma série** nos grupos futuros (§5.3): atendido
+    (`occurrence.recurringTaskId` nas linhas de `GET /tasks`); a regra da API (série diária ou semanal
+    só até hoje + 7, ou a próxima em aberto) fica como está.
+25. **`GET /tasks/me/overview`**: atendido pelo contrato (`TaskMyOverviewResponse`: `open`,
+    `productivity` com `trend` e `rateChange`, `upcoming`, `workload`, `comparison`, `insights` com
+    `link`). A tela não usa `workload` nesta revisão (o insight `busiestWeekday` já diz o dia mais
+    cheio).
+26. **Calendário, atividade, anotações e Início**: `GET /tasks/calendar` (`scope=mine|department`),
+    `GET /tasks/activity`, `GET /notes` e `GET /tasks/home` (o departamento da pessoa) servem como estão.
+27. **Hub e Auditoria enxuta**: nenhuma mudança de API (a meta mais próxima de cada cliente sai das
+    células que a auditoria já devolve).
+
 ---
 
 ## 19. Checklist de implementação
@@ -3194,6 +3796,23 @@ busca de tarefas e recorrentes e a troca de responsável em lote com a contagem 
 - [ ] Escritório: aba em Configurações, editor do modelo em `/configuracoes/contrato`, Gerar contrato
       e `/clientes/:id/contrato` (§13.9); passo "Dados do escritório" nos primeiros passos.
 - [ ] Perfil: foto com recorte e `MemberAvatar` com foto (§15.3).
+
+**Revisão 4** (plano: `docs/superpowers/plans/2026-11-05-hub-recorrencia-area-usuario.md`)
+
+- [ ] Trilho de 5 itens, páginas do hub com `place: 'hub'`, Tarefas ativo nelas, "Mais" sem elas e ⌘K
+      com todas, mais Grupos por regime e Minha área (§2.2, §2.4, §2.8).
+- [ ] `TasksHub` nos cabeçalhos de Tarefas, Auditoria, Recorrentes e Processos; saem o `TaskCreateHub`,
+      a Visualização dos filtros, o segmentado de Recorrentes e os botões dos cabeçalhos (§2.9).
+- [ ] Auditoria enxuta, A1 a A14 (§11.8).
+- [ ] `RepeatField` na criação e no detalhe, "Só esta / Esta e as próximas", a regra no subtítulo das
+      linhas e as ocorrências seguidas juntas nos grupos futuros (§5.3 e §9.4).
+- [ ] Recorrentes com o filtro Tipo e as linhas de repetição, quando a API mandar as duas origens
+      (§10.1, §10.2 e §18, item 23).
+- [ ] Minha área: avatar como link, menu de conta, linha no "Mais" do celular, faixa, 8 cards e
+      `MiniCalendar` (§15.4).
+- [ ] Capturas em 1440, 1024, 768 e 375: hub em largura total e sem Criar no celular; Minha área e
+      Auditoria sem rolagem lateral; `design-system.md` com `TasksHub`, `RepeatField`, `AccountMenu` e
+      `MiniCalendar`.
 
 **Em toda fase**
 

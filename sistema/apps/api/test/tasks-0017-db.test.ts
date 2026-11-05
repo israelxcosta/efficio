@@ -18,6 +18,8 @@ beforeAll(async () => {
   app = await createTestApp();
 });
 afterAll(async () => {
+  // 0017 re-adds its occurrence CHECK (no internal occurrences): 0019 brings the schema back to today's.
+  await runMigration('0019_task_recurrence.sql');
   await app.close();
 });
 beforeEach(async () => {

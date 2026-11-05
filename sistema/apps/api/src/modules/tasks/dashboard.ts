@@ -43,7 +43,7 @@ import { clientActiveIn, defaultWindow, ensureOccurrences, loadClients } from '.
 import { resolveView } from './home';
 import { aggregateOccurrences, byUrgency } from './occurrences';
 import { clientDisplayName, departmentNames } from './shared';
-import { NOT_OCCURRENCE_SQL, OCCURRENCE_SQL, OPEN_SQL, WORK_DATE } from './task-rows';
+import { AGGREGATED_SQL, NOT_OCCURRENCE_SQL, OCCURRENCE_SQL, OPEN_SQL, WORK_DATE } from './task-rows';
 
 type DashboardQuery = z.output<typeof taskDashboardQuerySchema>;
 
@@ -198,7 +198,8 @@ export async function taskDashboard(ctx: TaskContext, q: DashboardQuery): Promis
   const { from, to } = monthRange(month);
   const overdue = sql`${OPEN_SQL} and ${tasks.dueDate} < ${t}`;
   const pending = sql`${OPEN_SQL} and not (${tasks.dueDate} is not null and ${tasks.dueDate} < ${t})`;
-  const ofCompetence = and(eq(tasks.workspaceId, ctx.workspaceId), OCCURRENCE_SQL, scope, eq(tasks.competence, month));
+  // Obligations of the competence: the registry's occurrences (tasks' recurrences are tasks, migration 0019).
+  const ofCompetence = and(eq(tasks.workspaceId, ctx.workspaceId), AGGREGATED_SQL, scope, eq(tasks.competence, month));
   const lastFlowDay = addDays(t, FLOW_DAYS - 1);
 
   const [[status], flowRows, processRows, fiscalItems, upcoming, pastThisMonth, perClient, clients, names, documents, certificates, conventions, fees, incomplete] =

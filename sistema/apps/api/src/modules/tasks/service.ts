@@ -12,6 +12,9 @@
 // aggregated (`occurrences`) and counts them one per client; their registry fields are locked (they come
 // from the recurring task), and reopening a concluded one is only for who concluded it or an
 // administrator, with a reason (the audit record). Every write leaves an entry in the history.
+// Any task may repeat (`recurrence`, migration 0019; task-recurrence.ts): it becomes the first occurrence
+// of a recurring task of origin `task`, listed as tasks; its series is changed with `applyTo: 'series'` or
+// a new `recurrence`, and ended with `recurrence: null`. The reopening rule above is the registry's only.
 // Every statement filters by the workspace, even after an ownership check (test/tasks-scope.test.ts);
 // free text is encrypted per field (encrypted-text.ts).
 
@@ -47,7 +50,7 @@ import {
   type taskUpdateSchema,
 } from '@effinance/shared';
 import type { z } from 'zod';
-import { contacts, taskCategories, taskComments, taskEvents, taskSubtasks, tasks, type TaskRow } from '../../db/schema';
+import { contacts, taskCategories, taskComments, taskEvents, taskFlowSteps, taskSubtasks, tasks, type TaskRow } from '../../db/schema';
 import { now } from '../../lib/clock';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors';
 import { likePattern } from '../../lib/sql';
@@ -56,13 +59,35 @@ import { listAttachments } from './attachments';
 import {
   decryptTaskText,
   encryptTaskText,
+  RECURRING_DESCRIPTION,
   TASK_COMMENT_TEXT,
   TASK_DESCRIPTION,
 } from './encrypted-text';
 import { HISTORY_LIMIT, recordEvent, recordEvents, toHistoryItem, type EventInput } from './events';
 import { advanceOnCompletion, beforeStepReopens, flowOfTask } from './flow-engine';
-import { defaultWindow, ensureOccurrences } from './generation';
+import { defaultWindow, ensureOccurrences, syncOpenOccurrences } from './generation';
 import { aggregateOccurrences, canReopenOccurrence } from './occurrences';
+import {
+  assertCanManageSeries,
+  assertClientActiveIn,
+  deleteTaskSeries,
+  endedAt,
+  firstOccurrenceOf,
+  generateSeries,
+  insertSeries,
+  loadTaskSeries,
+  moveSeriesClient,
+  occurrenceColumns,
+  REGISTRY_SERIES_MESSAGE,
+  rekeyOccurrence,
+  seriesRule,
+  storedRule,
+  toTaskRecurrence,
+  updateSeries,
+  type SeriesFields,
+  type SeriesRule,
+  type TaskRecurrenceRule,
+} from './task-recurrence';
 import {
   assertMember,
   clientRef,
@@ -83,8 +108,10 @@ import {
   OPEN_SQL,
   overdueRef,
   priorityRank,
+  ROW_SQL,
   selectTask,
   selectTasks,
+  visibleSeriesSql,
   WORK_DATE,
 } from './task-rows';
 
@@ -119,19 +146,21 @@ export async function getTaskRowOrThrow(
   return row;
 }
 
-function canReopen(ctx: TaskContext, row: Pick<TaskRow, 'status' | 'completedBy' | 'recurringTaskId'>): boolean {
+/** A concluded occurrence of the registry is an audit record; anything else reopens freely. */
+function canReopen(ctx: TaskContext, row: Pick<TaskRow, 'status' | 'completedBy' | 'occurrenceOrigin'>): boolean {
   if (isOpenTaskStatus(row.status)) return false;
-  return row.recurringTaskId && row.status === 'done' ? canReopenOccurrence(ctx, row) : true;
+  return row.occurrenceOrigin === 'registry' && row.status === 'done' ? canReopenOccurrence(ctx, row) : true;
 }
 
 export async function getTaskDetail(ctx: TaskContext, id: string): Promise<TaskDetail> {
   const task = await selectTask(ctx, id);
   if (!task) throw new NotFoundError('Tarefa não encontrada');
   const [row] = await ctx.db
-    .select({ description: tasks.description, completedBy: tasks.completedBy })
+    .select({ description: tasks.description, completedBy: tasks.completedBy, occurrenceOrigin: tasks.occurrenceOrigin })
     .from(tasks)
     .where(taskKey(ctx, id));
-  const [subtasks, comments, attachments, flowProgress] = await Promise.all([
+  const series = task.occurrence?.origin === 'task' ? await loadTaskSeries(ctx, task.occurrence.recurringTaskId) : null;
+  const [subtasks, comments, attachments, flowProgress, recurrence] = await Promise.all([
     ctx.db
       .select()
       .from(taskSubtasks)
@@ -144,6 +173,7 @@ export async function getTaskDetail(ctx: TaskContext, id: string): Promise<TaskD
       .orderBy(asc(taskComments.createdAt), asc(taskComments.id)),
     listAttachments(ctx, id),
     task.flow ? flowOfTask(ctx, id) : Promise.resolve(null),
+    series ? toTaskRecurrence(ctx, series) : Promise.resolve(null),
   ]);
   const [description, texts] = await Promise.all([
     decryptTaskText(ctx.cipher, TASK_DESCRIPTION, row?.description ?? null),
@@ -160,8 +190,9 @@ export async function getTaskDetail(ctx: TaskContext, id: string): Promise<TaskD
     canReopen: canReopen(ctx, {
       status: task.status,
       completedBy: row?.completedBy ?? null,
-      recurringTaskId: task.occurrence?.recurringTaskId ?? null,
+      occurrenceOrigin: row?.occurrenceOrigin ?? null,
     }),
+    recurrence,
   };
 }
 
@@ -214,7 +245,8 @@ function buildFilters(ctx: TaskContext, q: TaskQuery, myDepartment: string | nul
           : sql`false`
         : undefined;
   const base: SQL[] = [eq(tasks.workspaceId, ctx.workspaceId)];
-  if (!q.occurrences) base.push(NOT_OCCURRENCE_SQL);
+  // `occurrences=false`: no aggregated occurrences (the registry's); tasks' recurrences are tasks.
+  if (!q.occurrences) base.push(ROW_SQL);
   if (scope) base.push(scope);
   if (q.clientId)
     base.push(q.clientId === 'internal' ? isNull(tasks.clientId) : eq(tasks.clientId, q.clientId));
@@ -266,10 +298,13 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
   const current = monthKey(ctx.today);
   // Occurrences are generated ahead (generation.ts); without a date filter the list goes up to the next
   // competence only, so obligations two months away do not swell "Em aberto" and "Mais tarde".
-  if (q.occurrences && !f.dated)
+  if (!f.dated) {
     f.base.push(sql`(${tasks.recurringTaskId} is null or ${tasks.competence} <= ${addMonthKey(current, 1)})`);
-  // Occurrences are listed aggregated (`occurrences`), never as rows of the page.
-  const pageWhere = and(...f.base, NOT_OCCURRENCE_SQL, f.situation, f.bucket, f.closed);
+    // A task's recurrence shows the next 7 days and its next open occurrence (not months of a daily one).
+    f.base.push(visibleSeriesSql(ctx.today));
+  }
+  // The registry's occurrences are listed aggregated (`occurrences`), never as rows of the page.
+  const pageWhere = and(...f.base, ROW_SQL, f.situation, f.bucket, f.closed);
   const order =
     q.situation === 'done'
       ? [sql`coalesce(${tasks.completedAt}, ${tasks.updatedAt}) desc`, sql`${tasks.id}`]
@@ -358,7 +393,7 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
         .selectDistinct({ month: sql<string>`to_char(${tasks.dueDate}, 'YYYY-MM')` })
         .from(tasks)
         .where(
-          and(eq(tasks.workspaceId, ctx.workspaceId), sql`${tasks.dueDate} is not null`, f.scope, q.occurrences ? undefined : NOT_OCCURRENCE_SQL),
+          and(eq(tasks.workspaceId, ctx.workspaceId), sql`${tasks.dueDate} is not null`, f.scope, q.occurrences ? undefined : ROW_SQL),
         ),
       q.occurrences && q.kind !== 'standalone' && q.kind !== 'flow'
         ? aggregateOccurrences(ctx, and(...f.base, f.situation, f.bucket, f.closed, occurrenceWindow))
@@ -526,6 +561,15 @@ async function fieldChanges(ctx: TaskContext, current: TaskRow, patch: TaskPatch
 export async function createTask(ctx: TaskContext, input: TaskInput): Promise<TaskDetail> {
   await assertRefs(ctx, input);
   const departmentId = await resolveTaskDepartment(ctx, input.assigneeId, input.departmentId);
+  // With recurrence: the series first (the task is its first occurrence; its due date comes from the rule).
+  const series = input.recurrence
+    ? await startSeries(
+        ctx,
+        { ...input, departmentId },
+        input.recurrence,
+        input.dueDate ?? ctx.today,
+      )
+    : null;
   const [row] = await ctx.db
     .insert(tasks)
     .values({
@@ -541,6 +585,7 @@ export async function createTask(ctx: TaskContext, input: TaskInput): Promise<Ta
       dueDate: input.dueDate,
       startTime: input.startTime,
       endTime: input.endTime,
+      ...(series?.occurrence ?? {}),
       createdBy: ctx.userId,
       createdByName: myName(ctx),
       createdAt: now(),
@@ -549,7 +594,130 @@ export async function createTask(ctx: TaskContext, input: TaskInput): Promise<Ta
     })
     .returning({ id: tasks.id });
   await recordEvent(ctx, { taskId: row!.id, kind: 'created', data: { origin: 'manual', status: input.status } });
+  if (series) await generateSeries(ctx, series.id);
   return getTaskDetail(ctx, row!.id);
+}
+
+// ---------------------------------------------------------------------------
+// Recurrence (task-recurrence.ts holds the series; these tie it to the task's own fields)
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates the series of a task (`recurrence` on create, or on a task without one): permission (theirs or
+ * their department's, else `registry`), the rule, its first occurrence (whose client must be active then).
+ * Returns the occurrence columns the task takes.
+ */
+async function startSeries(ctx: TaskContext, fields: SeriesFields, input: TaskRecurrenceRule, fallbackStart: string) {
+  await assertCanManageSeries(ctx, fields);
+  const rule = seriesRule(ctx, input, fallbackStart);
+  const first = firstOccurrenceOf(rule);
+  await assertClientActiveIn(ctx, fields.clientId, first.competence);
+  const id = await insertSeries(ctx, fields, rule);
+  return { id, occurrence: occurrenceColumns(id, first, fields.assigneeId) };
+}
+
+/** The fields of a task as its series takes them (the description decrypted). */
+async function seriesFieldsOf(ctx: TaskContext, row: TaskRow): Promise<SeriesFields> {
+  return {
+    title: row.title,
+    description: await decryptTaskText(ctx.cipher, TASK_DESCRIPTION, row.description),
+    clientId: row.clientId,
+    categoryId: row.categoryId,
+    assigneeId: row.assigneeId,
+    departmentId: row.departmentId,
+    priority: row.priority,
+    startTime: row.startTime,
+    endTime: row.endTime,
+  };
+}
+
+/** A standalone task gets a recurrence: it becomes the first occurrence of a new series. */
+async function convertToSeries(ctx: TaskContext, id: string, input: TaskRecurrenceRule): Promise<void> {
+  const [step] = await ctx.db
+    .select({ id: taskFlowSteps.id })
+    .from(taskFlowSteps)
+    .where(and(eq(taskFlowSteps.workspaceId, ctx.workspaceId), eq(taskFlowSteps.taskId, id)))
+    .limit(1);
+  if (step) throw new ValidationError('Etapas de processo não se repetem.');
+  const row = await getTaskRowOrThrow(ctx, id);
+  const series = await startSeries(ctx, await seriesFieldsOf(ctx, row), input, row.dueDate ?? ctx.today);
+  await ctx.db.update(tasks).set(series.occurrence).where(taskKey(ctx, id));
+  const changes: TaskFieldChange[] =
+    row.dueDate !== series.occurrence.dueDate ? [{ field: 'dueDate', from: row.dueDate, to: series.occurrence.dueDate }] : [];
+  await recordEvent(ctx, { taskId: id, kind: 'updated', data: { fields: ['recurrence'], changes } });
+  await generateSeries(ctx, series.id);
+}
+
+/**
+ * Series edit from one of its occurrences (`applyTo: 'series'`, a new `recurrence`, or `recurrence: null`
+ * to end it here): the series takes the fields sent, this occurrence takes them at once, and the
+ * not-started ones from the current competence on follow (`syncOpenOccurrences`). Dates come from the rule.
+ */
+async function updateSeriesFromTask(ctx: TaskContext, current: TaskRow, patch: TaskPatch): Promise<TaskDetail> {
+  const dates = (['startDate', 'dueDate'] as const).filter((k) => patch[k] !== undefined);
+  if (dates.length > 0) throw new ValidationError('As datas vêm da recorrência: altere a regra.', { fields: dates });
+  const series = await loadTaskSeries(ctx, current.recurringTaskId!);
+  const def = series.row;
+  await assertCanManageSeries(ctx, { assigneeId: def.defaultAssigneeId, departmentId: def.departmentId });
+  await assertRefs(ctx, {
+    clientId: patch.clientId !== undefined ? patch.clientId : undefined,
+    categoryId: patch.categoryId !== undefined ? patch.categoryId : undefined,
+    assigneeId: patch.assigneeId !== undefined ? patch.assigneeId : undefined,
+  });
+  const pick = <K extends keyof TaskPatch, V>(key: K, fallback: V) => (patch[key] !== undefined ? (patch[key] as V) : fallback);
+  const assigneeId = pick('assigneeId', def.defaultAssigneeId);
+  const fields: SeriesFields = {
+    title: pick('title', def.name),
+    description: patch.description !== undefined ? patch.description : await decryptTaskText(ctx.cipher, RECURRING_DESCRIPTION, def.description),
+    clientId: pick('clientId', def.internal ? null : ([...series.included][0] ?? null)),
+    categoryId: pick('categoryId', def.categoryId),
+    assigneeId,
+    departmentId: await resolveTaskDepartment(ctx, assigneeId, pick('departmentId', def.departmentId)),
+    priority: pick('priority', def.priority),
+    startTime: pick('startTime', def.startTime),
+    endTime: pick('endTime', def.endTime),
+  };
+  assertDates({ startDate: null, dueDate: current.dueDate, startTime: fields.startTime, endTime: fields.endTime });
+  // Handing the series to someone outside your reach is like creating it there.
+  await assertCanManageSeries(ctx, fields);
+  const previous = storedRule(def);
+  let rule: SeriesRule = previous;
+  if (patch.recurrence) rule = seriesRule(ctx, patch.recurrence, previous.startDate, previous.startDate);
+  if (patch.recurrence === null) rule = endedAt(previous, current);
+  const clientChanged = fields.clientId !== (def.internal ? null : ([...series.included][0] ?? null));
+  if (clientChanged) await assertClientActiveIn(ctx, fields.clientId, current.competence!);
+
+  await updateSeries(ctx, def.id, fields, rule);
+  if (clientChanged) await moveSeriesClient(ctx, def.id, current.id, fields.clientId);
+  // This occurrence takes the series' fields whatever its state (the others follow if not started).
+  await ctx.db
+    .update(tasks)
+    .set({
+      title: fields.title,
+      description: await encryptTaskText(ctx.cipher, TASK_DESCRIPTION, fields.description),
+      categoryId: fields.categoryId,
+      assigneeId: fields.assigneeId,
+      assigneeSource: fields.assigneeId ? 'default' : null,
+      departmentId: fields.departmentId,
+      priority: fields.priority,
+      startTime: fields.startTime,
+      endTime: fields.endTime,
+    })
+    .where(taskKey(ctx, current.id));
+  if (patch.recurrence) await rekeyOccurrence(ctx, await getTaskRowOrThrow(ctx, current.id), rule);
+  await syncOpenOccurrences(ctx, def.id);
+
+  const sent = (Object.keys(patch) as (keyof TaskPatch)[]).filter((k) => k !== 'applyTo' && k !== 'assigneeId' && k !== 'departmentId');
+  const events: EventInput[] = [];
+  if (patch.assigneeId !== undefined && patch.assigneeId !== current.assigneeId) {
+    events.push({ taskId: current.id, kind: 'assigned', data: { fromAssignee: personOf(ctx, current.assigneeId), toAssignee: personOf(ctx, patch.assigneeId) } });
+  }
+  if (sent.length > 0) {
+    const { recurrence: _r, applyTo: _a, ...plain } = patch;
+    events.push({ taskId: current.id, kind: 'updated', data: { fields: sent, changes: await fieldChanges(ctx, current, plain) } });
+  }
+  for (const e of events) await recordEvent(ctx, e);
+  return getTaskDetail(ctx, current.id);
 }
 
 /**
@@ -560,14 +728,23 @@ export async function createTask(ctx: TaskContext, input: TaskInput): Promise<Ta
 export async function updateTask(
   ctx: TaskContext,
   id: string,
-  patch: TaskPatch,
+  { recurrence, applyTo, ...patch }: TaskPatch,
 ): Promise<TaskDetail> {
   const current = await getTaskRowOrThrow(ctx, id);
+  if (current.occurrenceOrigin === 'registry' && (recurrence !== undefined || applyTo === 'series'))
+    throw new ValidationError(REGISTRY_SERIES_MESSAGE);
+  if (current.occurrenceOrigin === 'task' && (applyTo === 'series' || recurrence !== undefined))
+    return updateSeriesFromTask(ctx, current, recurrence !== undefined ? { ...patch, recurrence } : patch);
   const sent = Object.keys(patch) as (keyof TaskPatch)[];
   if (current.recurringTaskId) {
     const locked = sent.filter((k) => (OCCURRENCE_LOCKED as string[]).includes(k));
     if (locked.length > 0)
-      throw new ValidationError('Este campo vem da tarefa recorrente; altere o cadastro da recorrente.', { fields: locked });
+      throw new ValidationError(
+        current.occurrenceOrigin === 'task'
+          ? 'Este campo vem da recorrência: altere esta e as próximas (applyTo: series).'
+          : 'Este campo vem da tarefa recorrente; altere o cadastro da recorrente.',
+        { fields: locked },
+      );
   }
   const merged = { ...current, ...patch };
   assertDates(merged);
@@ -597,12 +774,14 @@ export async function updateTask(
       taskId: id,
       kind: 'assigned',
       data: { fromAssignee: personOf(ctx, current.assigneeId), toAssignee: personOf(ctx, patch.assigneeId) },
-      note: current.recurringTaskId ? 'Atribuída só nesta competência' : null,
+      note: current.occurrenceOrigin === 'task' ? 'Atribuída só nesta ocorrência' : current.recurringTaskId ? 'Atribuída só nesta competência' : null,
     });
   }
   const fields = sent.filter((k) => k !== 'assigneeId' && k !== 'departmentId');
   if (fields.length > 0) events.push({ taskId: id, kind: 'updated', data: { fields, changes: await fieldChanges(ctx, current, patch) } });
   for (const e of events) await recordEvent(ctx, e);
+  // A task without recurrence that gets one becomes the first occurrence of a new series.
+  if (!current.recurringTaskId && recurrence) await convertToSeries(ctx, id, recurrence);
   return getTaskDetail(ctx, id);
 }
 
@@ -623,7 +802,8 @@ export async function changeTaskStatus(
   let activated: string | null = null;
   if (current.status !== status) {
     const leavingConclusion = current.status === 'done';
-    if (leavingConclusion && current.recurringTaskId) {
+    // The audit record of the registry's occurrences; a task's recurrence reopens like any task.
+    if (leavingConclusion && current.occurrenceOrigin === 'registry') {
       if (!canReopenOccurrence(ctx, current))
         throw new ForbiddenError('Só quem concluiu ou um administrador pode reabrir esta tarefa.');
       const undo =
@@ -660,6 +840,8 @@ export async function changeTaskStatus(
  */
 export async function deleteTask(ctx: TaskContext, id: string): Promise<void> {
   const row = await getTaskRowOrThrow(ctx, id);
+  // A task's recurrence: the whole series, while nobody worked on it (else 409).
+  if (row.occurrenceOrigin === 'task') return deleteTaskSeries(ctx, row.recurringTaskId!);
   if (row.recurringTaskId)
     throw new ConflictError(
       'Ocorrências de tarefas recorrentes não são excluídas: cancele a ocorrência ou ajuste o cadastro da recorrente (exceções, encerramento).',

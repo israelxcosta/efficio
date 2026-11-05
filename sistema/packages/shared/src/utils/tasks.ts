@@ -4,6 +4,7 @@
 // occurrence.
 
 import {
+  MAX_RECURRENCE_COUNT,
   OPEN_TASK_STATUSES,
   RECURRENCE_PERIOD_MONTHS,
   TASK_TIME_ZONE,
@@ -11,7 +12,8 @@ import {
   type OccurrenceSituation,
   type OccurrenceStatus,
   type OpenTaskStatus,
-  type RecurrencePeriod,
+  type RecurrenceFrequency,
+  type RecurrenceNonBusinessDayRule,
   type TaskDueBucket,
   type TaskStatus,
 } from '../constants';
@@ -197,27 +199,41 @@ export function adjustToBusinessDay(
 // ---------------------------------------------------------------------------
 
 export interface RecurringSchedule {
-  period: RecurrencePeriod;
+  /** Registry periods plus `daily` (tasks' recurrence). */
+  period: RecurrenceFrequency;
   /**
    * Legal deadline: day of the month (1–31; a day the month lacks becomes its last day) or, for weekly
-   * tasks, the ISO weekday (1 = Monday … 7 = Sunday).
+   * tasks of the registry, the ISO weekday (1 = Monday … 7 = Sunday). Ignored by daily recurrences.
    */
   dueDay: number;
   /** Anchor month (1–12) of bimonthly, quarterly, semiannual and annual tasks; null otherwise. */
   dueMonth: number | null;
   /** Internal target ("meta interna"): this many calendar days before the legal deadline (0 = the deadline itself). */
   targetDaysBefore: number;
-  nonBusinessDayRule: NonBusinessDayRule;
-  /** Months between the competence and the reference month (0 = same, 1 = previous…); weekly: 0. */
+  /** `skip` (tasks' daily and weekly recurrences): no occurrence on a non-business day. */
+  nonBusinessDayRule: RecurrenceNonBusinessDayRule;
+  /** Months between the competence and the reference month (0 = same, 1 = previous…); daily and weekly: 0. */
   referenceOffset: number;
+  /** Every N days (daily), weeks (weekly) or months (monthly), counted from `startDate` (1 = every one). */
+  interval?: number;
+  /**
+   * Weekly recurrence of a task: its ISO weekdays, one occurrence each, identified by the date. Absent
+   * (the registry): one occurrence per week on `dueDay`, identified by the Monday of the week.
+   */
+  weekdays?: readonly number[] | null;
+  /** No occurrence with a nominal date before it (tasks' recurrences); also the anchor of `interval`. */
+  startDate?: ISODate | null;
+  /** No occurrence with a nominal date after it (inclusive). */
+  endDate?: ISODate | null;
 }
 
 const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 /**
- * Months (1–12) in which the task has occurrences: every month for weekly and monthly tasks; the anchor
- * month and every 2, 3, 6 months from it for bimonthly, quarterly and semiannual ones (anchor 1,
- * quarterly → jan, apr, jul, oct); the anchor month for annual ones.
+ * Months (1–12) in which the task has occurrences: every month for daily, weekly and monthly tasks; the
+ * anchor month and every 2, 3, 6 months from it for bimonthly, quarterly and semiannual ones (anchor 1,
+ * quarterly → jan, apr, jul, oct); the anchor month for annual ones. A monthly recurrence "every N
+ * months" depends on the year too: see `occursInCompetence`.
  */
 export function recurringMonths(schedule: Pick<RecurringSchedule, 'period' | 'dueMonth'>): number[] {
   const step = RECURRENCE_PERIOD_MONTHS[schedule.period];
@@ -226,10 +242,22 @@ export function recurringMonths(schedule: Pick<RecurringSchedule, 'period' | 'du
   return ALL_MONTHS.filter((m) => (((m - anchor) % step) + step) % step === 0);
 }
 
+const mod = (n: number, m: number) => ((n % m) + m) % m;
+
+/** Months from `a` to `b` (negative when `b` is earlier). */
+function monthsBetween(a: MonthKey, b: MonthKey): number {
+  return (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + Number(b.slice(5, 7)) - Number(a.slice(5, 7));
+}
+
 export function occursInCompetence(
-  schedule: Pick<RecurringSchedule, 'period' | 'dueMonth'>,
+  schedule: Pick<RecurringSchedule, 'period' | 'dueMonth' | 'interval' | 'startDate'>,
   competence: MonthKey,
 ): boolean {
+  const interval = schedule.interval ?? 1;
+  if (schedule.period === 'monthly' && interval > 1 && schedule.startDate) {
+    const diff = monthsBetween(monthKey(schedule.startDate), competence);
+    return diff >= 0 && diff % interval === 0;
+  }
   return recurringMonths(schedule).includes(Number(competence.slice(5, 7)));
 }
 
@@ -247,10 +275,12 @@ export interface OccurrenceDates {
  */
 export function deadlinesFrom(
   nominal: ISODate,
-  schedule: Pick<RecurringSchedule, 'targetDaysBefore' | 'nonBusinessDayRule'>,
+  schedule: Pick<RecurringSchedule, 'targetDaysBefore'> & { nonBusinessDayRule: RecurrenceNonBusinessDayRule },
   holidays: HolidayCalendar = NATIONAL_HOLIDAYS,
 ): OccurrenceDates {
-  const legalDueDate = adjustToBusinessDay(nominal, schedule.nonBusinessDayRule, holidays);
+  // `skip` never reaches a non-business day (the occurrence does not exist): nothing to move.
+  const rule: NonBusinessDayRule = schedule.nonBusinessDayRule === 'skip' ? 'keep' : schedule.nonBusinessDayRule;
+  const legalDueDate = adjustToBusinessDay(nominal, rule, holidays);
   const targetDate =
     schedule.targetDaysBefore > 0
       ? adjustToBusinessDay(addDays(legalDueDate, -schedule.targetDaysBefore), 'anticipate', holidays)
@@ -260,7 +290,10 @@ export function deadlinesFrom(
 
 /** One occurrence of a recurring task (per client, the API adds the client). */
 export interface ScheduledOccurrence extends OccurrenceDates {
-  /** Identity inside the recurring task: the competence, or the Monday of the week for weekly tasks. */
+  /**
+   * Identity inside the recurring task: the competence (monthly and longer), the Monday of the week
+   * (the registry's weekly) or the date itself (daily, and weekly on chosen weekdays).
+   */
   periodKey: string;
   /** Month the (nominal) legal deadline falls in: the column of the monthly audit. */
   competence: MonthKey;
@@ -274,10 +307,17 @@ export interface ScheduledOccurrence extends OccurrenceDates {
 
 const isoWeekday = (date: ISODate) => dayOfWeek(date) || 7;
 
+/** Occurrences identified by their date (daily, weekly on chosen weekdays) rather than by a period. */
+export function isDateKeyedSchedule(schedule: Pick<RecurringSchedule, 'period' | 'weekdays'>): boolean {
+  return schedule.period === 'daily' || (schedule.period === 'weekly' && Boolean(schedule.weekdays?.length));
+}
+
 /**
  * Occurrences of a recurring task in a competence: none, one (monthly and longer periods: the due day
- * of that month, 31 → last day of short months) or one per week (weekly: the weeks whose deadline
- * weekday falls in the month).
+ * of that month, 31 → last day of short months; every N months from the start month), one per week
+ * (the registry's weekly: the weeks whose deadline weekday falls in the month), one per chosen weekday
+ * (every N weeks from the week of the start) or one per day (daily: every N days from the start). Only
+ * nominal dates between `startDate` and `endDate`; `skip` drops those on non-business days.
  */
 export function occurrencesInCompetence(
   schedule: RecurringSchedule,
@@ -293,24 +333,87 @@ export function occurrencesInCompetence(
     holiday: nationalHolidayName(nominal),
     ...deadlinesFrom(nominal, schedule, holidays),
   });
-  if (schedule.period === 'weekly') {
+  const kept = (nominal: ISODate) =>
+    (!schedule.startDate || nominal >= schedule.startDate) &&
+    (!schedule.endDate || nominal <= schedule.endDate) &&
+    (schedule.nonBusinessDayRule !== 'skip' || isBusinessDay(nominal, holidays));
+  const interval = Math.max(1, schedule.interval ?? 1);
+  const { from, to } = monthRange(competence);
+  if (schedule.period === 'daily') {
     const out: ScheduledOccurrence[] = [];
-    const { from, to } = monthRange(competence);
     for (let d = from; d <= to; d = addDays(d, 1)) {
-      if (isoWeekday(d) !== schedule.dueDay) continue;
-      out.push(build(addDays(d, -(schedule.dueDay - 1)), d, competence));
+      if (interval > 1 && schedule.startDate && mod(diffInDays(d, schedule.startDate), interval) !== 0) continue;
+      if (kept(d)) out.push(build(d, d, competence));
+    }
+    return out;
+  }
+  if (schedule.period === 'weekly') {
+    const weekdays = schedule.weekdays?.length ? schedule.weekdays : null;
+    const anchor = schedule.startDate ? addDays(schedule.startDate, -(isoWeekday(schedule.startDate) - 1)) : null;
+    const out: ScheduledOccurrence[] = [];
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+      const weekday = isoWeekday(d);
+      if (weekdays ? !weekdays.includes(weekday) : weekday !== schedule.dueDay) continue;
+      const monday = addDays(d, -(weekday - 1));
+      if (interval > 1 && anchor && mod(diffInDays(monday, anchor) / 7, interval) !== 0) continue;
+      if (kept(d)) out.push(build(weekdays ? d : monday, d, competence));
     }
     return out;
   }
   if (!occursInCompetence(schedule, competence)) return [];
   const nominal = toISODate(year, month, Math.min(schedule.dueDay, daysInMonth(year, month)));
+  if (!kept(nominal)) return [];
   return [build(competence, nominal, addMonthKey(competence, -schedule.referenceOffset))];
 }
 
-/** The competence of a period key (weekly: the month of the deadline weekday of that week). */
-export function competenceOfPeriod(schedule: Pick<RecurringSchedule, 'period' | 'dueDay'>, periodKey: string): MonthKey {
+/**
+ * The competence of a period key: the key itself (`YYYY-MM`), the month of the date (date-keyed
+ * schedules) or, for the registry's weekly, the month of the deadline weekday of that week.
+ */
+export function competenceOfPeriod(schedule: Pick<RecurringSchedule, 'period' | 'dueDay' | 'weekdays'>, periodKey: string): MonthKey {
   if (periodKey.length === 7) return periodKey;
-  return monthKey(addDays(periodKey, schedule.period === 'weekly' ? schedule.dueDay - 1 : 0));
+  const byMonday = schedule.period === 'weekly' && !schedule.weekdays?.length;
+  return monthKey(addDays(periodKey, byMonday ? schedule.dueDay - 1 : 0));
+}
+
+/** Last month any schedule is followed to (the contract's MAX_YEAR). */
+const LAST_COMPETENCE = '2199-12';
+
+/**
+ * First occurrence of a series (nominal date on or after `startDate`), looking up to 10 years ahead;
+ * null without `startDate` or when the series ends before having one.
+ */
+export function firstScheduledOccurrence(
+  schedule: RecurringSchedule,
+  holidays: HolidayCalendar = NATIONAL_HOLIDAYS,
+): ScheduledOccurrence | null {
+  if (!schedule.startDate) return null;
+  const last = schedule.endDate ? monthKey(schedule.endDate) : LAST_COMPETENCE;
+  for (let m = monthKey(schedule.startDate), guard = 0; guard < 120 && m <= last; m = addMonthKey(m, 1), guard++) {
+    const [first] = occurrencesInCompetence(schedule, m, holidays);
+    if (first) return first;
+  }
+  return null;
+}
+
+/**
+ * Nominal date of the `count`-th occurrence from `startDate` ("após N vezes" becomes this end date),
+ * or null when the series ends (or the calendar runs out) before reaching it.
+ */
+export function seriesEndDate(
+  schedule: RecurringSchedule,
+  count: number,
+  holidays: HolidayCalendar = NATIONAL_HOLIDAYS,
+): ISODate | null {
+  if (!schedule.startDate || count < 1 || count > MAX_RECURRENCE_COUNT) return null;
+  const last = schedule.endDate ? monthKey(schedule.endDate) : LAST_COMPETENCE;
+  let seen = 0;
+  for (let m = monthKey(schedule.startDate); m <= last; m = addMonthKey(m, 1)) {
+    const list = occurrencesInCompetence(schedule, m, holidays);
+    if (seen + list.length >= count) return list[count - seen - 1]!.nominalDate;
+    seen += list.length;
+  }
+  return null;
 }
 
 /** The next `count` occurrences from a competence on (the registry's preview). */

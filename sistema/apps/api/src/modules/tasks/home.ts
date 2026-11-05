@@ -5,7 +5,9 @@
 // Units are tasks and recurring occurrences (one per client): the open ones (whatever the due date)
 // plus those due, concluded or canceled in the month. "Minhas tarefas" is everything open assigned to
 // you in any department (occurrences aggregated per recurring task), and "Obrigações da competência" is
-// the progress of the recurring tasks of the department in the month (spec §6.5).
+// the progress of the recurring tasks of the department in the month (spec §6.5). Tasks' recurrences
+// (migration 0019) count like occurrences in the totals, show as tasks in "Minhas" and stay out of the
+// obligations (the registry's only).
 
 import { and, asc, eq, gte, lte, or, sql, type SQL } from 'drizzle-orm';
 import {
@@ -32,12 +34,15 @@ import {
   bucketSql,
   CLOSED_SQL,
   COMPLETED_DAY,
+  AGGREGATED_SQL,
   NOT_OCCURRENCE_SQL,
   OCCURRENCE_SQL,
   OPEN_SQL,
   overdueRef,
   priorityRank,
+  ROW_SQL,
   selectTasks,
+  visibleSeriesSql,
   WORK_DATE,
 } from './task-rows';
 
@@ -126,7 +131,8 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
   const outcomes = outcomeCounts(t);
   const targetMissed = sql`${OPEN_SQL} and ${bucketSql('targetMissed', t)}`;
   // My open items in any department: counted in SQL; the first tasks loaded (occurrences aggregated).
-  const mineOpen = and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.assigneeId, ctx.userId), OPEN_SQL, horizon);
+  // A task's recurrence counts its next 7 days and its next open occurrence (like the list).
+  const mineOpen = and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.assigneeId, ctx.userId), OPEN_SQL, horizon, visibleSeriesSql(t));
 
   const [[totals], perStatus, perAssignee, perClient, [oldest], mine, [mineTotals], mineOccurrences, obligations] =
     await Promise.all([
@@ -171,7 +177,7 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
         orderBy: [asc(tasks.dueDate), sql`${priorityRank}`],
         limit: 1,
       }),
-      selectTasks(ctx, { where: and(mineOpen, NOT_OCCURRENCE_SQL), limit: MINE_LIMIT }),
+      selectTasks(ctx, { where: and(mineOpen, ROW_SQL), limit: MINE_LIMIT }),
       ctx.db
         .select({
           open: sql<number>`count(*)`.mapWith(Number),
@@ -234,7 +240,7 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
   const [obligationOverdue] = await ctx.db
     .select({ n: count(sql`${OPEN_SQL} and ${tasks.dueDate} < ${t}`) })
     .from(tasks)
-    .where(and(eq(tasks.workspaceId, ctx.workspaceId), OCCURRENCE_SQL, scope, eq(tasks.competence, month)));
+    .where(and(eq(tasks.workspaceId, ctx.workspaceId), AGGREGATED_SQL, scope, eq(tasks.competence, month)));
 
   return {
     today: t,

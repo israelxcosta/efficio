@@ -466,14 +466,75 @@ export const RECURRENCE_PERIOD_LABELS: Record<RecurrencePeriod, string> = {
   annual: 'Anual',
 };
 
-/** Months between two occurrences (weekly: every month has occurrences). */
-export const RECURRENCE_PERIOD_MONTHS: Record<RecurrencePeriod, number> = {
+/** Months between two occurrences (daily and weekly: every month has occurrences). */
+export const RECURRENCE_PERIOD_MONTHS: Record<RecurrenceFrequency, number> = {
+  daily: 1,
   weekly: 1,
   monthly: 1,
   bimonthly: 2,
   quarterly: 3,
   semiannual: 6,
   annual: 12,
+};
+
+/**
+ * Frequencies of a task's recurrence (`recurrence` on POST/PATCH /tasks): the registry's six plus
+ * daily. A task with recurrence is a recurring task of origin `task` (one client, or internal) whose
+ * occurrences are listed as tasks. The registry (`/tasks/recurring`) keeps `RECURRENCE_PERIODS`.
+ */
+export const RECURRENCE_FREQUENCIES = ['daily', ...RECURRENCE_PERIODS] as const;
+export type RecurrenceFrequency = (typeof RECURRENCE_FREQUENCIES)[number];
+
+export const RECURRENCE_FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
+  daily: 'Diária',
+  ...RECURRENCE_PERIOD_LABELS,
+};
+
+/** Unit of "a cada N" (`interval`): only daily, weekly and monthly recurrences take it. */
+export const RECURRENCE_INTERVAL_UNITS: Partial<Record<RecurrenceFrequency, { one: string; many: string }>> = {
+  daily: { one: 'dia', many: 'dias' },
+  weekly: { one: 'semana', many: 'semanas' },
+  monthly: { one: 'mês', many: 'meses' },
+};
+export const MAX_RECURRENCE_INTERVAL = 99;
+
+/** How a task's recurrence ends: never, on a date (inclusive) or after N occurrences. */
+export const RECURRENCE_ENDS = ['never', 'date', 'count'] as const;
+export type RecurrenceEnd = (typeof RECURRENCE_ENDS)[number];
+
+export const RECURRENCE_END_LABELS: Record<RecurrenceEnd, string> = {
+  never: 'Nunca',
+  date: 'Em uma data',
+  count: 'Após um número de vezes',
+};
+/** "Após N vezes": at most this many occurrences (counted from the start by the current rule). */
+export const MAX_RECURRENCE_COUNT = 500;
+
+/**
+ * Where a recurring task comes from: the registry ("Recorrentes": regimes, several clients, groups;
+ * `registry` permission; per-client occurrences, aggregated and audited) or a task with recurrence
+ * (one client or internal; every member for their own tasks or their department's; occurrences
+ * listed as tasks, out of the monthly audit).
+ */
+export const RECURRENCE_ORIGINS = ['registry', 'task'] as const;
+export type RecurrenceOrigin = (typeof RECURRENCE_ORIGINS)[number];
+
+export const RECURRENCE_ORIGIN_LABELS: Record<RecurrenceOrigin, string> = {
+  registry: 'Cadastro de recorrentes',
+  task: 'Recorrência da tarefa',
+};
+
+/**
+ * PATCH /tasks/:id on an occurrence of a task's recurrence: only this occurrence (default; like any
+ * occurrence: description, priority, responsible) or the series ("esta e as próximas": title,
+ * client, category, responsible, priority, description, time and the rule).
+ */
+export const TASK_RECURRENCE_APPLY_TO = ['occurrence', 'series'] as const;
+export type TaskRecurrenceApplyTo = (typeof TASK_RECURRENCE_APPLY_TO)[number];
+
+export const TASK_RECURRENCE_APPLY_TO_LABELS: Record<TaskRecurrenceApplyTo, string> = {
+  occurrence: 'Só esta ocorrência',
+  series: 'Esta e as próximas',
 };
 
 /** Weekdays of a weekly legal deadline (ISO: 1 = Monday … 7 = Sunday). */
@@ -498,6 +559,18 @@ export const NON_BUSINESS_DAY_RULE_LABELS: Record<NonBusinessDayRule, string> = 
   anticipate: 'Antecipar para o dia útil anterior',
   postpone: 'Postergar para o próximo dia útil',
   keep: 'Manter a data',
+};
+
+/**
+ * Rules of a task's recurrence: the registry's three plus `skip` (no occurrence on a weekend or
+ * national holiday), only for daily and weekly recurrences (their default).
+ */
+export const RECURRENCE_NON_BUSINESS_DAY_RULES = [...NON_BUSINESS_DAY_RULES, 'skip'] as const;
+export type RecurrenceNonBusinessDayRule = (typeof RECURRENCE_NON_BUSINESS_DAY_RULES)[number];
+
+export const RECURRENCE_NON_BUSINESS_DAY_RULE_LABELS: Record<RecurrenceNonBusinessDayRule, string> = {
+  ...NON_BUSINESS_DAY_RULE_LABELS,
+  skip: 'Pular (sem ocorrência no dia não útil)',
 };
 
 /**
@@ -626,6 +699,33 @@ export const MAX_WORKSPACE_ATTACHMENT_BYTES = 2 * 1024 * 1024 * 1024;
 
 /** Office time zone: "today" and the day something was concluded are taken here (deadlines are calendar dates). */
 export const TASK_TIME_ZONE = 'America/Sao_Paulo';
+
+/**
+ * Insights of the personal area (`GET /tasks/me/overview`), computed by the server from your own
+ * numbers and the department's aggregate. `tone` drives the color; `text` is ready to show (pt-BR).
+ */
+export const TASK_INSIGHT_KEYS = [
+  'overdue',
+  'dueToday',
+  'dueTomorrow',
+  'targetMissed',
+  'waitingClient',
+  'onTimeRate',
+  'rateTrend',
+  'department',
+  'busiestWeekday',
+  'allClear',
+] as const;
+export type TaskInsightKey = (typeof TASK_INSIGHT_KEYS)[number];
+
+export const TASK_INSIGHT_TONES = ['danger', 'warning', 'success', 'info'] as const;
+export type TaskInsightTone = (typeof TASK_INSIGHT_TONES)[number];
+
+/**
+ * The comparison with the department needs this many members: with fewer, the average would reveal
+ * a colleague's own numbers (the personal area never shows anyone else's).
+ */
+export const MIN_DEPARTMENT_COMPARISON_MEMBERS = 3;
 
 // ---------------------------------------------------------------------------
 // Phase 3: clients' documents and accesses, unions (sindicatos), office and contract

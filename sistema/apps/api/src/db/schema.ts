@@ -41,14 +41,15 @@ import type {
   OpenFinanceProvider,
   OpenTaskStatus,
   PaymentMethod,
-  NonBusinessDayRule,
   PermissionOverrides,
   PixKeyType,
   PlanCode,
   ProfilePhotoContentType,
   OfficeImageContentType,
+  RecurrenceFrequency,
   RecurrenceKind,
-  RecurrencePeriod,
+  RecurrenceNonBusinessDayRule,
+  RecurrenceOrigin,
   SimplesAnnex,
   SubscriptionStatus,
   TaskAttachmentType,
@@ -1211,16 +1212,37 @@ export const recurringTasks = pgTable(
     categoryId: uuid(),
     /** Default responsible of every occurrence (none: the department's queue). */
     defaultAssigneeId: uuid(),
-    period: text().$type<RecurrencePeriod>().notNull().default('monthly'),
-    /** Day of the month (1–31) or, weekly, the ISO weekday (1 = Monday). */
+    /** `daily` only for tasks' recurrences (migration 0019). */
+    period: text().$type<RecurrenceFrequency>().notNull().default('monthly'),
+    /** Day of the month (1–31) or, weekly, the ISO weekday (1 = Monday); daily: 1 (unused). */
     dueDay: integer().notNull(),
     dueMonth: integer(),
     targetDaysBefore: integer().notNull().default(0),
-    nonBusinessDayRule: text().$type<NonBusinessDayRule>().notNull().default('anticipate'),
+    /** `skip` only for tasks' daily and weekly recurrences (migration 0019). */
+    nonBusinessDayRule: text().$type<RecurrenceNonBusinessDayRule>().notNull().default('anticipate'),
     referenceOffset: integer().notNull().default(1),
     regimes: text().array().$type<TaxRegime[]>().notNull().default(sql`'{}'::text[]`),
     startCompetence: text().$type<MonthKey>().notNull(),
     endCompetence: text().$type<MonthKey>(),
+    // Migration 0019: recurrence of any task ("tarefa com recorrência"), on the same engine.
+    /** `registry` (the "Recorrentes" registry) or `task` (a task's recurrence: one client, or internal). Never changes. */
+    origin: text().$type<RecurrenceOrigin>().notNull().default('registry'),
+    /** Occurrences without a client (a task's internal recurrence): one per period. */
+    internal: boolean().notNull().default(false),
+    /** Every N days/weeks/months, counted from `start_date` (`interval` in the contract). */
+    repeatInterval: integer().notNull().default(1),
+    /** Weekly recurrence of a task: ISO weekdays, one occurrence each (period key = the date). */
+    weekdays: integer().array().$type<number[]>(),
+    /** First possible nominal date (tasks' recurrences) and anchor of `repeat_interval`. */
+    startDate: calendarDate(),
+    /** Last possible nominal date, inclusive (the chosen date, or computed from `occurrence_limit`). */
+    endDate: calendarDate(),
+    /** "Após N vezes" as chosen (the end date is computed from it). */
+    occurrenceLimit: integer(),
+    /** Priority and appointment time of the generated occurrences (tasks' recurrences). */
+    priority: text().$type<TaskPriority>().notNull().default('medium'),
+    startTime: text(),
+    endTime: text(),
     /**
      * Key of the regime-group catalog item it was created from (`REGIME_GROUP_ITEMS`, migration 0018):
      * applying a group again finds it instead of creating a twin. Null for recurring tasks made by hand.
@@ -1233,6 +1255,8 @@ export const recurringTasks = pgTable(
   },
   (t) => [
     tenantUnique('recurring_tasks', t),
+    // Migration 0019: target of `tasks_recurring_origin_fk` (an occurrence carries its series' origin).
+    unique('recurring_tasks_workspace_id_id_origin_uq').on(t.workspaceId, t.id, t.origin),
     uniqueIndex('recurring_tasks_catalog_key_uq').on(t.workspaceId, t.catalogKey).where(sql`${t.catalogKey} is not null`),
     check('recurring_tasks_catalog_key_chk', sql`${t.catalogKey} is null or ${t.catalogKey} ~ '^[a-z0-9_]{1,60}$'`),
     index('recurring_tasks_department_idx').on(t.workspaceId, t.departmentId),
@@ -1242,11 +1266,26 @@ export const recurringTasks = pgTable(
     check('recurring_tasks_name_chk', sql`length(${t.name}) between 1 and 200`),
     check('recurring_tasks_created_by_name_chk', sql`length(${t.createdByName}) between 1 and 120`),
     encryptedCheck('recurring_tasks_description_chk', t.description, ENCRYPTED_TEXT_MAX),
-    check('recurring_tasks_period_chk', sql`${t.period} in ('weekly', 'monthly', 'bimonthly', 'quarterly', 'semiannual', 'annual')`),
-    check('recurring_tasks_rule_chk', sql`${t.nonBusinessDayRule} in ('anticipate', 'postpone', 'keep')`),
+    check('recurring_tasks_period_chk', sql`${t.period} in ('daily', 'weekly', 'monthly', 'bimonthly', 'quarterly', 'semiannual', 'annual')`),
+    check('recurring_tasks_rule_chk', sql`${t.nonBusinessDayRule} in ('anticipate', 'postpone', 'keep', 'skip')`),
     check(
       'recurring_tasks_schedule_chk',
-      sql`(${t.period} = 'weekly' and ${t.dueDay} between 1 and 7 and ${t.dueMonth} is null and ${t.targetDaysBefore} between 0 and 6 and ${t.referenceOffset} = 0) or (${t.period} = 'monthly' and ${t.dueDay} between 1 and 31 and ${t.dueMonth} is null) or (${t.period} in ('bimonthly', 'quarterly', 'semiannual', 'annual') and ${t.dueDay} between 1 and 31 and ${t.dueMonth} is not null and ${t.dueMonth} between 1 and 12)`,
+      sql`(${t.period} = 'daily' and ${t.dueDay} = 1 and ${t.dueMonth} is null and ${t.targetDaysBefore} = 0 and ${t.referenceOffset} = 0 and ${t.startDate} is not null) or (${t.period} = 'weekly' and ${t.dueDay} between 1 and 7 and ${t.dueMonth} is null and ${t.targetDaysBefore} between 0 and 6 and ${t.referenceOffset} = 0) or (${t.period} = 'monthly' and ${t.dueDay} between 1 and 31 and ${t.dueMonth} is null) or (${t.period} in ('bimonthly', 'quarterly', 'semiannual', 'annual') and ${t.dueDay} between 1 and 31 and ${t.dueMonth} is not null and ${t.dueMonth} between 1 and 12)`,
+    ),
+    // Migration 0019: the rule of a task's recurrence ("a cada N", weekdays, skip, start/end, after N times).
+    check(
+      'recurring_tasks_recurrence_chk',
+      sql`${t.repeatInterval} between 1 and 99 and (${t.repeatInterval} = 1 or (${t.period} in ('daily', 'weekly', 'monthly') and ${t.startDate} is not null)) and (${t.weekdays} is null or (${t.period} = 'weekly' and cardinality(${t.weekdays}) between 1 and 7 and ${t.weekdays} <@ array[1, 2, 3, 4, 5, 6, 7])) and (${t.nonBusinessDayRule} <> 'skip' or ${t.period} = 'daily' or (${t.period} = 'weekly' and ${t.weekdays} is not null)) and (${t.endDate} is null or (${t.startDate} is not null and ${t.endDate} >= ${t.startDate})) and (${t.occurrenceLimit} is null or (${t.occurrenceLimit} between 1 and 500 and ${t.endDate} is not null))`,
+    ),
+    // Registry rows have none of the task-only features; tasks' recurrences have no regimes and a start.
+    check(
+      'recurring_tasks_origin_chk',
+      sql`(${t.origin} = 'registry' and not ${t.internal} and ${t.startDate} is null and ${t.endDate} is null and ${t.weekdays} is null and ${t.repeatInterval} = 1 and ${t.period} <> 'daily' and ${t.nonBusinessDayRule} <> 'skip') or (${t.origin} = 'task' and cardinality(${t.regimes}) = 0 and ${t.startDate} is not null)`,
+    ),
+    check('recurring_tasks_priority_chk', sql`${t.priority} in ('low', 'medium', 'high', 'urgent')`),
+    check(
+      'recurring_tasks_time_chk',
+      sql`(${t.startTime} is null or ${t.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') and (${t.endTime} is null or (${t.endTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' and ${t.startTime} is not null and ${t.endTime} > ${t.startTime}))`,
     ),
     check('recurring_tasks_target_chk', sql`${t.targetDaysBefore} between 0 and 30`),
     check('recurring_tasks_reference_chk', sql`${t.referenceOffset} between 0 and 12`),
@@ -1319,6 +1358,12 @@ export const tasks = pgTable(
     targetDate: calendarDate(),
     /** Where the responsible of an occurrence came from ('manual' = only this competence). */
     assigneeSource: text().$type<AssigneeSource>(),
+    /**
+     * Origin of the occurrence's recurring task (migration 0019; null for non-occurrences): `registry`
+     * occurrences are aggregated and audited, `task` ones are listed as tasks. Kept equal to the series'
+     * by `tasks_recurring_origin_fk`.
+     */
+    occurrenceOrigin: text().$type<RecurrenceOrigin>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1327,6 +1372,10 @@ export const tasks = pgTable(
     // Migration 0014: one occurrence per recurring task, client and period (the generation's ON
     // CONFLICT target; standalone tasks have nulls there and never conflict).
     unique('tasks_occurrence_uq').on(t.workspaceId, t.recurringTaskId, t.clientId, t.periodKey),
+    // Migration 0019: the same for internal occurrences (no client: NULLs never conflict above).
+    uniqueIndex('tasks_internal_occurrence_uq')
+      .on(t.workspaceId, t.recurringTaskId, t.periodKey)
+      .where(sql`${t.recurringTaskId} is not null and ${t.clientId} is null`),
     index('tasks_recurring_idx').on(t.workspaceId, t.recurringTaskId, t.competence),
     index('tasks_competence_idx').on(t.workspaceId, t.competence).where(sql`${t.recurringTaskId} is not null`),
     // Migration 0016: the calendar aggregates occurrences by target date (a range per request).
@@ -1336,7 +1385,7 @@ export const tasks = pgTable(
     index('tasks_completed_idx').on(t.workspaceId, t.completedAt).where(sql`${t.status} = 'done'`),
     check(
       'tasks_occurrence_chk',
-      sql`(${t.recurringTaskId} is null and ${t.competence} is null and ${t.periodKey} is null and ${t.referenceMonth} is null and ${t.targetDate} is null and ${t.assigneeSource} is null) or (${t.recurringTaskId} is not null and ${t.clientId} is not null and ${t.dueDate} is not null and ${t.targetDate} is not null and ${t.targetDate} <= ${t.dueDate} and ${t.competence} is not null and ${t.competence} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.referenceMonth} is not null and ${t.referenceMonth} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.periodKey} is not null and ${t.periodKey} ~ '^[0-9]{4}-(0[1-9]|1[0-2])(-[0-9]{2})?$' and (${t.assigneeSource} is null or ${t.assigneeSource} in ('manual', 'default')))`,
+      sql`(${t.recurringTaskId} is null and ${t.competence} is null and ${t.periodKey} is null and ${t.referenceMonth} is null and ${t.targetDate} is null and ${t.assigneeSource} is null and ${t.occurrenceOrigin} is null) or (${t.recurringTaskId} is not null and ${t.occurrenceOrigin} in ('registry', 'task') and (${t.clientId} is not null or ${t.occurrenceOrigin} = 'task') and ${t.dueDate} is not null and ${t.targetDate} is not null and ${t.targetDate} <= ${t.dueDate} and ${t.competence} is not null and ${t.competence} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.referenceMonth} is not null and ${t.referenceMonth} ~ ${sql.raw(MONTH_KEY_PATTERN)} and ${t.periodKey} is not null and ${t.periodKey} ~ '^[0-9]{4}-(0[1-9]|1[0-2])(-[0-9]{2})?$' and (${t.assigneeSource} is null or ${t.assigneeSource} in ('manual', 'default')))`,
     ),
     index('tasks_due_idx').on(t.workspaceId, t.dueDate),
     index('tasks_assignee_idx').on(t.workspaceId, t.assigneeId),
@@ -1398,6 +1447,11 @@ export const tasks = pgTable(
       name: 'tasks_recurring_fk',
       columns: [t.workspaceId, t.recurringTaskId],
       foreignColumns: [recurringTasks.workspaceId, recurringTasks.id],
+    }),
+    foreignKey({
+      name: 'tasks_recurring_origin_fk',
+      columns: [t.workspaceId, t.recurringTaskId, t.occurrenceOrigin],
+      foreignColumns: [recurringTasks.workspaceId, recurringTasks.id, recurringTasks.origin],
     }),
   ],
 );

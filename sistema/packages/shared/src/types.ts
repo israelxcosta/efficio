@@ -30,14 +30,21 @@ import type {
   OccurrenceStatus,
   OpenTaskStatus,
   PaymentMethod,
+  RecurrenceEnd,
+  RecurrenceFrequency,
   RecurrenceKind,
+  RecurrenceNonBusinessDayRule,
+  RecurrenceOrigin,
   RecurrencePeriod,
   SimplesAnnex,
   TaskAttachmentType,
   TaskDueBucket,
   TaskEventKind,
+  TaskInsightKey,
+  TaskInsightTone,
   TaskKind,
   TaskPriority,
+  TaskSituation,
   TaskStatus,
   TaxRegime,
   TransactionType,
@@ -1015,11 +1022,17 @@ export interface TaskFlowRef {
   stepCount: number;
 }
 
-/** What makes a task a recurring occurrence (one client × one period of a recurring task). */
+/**
+ * What makes a task a recurring occurrence: one client × one period of a recurring task of the registry
+ * (`origin: 'registry'`, aggregated in lists, audited), or one period of a task's recurrence
+ * (`origin: 'task'`, its client or internal, listed as a task: see `TaskDetail.recurrence`).
+ */
 export interface TaskOccurrenceRef {
   recurringTaskId: string;
-  period: RecurrencePeriod;
-  /** The competence, or the Monday of the week of a weekly occurrence. */
+  origin: RecurrenceOrigin;
+  /** `daily` only for tasks' recurrences. */
+  period: RecurrenceFrequency;
+  /** The competence, the Monday of the week (the registry's weekly) or the date (daily, weekly on chosen weekdays). */
   periodKey: string;
   /** Month the legal deadline falls in (the audit column). */
   competence: MonthKey;
@@ -1117,10 +1130,49 @@ export interface TaskDetail extends Task {
   attachments: TaskAttachment[];
   /** The whole process when the task is one of its steps (FlowStepper). */
   flowProgress: TaskFlow | null;
-  /** Fields locked for this task (occurrences); empty for the others. */
+  /**
+   * Fields locked for this task: occurrences take them from their recurring task (with
+   * `applyTo: 'series'`, a task's recurrence takes all but the dates). Empty for the others.
+   */
   lockedFields: TaskLockedField[];
-  /** May the requester reopen it? (A concluded occurrence: who concluded it or an administrator.) */
+  /**
+   * May the requester reopen it? A concluded occurrence of the registry (an audit record): who
+   * concluded it or `reopenOthers`. Occurrences of a task's recurrence reopen like any task.
+   */
   canReopen: boolean;
+  /** The rule when the task is an occurrence of a task's recurrence (null otherwise, registry included). */
+  recurrence: TaskRecurrence | null;
+}
+
+/** The recurrence of a task ("Repetir"), as `taskRecurrenceInputSchema` takes it plus what follows from it. */
+export interface TaskRecurrence {
+  /** The series (a recurring task of origin `task`). */
+  recurringTaskId: string;
+  frequency: RecurrenceFrequency;
+  /** Every N days/weeks/months (1 = every one). */
+  interval: number;
+  /** Weekly: ISO weekdays (1 = Monday … 7 = Sunday); empty otherwise. */
+  weekdays: number[];
+  /** Monthly and longer: day of the legal deadline. */
+  dueDay: number | null;
+  /** Bimonthly…annual: anchor month. */
+  dueMonth: number | null;
+  startDate: ISODate;
+  ends: RecurrenceEnd;
+  /** Last nominal date (inclusive): the chosen one, or computed from `count`. */
+  endDate: ISODate | null;
+  count: number | null;
+  targetDaysBefore: number;
+  nonBusinessDayRule: RecurrenceNonBusinessDayRule;
+  referenceOffset: number;
+  /** The series has an occurrence from today on. */
+  active: boolean;
+  /** Up to 5 next occurrences from today (legal deadline and target). */
+  upcoming: { periodKey: string; legalDueDate: ISODate; targetDate: ISODate }[];
+  /** Occurrences already generated. */
+  occurrenceCount: number;
+  /** May the requester change or end it (theirs or their department's; else `registry`)? */
+  canEdit: boolean;
 }
 
 /** PATCH /tasks/:id/status: the task and, when it concluded a process step, the task of the next step. */
@@ -1761,6 +1813,101 @@ export interface TaskDashboardResponse {
   fees: { within30: DashboardFeeItem[]; within60: DashboardFeeItem[] } | null;
   /** "Cadastro incompleto" (null without `registry`). */
   incomplete: { count: number; averagePercent: number; items: DashboardIncompleteItem[] } | null;
+}
+
+// --- GET /tasks/me/overview (the personal area: "clicar no avatar") ------------------------------
+
+/** One month of your conclusions (by the day of the conclusion in the office time zone). */
+export interface TaskProductivityPoint {
+  month: MonthKey;
+  concluded: number;
+  /** On or before the due date (the legal deadline of an occurrence); without due date counts on time. */
+  onTime: number;
+  late: number;
+  /** onTime / concluded, 0–100 (rounded); null without conclusions. */
+  onTimeRate: number | null;
+}
+
+/** The same figures for you and, averaged per member, for your department. */
+export interface TaskComparisonFigures {
+  /** Concluded in the month (per member, in the average: one decimal). */
+  concluded: number;
+  /** Of the conclusions in the month, on time (0–100); the department's is over all its conclusions. */
+  onTimeRate: number | null;
+  /** Open now, overdue included (the horizon of "Minhas"). */
+  open: number;
+  overdue: number;
+}
+
+export interface TaskInsight {
+  key: TaskInsightKey;
+  tone: TaskInsightTone;
+  /** Ready to show (pt-BR), e.g. "3 tarefas vencem amanhã." */
+  text: string;
+  /** A filter of "Minhas" in the task list the screen may link to (null: nothing to open). */
+  link: { dueBucket?: TaskDueBucket; dueDate?: ISODate; situation?: TaskSituation } | null;
+}
+
+/**
+ * GET /tasks/me/overview: what the personal area needs beyond the existing endpoints (calendar with
+ * `scope=mine|department`, notes, start page, dashboard). Only your own numbers and, for the
+ * comparison, your department's aggregate (never a colleague's). Units: tasks and occurrences (one per
+ * client), like the start page.
+ */
+export interface TaskMyOverviewResponse {
+  today: ISODate;
+  /** Month of `productivity` and `comparison` (default: current). */
+  month: MonthKey;
+  department: TaskRef | null;
+  /** Open with you now, in any department (occurrences up to the next competence, like "Minhas"). */
+  open: {
+    total: number;
+    overdue: number;
+    /** Work date today (due date; target of occurrences), not overdue. */
+    dueToday: number;
+    dueTomorrow: number;
+    /** Work date after today, up to 7 days ahead. */
+    next7Days: number;
+    /** Occurrences past the internal target, legal deadline still ahead. */
+    targetMissed: number;
+    /** The nearest legal deadline among them. */
+    targetMissedNextLegalDate: ISODate | null;
+    waitingClient: number;
+    noDueDate: number;
+    oldestOverdue: TaskOverdueRef | null;
+  };
+  /** What you concluded (you clicked "Concluir"), whoever was responsible. */
+  productivity: TaskProductivityPoint & {
+    /** Average calendar days from creation to conclusion in the month. */
+    averageDays: number | null;
+    /** The 6 months up to `month`, oldest first. */
+    trend: TaskProductivityPoint[];
+    /** onTimeRate − the previous month's, in percentage points (null when either has no conclusions). */
+    rateChange: number | null;
+  };
+  /**
+   * Next items with you, work date from today to 14 days ahead (overdue ones are in `open`): tasks
+   * (up to 15, by work date) and occurrences of the registry aggregated per recurring task and period.
+   */
+  upcoming: { from: ISODate; to: ISODate; total: number; tasks: Task[]; occurrences: RecurringOccurrence[] };
+  /**
+   * Load per weekday (ISO 1 = Monday … 7 = Sunday, all seven): your open items by work date in the
+   * next 4 weeks (`due`) and your conclusions in the last 8 weeks (`concluded`).
+   */
+  workload: {
+    dueFrom: ISODate;
+    dueTo: ISODate;
+    concludedFrom: ISODate;
+    days: { weekday: number; due: number; concluded: number }[];
+  };
+  /**
+   * You × the average per member of your department (current members) in the month. null without
+   * department; `average` null under MIN_DEPARTMENT_COMPARISON_MEMBERS members (it would reveal a
+   * colleague).
+   */
+  comparison: { department: TaskRef; members: number; me: TaskComparisonFigures; average: TaskComparisonFigures | null } | null;
+  /** Up to 6, most urgent first. */
+  insights: TaskInsight[];
 }
 
 /** GET /tasks/calendar: items by work date in a range (tasks by due date, occurrences by target). */

@@ -24,11 +24,31 @@ export const priorityRank = sql`case ${tasks.priority} when 'urgent' then 0 when
 
 export const OPEN_SQL = sql`${tasks.status} in ('todo', 'in_progress', 'waiting_client')`;
 export const CLOSED_SQL = sql`${tasks.status} in ('done', 'canceled')`;
-/** Rows that are recurring occurrences (one per client and period). */
+/** Rows that are recurring occurrences, of the registry or of a task's recurrence (`kind: 'recurring'`). */
 export const OCCURRENCE_SQL = sql`${tasks.recurringTaskId} is not null`;
 export const NOT_OCCURRENCE_SQL = sql`${tasks.recurringTaskId} is null`;
+/**
+ * Occurrences of the registry ("Recorrentes", one per client and period): aggregated per recurring task
+ * and period in lists, audited, the "obligations" blocks. Migration 0019.
+ */
+export const AGGREGATED_SQL = sql`${tasks.recurringTaskId} is not null and ${tasks.occurrenceOrigin} = 'registry'`;
+/** Rows listed one by one: standalone tasks, process steps and the occurrences of tasks' recurrences. */
+export const ROW_SQL = sql`(${tasks.recurringTaskId} is null or ${tasks.occurrenceOrigin} = 'task')`;
+/** Occurrences of tasks' recurrences (their client, or internal). */
+export const TASK_SERIES_SQL = sql`${tasks.occurrenceOrigin} = 'task'`;
 /** Work date: the target of an occurrence, the due date of anything else. */
 export const WORK_DATE = sql`coalesce(${tasks.targetDate}, ${tasks.dueDate})`;
+
+/**
+ * Lists without a date filter: an open occurrence of a task's recurrence shows when its work date is
+ * within the next 7 days (overdue included) or it is the next open one of its series, so a daily
+ * recurrence does not fill the list with the coming months. Everything else passes.
+ */
+export function visibleSeriesSql(today: ISODate): SQL {
+  const week = addDays(today, 7);
+  // Outer columns spelled out: Drizzle leaves them unqualified in a single-table select (pitfall #11).
+  return sql`(${tasks.occurrenceOrigin} is distinct from 'task' or not (${OPEN_SQL}) or ${WORK_DATE} <= ${week} or not exists (select 1 from tasks n where n.workspace_id = tasks.workspace_id and n.recurring_task_id = tasks.recurring_task_id and n.status in ('todo', 'in_progress', 'waiting_client') and (n.due_date, n.id) < (tasks.due_date, tasks.id)))`;
+}
 /** Calendar day of the conclusion in the office time zone (on time = on or before the due date). */
 export const COMPLETED_DAY = sql`(${tasks.completedAt} at time zone 'America/Sao_Paulo')::date`;
 
@@ -157,6 +177,7 @@ export function toTask(ctx: Pick<TaskContext, 'members' | 'today'>, row: TaskQue
       t.recurringTaskId && t.competence && t.periodKey && t.referenceMonth && t.targetDate
         ? {
             recurringTaskId: t.recurringTaskId,
+            origin: t.occurrenceOrigin ?? 'registry',
             period: row.recurringPeriod ?? 'monthly',
             periodKey: t.periodKey,
             competence: t.competence,

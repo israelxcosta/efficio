@@ -21,7 +21,7 @@ import type { TaskContext } from './access';
 import { ensureOccurrences, generationBounds } from './generation';
 import { aggregateOccurrences, CELL_COLUMNS, occurrenceClients, toOccurrenceCell } from './occurrences';
 import { departmentNames } from './shared';
-import { OCCURRENCE_SQL } from './task-rows';
+import { AGGREGATED_SQL } from './task-rows';
 
 type AuditQuery = z.output<typeof taskAuditQuerySchema>;
 
@@ -90,7 +90,9 @@ export async function auditMatrix(ctx: TaskContext, q: AuditQuery): Promise<Audi
     .select({ ...CELL_COLUMNS, departmentId: tasks.departmentId, taxRegime: contacts.taxRegime })
     .from(tasks)
     .innerJoin(contacts, and(eq(contacts.workspaceId, tasks.workspaceId), eq(contacts.id, tasks.clientId)))
-    .where(and(eq(tasks.workspaceId, ctx.workspaceId), OCCURRENCE_SQL, eq(tasks.competence, q.competence)));
+    // The registry's occurrences only: a task's recurrence (its client or internal) is not an obligation
+    // of the client and would add a sparse column per period (a daily one, ~22 a month). Migration 0019.
+    .where(and(eq(tasks.workspaceId, ctx.workspaceId), AGGREGATED_SQL, eq(tasks.competence, q.competence)));
   const all = rows.map((r) => ({ ...toOccurrenceCell(ctx, r), departmentId: r.departmentId, taxRegime: r.taxRegime }));
 
   let filtered = all.filter(

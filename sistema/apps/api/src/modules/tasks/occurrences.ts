@@ -16,6 +16,7 @@ import {
   type OccurrenceAssigneeCount,
   type OccurrenceCell,
   type OccurrenceClient,
+  type RecurrencePeriod,
   type RecurringOccurrence,
   type TaskCategoryRef,
   type TaskStatus,
@@ -25,7 +26,7 @@ import { appendTo } from '../../lib/collections';
 import { inChunks } from '../../lib/sql';
 import type { TaskContext } from './access';
 import { clientDisplayName, departmentNames, memberRef, personRef } from './shared';
-import { COMPLETED_DAY, OCCURRENCE_SQL, OPEN_SQL } from './task-rows';
+import { AGGREGATED_SQL, COMPLETED_DAY, OPEN_SQL } from './task-rows';
 
 const count = (cond?: SQL) =>
   (cond ? sql<number>`count(*) filter (where ${cond})` : sql<number>`count(*)`).mapWith(Number);
@@ -43,7 +44,8 @@ export async function aggregateOccurrences(
   opts: { limit?: number } = {},
 ): Promise<RecurringOccurrence[]> {
   const t = ctx.today;
-  const base = and(eq(tasks.workspaceId, ctx.workspaceId), OCCURRENCE_SQL, where);
+  // Only the registry's occurrences are aggregated: a task's recurrence is listed as tasks (0019).
+  const base = and(eq(tasks.workspaceId, ctx.workspaceId), AGGREGATED_SQL, where);
   const legal = sql<string>`coalesce(min(${tasks.dueDate}) filter (where ${OPEN_SQL}), min(${tasks.dueDate}))::text`;
   const target = sql<string>`coalesce(min(${tasks.targetDate}) filter (where ${OPEN_SQL}), min(${tasks.targetDate}))::text`;
   const groups = await ctx.db
@@ -115,7 +117,8 @@ export async function aggregateOccurrences(
       {
         recurringTaskId: def.id,
         name: def.name,
-        period: def.period,
+        // Registry rows only (AGGREGATED_SQL): never `daily` (recurring_tasks_origin_chk).
+        period: def.period as RecurrencePeriod,
         periodKey: g.periodKey!,
         competence: g.competence,
         referenceMonth: g.referenceMonth,

@@ -134,6 +134,13 @@
       "when": 1793807609882,
       "tag": "0018_task_generation_regime_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793898021709,
+      "tag": "0019_task_recurrence",
+      "breakpoints": true
     }
   ]
 }
