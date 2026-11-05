@@ -2,8 +2,21 @@
 // show the month's obligations).
 import { describe, expect, it } from 'vitest';
 import type { AuditClientRow } from '@effinance/shared';
-import { auditListKey, autoExpandedClients, cellDeadlines, cellSituationText, clientProgress } from './audit-logic';
-import { makeCell } from './test-fixtures';
+import {
+  auditListKey,
+  autoExpandedClients,
+  cellConclusionLine,
+  cellDeadlines,
+  cellSituationText,
+  cellTip,
+  clientProgress,
+  concludedAtText,
+  conclusionDelayDays,
+  conclusionDelayText,
+  sameDeadlines,
+  taskRowLabel,
+} from './audit-logic';
+import { makeCell, makeOccurrence } from './test-fixtures';
 
 const TODAY = '2026-10-28';
 
@@ -76,11 +89,68 @@ describe('an obligation of the client in the month', () => {
     expect(cellDeadlines(makeCell({ status: 'done', targetDate: '2026-10-15', legalDueDate: '2026-10-20' }), TODAY)).toEqual({ dates: 'Meta 15/10 · legal 20/10', status: null });
   });
 
-  it('names the situation, with who concluded and when', () => {
+  it('names the situation (who concluded and when go to their own columns)', () => {
     expect(cellSituationText(makeCell({ status: 'todo' }), TODAY)).toBe('A fazer');
     expect(cellSituationText(makeCell({ status: 'in_progress' }), TODAY)).toBe('Em andamento');
-    expect(cellSituationText(makeCell({ status: 'done', concludedBy: { id: 'm', name: 'Marina Souza' }, concludedAt: '2026-10-27T13:00:00Z' }), TODAY)).toBe('Concluída por Marina S. em 27/10');
+    expect(cellSituationText(makeCell({ status: 'waiting_client' }), TODAY)).toBe('Aguardando cliente');
+    expect(cellSituationText(makeCell({ status: 'done', concludedBy: { id: 'm', name: 'Marina Souza' }, concludedAt: '2026-10-27T13:00:00Z' }), TODAY)).toBe('Concluída');
     expect(cellSituationText(makeCell({ status: 'done', concludedBy: null, concludedAt: null }), TODAY)).toBe('Concluída');
     expect(cellSituationText(makeCell({ status: 'canceled' }), TODAY)).toBe('Cancelada');
+  });
+});
+
+describe('the conclusion of an occurrence (columns "Data de conclusão" and "Concluída por")', () => {
+  const done = (patch: Parameters<typeof makeCell>[0] = {}) =>
+    makeCell({ status: 'done', legalDueDate: '2026-10-20', targetDate: '2026-10-15', concludedBy: { id: 'm', name: 'Marina Souza' }, concludedAt: '2026-10-27T10:45:00Z', ...patch });
+
+  it('counts the days of delay after the legal deadline, by the day in the office time zone', () => {
+    expect(conclusionDelayDays({ status: 'done', legalDueDate: '2026-10-20', concludedAt: '2026-10-22T13:00:00Z' })).toBe(2);
+    expect(conclusionDelayDays({ status: 'done', legalDueDate: '2026-10-20', concludedAt: '2026-10-20T13:00:00Z' })).toBeNull();
+    // 23:30 of 20/10 in São Paulo (already 21/10 in UTC): on time.
+    expect(conclusionDelayDays({ status: 'done', legalDueDate: '2026-10-20', concludedAt: '2026-10-21T02:30:00Z' })).toBeNull();
+    expect(conclusionDelayDays({ status: 'done', legalDueDate: '2026-10-20', concludedAt: null })).toBeNull();
+    expect(conclusionDelayDays({ status: 'in_progress', legalDueDate: '2026-10-20', concludedAt: '2026-10-22T13:00:00Z' })).toBeNull();
+  });
+
+  it('writes the delay in days', () => {
+    expect(conclusionDelayText(1)).toBe('1 dia de atraso');
+    expect(conclusionDelayText(2)).toBe('2 dias de atraso');
+  });
+
+  it('writes the moment of the conclusion: day and time in the office time zone, the year only when it is another one', () => {
+    expect(concludedAtText('2026-10-27T10:45:00Z', TODAY)).toBe('27/10, 07:45');
+    expect(concludedAtText('2026-10-27T10:45:00Z', TODAY, false)).toBe('27/10');
+    expect(concludedAtText('2025-10-27T10:45:00Z', TODAY)).toBe('27/10/25, 07:45');
+  });
+
+  it('sums the conclusion in one line for the stacked rows', () => {
+    expect(cellConclusionLine(done(), TODAY)).toBe('Concluída em 27/10, 07:45 · Marina S.');
+    expect(cellConclusionLine(done(), TODAY, false)).toBe('Concluída em 27/10 · Marina S.');
+    expect(cellConclusionLine(done({ concludedBy: null }), TODAY)).toBe('Concluída em 27/10, 07:45');
+    expect(cellConclusionLine(done({ concludedBy: null, concludedAt: null }), TODAY)).toBe('Concluída');
+    expect(cellConclusionLine(makeCell({ status: 'todo' }), TODAY)).toBeNull();
+  });
+
+  it('keeps who concluded and when in the accessible text, with the delay', () => {
+    expect(cellTip(done({ concludedAt: '2026-10-22T13:00:00Z' }), 'Fiscal')).toBe('Concluída por Marina Souza em 22/10/2026 às 10:00, 2 dias após o prazo legal');
+    expect(cellTip(done({ concludedAt: '2026-10-21T13:00:00Z' }), 'Fiscal')).toBe('Concluída por Marina Souza em 21/10/2026 às 10:00, 1 dia após o prazo legal');
+    expect(cellTip(done({ concludedAt: '2026-10-20T13:00:00Z' }), 'Fiscal')).toBe('Concluída por Marina Souza em 20/10/2026 às 10:00');
+    expect(cellTip(done({ concludedBy: null, concludedAt: null }), 'Fiscal')).toBe('Concluída');
+  });
+
+  it('says whether an occurrence keeps the deadlines of its task', () => {
+    const column = { targetDate: '2026-10-15', legalDueDate: '2026-10-20' };
+    expect(sameDeadlines({ targetDate: '2026-10-15', legalDueDate: '2026-10-20' }, column)).toBe(true);
+    expect(sameDeadlines({ targetDate: '2026-10-17', legalDueDate: '2026-10-20' }, column)).toBe(false);
+    expect(sameDeadlines({ targetDate: '2026-10-15', legalDueDate: '2026-10-21' }, column)).toBe(false);
+  });
+});
+
+describe('the task row of "Por tarefa"', () => {
+  it('reads the count and how the deadline stands, and what the click does', () => {
+    const col = makeOccurrence({ name: 'Folha de pagamento', total: 3, done: 1, canceled: 0, pending: 2, legalDueDate: TODAY, targetDate: TODAY });
+    expect(taskRowLabel(col, TODAY, false)).toBe('Folha de pagamento: 1 de 3 concluídas, prazo legal hoje. Mostrar clientes.');
+    expect(taskRowLabel(col, TODAY, true)).toBe('Folha de pagamento: 1 de 3 concluídas, prazo legal hoje. Recolher clientes.');
+    expect(taskRowLabel({ ...col, total: 4, canceled: 1, done: 3, pending: 0, targetDate: '2026-10-26' }, TODAY, false)).toBe('Folha de pagamento: 3 de 3 concluídas, meta 26/10 · legal 28/10. Mostrar clientes.');
   });
 });

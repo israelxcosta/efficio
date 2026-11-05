@@ -7,6 +7,8 @@ import {
   dateInTimeZone,
   diffInDays,
   monthKeySchema,
+  TASK_STATUS_LABELS,
+  TASK_TIME_ZONE,
   TAX_REGIMES,
   type AuditClientRow,
   type AuditColumn,
@@ -20,7 +22,8 @@ import {
 } from '@effinance/shared';
 import { isUuid } from '@/lib/safe-url';
 import { daysText, shortDate, shortName, type DueInfo, type DueTone } from './due';
-import { occurrenceKey, openDeadlineInfo } from './occurrence';
+import { dateTimeBR } from './format';
+import { assigneeSourceText, groupDeadlineInfo, occurrenceKey, openDeadlineInfo } from './occurrence';
 
 // ---------------------------------------------------------------------------
 // URL (`competencia`, `visao`, `regime`, `departamento`, `responsavel`, `clientes`, `busca`, `recorrente`)
@@ -117,13 +120,6 @@ export function monthClosesWith(cells: OccurrenceCell[], cell: Pick<OccurrenceCe
   const mine = cells.filter((c) => c.clientId === cell.clientId);
   const live = mine.filter((c) => c.status !== 'canceled');
   return live.length > 0 && live.every((c) => c.taskId === cell.taskId || c.status === 'done');
-}
-
-/** Initials of who concluded (the pill of a concluded cell). */
-export function concludedInitials(name: string | null | undefined): string {
-  if (!name) return '✓';
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '')).toUpperCase();
 }
 
 // ---------------------------------------------------------------------------
@@ -279,10 +275,69 @@ const SITUATION_TEXT: Record<TaskStatus, string> = {
   canceled: 'Cancelada',
 };
 
-/** "A fazer", "Em andamento", "Concluída por Marina S. em 27/10". */
-export function cellSituationText(cell: Pick<OccurrenceCell, 'status' | 'concludedBy' | 'concludedAt'>, today: ISODate): string {
-  if (cell.status !== 'done') return SITUATION_TEXT[cell.status];
-  const who = cell.concludedBy ? ` por ${shortName(cell.concludedBy.name)}` : '';
-  const day = cell.concludedAt ? ` em ${shortDate(dateInTimeZone(new Date(cell.concludedAt)), today)}` : '';
-  return `Concluída${who}${day}`;
+/** The label beside the control: "A fazer", "Em andamento", "Concluída" (who and when have their own columns). */
+export function cellSituationText(cell: Pick<OccurrenceCell, 'status'>, _today?: ISODate): string {
+  return SITUATION_TEXT[cell.status];
+}
+
+// ---------------------------------------------------------------------------
+// The conclusion of an occurrence (§11.2: "Data de conclusão", "Concluída por" and the delay)
+// ---------------------------------------------------------------------------
+
+const timeFormat = new Intl.DateTimeFormat('pt-BR', { timeZone: TASK_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
+
+/**
+ * Days between the legal deadline and the day of the conclusion in the office time zone; null when not
+ * concluded, without the moment or on time (concluding after the target alone is not a delay).
+ */
+export function conclusionDelayDays(cell: Pick<OccurrenceCell, 'status' | 'concludedAt' | 'legalDueDate'>): number | null {
+  if (cell.status !== 'done' || !cell.concludedAt) return null;
+  const days = diffInDays(dateInTimeZone(new Date(cell.concludedAt)), cell.legalDueDate);
+  return days > 0 ? days : null;
+}
+
+/** "1 dia de atraso", "2 dias de atraso". */
+export function conclusionDelayText(days: number): string {
+  return `${daysText(days)} de atraso`;
+}
+
+/** "05/11, 07:45" ("05/11/25, 07:45" in another year; "05/11" without the time), in the office time zone. */
+export function concludedAtText(concludedAt: string, today: ISODate, withTime = true): string {
+  const at = new Date(concludedAt);
+  const day = shortDate(dateInTimeZone(at), today);
+  return withTime ? `${day}, ${timeFormat.format(at)}` : day;
+}
+
+/** The stacked rows: "Concluída em 05/11, 07:45 · Marina S."; null while not concluded. */
+export function cellConclusionLine(cell: Pick<OccurrenceCell, 'status' | 'concludedAt' | 'concludedBy'>, today: ISODate, withTime = true): string | null {
+  if (cell.status !== 'done') return null;
+  const when = cell.concludedAt ? ` em ${concludedAtText(cell.concludedAt, today, withTime)}` : '';
+  const who = cell.concludedBy ? ` · ${shortName(cell.concludedBy.name)}` : '';
+  return `Concluída${when}${who}`;
+}
+
+/**
+ * Accessible text and tooltip of the control: "A fazer · Ana Paula Ribeiro (responsável padrão da
+ * recorrente)", "Concluída por Marina Costa em 05/11/2026 às 07:45, 2 dias após o prazo legal".
+ */
+export function cellTip(cell: OccurrenceCell, _department: string | null): string {
+  if (cell.status === 'done') {
+    const delay = conclusionDelayDays(cell);
+    return `Concluída${cell.concludedBy ? ` por ${cell.concludedBy.name}` : ''}${cell.concludedAt ? ` em ${dateTimeBR(cell.concludedAt)}` : ''}${delay ? `, ${daysText(delay)} após o prazo legal` : ''}`;
+  }
+  const who = cell.assignee ? cell.assignee.name : 'Sem responsável';
+  const source = cell.assignee ? assigneeSourceText(cell.assigneeSource)?.toLowerCase() : null;
+  return `${TASK_STATUS_LABELS[cell.status]} · ${who}${source ? ` (${source})` : ''}`;
+}
+
+/** The occurrence keeps the target and the legal deadline of its task (no adjustment for the client). */
+export function sameDeadlines(cell: Pick<OccurrenceCell, 'targetDate' | 'legalDueDate'>, column: Pick<AuditColumn, 'targetDate' | 'legalDueDate'>): boolean {
+  return cell.targetDate === column.targetDate && cell.legalDueDate === column.legalDueDate;
+}
+
+/** The task row of "Por tarefa": "Folha de pagamento: 1 de 3 concluídas, prazo legal hoje. Mostrar clientes." */
+export function taskRowLabel(column: AuditColumn, today: ISODate, expanded: boolean): string {
+  const live = column.total - column.canceled;
+  const deadline = groupDeadlineInfo(column, today, true).text;
+  return `${column.name}: ${column.done} de ${live} concluídas, ${deadline.charAt(0).toLowerCase()}${deadline.slice(1)}. ${expanded ? 'Recolher' : 'Mostrar'} clientes.`;
 }

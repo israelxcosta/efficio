@@ -1847,8 +1847,8 @@ contêiner tem 1156px nas duas visões e cai no nível Largo.
 
 | Nível | Contêiner (viewport) | Grade | O que muda |
 | --- | --- | --- | --- |
-| Largo | `@6xl`, a partir de 1152px (1280 em diante) | `@6xl:grid-cols-[minmax(0,1fr)_7rem_8.5rem_9rem_11rem_7.5rem_8rem]` | as 7 colunas. Sobram cerca de 190px para o nome em 1280 e 350px em 1440 (200px no Médio em 1024) |
-| Médio | `@4xl`, de 896 a 1151px (1024 a 1279) | `@4xl:grid-cols-[minmax(0,1fr)_8.5rem_9rem_11rem_7.5rem]` | **Departamento** sai da grade: em Por cliente vai para o subtítulo da obrigação ("Pessoal/DP"); em Por tarefa não se repete, porque está no cabeçalho da tarefa. **Data de conclusão** e **Concluída por** viram uma coluna **Conclusão**: "05/11, 07:45" e, embaixo, "Marina C." (`text-xs text-muted`, sem avatar) |
+| Largo | `@6xl`, a partir de 1152px (1280 em diante) | `@6xl:grid-cols-[minmax(0,1fr)_7rem_8.5rem_10.5rem_11rem_7rem_8rem]` | as 7 colunas. Sobram cerca de 190px para o nome em 1280 e 350px em 1440 (200px no Médio em 1024) |
+| Médio | `@4xl`, de 896 a 1151px (1024 a 1279) | `@4xl:grid-cols-[minmax(0,1fr)_8.5rem_10.5rem_11rem_6.5rem]` | **Departamento** sai da grade: em Por cliente vai para o subtítulo da obrigação ("Pessoal/DP"); em Por tarefa não se repete, porque está no cabeçalho da tarefa. **Data de conclusão** e **Concluída por** viram uma coluna **Conclusão**: "05/11, 07:45" e, embaixo, "Marina C." (`text-xs text-muted`, sem avatar) |
 | Empilhado | abaixo de `@4xl` (tablet e celular) | `flex items-center gap-3` | a 1ª coluna vira um bloco `flex-1 min-w-0` com as linhas abaixo e o controle de 40px fica à direita (a ordem visual é a do DOM, a mesma do foco) |
 
 Linhas no nível Empilhado (todas `text-xs`, uma linha cada, truncando):

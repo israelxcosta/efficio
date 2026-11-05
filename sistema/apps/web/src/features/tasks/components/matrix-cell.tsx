@@ -1,24 +1,16 @@
 import { forwardRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Popover } from 'radix-ui';
-import { Check, CirclePause, CircleX, Contrast } from 'lucide-react';
-import { TASK_STATUS_LABELS, type OccurrenceCell, type OpenTaskStatus, type TaskStatus } from '@effinance/shared';
+import { CirclePause, CircleX, Contrast } from 'lucide-react';
+import { type OccurrenceCell, type OpenTaskStatus, type TaskStatus } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useTaskHistory } from '../api';
-import { concludedInitials, nextCellStatus, statusForKey } from '../audit-logic';
+import { cellTip, nextCellStatus, statusForKey } from '../audit-logic';
 import { dateTimeBR } from '../format';
-import { assigneeSourceText } from '../occurrence';
 import { auditEvents } from '../timeline';
 import { ReopenReasonForm } from './reopen';
-
-/** "A fazer · Ana Paula Ribeiro (responsável padrão da recorrente)". */
-export function cellTip(cell: OccurrenceCell, department: string | null): string {
-  if (cell.status === 'done') return `Concluída${cell.concludedBy ? ` por ${cell.concludedBy.name}` : ''}${cell.concludedAt ? ` em ${dateTimeBR(cell.concludedAt)}` : ''}`;
-  const who = cell.assignee ? cell.assignee.name : 'Sem responsável';
-  const source = cell.assignee ? assigneeSourceText(cell.assigneeSource)?.toLowerCase() : null;
-  return `${TASK_STATUS_LABELS[cell.status]} · ${who}${source ? ` (${source})` : ''}`;
-}
+import { TaskStatusGlyph } from './task-status';
 
 interface CellButtonProps {
   cell: OccurrenceCell;
@@ -34,36 +26,28 @@ interface CellButtonProps {
   onFocus?: () => void;
 }
 
-/** The visual of a cell (spec §3.2): ring, "Em andamento", "Aguardando", the concluded pill, canceled. */
+/** Look of each status (spec §3.2): the same circle for all, 32px (40px with `large`). */
+function cellLook(status: TaskStatus, large?: boolean): { tone: string; content: ReactNode } {
+  switch (status) {
+    case 'done':
+      return { tone: 'bg-success-soft text-success', content: <TaskStatusGlyph status="done" className="size-4" /> };
+    case 'in_progress':
+      return { tone: 'bg-primary-soft text-primary-soft-fg', content: <Contrast className="size-4" strokeWidth={1.75} aria-hidden /> };
+    case 'waiting_client':
+      return { tone: 'bg-bg-subtle text-muted', content: <CirclePause className="size-4" strokeWidth={1.75} aria-hidden /> };
+    case 'canceled':
+      return { tone: 'text-subtle', content: <CircleX className="size-4" strokeWidth={1.75} aria-hidden /> };
+    default:
+      return { tone: '', content: <span className={cn('rounded-full border border-border-strong', large ? 'size-6' : 'size-5')} aria-hidden /> };
+  }
+}
+
+/** The status control: ring, "Em andamento", "Aguardando", the green check (no initials), canceled. */
 const CellButton = forwardRef<HTMLButtonElement, CellButtonProps>(function CellButton(
   { cell, label, tip, busy, dimmed, large, tabIndex, onClick, onKeyDown, onFocus, ...rest },
   ref,
 ) {
-  const s = cell.status;
-  const box = large ? 'h-10 min-w-10' : 'h-8 min-w-8 pointer-coarse:h-10 pointer-coarse:min-w-10';
-  let content: ReactNode;
-  let tone: string;
-  if (s === 'done') {
-    tone = cn('w-[52px] rounded-full bg-success-soft text-success gap-0.5', large && 'w-[60px]');
-    content = (
-      <>
-        <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
-        <span className="text-mini font-semibold">{concludedInitials(cell.concludedBy?.name)}</span>
-      </>
-    );
-  } else if (s === 'in_progress') {
-    tone = 'rounded-full bg-primary-soft text-primary-soft-fg';
-    content = <Contrast className="size-4" strokeWidth={1.75} aria-hidden />;
-  } else if (s === 'waiting_client') {
-    tone = 'rounded-full bg-bg-subtle text-muted';
-    content = <CirclePause className="size-4" strokeWidth={1.75} aria-hidden />;
-  } else if (s === 'canceled') {
-    tone = 'rounded-full text-subtle';
-    content = <CircleX className="size-4" strokeWidth={1.75} aria-hidden />;
-  } else {
-    tone = 'rounded-full';
-    content = <span className={cn('rounded-full border border-border-strong', large ? 'size-6' : 'size-5')} aria-hidden />;
-  }
+  const { tone, content } = cellLook(cell.status, large);
   return (
     <Tooltip content={tip}>
       <button
@@ -76,10 +60,9 @@ const CellButton = forwardRef<HTMLButtonElement, CellButtonProps>(function CellB
         onKeyDown={onKeyDown}
         onFocus={onFocus}
         className={cn(
-          'inline-flex shrink-0 items-center justify-center transition-[background-color,opacity] duration-150 hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          box,
+          'inline-flex shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-150 hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          large ? 'h-10 w-10' : 'h-8 w-8 pointer-coarse:h-10 pointer-coarse:w-10',
           tone,
-          s !== 'done' && (large ? 'w-10' : 'w-8 pointer-coarse:w-10'),
           busy && 'opacity-70',
           dimmed && 'opacity-50',
         )}
@@ -90,6 +73,21 @@ const CellButton = forwardRef<HTMLButtonElement, CellButtonProps>(function CellB
     </Tooltip>
   );
 });
+
+/**
+ * The same look as the control for who cannot write tasks (spec §3.2): a `span role="img"` with the
+ * control's accessible text (who concluded and when, with the delay) and its tooltip.
+ */
+export function OccurrenceStatusGlyph({ cell, large, label }: { cell: OccurrenceCell; large?: boolean; label: string }) {
+  const { tone, content } = cellLook(cell.status, large);
+  return (
+    <Tooltip content={cellTip(cell, null)}>
+      <span role="img" aria-label={label} tabIndex={-1} className={cn('inline-flex shrink-0 items-center justify-center rounded-full', large ? 'size-10' : 'size-8', tone)}>
+        {content}
+      </span>
+    </Tooltip>
+  );
+}
 
 export interface OccurrenceCellControlProps {
   cell: OccurrenceCell;

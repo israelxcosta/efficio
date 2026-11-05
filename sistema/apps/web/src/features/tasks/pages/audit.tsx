@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Building2, ChevronDown, ChevronRight, ChevronsUpDown, CircleCheck, ClipboardCheck, LockKeyhole, Repeat, Search, SearchX, SlidersHorizontal, X } from 'lucide-react';
+import { Building2, ChevronRight, ChevronsUpDown, CircleCheck, ClipboardCheck, LockKeyhole, Search, SearchX, SlidersHorizontal, X } from 'lucide-react';
 import {
   formatCNPJ,
   formatMonthKey,
@@ -9,9 +9,7 @@ import {
   TAX_REGIMES,
   todayISO,
   type AuditClientRow,
-  type AuditColumn,
   type AuditMatrixResponse,
-  type OccurrenceCell,
   type TaskOptionsResponse,
   type TaxRegime,
 } from '@effinance/shared';
@@ -20,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, Input } from '@/components/ui/input';
-import { MemberAvatar } from '@/components/ui/member-avatar';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
 import { PeriodNavigator } from '@/components/ui/period-navigator';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -29,7 +26,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { Tooltip } from '@/components/ui/tooltip';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
-import { cn, initials, pluralize } from '@/lib/utils';
+import { cn, pluralize } from '@/lib/utils';
 import { useTaskAudit, useTaskOptions } from '../api';
 import {
   accordionByClient,
@@ -38,12 +35,10 @@ import {
   auditHeadline,
   auditListKey,
   autoExpandedClients,
-  cellDeadlines,
-  cellSituationText,
   clientPending,
   clientProgress,
-  monthClosesWith,
   parseAuditFilters,
+  taskRowLabel,
   toAuditQuery,
   visibleClients,
   visibleColumns,
@@ -55,11 +50,8 @@ import { DUE_TONE_CLASS, shortDate, shortName } from '../due';
 import { dateTimeBR } from '../format';
 import { competenceName, deadlineTip, groupDeadlineInfo, periodLabel } from '../occurrence';
 import { toggleClass, SummaryLabel } from '../components/tasks-summary';
-import { OccurrenceCellControl } from '../components/matrix-cell';
-import { NeutralIcon } from '../components/neutral-icon';
+import { AUDIT_ROW_GRID, AuditColumnsHeader, AuditOccurrenceRow } from '../components/audit-occurrence-row';
 import { MemberPicker } from '../components/pickers';
-import { useTaskSheetLinks } from '../task-links';
-import { useCellStatus, type CellChangeContext } from '../use-cell-status';
 
 /** Auditoria mensal (spec §11): the recurring tasks of a competence, by client (a list) or by task. */
 export default function TaskAuditPage() {
@@ -475,12 +467,6 @@ interface SharedProps {
   monthName: string;
 }
 
-/** Context of a status change: names for the toast and whether it closes the client's month. */
-function changeContext(data: AuditMatrixResponse, column: AuditColumn, cell: OccurrenceCell, client: { name: string }, monthName: string, announce: (t: string) => void, status: string): CellChangeContext {
-  const closes = status === 'done' && monthClosesWith(data.cells, cell);
-  return { taskName: column.name, clientName: client.name, monthCloses: closes ? monthName.charAt(0).toUpperCase() + monthName.slice(1) : null, announce };
-}
-
 /** Lock of a concluded month, with the moment of the last conclusion. */
 function MonthLock({ client, today }: { client: AuditClientRow; today: string }) {
   if (!client.monthConcludedAt) return null;
@@ -517,7 +503,6 @@ function ClientMonthNote({ client, today }: { client: AuditClientRow; today: str
  */
 function AuditClientList({ data, filters, today, announce, monthName }: SharedProps) {
   const items = accordionByClient(data, filters);
-  const status = useCellStatus();
   const [open, setOpen] = useState<Set<string>>(() => new Set(autoExpandedClients(items.map((i) => i.client))));
   const [focus, setFocus] = useState(0);
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -608,22 +593,17 @@ function AuditClientList({ data, filters, today, announce, monthName }: SharedPr
                 <ClientMonthNote client={client} today={today} />
               </button>
               {expanded ? (
-                <div id={regionId} role="region" aria-label={`Obrigações de ${client.name} em ${monthName}`} className="pb-2 @lg:pl-10">
+                <div id={regionId} role="region" aria-label={`Obrigações de ${client.name} em ${monthName}`} className="pb-2">
                   {cells.length === 0 ? (
-                    <p className="px-3 py-2 text-body-sm text-muted">{filters.clients === 'pending' ? 'Nenhuma pendência deste cliente.' : 'Nenhuma obrigação nesta competência.'}</p>
+                    <p className="px-2 py-2 text-body-sm text-muted @lg:pr-3 @lg:pl-13">{filters.clients === 'pending' ? 'Nenhuma pendência deste cliente.' : 'Nenhuma obrigação nesta competência.'}</p>
                   ) : (
                     <>
-                      <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_16.5rem] items-center gap-3 px-3 pt-1 pb-1.5 text-xs font-medium text-muted @4xl:grid">
-                        <span>Obrigação</span>
-                        <span>Departamento</span>
-                        <span>Responsável</span>
-                        <span>Prazo</span>
-                        <span>Situação</span>
-                      </div>
+                      <AuditColumnsHeader lead="obligation" />
                       <ul>
                         {cells.map(({ column, cell }) => (
-                          <ClientObligationRow
+                          <AuditOccurrenceRow
                             key={cell.taskId}
+                            lead="obligation"
                             cell={cell}
                             column={column}
                             client={client}
@@ -631,7 +611,6 @@ function AuditClientList({ data, filters, today, announce, monthName }: SharedPr
                             today={today}
                             monthName={monthName}
                             announce={announce}
-                            status={status}
                             dimmed={Boolean(filters.assignee) && cell.assignee?.id !== filters.assignee}
                           />
                         ))}
@@ -646,85 +625,6 @@ function AuditClientList({ data, filters, today, announce, monthName }: SharedPr
       </ul>
     </Card>
   );
-}
-
-interface ClientObligationRowProps {
-  cell: OccurrenceCell;
-  column: AuditColumn;
-  client: AuditClientRow;
-  data: AuditMatrixResponse;
-  today: string;
-  monthName: string;
-  announce: (t: string) => void;
-  status: ReturnType<typeof useCellStatus>;
-  dimmed: boolean;
-}
-
-/** An obligation of the opened client: name (opens the task), department, responsible, deadlines, status. */
-function ClientObligationRow({ cell, column, client, data, today, monthName, announce, status, dimmed }: ClientObligationRowProps) {
-  const { openTask } = useTaskSheetLinks();
-  const { canWriteTasks } = usePermissions();
-  const dl = cellDeadlines(cell, today);
-  const period = column.period === 'weekly' ? periodLabel(column, today) : column.period !== 'monthly' ? RECURRENCE_PERIOD_LABELS[column.period] : null;
-  const who = cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável';
-  const control = canWriteTasks ? (
-    <OccurrenceCellControl
-      cell={cell}
-      taskName={column.name}
-      clientName={client.name}
-      periodName={periodLabel(column, today)}
-      department={column.department?.name ?? null}
-      busy={status.isBusy(cell.taskId)}
-      dimmed={dimmed}
-      large
-      onChange={(s) => void status.change(cell, s, changeContext(data, column, cell, client, monthName, announce, s))}
-      onReopen={(reason, s) => status.change(cell, s, changeContext(data, column, cell, client, monthName, announce, s), { reason })}
-      onOpenTask={() => openTask(cell.taskId)}
-    />
-  ) : (
-    <span className="inline-flex size-10 shrink-0 items-center justify-center">
-      <ReadOnlyCell cell={cell} />
-    </span>
-  );
-  return (
-    <li className={cn('flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface @4xl:grid @4xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_16.5rem]', dimmed && 'opacity-70')}>
-      <div className="min-w-0 flex-1">
-        <button type="button" onClick={() => openTask(cell.taskId)} className="flex max-w-full items-center gap-1.5 text-left text-sm font-semibold text-fg hover:underline">
-          <span className="truncate">{column.name}</span>
-          {period ? <span className="shrink-0 text-xs font-normal text-muted">{period}</span> : null}
-        </button>
-        <p className="truncate text-xs text-muted @4xl:hidden">
-          {column.department?.name ?? 'Sem departamento'} · {who}
-        </p>
-        <p className="truncate text-xs @4xl:hidden">
-          <span className="text-muted">{dl.dates}</span>
-          {dl.status && dl.status.tone !== 'muted' ? <span className={DUE_TONE_CLASS[dl.status.tone]}> · {dl.status.text}</span> : null}
-        </p>
-        <p className="truncate text-xs text-muted @4xl:hidden">{cellSituationText(cell, today)}</p>
-      </div>
-      <span className="hidden truncate text-body-sm text-fg @4xl:block">{column.department?.name ?? <span className="text-subtle">Sem departamento</span>}</span>
-      <span className="hidden min-w-0 items-center gap-2 @4xl:flex">
-        <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} userId={cell.assignee?.id} />
-        <span className={cn('truncate text-body-sm', cell.assignee ? 'text-fg' : 'text-subtle')}>{who}</span>
-      </span>
-      <span className="hidden min-w-0 @4xl:block">
-        <Tooltip content={deadlineTip(cell, today)}>
-          <span tabIndex={-1} className="tabular block truncate text-body-sm text-fg">
-            {dl.dates}
-          </span>
-        </Tooltip>
-        {dl.status && dl.status.tone !== 'muted' ? <span className={cn('block truncate text-xs', DUE_TONE_CLASS[dl.status.tone])}>{dl.status.text}</span> : null}
-      </span>
-      <span className="flex shrink-0 items-center gap-2.5 @4xl:min-w-0">
-        {control}
-        <span className="hidden min-w-0 truncate text-[13px] text-muted @4xl:block">{cellSituationText(cell, today)}</span>
-      </span>
-    </li>
-  );
-}
-
-function ReadOnlyCell({ cell }: { cell: OccurrenceCell }) {
-  return <span className="text-caption text-muted">{cell.status === 'done' ? `✓ ${initials(cell.concludedBy?.name)}` : '·'}</span>;
 }
 
 /** "Por tarefa" (§11.3): each recurring task, opened to show its clients. */
@@ -743,20 +643,23 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
   }, [filters.recurring, data.competence]);
 
   return (
-    <Card className="@container overflow-hidden p-1.5">
-      <ul>
+    <Card className="@container overflow-hidden">
+      <ul className="p-1.5" aria-label={`Tarefas recorrentes de ${monthName}`}>
         {items.map(({ column: col, cells }) => {
           const k = `${col.recurringTaskId}:${col.periodKey}`;
           const expanded = open.has(k);
           const live = col.total - col.canceled;
+          const ratio = col.done / Math.max(1, live);
           const dl = groupDeadlineInfo(col, today, true);
+          const inline = groupDeadlineInfo(col, today);
           const regionId = `audit-task-${k}`;
           return (
-            <li key={k} ref={(el) => void (el ? refs.current.set(k, el) : refs.current.delete(k))} className="scroll-mt-24">
+            <li key={k} ref={(el) => void (el ? refs.current.set(k, el) : refs.current.delete(k))} className={cn('scroll-mt-24 rounded-lg', expanded && 'bg-surface-muted/50')}>
               <button
                 type="button"
                 aria-expanded={expanded}
                 aria-controls={regionId}
+                aria-label={taskRowLabel(col, today, expanded)}
                 onClick={() => {
                   setOpen((o) => {
                     const next = new Set(o);
@@ -766,59 +669,75 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
                   });
                   if (!expanded) onExpand(col.recurringTaskId);
                 }}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-surface-muted @lg:px-4"
+                className={cn(
+                  'group/task flex min-h-14 w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @lg:px-3',
+                  AUDIT_ROW_GRID,
+                )}
               >
-                <span className="hidden @sm:contents">
-                  <NeutralIcon icon={Repeat} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-sm font-semibold text-fg">{col.name}</span>
-                    {col.period !== 'monthly' ? <Badge tone="neutral">{RECURRENCE_PERIOD_LABELS[col.period]}</Badge> : null}
-                    {col.period === 'weekly' ? <span className="shrink-0 text-xs text-muted">{periodLabel(col, today)}</span> : null}
+                {/* Arrow, name and subtitle: over Cliente, Departamento and Responsável */}
+                <span className="flex min-w-0 flex-1 items-center gap-2.5 @lg:gap-3 @4xl:col-span-2 @6xl:col-span-3">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted transition-colors group-hover/task:bg-bg-subtle group-hover/task:text-fg" aria-hidden>
+                    <ChevronRight className={cn('size-4 transition-transform duration-150', expanded && 'rotate-90')} />
                   </span>
-                  <span className="mt-0.5 block truncate text-xs text-muted">
-                    {[col.department?.name, col.defaultAssignee ? `padrão: ${shortName(col.defaultAssignee.name)}` : null].filter(Boolean).join(' · ') || 'Sem departamento'}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-sm font-semibold text-fg">{col.name}</span>
+                      {col.period !== 'monthly' ? (
+                        <span className="hidden shrink-0 @md:inline-flex">
+                          <Badge tone="neutral">{RECURRENCE_PERIOD_LABELS[col.period]}</Badge>
+                        </span>
+                      ) : null}
+                      {col.period === 'weekly' ? <span className="hidden shrink-0 text-xs text-muted @md:inline">{periodLabel(col, today)}</span> : null}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-muted">
+                      {/* Narrow: the name keeps the room; the week goes to the subtitle */}
+                      {col.period === 'weekly' ? <span className="@md:hidden">{periodLabel(col, today)} · </span> : null}
+                      {[col.department?.name, col.defaultAssignee ? `padrão: ${shortName(col.defaultAssignee.name)}` : null].filter(Boolean).join(' · ') || 'Sem departamento'}
+                    </span>
+                    <span className={cn('mt-0.5 block truncate text-xs @xl:hidden', DUE_TONE_CLASS[inline.tone])}>{inline.text}</span>
                   </span>
-                  <span className={cn('mt-0.5 block truncate text-xs @xl:hidden', DUE_TONE_CLASS[groupDeadlineInfo(col, today).tone])}>{groupDeadlineInfo(col, today).text}</span>
                 </span>
-                <span className="flex w-24 shrink-0 flex-col items-end gap-1 @sm:w-28">
+                {/* Prazo track: the target and how the deadline stands (right of the bar below @4xl) */}
+                <span className="order-last hidden w-40 shrink-0 text-right @xl:block @4xl:order-none @4xl:w-auto @4xl:min-w-0 @4xl:text-left">
+                  <Tooltip content={deadlineTip(col, today)}>
+                    <span className="tabular block truncate text-[13px] font-medium text-fg">{shortDate(col.targetDate, today)}</span>
+                  </Tooltip>
+                  <span className={cn('block truncate text-xs', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span>
+                </span>
+                {/* Situação track: "1/3" and the bar */}
+                <span className="flex w-24 shrink-0 flex-col items-end gap-1 @sm:w-28 @4xl:w-auto @4xl:min-w-0 @4xl:items-start">
                   <span className="tabular text-[13px] font-medium text-fg">
                     {col.done}/{live}
                   </span>
                   <span className="block h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
-                    <span className="block h-full rounded-full bg-data" style={{ width: `${(col.done / Math.max(1, live)) * 100}%` }} />
+                    <span className={cn('block h-full rounded-full', ratio === 1 ? 'bg-success' : 'bg-data')} style={{ width: `${ratio * 100}%` }} />
                   </span>
                 </span>
-                <span className="hidden w-40 text-right @xl:block">
-                  <span className="tabular block text-[13px] font-medium text-fg">{shortDate(col.targetDate, today)}</span>
-                  <span className={cn('block truncate text-xs', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span>
-                </span>
-                <ChevronDown className={cn('size-4 shrink-0 text-muted transition-transform duration-150', expanded && 'rotate-180')} aria-hidden />
               </button>
               {expanded ? (
-                <div id={regionId} role="region" aria-label={`Clientes de ${col.name}`} className="mb-2 ml-0 border-l-0 @sm:ml-8">
+                <div id={regionId} role="region" aria-label={`Clientes de ${col.name}`} className="pb-2">
                   {cells.length === 0 ? (
-                    <p className="px-3 py-3 text-body-sm text-muted">Nenhum cliente {filters.clients === 'pending' ? 'pendente' : 'nesta tarefa'}.</p>
+                    <p className="px-2 py-2 text-body-sm text-muted @lg:pr-3 @lg:pl-13">Nenhum cliente {filters.clients === 'pending' ? 'pendente' : 'nesta tarefa'}.</p>
                   ) : (
-                    <ul>
-                      {cells.map((cell) => (
-                        <AccordionCellRow
-                          key={cell.taskId}
-                          cell={cell}
-                          column={col}
-                          client={cell.client}
-                          title={cell.client.name}
-                          subtitle={TAX_REGIME_LABELS[cell.client.taxRegime]}
-                          locked={Boolean(cell.client.monthConcludedAt)}
-                          data={data}
-                          today={today}
-                          monthName={monthName}
-                          announce={announce}
-                          dimmed={Boolean(filters.assignee) && cell.assignee?.id !== filters.assignee}
-                        />
-                      ))}
-                    </ul>
+                    <>
+                      <AuditColumnsHeader lead="client" />
+                      <ul>
+                        {cells.map((cell) => (
+                          <AuditOccurrenceRow
+                            key={cell.taskId}
+                            lead="client"
+                            cell={cell}
+                            column={col}
+                            client={cell.client}
+                            data={data}
+                            today={today}
+                            monthName={monthName}
+                            announce={announce}
+                            dimmed={Boolean(filters.assignee) && cell.assignee?.id !== filters.assignee}
+                          />
+                        ))}
+                      </ul>
+                    </>
                   )}
                 </div>
               ) : null}
@@ -827,73 +746,5 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
         })}
       </ul>
     </Card>
-  );
-}
-
-interface AccordionCellRowProps {
-  cell: OccurrenceCell;
-  column: AuditColumn;
-  client: AuditClientRow;
-  title: string;
-  subtitle: ReactNode;
-  locked?: boolean;
-  showDeadline?: boolean;
-  data: AuditMatrixResponse;
-  today: string;
-  monthName: string;
-  announce: (t: string) => void;
-  dimmed: boolean;
-}
-
-/** One line of an accordion: the 40px cell, the name (opens the occurrence), the responsible, the conclusion. */
-function AccordionCellRow({ cell, column, client, title, subtitle, locked, showDeadline, data, today, monthName, announce, dimmed }: AccordionCellRowProps) {
-  const status = useCellStatus();
-  const { openTask } = useTaskSheetLinks();
-  const { canWriteTasks } = usePermissions();
-  const dl = groupDeadlineInfo({ legalDueDate: cell.legalDueDate, targetDate: cell.targetDate, pending: cell.status === 'done' || cell.status === 'canceled' ? 0 : 1 }, today);
-  return (
-    <li className="flex min-h-[52px] items-center gap-3 rounded-lg px-3 py-1.5 hover:bg-surface-muted">
-      {canWriteTasks ? (
-        <OccurrenceCellControl
-          cell={cell}
-          taskName={column.name}
-          clientName={client.name}
-          periodName={periodLabel(column, today)}
-          department={column.department?.name ?? null}
-          busy={status.isBusy(cell.taskId)}
-          dimmed={dimmed}
-          large
-          onChange={(s) => void status.change(cell, s, changeContext(data, column, cell, client, monthName, announce, s))}
-          onReopen={(reason, s) => status.change(cell, s, changeContext(data, column, cell, client, monthName, announce, s), { reason })}
-          onOpenTask={() => openTask(cell.taskId)}
-        />
-      ) : (
-        <span className="inline-flex size-10 items-center justify-center">
-          <ReadOnlyCell cell={cell} />
-        </span>
-      )}
-      <div className="min-w-0 flex-1">
-        <button type="button" onClick={() => openTask(cell.taskId)} className="flex max-w-full items-center gap-1 truncate text-left text-sm font-semibold text-fg hover:underline">
-          {locked ? <LockKeyhole className="size-3 shrink-0 text-muted" aria-label="Mês concluído" /> : null}
-          <span className="truncate">{title}</span>
-        </button>
-        <p className="truncate text-xs text-muted">
-          {subtitle}
-          {subtitle ? ' · ' : ''}
-          {cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável'}
-        </p>
-        {showDeadline ? <p className={cn('truncate text-xs sm:hidden', DUE_TONE_CLASS[dl.tone])}>{dl.text}</p> : null}
-        {cell.status === 'done' && cell.concludedAt ? (
-          <p className="truncate text-mini text-muted">
-            Concluída{cell.concludedBy ? ` por ${shortName(cell.concludedBy.name)}` : ''} em {dateTimeBR(cell.concludedAt).replace(/\/\d{4} às /, ', ')}
-          </p>
-        ) : null}
-      </div>
-      <span className="hidden w-32 min-w-0 items-center gap-2 sm:flex">
-        <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} userId={cell.assignee?.id} />
-        <span className={cn('truncate text-[13px]', cell.assignee ? 'text-fg' : 'text-subtle')}>{cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável'}</span>
-      </span>
-      {showDeadline ? <span className={cn('hidden w-40 shrink-0 truncate text-right text-xs sm:block', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span> : null}
-    </li>
   );
 }

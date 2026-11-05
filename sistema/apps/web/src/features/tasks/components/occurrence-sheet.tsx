@@ -27,12 +27,12 @@ import { ApiRequestError } from '@/lib/api';
 import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { useRecurringOccurrence, useTaskOptions, useUpdateTask } from '../api';
-import { isPendingCell } from '../audit-logic';
+import { cellTip, isPendingCell } from '../audit-logic';
 import { DUE_TONE_CLASS, firstName, shortDate, shortName } from '../due';
 import { assigneeSourceText, auditHref, competenceName, groupDeadlineInfo, isOccurrenceRef, occurrenceTitle, periodLabel, referenceLabel } from '../occurrence';
 import { withSheetParams } from '../task-links';
 import { useCellStatus } from '../use-cell-status';
-import { cellTip, OccurrenceCellControl } from './matrix-cell';
+import { OccurrenceCellControl, OccurrenceStatusGlyph } from './matrix-cell';
 import { occurrenceViewFromParam, OCCURRENCE_SHEET_PARAMS, type OccurrenceView } from './occurrence-row';
 import { MemberPicker, NONE } from './pickers';
 
@@ -281,9 +281,7 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
           onOpenTask={onOpenTask}
         />
       ) : (
-        <span className="inline-flex size-10 items-center justify-center text-caption text-muted" title={cellTip(cell, department)}>
-          {cell.status === 'done' ? '✓' : '·'}
-        </span>
+        <OccurrenceStatusGlyph cell={cell} large label={`${detail.name}, ${cell.client.name}: ${cellTip(cell, department)}`} />
       )}
       <div className="min-w-0 flex-1">
         <button type="button" onClick={onOpenTask} className={cn('block max-w-full truncate rounded-sm text-left text-sm font-semibold hover:underline', canceled ? 'text-muted' : 'text-fg')}>

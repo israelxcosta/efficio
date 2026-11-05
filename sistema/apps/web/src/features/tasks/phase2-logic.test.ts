@@ -14,8 +14,8 @@ import {
   accordionByClient,
   accordionByTask,
   auditHeadline,
+  cellTip,
   columnDeadline,
-  concludedInitials,
   monthClosesWith,
   nextCellStatus,
   parseAuditFilters,
@@ -26,7 +26,6 @@ import {
   writeAuditFilters,
 } from './audit-logic';
 import { agendaDayTitle, calendarWeeks, itemsByDay } from './calendar-logic';
-import { cellTip } from './components/matrix-cell';
 import { filterNotes } from './components/notes-sheet';
 import { occurrenceSheetCells } from './components/occurrence-sheet';
 import { REOPEN_REASON_REQUIRED, reopenReasonError } from './components/reopen';
@@ -331,7 +330,6 @@ describe('monthly audit', () => {
     expect(nextCellStatus('done')).toBeNull();
     expect(nextCellStatus('canceled')).toBeNull();
     expect([statusForKey('1'), statusForKey('2'), statusForKey('3'), statusForKey('4')]).toEqual(['todo', 'in_progress', 'done', null]);
-    expect(concludedInitials('Ana Paula Ribeiro')).toBe('AR');
   });
 
   it('orders the clients by name, and the overdue first with "Com pendências"', () => {
