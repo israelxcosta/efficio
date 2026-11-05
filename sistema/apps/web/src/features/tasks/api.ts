@@ -1,6 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type {
   ApplyFlowTemplateInput,
+  NonBusinessDayRule,
+  RecurrencePeriod,
   AuditMatrixResponse,
   Client,
   ClientListResponse,
@@ -492,14 +494,15 @@ export function recurringInputOf(r: RecurringTask, patch: Partial<RecurringTaskI
   return {
     name: r.name,
     description: r.description,
-    period: r.period,
+    // The registry's recurring tasks (the default `origin`): never `daily` nor `skip`.
+    period: r.period as RecurrencePeriod,
     departmentId: r.department?.id ?? null,
     categoryId: r.category?.id ?? null,
     assigneeId: r.assignee?.id ?? null,
     dueDay: r.dueDay,
     dueMonth: r.dueMonth,
     targetDaysBefore: r.targetDaysBefore,
-    nonBusinessDayRule: r.nonBusinessDayRule,
+    nonBusinessDayRule: r.nonBusinessDayRule as NonBusinessDayRule,
     referenceOffset: r.referenceOffset,
     regimes: r.regimes,
     clientIds: r.clientIds,

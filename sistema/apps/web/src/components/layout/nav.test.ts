@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { areaOf, FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS, isActivePath, navItemsFor, RAIL_GAP_PX, RAIL_ITEM_PX, splitRail } from './nav';
+import { areaOf, FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS, isActivePath, navItemsFor, RAIL_GAP_PX, RAIL_ITEM_PX, railItemsFor, splitRail } from './nav';
 
 const items = Array.from({ length: 12 }, (_, i) => i);
 const heightFor = (slots: number) => slots * RAIL_ITEM_PX + (slots - 1) * RAIL_GAP_PX;
@@ -55,23 +55,22 @@ describe('areas', () => {
     expect(areaOf('/tarefasx')).toBe('common');
   });
 
-  it('has the final rail of the Gestão, in order of use (spec §2.2)', () => {
+  it('has the 5-item rail of the Gestão and keeps the hub pages in the list (spec §2.2, revision 4)', () => {
     expect(GESTAO_NAV_ITEMS.map((i) => i.to)).toEqual([
       '/',
       '/tarefas',
-      '/tarefas/auditoria',
-      '/tarefas/recorrentes',
-      '/tarefas/processos',
       '/tarefas/clientes',
       '/tarefas/relatorios',
       '/tarefas/cadastros',
+      '/tarefas/auditoria',
+      '/tarefas/recorrentes',
+      '/tarefas/processos',
     ]);
-    expect(GESTAO_NAV_ITEMS.map((i) => i.short ?? i.label)).toEqual(['Início', 'Tarefas', 'Auditoria', 'Recorrentes', 'Processos', 'Clientes', 'Relatórios', 'Cadastros']);
-    // Tarefas is active only on its own path: the other pages live under /tarefas/.
-    expect(isActivePath('/tarefas/auditoria', GESTAO_NAV_ITEMS[1]!)).toBe(false);
-    expect(isActivePath('/tarefas/auditoria', GESTAO_NAV_ITEMS[2]!)).toBe(true);
+    expect(railItemsFor('gestao').map((i) => i.short ?? i.label)).toEqual(['Início', 'Tarefas', 'Clientes', 'Relatórios', 'Cadastros']);
+    expect(GESTAO_NAV_ITEMS.filter((i) => i.place === 'hub').map((i) => i.to)).toEqual(['/tarefas/auditoria', '/tarefas/recorrentes', '/tarefas/processos']);
     expect(GESTAO_NAV_ITEMS.filter((i) => i.mobile).map((i) => i.label)).toEqual(['Início', 'Tarefas', 'Clientes']);
     expect(navItemsFor('gestao')).toBe(GESTAO_NAV_ITEMS);
+    expect(railItemsFor('financeiro')).toEqual(FINANCE_NAV_ITEMS);
   });
 
   it('moves the finance panel to /financeiro', () => {
@@ -82,10 +81,15 @@ describe('areas', () => {
 });
 
 describe('isActivePath', () => {
-  it('marks Tarefas only on its own page (the other Gestão pages live under it)', () => {
+  it('marks Tarefas on its page and on the hub pages, not on the other Gestão pages', () => {
     const tarefas = GESTAO_NAV_ITEMS[1]!;
     expect(isActivePath('/tarefas', tarefas)).toBe(true);
+    expect(isActivePath('/tarefas/auditoria', tarefas)).toBe(true);
+    expect(isActivePath('/tarefas/recorrentes', tarefas)).toBe(true);
+    expect(isActivePath('/tarefas/processos/x', tarefas)).toBe(true);
     expect(isActivePath('/tarefas/clientes', tarefas)).toBe(false);
+    expect(isActivePath('/tarefas/relatorios', tarefas)).toBe(false);
+    expect(isActivePath('/tarefas/auditoriax', tarefas)).toBe(false);
     expect(isActivePath('/tarefas/clientes', GESTAO_NAV_ITEMS.find((i) => i.to === '/tarefas/clientes')!)).toBe(true);
   });
 

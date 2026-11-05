@@ -6,7 +6,7 @@ import {
   type UnionConvention,
   type UnionListSummary,
 } from '@effinance/shared';
-import { navItemsFor, pagePermissionOf, GESTAO_NAV_ITEMS } from '@/components/layout/nav';
+import { navItemsFor, pagePermissionOf, railItemsFor, GESTAO_NAV_ITEMS } from '@/components/layout/nav';
 import { notificationsLabel } from '@/components/layout/notifications';
 import {
   adjustmentTitle,
@@ -108,10 +108,18 @@ describe('permissions per person (spec §13.10)', () => {
     expect(items).not.toContain('/tarefas/cadastros');
     expect(navItemsFor('gestao', () => false).map((i) => i.to)).toEqual(['/', '/tarefas']);
     expect(navItemsFor('gestao')).toBe(GESTAO_NAV_ITEMS);
+    expect(railItemsFor('gestao', () => false).map((i) => i.to)).toEqual(['/', '/tarefas']);
+    // The hub pages leave the rail but stay in ⌘K.
+    const canOwner = () => true;
+    const all = navItemsFor('gestao', canOwner).map((i) => i.to);
+    expect(all).toEqual(expect.arrayContaining(['/tarefas/auditoria', '/tarefas/recorrentes', '/tarefas/processos']));
+    expect(railItemsFor('gestao', canOwner).map((i) => i.to)).not.toContain('/tarefas/auditoria');
   });
 
   it('maps each Gestão path to its page key (the URL shows "Acesso restrito")', () => {
     expect(pagePermissionOf('/tarefas/auditoria')).toBe('page.audit');
+    expect(pagePermissionOf('/tarefas/recorrentes')).toBe('page.recurring');
+    expect(pagePermissionOf('/tarefas/processos')).toBe('page.processes');
     expect(pagePermissionOf('/tarefas/cadastros')).toBe('page.registry');
     expect(pagePermissionOf('/TAREFAS/Clientes')).toBe('page.clients');
     expect(pagePermissionOf('/tarefas')).toBeNull();

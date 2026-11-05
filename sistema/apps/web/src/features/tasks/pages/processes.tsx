@@ -26,6 +26,7 @@ import { NeutralIcon } from '../components/neutral-icon';
 import { FlowStepsSheet, FlowTemplateSheet } from '../components/flow-sheets';
 import { useTaskActions } from '../task-actions';
 import { useTaskSheetLinks } from '../task-links';
+import { TasksHub } from '../components/tasks-hub';
 
 type FlowStatus = 'active' | 'done';
 
@@ -79,31 +80,27 @@ export default function ProcessesPage() {
   const editing = template && template !== 'novo' ? (templates.data?.find((t) => t.id === template) ?? null) : null;
   const nTemplates = templates.data?.length ?? 0;
   const nActive = activeFlows.data?.length ?? 0;
-  const description = `Roteiros em etapas: cada etapa vira tarefa quando a anterior é concluída.${templates.data ? ` ${nTemplates} ${nTemplates === 1 ? 'modelo' : 'modelos'} · ${nActive} ${nActive === 1 ? 'processo em andamento' : 'processos em andamento'}.` : ''}${isAdmin ? '' : ' Somente administradores alteram os modelos.'}`;
+  // Short (revision 4): the counts only; the explanation and the permission note live in the editor.
+  const description = templates.data
+    ? `${nTemplates} ${nTemplates === 1 ? 'modelo' : 'modelos'} · ${nActive} ${nActive === 1 ? 'processo em andamento' : 'processos em andamento'}`
+    : undefined;
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader
-        title="Processos"
-        description={description}
-        actions={
-          <>
-            <WriteGate scope="tasks">
-              <Button variant="outline" onClick={actions.openFlowBuilder}>
-                <ListOrdered /> Criar processo avulso
-              </Button>
-            </WriteGate>
+      <PageHeader title="Processos" description={description} actions={<TasksHub />} actionsClassName="max-sm:w-full" />
+
+      <Card className="@container overflow-hidden">
+        <CardHeader
+          title="Modelos de processo"
+          className="px-5 pt-5"
+          action={
             <WriteGate scope="admin">
-              <Button onClick={() => set('modelo', 'novo')}>
+              <Button variant="outline" size="sm" onClick={() => set('modelo', 'novo')}>
                 <Plus /> Novo modelo
               </Button>
             </WriteGate>
-          </>
-        }
-      />
-
-      <Card className="@container overflow-hidden">
-        <CardHeader title="Modelos de processo" className="px-5 pt-5" />
+          }
+        />
         <div className="p-1.5 pt-3">
           {templates.isPending ? (
             <SkeletonRows rows={3} className="p-3" />

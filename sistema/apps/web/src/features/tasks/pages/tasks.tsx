@@ -19,7 +19,7 @@ import { TaskFiltersBar } from '../components/task-filters';
 import { TaskGroup } from '../components/task-group';
 import { TaskRow } from '../components/task-row';
 import { TasksSummary } from '../components/tasks-summary';
-import { TaskCreateHub } from '../components/task-create-hub';
+import { TasksHub } from '../components/tasks-hub';
 import { PendingByClientCard } from '../components/pending-by-client-card';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
@@ -141,9 +141,9 @@ export default function TasksPage() {
       <PageHeader
         title="Tarefas"
         description={`${longDay(today)} · ${scopeText}`}
+        actions={<TasksHub currentView={filters.view} onViewChosen={(view) => writeTaskView(viewKey, { scope: filters.scope, view })} />}
+        actionsClassName="max-sm:w-full"
       />
-
-      <TaskCreateHub />
 
       {list.isError && !data ? null : workspaceEmpty ? null : (
         <TasksSummary

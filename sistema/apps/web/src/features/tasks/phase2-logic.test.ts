@@ -13,7 +13,6 @@ import { ATTACHMENT_ERRORS, attachmentIconKind, attachmentTypeOf, checkAttachmen
 import {
   accordionByClient,
   accordionByTask,
-  auditHeadline,
   cellTip,
   columnDeadline,
   monthClosesWith,
@@ -372,12 +371,6 @@ describe('monthly audit', () => {
     expect(columnDeadline(makeOccurrence({ overdue: true, legalDueDate: '2026-10-20' }), TODAY)).toEqual({ text: 'Prazo legal venceu há 8 dias', tone: 'danger' });
     expect(columnDeadline(makeOccurrence({ targetMissed: true, targetDate: '2026-10-26' }), TODAY)).toEqual({ text: 'Meta venceu há 2 dias', tone: 'warning-strong' });
     expect(columnDeadline(makeOccurrence({ pending: 0 }), TODAY)).toEqual({ text: 'Meta 28/10 · legal 30/10', tone: 'muted' });
-  });
-
-  it('states the finding of the page', () => {
-    const summary = { total: 240, canceled: 0, done: 182, overduePending: 12 } as AuditMatrixResponse['summary'];
-    expect(auditHeadline(summary, 'Outubro de 2026')).toBe('Outubro de 2026: 182 de 240 concluídas (76%). 12 pendências já passaram do prazo legal.');
-    expect(auditHeadline({ ...summary, overduePending: 0 }, 'Outubro de 2026')).toBe('Outubro de 2026: 182 de 240 concluídas (76%). Nenhuma pendência passou do prazo legal.');
   });
 
   it('marks a cell optimistically and words the toast with the month closed', () => {

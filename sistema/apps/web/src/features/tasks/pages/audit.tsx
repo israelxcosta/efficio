@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { Building2, ChevronRight, ChevronsUpDown, CircleCheck, ClipboardCheck, LockKeyhole, Search, SearchX, SlidersHorizontal, X } from 'lucide-react';
 import {
   formatCNPJ,
-  formatMonthKey,
   RECURRENCE_PERIOD_LABELS,
   TAX_REGIME_LABELS,
   TAX_REGIMES,
@@ -28,11 +27,11 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
 import { cn, pluralize } from '@/lib/utils';
 import { useTaskAudit, useTaskOptions } from '../api';
+import { TasksHub } from '../components/tasks-hub';
 import {
   accordionByClient,
   accordionByTask,
   auditFilterCount,
-  auditHeadline,
   auditListKey,
   autoExpandedClients,
   clientPending,
@@ -61,7 +60,6 @@ export default function TaskAuditPage() {
   const filters = parseAuditFilters(params, today);
   const audit = useTaskAudit(toAuditQuery(filters));
   const data = audit.data;
-  const monthLabel = formatMonthKey(filters.competence);
   const [announcement, setAnnouncement] = useState('');
 
   function update(patch: Partial<AuditFilters>) {
@@ -70,21 +68,7 @@ export default function TaskAuditPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader
-        title="Auditoria mensal"
-        description={data ? auditHeadline(data.summary, monthLabel) : monthLabel}
-        actions={
-          <Tooltip content="Competência: mês em que o prazo legal cai">
-            <div>
-              <PeriodNavigator
-                modes={['month']}
-                value={{ mode: 'month', anchor: `${filters.competence}-01` }}
-                onChange={(v) => update({ competence: v.anchor.slice(0, 7) })}
-              />
-            </div>
-          </Tooltip>
-        }
-      />
+      <PageHeader title="Auditoria mensal" actions={<TasksHub />} actionsClassName="max-sm:w-full" />
       <AuditSummaryPanel summary={data?.summary} filters={filters} onChange={update} />
       <AuditToolbar filters={filters} options={options.data} onChange={update} />
       <span className="sr-only" aria-live="polite">
@@ -122,7 +106,7 @@ function AuditSummaryPanel({ summary: s, filters, onChange }: { summary: AuditMa
           )}
           {s ? (
             <p className="mt-1 text-body-sm text-muted">
-              {pct}% da competência{s.canceled ? ` · ${s.canceled} ${s.canceled === 1 ? 'cancelada' : 'canceladas'}` : ''}
+              {pct}%{s.canceled ? ` · ${s.canceled} ${s.canceled === 1 ? 'cancelada' : 'canceladas'}` : ''}
             </p>
           ) : null}
         </div>
@@ -130,11 +114,11 @@ function AuditSummaryPanel({ summary: s, filters, onChange }: { summary: AuditMa
           <button
             type="button"
             aria-pressed={filters.clients === 'pending'}
-            aria-label={s ? `Pendências atrasadas: ${s.overduePending}. Mostrar os clientes com pendências.` : 'Pendências atrasadas'}
+            aria-label={s ? `Atrasadas: ${s.overduePending}. Mostrar os clientes com pendências.` : 'Atrasadas'}
             onClick={() => onChange({ clients: filters.clients === 'pending' ? '' : 'pending' })}
             className={cn('-m-2 block w-[calc(100%+1rem)] p-2 text-left', toggleClass)}
           >
-            <SummaryLabel>Pendências atrasadas</SummaryLabel>
+            <SummaryLabel>Atrasadas</SummaryLabel>
             {s ? (
               <span className={cn('tabular mt-1 block text-kpi leading-10 font-semibold tracking-tight', s.overduePending > 0 ? 'text-danger' : 'text-fg')}>{s.overduePending}</span>
             ) : (
@@ -152,14 +136,14 @@ function AuditSummaryPanel({ summary: s, filters, onChange }: { summary: AuditMa
           <button
             type="button"
             aria-pressed={filters.clients === 'concluded'}
-            aria-label={s ? `${s.clientsConcluded} de ${s.clientCount} clientes com o mês concluído. Filtrar.` : 'Clientes'}
+            aria-label={s ? `Mês concluído: ${s.clientsConcluded} de ${s.clientCount} clientes. Filtrar.` : 'Mês concluído'}
             onClick={() => onChange({ clients: filters.clients === 'concluded' ? '' : 'concluded' })}
             className={cn('-m-2 block w-[calc(100%+1rem)] p-2 text-left', toggleClass)}
           >
-            <SummaryLabel>Clientes</SummaryLabel>
+            <SummaryLabel>Mês concluído</SummaryLabel>
             {s ? (
-              <span className="mt-1 block leading-10 text-body-sm text-muted">
-                <span className="tabular text-kpi font-semibold tracking-tight text-fg">{s.clientsConcluded}</span> de {s.clientCount} com o mês concluído
+              <span className="tabular mt-1 block leading-10 text-kpi font-semibold tracking-tight text-fg">
+                {s.clientsConcluded} <span className="font-medium text-muted">de {s.clientCount}</span>
               </span>
             ) : (
               skeleton('w-32')
@@ -260,7 +244,20 @@ function AuditToolbar({ filters, options, onChange }: { filters: AuditFilters; o
       fullWidth={false}
     />
   );
-  const placeholder = filters.view === 'client' ? 'Buscar cliente' : 'Buscar tarefa recorrente';
+  // The competence is a filter of the screen (revision 4): right after the view, with its tooltip.
+  const period = (
+    <Tooltip content="Competência: mês em que o prazo legal cai">
+      <div className="max-sm:w-full">
+        <PeriodNavigator
+          modes={['month']}
+          value={{ mode: 'month', anchor: `${filters.competence}-01` }}
+          onChange={(v) => onChange({ competence: v.anchor.slice(0, 7) })}
+        />
+      </div>
+    </Tooltip>
+  );
+  // The view beside says what is searched: the placeholder is short, the aria-label complete (A6).
+  const searchLabel = filters.view === 'client' ? 'Buscar cliente' : 'Buscar tarefa recorrente';
   const regime = (sm: boolean) => (
     <Select size_={sm ? 'sm' : 'md'} aria-label="Regime" value={filters.regime} onChange={(e) => onChange({ regime: e.target.value as TaxRegime | '' })}>
       <option value="">Todos os regimes</option>
@@ -303,10 +300,11 @@ function AuditToolbar({ filters, options, onChange }: { filters: AuditFilters; o
     <Card className="p-4">
       <div className="hidden flex-wrap items-center gap-2 sm:flex">
         {view}
-        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))_auto]">
+        {period}
+        <div className="grid w-full min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))_auto] min-[1360px]:w-auto min-[1360px]:flex-1">
           <div className="relative sm:col-span-2 lg:col-span-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={placeholder} aria-label={placeholder} className="h-9 rounded-[10px] pl-9 text-[13px]" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label={searchLabel} className="h-9 rounded-[10px] pl-9 text-[13px]" />
           </div>
           {regime(true)}
           {department(true)}
@@ -323,10 +321,11 @@ function AuditToolbar({ filters, options, onChange }: { filters: AuditFilters; o
       </div>
       <div className="flex flex-col gap-3 sm:hidden">
         {view}
+        {period}
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label={placeholder} className="h-9 rounded-[10px] pl-9 text-[13px]" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label={searchLabel} className="h-9 rounded-[10px] pl-9 text-[13px]" />
           </div>
           <Button variant="outline" size="sm" className="h-9" onClick={() => setSheet(true)}>
             <SlidersHorizontal /> Filtros{count - (filters.search ? 1 : 0) > 0 ? ` (${count - (filters.search ? 1 : 0)})` : ''}
@@ -337,7 +336,6 @@ function AuditToolbar({ filters, options, onChange }: { filters: AuditFilters; o
         open={sheet}
         onOpenChange={setSheet}
         title="Filtros"
-        description="Refine a auditoria da competência."
         footer={
           <>
             <Button variant="ghost" onClick={clear}>
@@ -393,9 +391,7 @@ function AuditContent({ data, loading, error, onRetry, filters, options, today, 
         icon={<ClipboardCheck />}
         title="A auditoria começa pelas tarefas recorrentes"
         description={
-          isAdmin
-            ? 'Cadastre as obrigações do escritório e a quais clientes se aplicam; elas viram as colunas desta tela.'
-            : 'Os administradores cadastram as obrigações do escritório e a quais clientes se aplicam; elas viram as colunas desta tela.'
+          isAdmin ? 'Cadastre as obrigações e a quais clientes se aplicam.' : 'Os administradores cadastram as obrigações.'
         }
         action={
           <WriteGate scope="admin">
@@ -428,11 +424,7 @@ function AuditContent({ data, loading, error, onRetry, filters, options, today, 
       return <EmptyState icon={<CircleCheck />} title={`Nenhuma pendência em ${monthName}`} description="Todas as tarefas recorrentes da competência foram concluídas." />;
     if (filters.clients === 'concluded' && !filters.search)
       return (
-        <EmptyState
-          icon={<LockKeyhole />}
-          title={`Nenhum cliente com o mês concluído em ${monthName}.`}
-          description="O mês de um cliente fica concluído quando todas as tarefas recorrentes dele estão concluídas."
-        />
+        <EmptyState icon={<LockKeyhole />} title={`Nenhum cliente com o mês concluído em ${monthName}.`} />
       );
     return (
       <EmptyState

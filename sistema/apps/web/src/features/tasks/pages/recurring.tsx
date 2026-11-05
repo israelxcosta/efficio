@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { CalendarDays, ClipboardCheck, Copy, Ellipsis, Eye, Pencil, Plus, Power, Repeat, Search, SearchX, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, Copy, Ellipsis, Eye, Pencil, Power, Repeat, Search, SearchX, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
+  RECURRENCE_FREQUENCY_LABELS,
   RECURRENCE_PERIOD_LABELS,
   TAX_REGIME_LABELS,
   TAX_REGIMES,
@@ -57,14 +58,14 @@ import { NeutralIcon } from '../components/neutral-icon';
 import { MemberPicker } from '../components/pickers';
 import { EndRecurringDialog, RecurringTaskSheet } from '../components/recurring-sheet';
 import { RegimeGroupsView } from '../components/regime-groups-view';
-import { parseRecurringView, writeRecurringView, type RecurringView } from '../regime-groups-logic';
+import { TasksHub } from '../components/tasks-hub';
+import { parseRecurringView, writeRecurringView } from '../regime-groups-logic';
 
 const CALENDAR_HREF = '/tarefas?escopo=todas&tipo=recorrentes&visao=calendario';
 
 /** Tarefas recorrentes (spec §10): the office's obligations, who does them and how the month is going. */
 export default function RecurringTasksPage() {
   const [params, setParams] = useSearchParams();
-  const navigate = useNavigate();
   const options = useTaskOptions();
   const today = options.data?.today ?? todayISO();
   const month = today.slice(0, 7);
@@ -104,44 +105,10 @@ export default function RecurringTasksPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        title="Tarefas recorrentes"
+        title={view.view === 'regimes' ? 'Grupos por regime' : 'Tarefas recorrentes'}
         description={description}
-        actions={
-          <>
-            <Button variant="outline" className="max-sm:hidden" onClick={() => navigate(CALENDAR_HREF)}>
-              <CalendarDays /> Ver no calendário
-            </Button>
-            <WriteGate scope="admin">
-              <Button onClick={() => update({ open: 'nova' })}>
-                <Plus /> Nova tarefa recorrente
-              </Button>
-            </WriteGate>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="sm:hidden" aria-label="Mais ações">
-                  <Ellipsis />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem icon={<CalendarDays />} onSelect={() => navigate(CALENDAR_HREF)}>
-                  Ver no calendário
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        }
-      />
-
-      <SegmentedControl<RecurringView>
-        ariaLabel="Visão"
-        value={view.view}
-        onChange={(v) => setParams(writeRecurringView(params, { view: v }), { replace: true })}
-        options={[
-          { value: 'list', label: 'Tarefas recorrentes' },
-          { value: 'regimes', label: 'Grupos por regime' },
-        ]}
-        className="max-sm:flex max-sm:w-full sm:self-start"
-        fullWidth={false}
+        actions={<TasksHub />}
+        actionsClassName="max-sm:w-full"
       />
 
       {view.view === 'regimes' ? (
@@ -453,7 +420,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className={cn('min-w-0 truncate text-sm font-semibold', r.active ? 'text-fg' : 'text-muted')}>{r.name}</span>
-              {r.period !== 'monthly' ? <Badge tone="neutral">{RECURRENCE_PERIOD_LABELS[r.period]}</Badge> : null}
+              {r.period !== 'monthly' ? <Badge tone="neutral">{RECURRENCE_FREQUENCY_LABELS[r.period]}</Badge> : null}
               {!r.active && r.endCompetence ? <Badge tone="neutral">{endedLabel(r.endCompetence)}</Badge> : null}
             </span>
             <span className="mt-0.5 block truncate text-xs text-muted">

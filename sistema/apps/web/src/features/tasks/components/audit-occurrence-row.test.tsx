@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { makeCell, makeOccurrence } from '../test-fixtures';
-import { AuditColumnsHeader, AuditOccurrenceRowView, type AuditOccurrenceRowViewProps } from './audit-occurrence-row';
+import { AuditClientRowView, AuditColumnsHeader, AuditOccurrenceRowView, type AuditOccurrenceRowViewProps } from './audit-occurrence-row';
 
 const TODAY = '2026-10-28';
 const column = makeOccurrence({ name: 'Folha de pagamento', targetDate: '2026-10-15', legalDueDate: '2026-10-20' });
@@ -42,11 +42,10 @@ function col(html: string, name: string): string {
 }
 
 describe('a concluded occurrence', () => {
-  it('says only "Concluída" beside the control, and the delay below in amber, in words', () => {
+  it('keeps only the control beside it and, late, the delay in amber, in words (no "Concluída": the glyph says it)', () => {
     const situation = col(render(), 'situation');
     expect(situation).toContain('controle');
-    expect(situation).toMatch(/text-success[^>]*>Concluída</);
-    expect(situation).not.toContain('Concluída por');
+    expect(situation).not.toContain('Concluída');
     expect(situation).toMatch(/text-warning[^>]*>2 dias de atraso</);
   });
 
@@ -86,12 +85,42 @@ describe('a pending occurrence', () => {
     const html = render({ cell: makeCell({ status: 'in_progress', targetDate: '2026-10-15', legalDueDate: '2026-10-20', overdue: true }) });
     expect(col(html, 'concluded-at')).not.toMatch(/\d{2}\/\d{2}|—/);
     expect(col(html, 'concluded-by')).not.toContain('—');
-    expect(col(html, 'situation')).toMatch(/text-brand-text[^>]*>Em andamento</);
+    expect(col(html, 'situation')).not.toContain('Em andamento');
+  });
+
+  it('labels the situation only in the exceptions (revision 4)', () => {
+    expect(col(render({ cell: makeCell({ status: 'todo' }) }), 'situation')).not.toContain('A fazer');
+    expect(col(render({ cell: makeCell({ status: 'waiting_client' }) }), 'situation')).toContain('Aguardando');
+    expect(col(render({ cell: makeCell({ status: 'canceled' }) }), 'situation')).toContain('Cancelada');
+  });
+
+  it('has no third stacked line while pending without an exception', () => {
+    expect(col(render({ cell: makeCell({ status: 'todo' }) }), 'stacked-situation')).toBe('');
+    // "Concluída" in green and the rest muted: the text reads on across the two spans.
+    expect(col(render(), 'stacked-situation').replace(/<[^>]+>/g, '')).toContain('Concluída em 22/10');
+    expect(col(render({ cell: makeCell({ status: 'waiting_client' }) }), 'stacked-situation')).toContain('Aguardando');
+  });
+
+  it('writes who and the target on the second stacked line, with the alert in its tone', () => {
+    const pending = makeCell({ status: 'todo', assignee: { id: 'j', name: 'Juliana Martins' }, targetDate: '2026-10-24', legalDueDate: '2026-10-26' });
+    const meta = col(render({ cell: pending }), 'stacked-meta');
+    expect(meta).toContain('Juliana M. · meta 24/10');
+    expect(meta).toMatch(/text-danger[^>]*>[^<]*Prazo legal venceu há 2 dias/);
   });
 });
 
 describe('the deadline column', () => {
   const pending = makeCell({ status: 'todo', targetDate: '2026-10-15', legalDueDate: '2026-10-20', overdue: true });
+
+  it('"Por cliente": only the alert on the second line (the first is the target)', () => {
+    const late = makeCell({ status: 'todo', targetDate: '2026-10-24', legalDueDate: '2026-10-26' });
+    const deadline = col(render({ cell: late }), 'deadline');
+    expect(deadline).toContain('Prazo legal venceu há 2 dias');
+    expect(deadline).not.toContain('Meta em');
+    const soon = col(render({ cell: makeCell({ status: 'todo', targetDate: '2026-11-03', legalDueDate: '2026-11-05' }) }), 'deadline');
+    expect(soon).toMatch(/text-muted[^>]*>legal 05\/11</);
+    expect(soon).not.toContain('Meta em');
+  });
 
   it('"Por cliente": the target and, below, how the deadline stands, in its tone', () => {
     const deadline = col(render({ cell: pending }), 'deadline');
@@ -131,11 +160,58 @@ describe('the lead column', () => {
   });
 });
 
-describe('the columns header', () => {
+describe('the columns header (one per card, revision 4)', () => {
+  const firstLabel = (html: string) => html.replace(/<[^>]+>/g, '|').split('|').filter(Boolean)[0];
+
   it('names the columns of each level, hidden from screen readers', () => {
-    const html = renderToStaticMarkup(<AuditColumnsHeader lead="client" />);
+    const html = renderToStaticMarkup(<AuditColumnsHeader view="client" />);
     expect(html).toContain('aria-hidden="true"');
     for (const label of ['Cliente', 'Departamento', 'Responsável', 'Prazo', 'Situação', 'Data de conclusão', 'Concluída por', 'Conclusão']) expect(html).toContain(`>${label}<`);
-    expect(renderToStaticMarkup(<AuditColumnsHeader lead="obligation" />)).toContain('>Obrigação<');
+  });
+
+  it('starts with the parent row of the view: Cliente or Tarefa recorrente', () => {
+    expect(firstLabel(renderToStaticMarkup(<AuditColumnsHeader view="client" />))).toBe('Cliente');
+    expect(firstLabel(renderToStaticMarkup(<AuditColumnsHeader view="task" />))).toBe('Tarefa recorrente');
+  });
+});
+
+describe('the client row of "Por cliente" (revision 4)', () => {
+  const rowClient = {
+    id: 'c1',
+    name: 'Pão Quente',
+    legalName: 'Pão Quente Ltda',
+    document: '12345678000190',
+    taxRegime: 'simples_nacional' as const,
+    total: 9,
+    done: 7,
+    canceled: 0,
+    inProgress: 0,
+    overduePending: 2,
+    targetMissedPending: 0,
+    monthConcludedAt: null,
+  };
+  const cells = [
+    makeCell({ status: 'todo', targetDate: '2026-11-07' }),
+    makeCell({ status: 'in_progress', targetDate: '2026-11-10' }),
+    makeCell({ status: 'done', targetDate: '2026-10-20' }),
+  ];
+  const renderRow = (patch: Partial<typeof rowClient> & { monthConcludedAt?: string | null } = {}, rowCells = cells) =>
+    renderToStaticMarkup(
+      <TooltipProvider>
+        <AuditClientRowView client={{ ...rowClient, ...patch }} cells={rowCells} today={TODAY} expanded={false} regionId="r" />
+      </TooltipProvider>,
+    );
+
+  it('shows the progress, the alert and the nearest target, without the CNPJ', () => {
+    const html = renderRow();
+    expect(html).toContain('7/9');
+    expect(html).toContain('2 atrasadas');
+    expect(html).toContain('07/11');
+    expect(html).not.toContain('12.345.678');
+  });
+
+  it('puts the moment of a concluded month in the conclusion track', () => {
+    const html = renderRow({ done: 9, overduePending: 0, monthConcludedAt: '2026-10-27T17:32:00Z' }, [makeCell({ status: 'done' })]);
+    expect(col(html, 'concluded-at')).toContain('27/10, 14:32');
   });
 });

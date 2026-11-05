@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Popover } from 'radix-ui';
-import { CalendarDays, List, ListFilter, Search, SlidersHorizontal, SquareKanban, X } from 'lucide-react';
+import { ListFilter, Search, SlidersHorizontal, X } from 'lucide-react';
 import {
   formatMonthKey,
   TASK_KIND_LABELS,
@@ -23,7 +23,7 @@ import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { activeFilterCount, CLEARED_FILTERS, PRIORITY_OPTIONS, type TaskFilterPatch, type TaskFilters, type TaskView } from '../url-state';
+import { activeFilterCount, CLEARED_FILTERS, PRIORITY_OPTIONS, type TaskFilterPatch, type TaskFilters } from '../url-state';
 import { ClientPicker, MemberPicker } from './pickers';
 
 function useDebounced<T>(value: T, ms = 300): T {
@@ -80,19 +80,6 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
     ...(hasDepartment ? [{ value: 'department' as const, label: 'Meu departamento' }] : []),
     { value: 'all', label: 'Todas' },
   ];
-  const viewControl = (size: 'sm' | 'md' = 'md') => (
-    <SegmentedControl<TaskView>
-      size={size}
-      ariaLabel="Visualização"
-      value={filters.view}
-      onChange={(view) => onChange({ view })}
-      options={[
-        { value: 'list', label: <span className="sr-only">Lista</span>, icon: <List aria-hidden />, title: 'Lista' },
-        { value: 'board', label: <span className="sr-only">Quadro</span>, icon: <SquareKanban aria-hidden />, title: 'Quadro' },
-        { value: 'calendar', label: <span className="sr-only">Calendário</span>, icon: <CalendarDays aria-hidden />, title: 'Calendário' },
-      ]}
-    />
-  );
   const clear = () => {
     setSearchInput('');
     onChange(CLEARED_FILTERS);
@@ -200,7 +187,6 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
               options={SITUATION_OPTIONS}
             />
           )}
-          {viewControl()}
         </div>
       </div>
 
@@ -248,7 +234,7 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
         )}
       </div>
 
-      {/* Phones: search, "Filtros (N)" and the view. */}
+      {/* Phones: search and "Filtros (N)" (the view is in the hub of the header). */}
       <div className="mt-3 flex items-center gap-2 sm:hidden">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
@@ -263,7 +249,6 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
         <Button variant="outline" size="sm" className="h-9" onClick={() => setSheetOpen(true)}>
           <SlidersHorizontal /> Filtros{mobileCount > 0 ? ` (${mobileCount})` : ''}
         </Button>
-        {viewControl('sm')}
       </div>
 
       <Sheet

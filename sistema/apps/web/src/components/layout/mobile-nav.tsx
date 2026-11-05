@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router';
-import { ArrowLeftRight, Bell, BriefcaseBusiness, CalendarClock, FileClock, Layers, ListChecks, ListTree, LogOut, Menu, Minus, NotebookPen, Plus, Repeat, Search, TrendingUp, Wallet, Workflow } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { ArrowLeftRight, Bell, BriefcaseBusiness, FileClock, ListChecks, ListTree, LogOut, Menu, Minus, NotebookPen, Plus, Search, TrendingUp, Wallet, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
@@ -10,6 +10,7 @@ import { useTaskSheetLinks } from '@/features/tasks/task-links';
 import { useTaskActions } from '@/features/tasks/task-actions';
 import { tasksHref } from '@/features/tasks/url-state';
 import { createActions } from '@/features/tasks/task-hub';
+import { CREATE_ICONS } from '@/features/tasks/components/tasks-hub';
 import { Sheet } from '@/components/ui/sheet';
 import {
   DropdownMenu,
@@ -19,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { lastPathOf, type AreaMemory } from './area-memory';
-import { AREA_LABELS, navItemsFor, SETTINGS_ITEM, type Area } from './nav';
+import { AREA_LABELS, isActivePath, railItemsFor, SETTINGS_ITEM, type Area, type NavItem } from './nav';
 import { useMyOverdueTasks, useOverdueBills } from './notifications';
 import { useDeadlinesSummary } from '@/features/deadlines/api';
 
@@ -34,16 +35,31 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
   const { canAccessFinance, can } = usePermissions();
   const { openNotes, openDeadlines } = useTaskActions();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   // Counts what each link opens: overdue payables (administrators) and your overdue tasks.
   const overdueBills = useOverdueBills().data?.filter((t) => t.type === 'expense').length ?? 0;
   const overdueTasks = useMyOverdueTasks().data?.total ?? 0;
   const overdueDeadlines = useDeadlinesSummary().data?.overdueTotal ?? 0;
-  const areaItems = navItemsFor(area, can);
+  // The hub pages (Auditoria, Recorrentes, Processos) open from the hub, not from the "Mais" (spec §2.4).
+  const areaItems = railItemsFor(area, can);
   const items = areaItems.filter((i) => i.mobile);
-  const link = ({ isActive }: { isActive: boolean }) =>
-    cn('flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-semibold', isActive ? 'text-fg' : 'text-muted');
+  // Tarefas is active on the hub pages too (`activeOn`), which `NavLink end` cannot express.
+  const barLink = (i: NavItem) => {
+    const isActive = isActivePath(pathname, i);
+    return (
+      <Link
+        key={i.to}
+        to={i.to}
+        aria-current={isActive ? 'page' : undefined}
+        className={cn('flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-semibold', isActive ? 'text-fg' : 'text-muted')}
+      >
+        <i.icon className="size-5" />
+        {i.short ?? i.label.split(' ')[0]}
+      </Link>
+    );
+  };
   const close = () => setMenuOpen(false);
 
   return (
@@ -53,19 +69,9 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
         data-bottom-bar
         className="fixed inset-x-0 bottom-0 z-30 flex items-center border-t border-border bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden"
       >
-        {items.slice(0, 2).map((i) => (
-          <NavLink key={i.to} to={i.to} end={i.end || i.to === '/'} className={link}>
-            <i.icon className="size-5" />
-            {i.short ?? i.label.split(' ')[0]}
-          </NavLink>
-        ))}
+        {items.slice(0, 2).map(barLink)}
         {area === 'financeiro' ? <FinanceCreate /> : <TaskCreate />}
-        {items.slice(2, 3).map((i) => (
-          <NavLink key={i.to} to={i.to} end={i.end} className={link}>
-            <i.icon className="size-5" />
-            {i.short ?? i.label.split(' ')[0]}
-          </NavLink>
-        ))}
+        {items.slice(2, 3).map(barLink)}
         <button type="button" className="flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-semibold text-muted" onClick={() => setMenuOpen(true)}>
           <Menu className="size-5" />
           Mais
@@ -157,17 +163,20 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
             </button>
           ) : null}
           <span className="my-1 h-px bg-border" aria-hidden />
-          {[...areaItems, SETTINGS_ITEM].map((i) => (
-            <NavLink
-              key={i.to}
-              to={i.to}
-              end={i.end || i.to === '/'}
-              onClick={close}
-              className={({ isActive }) => cn(menuRow, isActive ? 'bg-primary-soft text-primary-soft-fg' : 'text-fg hover:bg-bg-subtle')}
-            >
-              <i.icon className="size-5" /> {i.label}
-            </NavLink>
-          ))}
+          {[...areaItems, SETTINGS_ITEM].map((i) => {
+            const isActive = isActivePath(pathname, i);
+            return (
+              <Link
+                key={i.to}
+                to={i.to}
+                onClick={close}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(menuRow, isActive ? 'bg-primary-soft text-primary-soft-fg' : 'text-fg hover:bg-bg-subtle')}
+              >
+                <i.icon className="size-5" /> {i.label}
+              </Link>
+            );
+          })}
           <button
             type="button"
             className={cn(menuRow, 'text-fg hover:bg-bg-subtle')}
@@ -198,7 +207,7 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
 const plusClass =
   'mx-2 -mt-6 flex size-14 items-center justify-center rounded-full bg-primary text-primary-fg shadow-lg ring-4 ring-bg disabled:opacity-50';
 
-/** The phone's "+" in the Gestão: the same kinds as the hub of Tarefas (`createActions`, by permission). */
+/** The phone's "+" in the Gestão: the same options and icons as Criar in the hub (`createActions`, by permission). */
 function TaskCreate() {
   const { newTask } = useTaskSheetLinks();
   const { openTemplatePicker, openFlowBuilder } = useTaskActions();
@@ -215,14 +224,14 @@ function TaskCreate() {
         </DropdownMenuTrigger>
       </WriteGate>
       <DropdownMenuContent align="center" side="top" sideOffset={10}>
-        <DropdownMenuItem icon={<ListChecks />} onSelect={() => newTask()}>
+        <DropdownMenuItem icon={<CREATE_ICONS.task />} onSelect={() => newTask()}>
           Tarefa
         </DropdownMenuItem>
-        <DropdownMenuItem icon={<CalendarClock />} onSelect={() => newTask({ appointment: true })}>
+        <DropdownMenuItem icon={<CREATE_ICONS.appointment />} onSelect={() => newTask({ appointment: true })}>
           Compromisso
         </DropdownMenuItem>
         {ids.has('recurring') ? (
-          <DropdownMenuItem icon={<Repeat />} onSelect={() => navigate('/tarefas/recorrentes?recorrente=nova')}>
+          <DropdownMenuItem icon={<CREATE_ICONS.recurring />} onSelect={() => navigate('/tarefas/recorrentes?recorrente=nova')}>
             Tarefa recorrente
           </DropdownMenuItem>
         ) : null}
@@ -233,14 +242,6 @@ function TaskCreate() {
         <DropdownMenuItem icon={<ListTree />} onSelect={openFlowBuilder}>
           Processo avulso
         </DropdownMenuItem>
-        {ids.has('regimeGroup') ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem icon={<Layers />} onSelect={() => navigate('/tarefas/recorrentes?visao=regimes')}>
-              Grupo por regime
-            </DropdownMenuItem>
-          </>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

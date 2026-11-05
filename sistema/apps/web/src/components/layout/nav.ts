@@ -34,6 +34,10 @@ export interface NavItem {
   keywords?: string;
   /** Active only on the exact path (Tarefas: the other Gestão pages live under `/tarefas/`). */
   end?: boolean;
+  /** Other paths (and their sub-paths) that also make it active: Tarefas on the hub pages (spec §2.2). */
+  activeOn?: string[];
+  /** `hub` pages live in the tasks hub (spec §2.9), not in the rail nor the "Mais"; ⌘K keeps them. */
+  place?: 'rail' | 'hub';
   /** Page key that hides it (phase 3, spec §13.10): Início and Tarefas have none. */
   permission?: PagePermissionKey;
 }
@@ -44,9 +48,13 @@ export interface NavItem {
  */
 export type Area = 'gestao' | 'financeiro';
 
+/** Pages of the tasks hub: Tarefas stays active in the rail on them (spec §2.2). */
+const HUB_PATHS = ['/tarefas/auditoria', '/tarefas/recorrentes', '/tarefas/processos'];
+
 /**
- * Gestão de tarefas, the final rail (spec §2.2), in order of use so the "more" menu takes the least
- * used first: Início, Tarefas, Auditoria, Recorrentes, Processos, Clientes, Relatórios, Cadastros.
+ * Gestão de tarefas (spec §2.2, revision 4): the 5-item rail (Início, Tarefas, Clientes, Relatórios,
+ * Cadastros) and, after it, the hub pages (`place: 'hub'`), which ⌘K, the route test and
+ * `pagePermissionOf` still need.
  */
 export const GESTAO_NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Início', icon: House, mobile: true, end: true, keywords: 'painel resumo departamento hoje minhas' },
@@ -56,26 +64,17 @@ export const GESTAO_NAV_ITEMS: NavItem[] = [
     icon: ListChecks,
     mobile: true,
     end: true,
+    activeOn: HUB_PATHS,
     keywords: 'solicitacoes pedidos afazeres prazos kanban quadro agenda compromissos calendario',
   },
   {
-    to: '/tarefas/auditoria',
-    label: 'Auditoria mensal',
-    short: 'Auditoria',
-    icon: ClipboardCheck,
-    permission: 'page.audit',
-    keywords: 'competencia matriz obrigacoes entregas conclusao acompanhamento encerramento',
+    to: '/tarefas/clientes',
+    label: 'Clientes',
+    icon: Building2,
+    mobile: true,
+    permission: 'page.clients',
+    keywords: 'empresas cnpj regime contatos documentos certificado certidoes alvara inscricao',
   },
-  {
-    to: '/tarefas/recorrentes',
-    label: 'Tarefas recorrentes',
-    short: 'Recorrentes',
-    icon: Repeat,
-    permission: 'page.recurring',
-    keywords: 'obrigacoes prazo legal meta das dctfweb folha periodicidade calendario feriados',
-  },
-  { to: '/tarefas/processos', label: 'Processos', icon: Workflow, permission: 'page.processes', keywords: 'fluxos modelos etapas roteiro abertura alteracao' },
-  { to: '/tarefas/clientes', label: 'Clientes', icon: Building2, mobile: true, permission: 'page.clients', keywords: 'empresas cnpj regime contatos documentos' },
   {
     to: '/tarefas/relatorios',
     label: 'Relatórios de tarefas',
@@ -89,7 +88,33 @@ export const GESTAO_NAV_ITEMS: NavItem[] = [
     label: 'Cadastros',
     icon: FolderCog,
     permission: 'page.registry',
-    keywords: 'departamentos categorias equipe usuarios membros sindicatos convencoes coletivas data-base',
+    keywords: 'departamentos categorias equipe usuarios membros sindicatos convencoes data-base permissoes',
+  },
+  {
+    to: '/tarefas/auditoria',
+    label: 'Auditoria mensal',
+    short: 'Auditoria',
+    icon: ClipboardCheck,
+    place: 'hub',
+    permission: 'page.audit',
+    keywords: 'competencia matriz obrigacoes entregas conclusao acompanhamento encerramento',
+  },
+  {
+    to: '/tarefas/recorrentes',
+    label: 'Tarefas recorrentes',
+    short: 'Recorrentes',
+    icon: Repeat,
+    place: 'hub',
+    permission: 'page.recurring',
+    keywords: 'obrigacoes repeticoes repete prazo legal meta das dctfweb folha periodicidade feriados grupos regime',
+  },
+  {
+    to: '/tarefas/processos',
+    label: 'Processos',
+    icon: Workflow,
+    place: 'hub',
+    permission: 'page.processes',
+    keywords: 'fluxos modelos etapas roteiro abertura alteracao',
   },
 ];
 
@@ -123,6 +148,11 @@ export const AREA_HOME: Record<Area, string> = { gestao: '/', financeiro: '/fina
 export function navItemsFor(area: Area, can?: (key: PermissionKey) => boolean): NavItem[] {
   const items = area === 'financeiro' ? FINANCE_NAV_ITEMS : GESTAO_NAV_ITEMS;
   return can ? items.filter((i) => !i.permission || can(i.permission)) : items;
+}
+
+/** Items of the rail and of the mobile "Mais": `navItemsFor` without the hub pages (spec §2.2). */
+export function railItemsFor(area: Area, can?: (key: PermissionKey) => boolean): NavItem[] {
+  return navItemsFor(area, can).filter((i) => i.place !== 'hub');
 }
 
 /** Page key of a Gestão path (`/tarefas/auditoria/...` → `page.audit`); null for Início, Tarefas and others. */
@@ -171,10 +201,15 @@ export function areaOf(pathname: string): Area | 'common' {
   return 'common';
 }
 
-/** Whether a rail item is the current page (`end` items only on their exact path). */
-export function isActivePath(pathname: string, item: Pick<NavItem, 'to' | 'end'>): boolean {
-  if (item.to === '/' || item.end) return pathname === item.to;
-  return underPath(pathname, item.to);
+/**
+ * Whether a rail item is the current page: `end` items only on their exact path, the others on their
+ * sub-paths too; `activeOn` paths (and their sub-paths) also count (Tarefas on the hub pages).
+ */
+export function isActivePath(pathname: string, item: Pick<NavItem, 'to' | 'end' | 'activeOn'>): boolean {
+  const path = routePath(pathname);
+  if (item.activeOn?.some((to) => underPath(path, to))) return true;
+  if (item.to === '/' || item.end) return path === item.to;
+  return underPath(path, item.to);
 }
 
 /** Rail geometry (px): a 44px icon button every 50px (6px gap). */

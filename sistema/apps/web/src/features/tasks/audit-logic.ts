@@ -208,18 +208,6 @@ export function columnDeadline(c: Pick<AuditColumn, 'legalDueDate' | 'targetDate
   return { text: `Prazo legal ${shortDate(c.legalDueDate, today)}`, tone: 'muted' };
 }
 
-/** "Outubro de 2026: 182 de 240 concluídas (76%). 12 pendências já passaram do prazo legal." */
-export function auditHeadline(summary: AuditMatrixResponse['summary'], monthLabel: string): string {
-  const live = summary.total - summary.canceled;
-  if (live === 0) return `${monthLabel}: nenhuma tarefa recorrente na competência.`;
-  const pct = Math.round((summary.done / live) * 100);
-  const late =
-    summary.overduePending > 0
-      ? `${summary.overduePending} ${summary.overduePending === 1 ? 'pendência já passou' : 'pendências já passaram'} do prazo legal.`
-      : 'Nenhuma pendência passou do prazo legal.';
-  return `${monthLabel}: ${summary.done} de ${live} concluídas (${pct}%). ${late}`;
-}
-
 // ---------------------------------------------------------------------------
 // "Por cliente" as a list (every width): each client with its progress, opened to its obligations
 // ---------------------------------------------------------------------------
@@ -340,4 +328,66 @@ export function taskRowLabel(column: AuditColumn, today: ISODate, expanded: bool
   const live = column.total - column.canceled;
   const deadline = groupDeadlineInfo(column, today, true).text;
   return `${column.name}: ${column.done} de ${live} concluídas, ${deadline.charAt(0).toLowerCase()}${deadline.slice(1)}. ${expanded ? 'Recolher' : 'Mostrar'} clientes.`;
+}
+
+// ---------------------------------------------------------------------------
+// Lean audit (spec §11.8, revision 4): the data and the control stay; the sentence that repeats a
+// number and the label the glyph already says go away.
+// ---------------------------------------------------------------------------
+
+/** First column of an occurrence row: the client (Por tarefa) or the obligation (Por cliente). */
+export type AuditRowLead = 'client' | 'obligation';
+
+/** The nearest target among the client's pending occurrences (the Prazo of the client row). */
+export function clientNextTarget(cells: Pick<OccurrenceCell, 'status' | 'targetDate'>[]): ISODate | null {
+  let next: ISODate | null = null;
+  for (const c of cells) if (isPendingCell(c) && (next === null || c.targetDate < next)) next = c.targetDate;
+  return next;
+}
+
+/** The alert under the client's Prazo: "2 atrasadas" (red) or "1 fora da meta" (amber); null when on time. */
+export function clientDeadlineNote(c: Pick<AuditClientRow, 'overduePending' | 'targetMissedPending'>): DueInfo | null {
+  if (c.overduePending > 0) return { text: `${c.overduePending} ${c.overduePending === 1 ? 'atrasada' : 'atrasadas'}`, tone: 'danger' };
+  if (c.targetMissedPending > 0) return { text: `${c.targetMissedPending} fora da meta`, tone: 'warning' };
+  return null;
+}
+
+/**
+ * Second line of the Prazo in Por cliente (the first is the target date): only the alert, or the legal
+ * date when it differs from the target; nothing when they are the same and nothing is late.
+ */
+export function obligationDeadlineDetail(cell: Pick<OccurrenceCell, 'status' | 'targetDate' | 'legalDueDate'>, today: ISODate): DueInfo | null {
+  const legal: DueInfo | null = cell.targetDate < cell.legalDueDate ? { text: `legal ${shortDate(cell.legalDueDate, today)}`, tone: 'muted' } : null;
+  if (!isPendingCell(cell)) return legal;
+  const toLegal = diffInDays(cell.legalDueDate, today);
+  if (toLegal < 0) return { text: `Prazo legal venceu há ${daysText(-toLegal)}`, tone: 'danger' };
+  if (toLegal === 0) return { text: 'Prazo legal hoje', tone: 'warning-strong' };
+  if (cell.targetDate < today) return { text: `Fora da meta · legal ${shortDate(cell.legalDueDate, today)}`, tone: 'warning' };
+  return legal;
+}
+
+/** The label beside the control, only in the exceptions (the glyph says A fazer, Em andamento, Concluída). */
+export function situationException(cell: Pick<OccurrenceCell, 'status'>): { text: string; className: string } | null {
+  if (cell.status === 'waiting_client') return { text: 'Aguardando', className: 'text-muted' };
+  if (cell.status === 'canceled') return { text: 'Cancelada', className: 'text-subtle' };
+  return null;
+}
+
+const ALERT_TONES = new Set<DueTone>(['danger', 'warning', 'warning-strong']);
+
+/**
+ * Second line of the stacked row: "Juliana M. · meta 03/11" (Por cliente) or "Juliana M." (Por tarefa,
+ * where the task header says the dates) and, apart, the alert in its tone. In Por tarefa the alert
+ * shows only when the occurrence's dates differ from the task's.
+ */
+export function stackedMeta(
+  cell: Pick<OccurrenceCell, 'status' | 'targetDate' | 'legalDueDate' | 'assignee'>,
+  lead: AuditRowLead,
+  sameDates: boolean,
+  today: ISODate,
+): { text: string; alert: DueInfo | null } {
+  const who = cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável';
+  const detail = lead === 'obligation' || !sameDates ? obligationDeadlineDetail(cell, today) : null;
+  const alert = detail && ALERT_TONES.has(detail.tone) ? detail : null;
+  return { text: lead === 'obligation' ? `${who} · meta ${shortDate(cell.targetDate, today)}` : who, alert };
 }

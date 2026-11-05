@@ -9,11 +9,16 @@ import {
   cellDeadlines,
   cellSituationText,
   cellTip,
+  clientDeadlineNote,
+  clientNextTarget,
   clientProgress,
   concludedAtText,
   conclusionDelayDays,
   conclusionDelayText,
+  obligationDeadlineDetail,
   sameDeadlines,
+  situationException,
+  stackedMeta,
   taskRowLabel,
 } from './audit-logic';
 import { makeCell, makeOccurrence } from './test-fixtures';
@@ -152,5 +157,52 @@ describe('the task row of "Por tarefa"', () => {
     expect(taskRowLabel(col, TODAY, false)).toBe('Folha de pagamento: 1 de 3 concluídas, prazo legal hoje. Mostrar clientes.');
     expect(taskRowLabel(col, TODAY, true)).toBe('Folha de pagamento: 1 de 3 concluídas, prazo legal hoje. Recolher clientes.');
     expect(taskRowLabel({ ...col, total: 4, canceled: 1, done: 3, pending: 0, targetDate: '2026-10-26' }, TODAY, false)).toBe('Folha de pagamento: 3 de 3 concluídas, meta 26/10 · legal 28/10. Mostrar clientes.');
+  });
+});
+
+describe('lean audit texts (spec §11.8)', () => {
+  it('gives the nearest target among the pending occurrences of a client', () => {
+    const cells = [
+      makeCell({ status: 'todo', targetDate: '2026-11-07' }),
+      makeCell({ status: 'in_progress', targetDate: '2026-11-03' }),
+      makeCell({ status: 'done', targetDate: '2026-10-20' }),
+    ];
+    expect(clientNextTarget(cells)).toBe('2026-11-03');
+    expect(clientNextTarget([makeCell({ status: 'done' }), makeCell({ status: 'canceled' })])).toBeNull();
+  });
+
+  it('says the alert of a client: overdue first, then out of the target', () => {
+    expect(clientDeadlineNote({ overduePending: 2, targetMissedPending: 1 })).toEqual({ text: '2 atrasadas', tone: 'danger' });
+    expect(clientDeadlineNote({ overduePending: 1, targetMissedPending: 0 })).toEqual({ text: '1 atrasada', tone: 'danger' });
+    expect(clientDeadlineNote({ overduePending: 0, targetMissedPending: 1 })).toEqual({ text: '1 fora da meta', tone: 'warning' });
+    expect(clientDeadlineNote({ overduePending: 0, targetMissedPending: 0 })).toBeNull();
+  });
+
+  it('keeps on the second line of the deadline only the alert or the legal date (Por cliente)', () => {
+    const pending = (targetDate: string, legalDueDate: string) => makeCell({ status: 'todo', targetDate, legalDueDate });
+    expect(obligationDeadlineDetail(pending('2026-10-24', '2026-10-26'), TODAY)).toEqual({ text: 'Prazo legal venceu há 2 dias', tone: 'danger' });
+    expect(obligationDeadlineDetail(pending('2026-10-28', '2026-10-28'), TODAY)).toEqual({ text: 'Prazo legal hoje', tone: 'warning-strong' });
+    expect(obligationDeadlineDetail(pending('2026-10-25', '2026-11-05'), TODAY)).toEqual({ text: 'Fora da meta · legal 05/11', tone: 'warning' });
+    expect(obligationDeadlineDetail(pending('2026-11-03', '2026-11-05'), TODAY)).toEqual({ text: 'legal 05/11', tone: 'muted' });
+    expect(obligationDeadlineDetail(pending('2026-11-05', '2026-11-05'), TODAY)).toBeNull();
+    expect(obligationDeadlineDetail(makeCell({ status: 'done', targetDate: '2026-11-03', legalDueDate: '2026-11-05' }), TODAY)).toEqual({ text: 'legal 05/11', tone: 'muted' });
+    expect(obligationDeadlineDetail(makeCell({ status: 'done', targetDate: '2026-11-05', legalDueDate: '2026-11-05' }), TODAY)).toBeNull();
+  });
+
+  it('labels the situation only in the exceptions', () => {
+    expect(situationException({ status: 'waiting_client' })).toEqual({ text: 'Aguardando', className: 'text-muted' });
+    expect(situationException({ status: 'canceled' })).toEqual({ text: 'Cancelada', className: 'text-subtle' });
+    for (const status of ['todo', 'in_progress', 'done'] as const) expect(situationException({ status })).toBeNull();
+  });
+
+  it('writes the second stacked line: who, the target and the alert', () => {
+    const juliana = { id: 'j', name: 'Juliana Martins' };
+    const cell = makeCell({ status: 'todo', assignee: juliana, targetDate: '2026-11-03', legalDueDate: '2026-11-05' });
+    expect(stackedMeta(cell, 'obligation', true, TODAY)).toEqual({ text: 'Juliana M. · meta 03/11', alert: null });
+    expect(stackedMeta({ ...cell, assignee: null }, 'obligation', true, TODAY).text.startsWith('Sem responsável')).toBe(true);
+    expect(stackedMeta(cell, 'client', true, TODAY)).toEqual({ text: 'Juliana M.', alert: null });
+    const late = makeCell({ status: 'todo', assignee: juliana, targetDate: '2026-10-24', legalDueDate: '2026-10-26' });
+    expect(stackedMeta(late, 'client', false, TODAY).alert?.tone).toBe('danger');
+    expect(stackedMeta(late, 'obligation', true, TODAY)).toEqual({ text: 'Juliana M. · meta 24/10', alert: { text: 'Prazo legal venceu há 2 dias', tone: 'danger' } });
   });
 });

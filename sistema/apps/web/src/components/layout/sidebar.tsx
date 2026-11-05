@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { BriefcaseBusiness, ChevronDown, LogOut, Moon, NotebookPen, Settings, Sun, UserRound, Wallet } from 'lucide-react';
 import { WORKSPACE_KIND_LABELS } from '@effinance/shared';
-import { cn, initials } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { useTheme } from '@/lib/theme';
 import { useElementSize } from '@/lib/use-element-size';
 import { useAuth } from '@/features/auth/auth-context';
@@ -20,7 +20,7 @@ import { WORKSPACE_KIND_ICONS } from '@/features/workspaces/kind-icon';
 import { usePermissions } from '@/features/auth/permissions';
 import { useTaskActions } from '@/features/tasks/task-actions';
 import { lastPathOf, type AreaMemory } from './area-memory';
-import { AREA_HOME, AREA_SHORT_LABELS, isActivePath, navItemsFor, SETTINGS_ITEM, splitRail, type Area, type NavItem } from './nav';
+import { AREA_HOME, AREA_SHORT_LABELS, isActivePath, railItemsFor, SETTINGS_ITEM, splitRail, type Area, type NavItem } from './nav';
 import { MemberAvatar } from '@/components/ui/member-avatar';
 
 interface SidebarProps {
@@ -40,7 +40,7 @@ export function Sidebar({ area, memory }: SidebarProps) {
   const rail = useElementSize<HTMLElement>();
   // Only members with both areas see the area label and the switch button.
   const { canAccessFinance, can } = usePermissions();
-  const { visible, hidden } = splitRail(navItemsFor(area, can), rail.height);
+  const { visible, hidden } = splitRail(railItemsFor(area, can), rail.height);
   const { openNotes } = useTaskActions();
 
   return (
@@ -198,9 +198,21 @@ function MoreLinks({ items }: { items: NavItem[] }) {
   );
 }
 
-function SidebarLink({ to, label, icon: Icon, end }: { to: string; label: string; end?: boolean; icon: React.ComponentType<{ className?: string }> }) {
+function SidebarLink({
+  to,
+  label,
+  icon: Icon,
+  end,
+  activeOn,
+}: {
+  to: string;
+  label: string;
+  end?: boolean;
+  activeOn?: string[];
+  icon: React.ComponentType<{ className?: string }>;
+}) {
   const { pathname } = useLocation();
-  const isActive = isActivePath(pathname, { to, end });
+  const isActive = isActivePath(pathname, { to, end, activeOn });
   // Plain Link with a string className: Tooltip's Slot cannot merge NavLink's function className.
   return (
     <Tooltip content={label} side="right" delay={150}>
