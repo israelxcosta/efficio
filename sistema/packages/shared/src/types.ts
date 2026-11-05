@@ -1314,9 +1314,12 @@ export interface RecurringOccurrenceDetail extends RecurringOccurrence {
 
 export interface RecurringTask {
   id: string;
+  /** `task`: a task's recurrence (`GET /tasks/recurring?origin=task|all`), managed from its task. */
+  origin: RecurrenceOrigin;
   name: string;
   description: string | null;
-  period: RecurrencePeriod;
+  /** `daily` only for tasks' recurrences. */
+  period: RecurrenceFrequency;
   /** Day of the month (1–31) or, weekly, the ISO weekday (1 = Monday). */
   dueDay: number;
   /** Anchor month of bimonthly…annual tasks. */
@@ -1324,13 +1327,20 @@ export interface RecurringTask {
   /** Months (1–12) it occurs in (all 12 for weekly and monthly). */
   months: number[];
   targetDaysBefore: number;
-  nonBusinessDayRule: NonBusinessDayRule;
+  /** `skip` only for tasks' recurrences. */
+  nonBusinessDayRule: RecurrenceNonBusinessDayRule;
   /** Reference month = competence − this many months. */
   referenceOffset: number;
   department: TaskRef | null;
   category: TaskCategoryRef | null;
   /** Default responsible. */
   assignee: TaskMemberRef | null;
+  /** A task's recurrence: its client (null = internal). Always null for the registry's. */
+  client: TaskClientRef | null;
+  /** A task's recurrence: the rule as the task shows it (with `canEdit`). Null for the registry's. */
+  recurrence: TaskRecurrence | null;
+  /** A task's recurrence: the task to open — the next open occurrence, else the last one. Null for the registry's. */
+  nextTaskId: string | null;
   regimes: TaxRegime[];
   clientIds: string[];
   excludedClientIds: string[];
@@ -1369,6 +1379,8 @@ export interface RecurringTaskListResponse {
     ended: number;
     /** Occurrences of the month (active recurring tasks): "182 de 240 concluídas". */
     occurrences: { total: number; done: number; canceled: number };
+    /** Active recurring tasks per origin, whatever `origin` was asked (the "Tipo" filter's counts). */
+    byOrigin: Record<RecurrenceOrigin, number>;
   };
 }
 

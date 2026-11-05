@@ -423,7 +423,7 @@ describe('recurring tasks: editing and deleting', () => {
     const list = (await carla.get('/tasks/recurring')).body;
     expect(list.month).toBe('2026-10');
     expect(list.items.map((i: any) => i.name)).toEqual(['DAS', 'Folha de pagamento']);
-    expect(list.summary).toEqual({ active: 2, ended: 0, occurrences: { total: 2, done: 0, canceled: 0 } });
+    expect(list.summary).toEqual({ active: 2, ended: 0, occurrences: { total: 2, done: 0, canceled: 0 }, byOrigin: { registry: 2, task: 0 } });
     expect((await carla.get(`/tasks/recurring?departmentId=${pessoal}`)).body.items.map((i: any) => i.name)).toEqual(['Folha de pagamento']);
     expect((await carla.get('/tasks/recurring?search=folha')).body.items).toHaveLength(1);
     const folha = list.items[1];

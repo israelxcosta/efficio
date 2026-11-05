@@ -36,6 +36,7 @@ import {
   RECURRENCE_FREQUENCIES,
   RECURRENCE_KINDS,
   RECURRENCE_NON_BUSINESS_DAY_RULES,
+  RECURRENCE_ORIGINS,
   RECURRENCE_PERIODS,
   SERIES_SCOPES,
   SIMPLES_ACCESS_REGIMES,
@@ -1152,7 +1153,13 @@ export const recurringTaskQuerySchema = z.object({
   /** Month of the progress column (default: current). */
   month: monthKeySchema.optional(),
   search: z.string().trim().max(200).optional(),
-  period: z.enum(RECURRENCE_PERIODS).optional(),
+  /** `daily` only matches tasks' recurrences. */
+  period: z.enum(RECURRENCE_FREQUENCIES).optional(),
+  /**
+   * `registry` (default: the "Recorrentes" registry, as always), `task` (tasks' recurrences, managed from
+   * their task) or `all`.
+   */
+  origin: z.enum([...RECURRENCE_ORIGINS, 'all']).default('registry'),
   departmentId: idSchema.optional(),
   /** Default responsible, or the responsible of any client in the month. */
   assigneeId: idSchema.optional(),

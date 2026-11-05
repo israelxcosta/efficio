@@ -229,7 +229,8 @@ sequenceDiagram
   revisão das fases 2/3 (responsáveis do histórico pseudonimizados na exclusão da conta, índices do
   calendário e de "quem viu", CHECK do modelo de contrato) · 0017 remoção do responsável por cliente
   (`task_client_responsibles`) · 0018 marcador de geração (`task_generation_state`/`_marks` + gatilhos),
-  `recurring_tasks.catalog_key` e índice de conclusões (`tasks_completed_idx`). Escritas
+  `recurring_tasks.catalog_key` e índice de conclusões (`tasks_completed_idx`) · 0019 recorrência em qualquer
+  tarefa (`recurring_tasks.origin`/`internal`/regra por data, `tasks.occurrence_origin`, índice das internas). Escritas
   para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tarefas usam `todayIn('America/Sao_Paulo')` (o dia do escritório, não o do servidor
@@ -335,7 +336,9 @@ sequenceDiagram
 13. **Ocorrências de recorrentes são linhas de `tasks`** (`recurring_task_id` não nulo): a lista nunca
     as devolve em `items` (vêm agregadas em `occurrences`), mas os resumos as contam uma por cliente.
     Consulta nova sobre `tasks` precisa decidir se inclui ocorrências (`OCCURRENCE_SQL`/
-    `NOT_OCCURRENCE_SQL` em `task-rows.ts`). Leitura de uma competência chama `ensureOccurrences`
+    `NOT_OCCURRENCE_SQL` em `task-rows.ts`) e, desde a 0019, de que origem: `AGGREGATED_SQL` (cadastro:
+    agregadas, auditoria, obrigações) × `ROW_SQL` (linhas: avulsas, etapas e recorrência de tarefas;
+    `visibleSeriesSql` sem filtro de data). Recorrência de tarefa: `task-recurrence.ts`; área pessoal: `overview.ts`. Leitura de uma competência chama `ensureOccurrences`
     antes (gera o que falta; não gera sem assinatura com escrita nem fora da janela −24/+2; pula os pares
     recorrente × competência com marca na versão atual — mudança nova que decide ocorrências precisa
     subir a versão: gatilho em `contacts`/`recurring_tasks`/`recurring_task_clients`, ou `GENERATION_RULES`

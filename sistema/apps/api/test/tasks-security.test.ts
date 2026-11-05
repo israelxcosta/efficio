@@ -131,6 +131,8 @@ const MEMBER_ROUTES = new Set([
   'GET /api/tasks/dashboard',
   'GET /api/tasks/regime-groups',
   'GET /api/tasks/activity',
+  // The personal area (only your numbers and your department's aggregate).
+  'GET /api/tasks/me/overview',
   'GET /api/tasks',
   'POST /api/tasks',
   'GET /api/tasks/:id',

@@ -287,8 +287,14 @@ export async function ensureOccurrences(
       ),
   ]);
   const existing = new Set(existingRows.map((r) => keyOf(r.defId!, r.clientId, r.periodKey!)));
+  // No backfill for tasks' recurrences: their task is the first occurrence and nothing before today is
+  // generated (a rule starting in the past, or changed, would otherwise bring a run of overdue copies).
   const missing = [...pending].flatMap(([competence, list]) =>
-    desiredOccurrences(list, clients, [competence]).filter((o) => !existing.has(keyOf(o.def.row.id, o.client?.id ?? null, o.scheduled.periodKey))),
+    desiredOccurrences(list, clients, [competence]).filter(
+      (o) =>
+        !existing.has(keyOf(o.def.row.id, o.client?.id ?? null, o.scheduled.periodKey)) &&
+        (o.def.row.origin !== 'task' || o.scheduled.legalDueDate >= ctx.today),
+    ),
   );
   if (missing.length === 0) {
     await writeMarks(ctx, [...pending].flatMap(([competence, list]) => list.map((d) => ({ recurringTaskId: d.row.id, competence }))), version);
@@ -611,7 +617,11 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
  * Occurrences of a recurring task someone worked on: status other than "A fazer", assigned by hand,
  * with comments, attachments or subtasks. Deleting the recurring task would erase them (refused).
  */
-export async function workedOccurrenceCount(ctx: Pick<TaskContext, 'db' | 'workspaceId'>, recurringTaskId: string): Promise<number> {
+export async function workedOccurrenceCount(
+  ctx: Pick<TaskContext, 'db' | 'workspaceId'>,
+  recurringTaskId: string,
+  exceptTaskId?: string,
+): Promise<number> {
   const [worked] = await ctx.db
     .select({ n: sql<number>`count(*)`.mapWith(Number) })
     .from(tasks)
@@ -619,6 +629,7 @@ export async function workedOccurrenceCount(ctx: Pick<TaskContext, 'db' | 'works
       and(
         eq(tasks.workspaceId, ctx.workspaceId),
         eq(tasks.recurringTaskId, recurringTaskId),
+        exceptTaskId ? sql`${tasks.id} <> ${exceptTaskId}` : undefined,
         sql`(${tasks.status} <> 'todo' or ${tasks.assigneeSource} = 'manual'
           or exists (select 1 from task_comments c where c.workspace_id = tasks.workspace_id and c.task_id = tasks.id)
           or exists (select 1 from task_attachments a where a.workspace_id = tasks.workspace_id and a.task_id = tasks.id)

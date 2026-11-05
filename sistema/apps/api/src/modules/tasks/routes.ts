@@ -36,6 +36,7 @@ import {
   taskFlowQuerySchema,
   taskHomeQuerySchema,
   taskInputSchema,
+  taskMyOverviewQuerySchema,
   taskNoteInputSchema,
   taskQuerySchema,
   taskReportExportQuerySchema,
@@ -65,6 +66,7 @@ import { taskDashboard } from './dashboard';
 import { taskHome } from './home';
 import { exportTaskReport, taskCalendar, taskReport } from './insights';
 import { createNote, deleteNote, listNotes, updateNote } from './notes';
+import { myOverview } from './overview';
 import { applyRegimeGroup, listRegimeGroups } from './regime-groups';
 import {
   createRecurring,
@@ -175,6 +177,10 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
     run(req, (ctx) => taskDashboard(ctx, req.query)),
   );
   app.get('/activity', async (req) => run(req, (ctx) => recentActivity(ctx)));
+  // The personal area: only your numbers and your department's aggregate.
+  app.get('/me/overview', { schema: { querystring: taskMyOverviewQuerySchema } }, async (req) =>
+    run(req, (ctx) => myOverview(ctx, req.query)),
+  );
   app.get('/calendar', { schema: { querystring: taskCalendarQuerySchema } }, async (req) =>
     run(req, (ctx) => taskCalendar(ctx, req.query)),
   );

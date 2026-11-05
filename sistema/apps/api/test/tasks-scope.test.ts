@@ -34,6 +34,7 @@ import {
   taskFlowQuerySchema,
   taskHomeQuerySchema,
   taskInputSchema,
+  taskMyOverviewQuerySchema,
   taskNoteInputSchema,
   taskQuerySchema,
   taskReportExportQuerySchema,
@@ -54,6 +55,7 @@ import * as flowsModule from '../src/modules/tasks/flows';
 import * as homeModule from '../src/modules/tasks/home';
 import * as insightsModule from '../src/modules/tasks/insights';
 import * as notesModule from '../src/modules/tasks/notes';
+import * as overviewModule from '../src/modules/tasks/overview';
 import * as recurringModule from '../src/modules/tasks/recurring';
 import * as regimeGroupsModule from '../src/modules/tasks/regime-groups';
 import * as registryModule from '../src/modules/tasks/registry';
@@ -260,6 +262,7 @@ describe('tasks: every query filters by the workspace', () => {
     // Office A: owner Ana and collaborator Carla, one client.
     const ana = await registerUser(app, 'Ana Titular');
     const carla = await member(ana, 'viewer', 'Carla Souza');
+    const dani = await member(ana, 'viewer', 'Dani Lima');
     const ws = await workspaceOf(ana);
     const aClient = await ana.post(
       '/clients',
@@ -303,6 +306,7 @@ describe('tasks: every query filters by the workspace', () => {
     const insights = tracked(insightsModule, called);
     const attachments = tracked(attachmentsModule, called);
     const notes = tracked(notesModule, called);
+    const overview = tracked(overviewModule, called);
     statements.length = 0;
 
     // Registries.
@@ -326,6 +330,7 @@ describe('tasks: every query filters by the workspace', () => {
       ),
     );
     await run(anaCtx, (c) => registry.setMemberDepartment(c, carla.userId, fiscal.id));
+    await run(anaCtx, (c) => registry.setMemberDepartment(c, dani.userId, fiscal.id));
     await run(anaCtx, (c) => registry.listDepartments(c));
     const category = await run(anaCtx, (c) =>
       registry.createCategory(c, taskCategoryInputSchema.parse({ name: 'Certidões' })),
@@ -468,6 +473,38 @@ describe('tasks: every query filters by the workspace', () => {
     await run(carlaCtx, (c) => service.listTasks(c, taskQuerySchema.parse({ kind: 'recurring', dueBucket: 'targetMissed' })));
     await run(anaCtx, (c) => recurring.deleteRecurring(c, weekly.id));
 
+    // Tasks' recurrences (migration 0019): with a task (internal daily, client weekly), converted, edited as
+    // a series (client switch, new rule), one occurrence only, ended, undone, deleted; lists with origins.
+    const daily = await run(carlaCtx, (c) =>
+      service.createTask(c, taskInputSchema.parse({ title: 'Conferir caixa', description: 'Somar', assigneeId: carla.userId, dueDate: '2026-10-21', recurrence: { frequency: 'daily' } })),
+    );
+    const calls = await run(carlaCtx, (c) =>
+      service.createTask(
+        c,
+        taskInputSchema.parse({ title: 'Ligar', clientId: aClient.body.id, assigneeId: carla.userId, dueDate: '2026-10-21', recurrence: { frequency: 'weekly', weekdays: [1, 3], ends: 'count', count: 6 } }),
+      ),
+    );
+    await run(carlaCtx, (c) => service.updateTask(c, calls.id, taskUpdateSchema.parse({ clientId: null, title: 'Ligar (interna)', applyTo: 'series' })));
+    await run(carlaCtx, (c) => service.updateTask(c, calls.id, taskUpdateSchema.parse({ clientId: aClient.body.id, applyTo: 'series' })));
+    await run(carlaCtx, (c) => service.updateTask(c, calls.id, taskUpdateSchema.parse({ recurrence: { frequency: 'weekly', weekdays: [2] } })));
+    await run(carlaCtx, (c) => service.updateTask(c, calls.id, taskUpdateSchema.parse({ priority: 'high' })));
+    const [later] = await executeRows<{ id: string }>(
+      admin(),
+      sql`select id from tasks where recurring_task_id = ${calls.occurrence!.recurringTaskId} and status = 'todo' order by due_date offset 1 limit 1`,
+    );
+    await run(carlaCtx, (c) => service.updateTask(c, later!.id, taskUpdateSchema.parse({ recurrence: null })));
+    await run(carlaCtx, (c) => service.updateTask(c, daily.id, taskUpdateSchema.parse({ recurrence: null })));
+    const monthly = await run(carlaCtx, (c) => service.createTask(c, taskInputSchema.parse({ title: 'Relatório', assigneeId: carla.userId, dueDate: '2026-10-30' })));
+    await run(carlaCtx, (c) => service.updateTask(c, monthly.id, taskUpdateSchema.parse({ recurrence: { frequency: 'monthly' } })));
+    await run(carlaCtx, (c) => service.getTaskDetail(c, monthly.id));
+    for (const query of [{ origin: 'all' }, { origin: 'task', period: 'weekly', status: 'all' }]) {
+      await run(carlaCtx, (c) => recurring.listRecurring(c, recurringTaskQuerySchema.parse(query)));
+    }
+    await run(anaCtx, (c) => service.deleteTask(c, monthly.id));
+    // The personal area (with a department of 3: the average runs too).
+    await run(carlaCtx, (c) => overview.myOverview(c, taskMyOverviewQuerySchema.parse({})));
+    await run(carlaCtx, (c) => overview.myOverview(c, taskMyOverviewQuerySchema.parse({ month: '2026-09' })));
+
     // Regime groups: list, apply (creates, then adds a regime to a common one), and a plain insert.
     await run(carlaCtx, (c) => regimeGroups.listRegimeGroups(c));
     await run(anaCtx, (c) => regimeGroups.applyRegimeGroup(c, 'simples_nacional', regimeGroupApplySchema.parse({ keys: ['fgts_digital', 'pgdas_das'] })));
@@ -567,6 +604,7 @@ describe('tasks: every query filters by the workspace', () => {
         insightsModule,
         attachmentsModule,
         notesModule,
+        overviewModule,
       ),
     );
 

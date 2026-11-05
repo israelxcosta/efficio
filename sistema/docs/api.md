@@ -692,7 +692,10 @@ provider_unavailable` (agregador não respondeu; detalhes só no log do servidor
 Gestão de tarefas do escritório (porte das regras do Effy). Especificação de UI:
 `docs/tarefas-ui.md` (rev. 3). Contrato em `packages/shared`: constantes e rótulos em `constants.ts`
 (`TASK_STATUSES`, `TASK_PRIORITIES`, `TASK_SCOPES`, `TASK_SITUATIONS`, `TASK_KINDS`,
-`TASK_DUE_BUCKETS` — com `targetMissed`, "Fora da meta" —, `RECURRENCE_PERIODS` (6),
+`TASK_DUE_BUCKETS` — com `targetMissed`, "Fora da meta" —, `RECURRENCE_PERIODS` (6, do cadastro;
+`RECURRENCE_FREQUENCIES` acrescenta `daily` para a recorrência de tarefas, com `RECURRENCE_ENDS`,
+`RECURRENCE_ORIGINS`, `RECURRENCE_NON_BUSINESS_DAY_RULES` com `skip` e `TASK_RECURRENCE_APPLY_TO`),
+`TASK_INSIGHT_KEYS`/`TASK_INSIGHT_TONES`, `MIN_DEPARTMENT_COMPARISON_MEMBERS`,
 `RECURRENCE_PERIOD_MONTHS`, `WEEKDAY_LABELS`, `NON_BUSINESS_DAY_RULES`, `MAX_REFERENCE_OFFSET`,
 `OCCURRENCE_STATUSES`, `OCCURRENCE_SITUATIONS`, `ASSIGNEE_SOURCES`, `FLOW_STEP_STATES`,
 `TASK_EVENT_KINDS`, `TASK_ATTACHMENT_TYPES`/`TASK_ATTACHMENT_CONTENT_TYPES`, `MAX_ATTACHMENT_BYTES`,
@@ -733,6 +736,7 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) está i
   | Anotações pessoais | as próprias | as próprias (nunca as de outro) |
   | Departamentos, departamento do membro, categorias, aplicar grupo padrão por regime | não | sim |
   | Tarefas recorrentes (criar, editar, excluir, gerar competência) | não | sim |
+  | Repetir uma tarefa (`recurrence`, um cliente ou interna): criar, alterar a série, encerrar | as suas e as do seu departamento | todas (`registry`) |
   | Modelos de processo (criar, editar, excluir) | não | sim |
   | Excluir tarefa avulsa; excluir processo | não | sim |
   | Página de início de outro departamento ou de todos | não | sim |
@@ -781,11 +785,12 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) está i
 | GET | `/api/tasks/regime-groups` | — | `RegimeGroupsResponse` | todos |
 | POST | `/api/tasks/regime-groups/:regime/apply` | `regimeGroupApplySchema` (`keys`, `departments`) | `RegimeGroupApplyResponse` | admin |
 | GET | `/api/tasks/activity` | — | `TaskActivityItem[]` | todos |
+| GET | `/api/tasks/me/overview` | `taskMyOverviewQuerySchema` (`month`) | `TaskMyOverviewResponse` (área pessoal: só os seus números e o agregado do departamento) | todos |
 | GET | `/api/tasks/calendar` | `taskCalendarQuerySchema` (`from`, `to` ≤ 62 dias, escopo e filtros) | `TaskCalendarResponse` | todos |
 | GET | `/api/tasks/reports` | `taskReportQuerySchema` (período ≤ 1 ano, filtros, página até 1000) | `TaskReportResponse` | todos |
 | GET | `/api/tasks/reports/export.csv` | `taskReportExportQuerySchema` | `text/csv` (download, até 10 000 linhas) | todos |
 | GET | `/api/tasks/audit` | `taskAuditQuerySchema` (`competence`, `taxRegime`, `departmentId`, `assigneeId`, `recurringTaskId`) | `AuditMatrixResponse` | todos |
-| GET | `/api/tasks/recurring` | `recurringTaskQuerySchema` | `RecurringTaskListResponse` | todos |
+| GET | `/api/tasks/recurring` | `recurringTaskQuerySchema` (`origin` = `registry` (padrão) \| `task` \| `all`) | `RecurringTaskListResponse` (itens com `origin`, `client`, `recurrence`, `nextTaskId`; `summary.byOrigin`) | todos |
 | POST | `/api/tasks/recurring` | `recurringTaskInputSchema` | `RecurringTask` (201; gera as ocorrências da janela) | admin |
 | POST | `/api/tasks/recurring/generate` | `recurringGenerateSchema` (`competence`) | `RecurringGenerateResponse` | admin |
 | GET | `/api/tasks/recurring/:id` | `?month` | `RecurringTask` | todos |
@@ -807,11 +812,11 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) está i
 | PUT | `/api/tasks/notes/:id` | `taskNoteInputSchema` | `TaskNote` | dono |
 | DELETE | `/api/tasks/notes/:id` | — | 204 | dono |
 | GET | `/api/tasks` | `taskQuerySchema` | `TaskListResponse` | todos |
-| POST | `/api/tasks` | `taskInputSchema` | `TaskDetail` (201) | todos |
+| POST | `/api/tasks` | `taskInputSchema` (+ `recurrence` opcional) | `TaskDetail` (201; com `recurrence`, a primeira ocorrência) | todos (repetir: sua/departamento ou `registry`) |
 | GET | `/api/tasks/:id` | — | `TaskDetail` | todos |
-| PATCH | `/api/tasks/:id` | `taskUpdateSchema` (só os campos enviados) | `TaskDetail` | todos |
+| PATCH | `/api/tasks/:id` | `taskUpdateSchema` (só os campos enviados; `recurrence`, `applyTo`) | `TaskDetail` | todos (série: sua/departamento ou `registry`) |
 | PATCH | `/api/tasks/:id/status` | `taskStatusInputSchema` (`status`, `reason`) | `TaskStatusChangeResponse` | todos (regras de reabertura) |
-| DELETE | `/api/tasks/:id` | — | 204 (subtarefas, comentários, anexos e histórico juntos); 409 para ocorrência | admin |
+| DELETE | `/api/tasks/:id` | — | 204 (subtarefas, comentários, anexos e histórico juntos); 409 para ocorrência do cadastro; tarefa que se repete: a série inteira, se nada foi trabalhado (senão 409) | admin |
 | GET | `/api/tasks/:id/history` | — | `TaskHistoryResponse` (até 500, mais recentes primeiro) | todos |
 | POST | `/api/tasks/:id/subtasks` | `subtaskInputSchema` | `TaskSubtask` (201) | todos |
 | PATCH | `/api/tasks/:id/subtasks/:subtaskId` | `subtaskUpdateSchema` (`title` e/ou `done`) | `TaskSubtask` | todos |
@@ -1036,7 +1041,118 @@ células).
   `RecurringOccurrenceDetail`): o agregado, a descrição decifrada e uma `OccurrenceCell` por cliente
   (com nome, razão social, CNPJ decifrado e regime).
 
+## Recorrência em qualquer tarefa (migração 0019)
+
+Toda tarefa pode se repetir: sem `recurrence`, um vencimento só (como sempre); com `recurrence`
+(`taskRecurrenceInputSchema`), a regra escolhida. **Um motor só**: a tarefa vira uma tarefa recorrente de
+**origem `task`** (`recurring_tasks.origin`; as do cadastro são `registry`) com **um cliente** (vínculo
+`include`) ou **interna** (`internal`, uma ocorrência por período, `client_id` nulo), responsável padrão = o
+da tarefa, departamento = o do responsável (ou a fila). As ocorrências são geradas por `ensureOccurrences`
+com o marcador da 0018, como as do cadastro, e levam `occurrence_origin = 'task'`, a prioridade, o
+horário e a descrição da série. Serviços: `modules/tasks/task-recurrence.ts` (série) e `service.ts`.
+
+- **Regra** (`taskRecurrenceInputSchema`): `frequency` = `daily | weekly | monthly | bimonthly | quarterly |
+  semiannual | annual`; `interval` "a cada N" dias/semanas/meses (só diária, semanal e mensal, 1–99,
+  contado a partir do início); `weekdays` na semanal (ISO 1–7, um ou vários, cada dia uma ocorrência);
+  `dueDay` (mensal em diante; padrão o dia do início) e `dueMonth` (bimestral em diante; padrão o mês do
+  início); `startDate` (padrão: o vencimento da tarefa, senão hoje; no mínimo o 1º dia da competência
+  anterior → 422 "A recorrência pode começar a partir de…"); `ends` = `never | date (endDate, inclusive) |
+  count (1–500; o fim é calculado por `seriesEndDate` e gravado)`; regras de obrigação como no cadastro:
+  `targetDaysBefore` (meta; 0 na diária, até 6 na semanal), `nonBusinessDayRule` (`anticipate | postpone |
+  keep`, e `skip` = sem ocorrência em fim de semana/feriado, só diária e semanal, o padrão delas; nas demais
+  o padrão é `anticipate`) e `referenceOffset` (0 na diária/semanal; padrão 0).
+- **Agenda compartilhada** (`utils/tasks.ts`): `occurrencesInCompetence` com diária, semanal em dias
+  escolhidos, "a cada N", limites `startDate`/`endDate` e `skip`; chave do período = a data nas diárias e
+  semanais por dias (a semanal do cadastro continua com a segunda-feira) — `competenceOfPeriod`,
+  `isDateKeyedSchedule`, `firstScheduledOccurrence`, `seriesEndDate`.
+- **Criar** (`POST /tasks` com `recurrence`): a tarefa é a **primeira ocorrência** (vencimento = primeira data
+  da regra a partir do início, que pode diferir do enviado); 422 "Essa recorrência não tem nenhuma
+  ocorrência." e "O cliente ainda não está ativo em MM/AAAA." (cliente ativo na competência da primeira).
+  As seguintes são geradas na janela (−2/+2 competências). **Sem retroativo**: nada com prazo antes de hoje é
+  gerado para origem `task` (só a própria tarefa pode estar no passado).
+- **Tornar repetível** (`PATCH` de uma tarefa sem recorrência com `recurrence`): a própria tarefa vira a
+  primeira ocorrência (o vencimento passa à primeira data da regra; histórico "updated" com
+  `recurrence`). Etapa de processo → 422 "Etapas de processo não se repetem.".
+- **Só esta × esta e as próximas** (ocorrência de origem `task`): `applyTo: 'occurrence'` (padrão,
+  compatível) altera só a ocorrência — descrição, prioridade, responsável (`manual`, "Atribuída só nesta
+  ocorrência"); título, cliente, categoria, departamento, horário e datas → 422. `applyTo: 'series'` (ou
+  enviar `recurrence`) altera a **série**: título, cliente, categoria, responsável, fila, prioridade,
+  descrição e horário; a ocorrência editada recebe tudo na hora e as não iniciadas da competência atual em
+  diante seguem (`syncOpenOccurrences`); em andamento e concluídas não mudam. **Datas** vêm sempre da regra
+  (`startDate`/`dueDate` → 422). Troca de cliente (inclusive para interna e de volta) **move** as não
+  iniciadas no lugar (sem cancelar e recriar). Regra nova: as não iniciadas cujo período deixou de existir
+  são canceladas com motivo, as que faltam são geradas, e a ocorrência editada, se "A fazer", **muda para o
+  período novo mais próximo** a partir do seu vencimento quando ele está livre (o `id` não muda).
+- **Encerrar** (`recurrence: null`): a série termina nesta ocorrência (`ends: 'date'`); as não iniciadas
+  depois dela são canceladas ("A recorrência foi encerrada antes desta data"). **Desfazer "Repetir"**: se a
+  tarefa é a primeira ocorrência e nenhuma outra foi trabalhada, `recurrence: null` a devolve a **avulsa**
+  (mesmo vencimento; série e ocorrências intocadas apagadas). Reativar: `recurrence` numa ocorrência da série
+  encerrada reaproveita a série.
+- **Excluir** (`DELETE /tasks/:id`, `deleteTasks`) numa ocorrência de origem `task`: a série inteira, se
+  nenhuma ocorrência foi trabalhada (mesma regra de `DELETE /tasks/recurring/:id`); senão 409 "Esta tarefa
+  se repete e já tem histórico…".
+- **Permissão**: qualquer membro cria, altera a série ou encerra quando ela é **sua** (responsável) ou do
+  **seu departamento**, antes e depois da mudança (passar a série para outro departamento é como criá-la
+  lá); o resto exige `registry` → 403 "Você só pode repetir tarefas suas ou do seu departamento.". Ocorrência
+  do **cadastro** com `recurrence`/`applyTo: 'series'` → 422 "Esta tarefa vem de uma tarefa recorrente do
+  cadastro: altere-a em Recorrentes." `TaskDetail.recurrence.canEdit` diz se pode.
+- **Resposta**: `Task.kind = 'recurring'` e `Task.occurrence.origin` (`registry | task`, `period` pode ser
+  `daily`); `TaskDetail.recurrence: TaskRecurrence | null` (só origem `task`: a regra, `endDate` calculado,
+  `active`, as 5 próximas datas, `occurrenceCount`, `canEdit`). `lockedFields` continua o da ocorrência (o
+  modo `occurrence`). Reabrir uma ocorrência de origem `task` concluída segue a regra de qualquer tarefa (o
+  registro de auditoria com motivo é só do cadastro).
+- **Onde aparecem** (decisão): ocorrências de origem `task` são **tarefas** — na lista (`items`, nunca em
+  `occurrences`), em "Minhas" do início, no calendário (`tasks`), nos relatórios e nos totais (contam como
+  `recurring`). Sem filtro de data, a lista e "Minhas" mostram as dos **próximos 7 dias** e a **próxima em
+  aberto** de cada série (`visibleSeriesSql`: uma diária não enche a lista com dois meses); com `month`/
+  `dueFrom`/`dueTo`, todas do período. **Ficam fora da auditoria mensal** (com cliente ou internas: não são
+  obrigação do cliente e uma diária criaria ~22 colunas por competência), dos blocos de obrigações
+  (`obligations` do início; "Pendências fiscais", "Processos por departamento" e "Visão geral dos clientes"
+  do dashboard), dos agregados `RecurringOccurrence` e dos grupos padrão por regime. A busca mostra só a
+  próxima ocorrência em aberto de cada série; os resultados `recurringTasks` são do cadastro.
+- **Lista de recorrentes** (`GET /tasks/recurring`): `origin=registry` (padrão, nada muda), `task` ou
+  `all`; itens de origem `task` com `client` (null = interna), `recurrence` e `nextTaskId` (próxima
+  ocorrência aberta; sem ela, a última). `summary.byOrigin` conta as ativas por origem. `GET/PUT/DELETE
+  /tasks/recurring/:id` e o detalhe por cliente continuam só do cadastro (404 para origem `task`, que se
+  gerencia pela tarefa).
+- **Membro muda de departamento**: as séries de origem `task` dele seguem a regra das ocorrências (ficam no
+  departamento da série).
+
+## Área pessoal (`GET /tasks/me/overview`)
+
+O que a área do usuário (clicar no avatar; `view-perfil` do Effy) precisa além do calendário
+(`scope=mine|department`), das anotações, do início e do dashboard. Tudo em SQL agregado
+(`modules/tasks/overview.ts`), unidades como no início (tarefas e ocorrências, uma por cliente). **Só os
+números da pessoa** e, na comparação, o **agregado** do departamento — nunca o de um colega.
+
+- `open`: o que está aberto com você agora, em qualquer departamento (horizonte e visibilidade de
+  "Minhas"): total, atrasadas, vencem hoje/amanhã (data de trabalho), próximos 7 dias, fora da meta (e o
+  prazo legal mais próximo), aguardando cliente, sem vencimento e a mais antiga atrasada.
+- `productivity`: o que **você concluiu** (quem clicou em Concluir) no mês `month` (padrão: o atual), pelo
+  dia da conclusão no fuso do escritório — no prazo (≤ vencimento/prazo legal; sem vencimento conta no
+  prazo) × com atraso, `onTimeRate` 0–100, média de dias da criação à conclusão, `trend` dos 6 meses até o
+  mês e `rateChange` (pontos contra o mês anterior). Filtra um intervalo de `completed_at` com
+  `status = 'done'` literal (índice `tasks_completed_idx`).
+- `upcoming`: hoje a hoje + 14 (as atrasadas estão em `open`): até 15 tarefas pela data de trabalho
+  (com horário) e as ocorrências do cadastro agregadas; `total` em unidades.
+- `workload`: por dia da semana (ISO 1–7, os sete): suas abertas pela data de trabalho nas próximas 4
+  semanas (`due`, todas as ocorrências) e suas conclusões nas últimas 8 (`concluded`).
+- `comparison`: você × a **média por membro** do seu departamento (membros atuais) no mês — concluídas,
+  % no prazo (sobre todas as conclusões do departamento), abertas e atrasadas agora. Sem departamento,
+  `null`; com menos de `MIN_DEPARTMENT_COMPARISON_MEMBERS` (3) membros, `average: null` (a média revelaria
+  os números de um colega).
+- `insights` (até 6, por urgência; `overview-insights.ts`, textos pt-BR prontos): atrasadas ("Você tem 2
+  tarefas atrasadas; a mais antiga venceu há 10 dias."), vencem hoje, fora da meta, vencem amanhã ("3
+  tarefas vencem amanhã."), % no prazo ("Você concluiu 92% no prazo este mês (23 de 25)." / "Só 60%…"),
+  tendência (±10 pontos), departamento (acima da média em concluídas, ou mais atrasadas que a média),
+  aguardando cliente, dia mais cheio da semana e "tudo em dia". `link` = filtro de "Minhas" na lista
+  (`situation` com os valores de `TASK_SITUATIONS`, `dueBucket` ou `dueDate`).
+- Testes: `test/tasks-overview.test.ts` (números, tendência, comparação com 2 e 3 membros, nada de outra
+  pessoa na resposta, insights puros) e o roteiro de `test/tasks-scope.test.ts`.
+
 ## Auditoria mensal (fase 2)
+
+Só as recorrentes do **cadastro** (origem `registry`); a recorrência de tarefas fica fora (ver acima).
 
 Porte de `StatusMatrixEntry` + `AuditConclusion` + `monthlyAudit.service`, agora sobre as ocorrências
 geradas (`modules/tasks/audit.ts`). `GET /tasks/audit?competence=` devolve a matriz cliente ×
@@ -1232,6 +1348,24 @@ departamento, só os seus itens) e `month` (competência dos cards de tarefas, p
   só presença, nunca os valores cifrados (`CLIENT_COMPLETENESS_FIELDS`, `completenessFieldsOf`).
 
 Testes: `test/tasks-dashboard.test.ts`.
+
+## Banco (migração 0019)
+
+- `recurring_tasks`: `origin` (`registry` | `task`, nunca muda), `internal`, `repeat_interval`, `weekdays
+  integer[]`, `start_date`/`end_date` (datas nominais, inclusive; as competências acompanham),
+  `occurrence_limit`, `priority`, `start_time`/`end_time`. CHECKs: período `daily` e regra `skip` (só diária
+  e semanal com dias), `recurring_tasks_recurrence_chk` (intervalo 1–99 só diária/semanal/mensal com
+  início, dias 1–7 só na semanal, fim ≥ início, limite 1–500 com fim), `recurring_tasks_origin_chk` (linha do
+  cadastro sem nada disso; de tarefa sem regimes e com início), prioridade e horário.
+  `unique (workspace_id, id, origin)` para a FK abaixo.
+- `tasks.occurrence_origin`: origem da série da ocorrência (nula fora de ocorrências), mantida igual à da
+  série pela FK composta `tasks_recurring_origin_fk`; backfill `registry` por espaço (FORCE RLS). O
+  `tasks_occurrence_chk` aceita ocorrência sem cliente só de origem `task`;
+  `tasks_internal_occurrence_uq` (parcial) dá às internas a unicidade que `tasks_occurrence_uq` dá às demais
+  (a geração usa `ON CONFLICT DO NOTHING` sem alvo).
+- O gatilho de versão de geração passa a observar `internal`, `repeat_interval`, `weekdays`, `start_date` e
+  `end_date`. Reexecutável e roda no PGlite; `tasks-phase2-db` e `tasks-0017-db` reexecutam a 0019 depois das
+  migrações antigas que reaplicam os CHECKs anteriores.
 
 ## Banco (migrações 0017 e 0018)
 

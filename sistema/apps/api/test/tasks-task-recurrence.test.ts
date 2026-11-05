@@ -177,6 +177,14 @@ describe('task recurrence: creating and listing', () => {
     expect((await carla.patch(`/tasks/${task.id}/status`, { status: 'todo' })).status).toBe(200);
   });
 
+  it('no backfill: a rule that starts in the past keeps the task and generates from today on', async () => {
+    const { carla } = await office(app);
+    const task = await create(carla, { title: 'Conferir caixa', assigneeId: carla.userId, dueDate: '2026-10-15', recurrence: { frequency: 'daily' } });
+    expect(task).toMatchObject({ dueDate: '2026-10-15', overdue: true, recurrence: { startDate: '2026-10-15' } });
+    const dates = (await seriesRows(task.occurrence.recurringTaskId)).map((r) => r.due_date);
+    expect(dates.slice(0, 3)).toEqual(['2026-10-15', '2026-10-20', '2026-10-21']);
+  });
+
   it('refuses a start too far back, a rule without occurrences and a client not active then', async () => {
     const { ana, carla } = await office(app);
     const future = await createClient(ana, { tradeName: 'Futura', contractStartDate: '2027-03-01' });
@@ -266,6 +274,16 @@ describe('task recurrence: changing and ending it from the task', () => {
     list = await seriesRows(seriesId);
     expect(list.map((r) => [r.client_id, r.status])).toEqual([[padaria, 'todo'], [padaria, 'todo'], [padaria, 'todo']]);
 
+    // "Repetir" undone right away (the task is the first occurrence, nothing else worked on): standalone again.
+    const again = await create(carla, { title: 'Avulsa', assigneeId: carla.userId, dueDate: '2026-10-28' });
+    expect((await carla.patch(`/tasks/${again.id}`, { recurrence: { frequency: 'weekly', weekdays: [3] } })).status).toBe(200);
+    const againSeries = (await carla.get(`/tasks/${again.id}`)).body.occurrence.recurringTaskId;
+    const undone = await carla.patch(`/tasks/${again.id}`, { recurrence: null });
+    expect(undone.status, JSON.stringify(undone.body)).toBe(200);
+    expect(undone.body).toMatchObject({ id: again.id, kind: 'standalone', occurrence: null, recurrence: null, dueDate: '2026-10-28' });
+    expect(await rows(sql`select id from recurring_tasks where id = ${againSeries}`)).toEqual([]);
+    expect(await rows(sql`select id from tasks where recurring_task_id = ${againSeries}`)).toEqual([]);
+
     // A comment makes it history: deleting is refused; without it the whole series goes.
     const comment = await carla.post(`/tasks/${list[1]!.id}/comments`, { text: 'Cliente pediu o PDF' });
     expect((await bruno.del(`/tasks/${standalone.id}`)).status).toBe(409);
@@ -316,5 +334,41 @@ describe('task recurrence: who may repeat what', () => {
     expect(await ana.patch(`/tasks/${occurrence!.id}`, { recurrence: { frequency: 'monthly' } })).toMatchObject({ status: 422, body: { message: registryMessage } });
     expect(await ana.patch(`/tasks/${occurrence!.id}`, { title: 'X', applyTo: 'series' })).toMatchObject({ status: 422, body: { message: registryMessage } });
     expect((await ana.get(`/tasks/${occurrence!.id}`)).body).toMatchObject({ occurrence: { origin: 'registry' }, recurrence: null });
+  });
+});
+
+describe('task recurrence: in the recurring list', () => {
+  it('the registry by default; tasks\' recurrences on request, with their target, rule and next open task', async () => {
+    const { ana, carla, fiscal } = await office(app);
+    const padaria = await createClient(ana, { tradeName: 'Padaria' });
+    expect((await ana.post('/tasks/recurring', { name: 'DAS', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] })).status).toBe(201);
+    const weekly = await create(carla, { title: 'Ligar para a Padaria', clientId: padaria, assigneeId: carla.userId, dueDate: '2026-10-21', recurrence: { frequency: 'weekly', weekdays: [3] } });
+    expect((await carla.patch(`/tasks/${weekly.id}/status`, { status: 'done' })).status).toBe(200);
+
+    const registry = (await carla.get('/tasks/recurring')).body;
+    expect(registry.items.map((i: any) => i.name)).toEqual(['DAS']);
+    expect(registry.items[0]).toMatchObject({ origin: 'registry', client: null, recurrence: null, nextTaskId: null });
+    const own = (await carla.get('/tasks/recurring?origin=task')).body;
+    expect(own.items).toHaveLength(1);
+    const item = own.items[0];
+    expect(item).toMatchObject({
+      origin: 'task',
+      name: 'Ligar para a Padaria',
+      period: 'weekly',
+      client: { id: padaria, name: 'Padaria' },
+      assignee: { id: carla.userId },
+      recurrence: { frequency: 'weekly', weekdays: [3], ends: 'never', canEdit: true },
+      month: { competence: '2026-10', done: 1 },
+    });
+    const [next] = await rows<{ id: string }>(sql`select id from tasks where recurring_task_id = ${item.id} and due_date = '2026-10-28'`);
+    expect(item.nextTaskId).toBe(next!.id);
+    const all = (await carla.get('/tasks/recurring?origin=all')).body;
+    expect(all.items.map((i: any) => i.origin).sort()).toEqual(['registry', 'task']);
+    expect(all.summary.byOrigin).toEqual({ registry: 1, task: 1 });
+    expect((await carla.get('/tasks/recurring?origin=all&period=daily')).body.items).toEqual([]);
+    // Ended at it: still the next open one.
+    expect((await carla.patch(`/tasks/${next!.id}`, { recurrence: null })).status).toBe(200);
+    const ended = (await carla.get('/tasks/recurring?origin=task&status=all')).body.items[0];
+    expect(ended.nextTaskId).toBe(next!.id);
   });
 });

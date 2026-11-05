@@ -80,6 +80,7 @@ import {
   occurrenceColumns,
   REGISTRY_SERIES_MESSAGE,
   rekeyOccurrence,
+  revertToStandalone,
   seriesRule,
   storedRule,
   toTaskRecurrence,
@@ -659,6 +660,11 @@ async function updateSeriesFromTask(ctx: TaskContext, current: TaskRow, patch: T
   const series = await loadTaskSeries(ctx, current.recurringTaskId!);
   const def = series.row;
   await assertCanManageSeries(ctx, { assigneeId: def.defaultAssigneeId, departmentId: def.departmentId });
+  if (patch.recurrence === null && (await revertToStandalone(ctx, current))) {
+    await recordEvent(ctx, { taskId: current.id, kind: 'updated', data: { fields: ['recurrence'], changes: [] } });
+    const { recurrence: _r, applyTo: _a, ...rest } = patch;
+    return Object.keys(rest).length > 0 ? updateTask(ctx, current.id, rest) : getTaskDetail(ctx, current.id);
+  }
   await assertRefs(ctx, {
     clientId: patch.clientId !== undefined ? patch.clientId : undefined,
     categoryId: patch.categoryId !== undefined ? patch.categoryId : undefined,

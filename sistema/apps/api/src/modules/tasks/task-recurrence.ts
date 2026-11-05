@@ -17,7 +17,7 @@
 //   canceling and regenerating them; a rule change moves the edited occurrence to the nearest new period
 //   when it is free (the task the user is looking at does not become "canceled").
 
-import { and, eq, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import {
   addMonthKey,
   firstScheduledOccurrence,
@@ -97,10 +97,12 @@ export interface SeriesRule {
 export async function canManageSeries(
   ctx: TaskContext,
   state: { assigneeId: string | null; departmentId: string | null },
+  myDepartment?: string | null,
 ): Promise<boolean> {
   if (ctx.permissions.registry || state.assigneeId === ctx.userId) return true;
   if (!state.departmentId) return false;
-  return (await departmentOfMember(ctx.db, ctx.workspaceId, ctx.userId)) === state.departmentId;
+  const own = myDepartment !== undefined ? myDepartment : await departmentOfMember(ctx.db, ctx.workspaceId, ctx.userId);
+  return own === state.departmentId;
 }
 
 export async function assertCanManageSeries(ctx: TaskContext, state: { assigneeId: string | null; departmentId: string | null }): Promise<void> {
@@ -356,8 +358,51 @@ export async function deleteTaskSeries(ctx: TaskContext, seriesId: string): Prom
   await deleteSeriesRows(ctx, seriesId);
 }
 
-/** The rule as `TaskDetail.recurrence` shows it. */
-export async function toTaskRecurrence(ctx: TaskContext, def: GenDef): Promise<TaskRecurrence> {
+/**
+ * "Desfazer" right after "Repetir" (`recurrence: null` on the first occurrence while no other occurrence
+ * was worked on): the task goes back to standalone, keeping its due date, and the series goes with its
+ * untouched occurrences. Returns false when that does not apply (then the series ends here).
+ */
+export async function revertToStandalone(ctx: TaskContext, row: TaskRow): Promise<boolean> {
+  const seriesId = row.recurringTaskId!;
+  const [earlier] = await ctx.db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.workspaceId, ctx.workspaceId),
+        eq(tasks.recurringTaskId, seriesId),
+        ne(tasks.id, row.id),
+        sql`${tasks.dueDate} < ${row.dueDate}`,
+      ),
+    )
+    .limit(1);
+  if (earlier || (await workedOccurrenceCount(ctx, seriesId, row.id)) > 0) return false;
+  await ctx.db
+    .update(tasks)
+    .set({
+      recurringTaskId: null,
+      occurrenceOrigin: null,
+      competence: null,
+      periodKey: null,
+      referenceMonth: null,
+      targetDate: null,
+      assigneeSource: null,
+    })
+    .where(and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.id, row.id)));
+  await deleteSeriesRows(ctx, seriesId);
+  return true;
+}
+
+/**
+ * The rule as `TaskDetail.recurrence` shows it. `known`: what a list already loaded (the count of
+ * occurrences, the requester's department), so it is not read again per item.
+ */
+export async function toTaskRecurrence(
+  ctx: TaskContext,
+  def: GenDef,
+  known: { occurrenceCount?: number; myDepartment?: string | null } = {},
+): Promise<TaskRecurrence> {
   const row = def.row;
   const schedule = scheduleOf(row);
   const upcoming: TaskRecurrence['upcoming'] = [];
@@ -368,10 +413,13 @@ export async function toTaskRecurrence(ctx: TaskContext, def: GenDef): Promise<T
         upcoming.push({ periodKey: o.periodKey, legalDueDate: o.legalDueDate, targetDate: o.targetDate });
     }
   }
-  const [count] = await ctx.db
-    .select({ n: sql<number>`count(*)`.mapWith(Number) })
-    .from(tasks)
-    .where(and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.recurringTaskId, row.id)));
+  const [count] =
+    known.occurrenceCount !== undefined
+      ? [{ n: known.occurrenceCount }]
+      : await ctx.db
+          .select({ n: sql<number>`count(*)`.mapWith(Number) })
+          .from(tasks)
+          .where(and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.recurringTaskId, row.id)));
   const anchored = ['bimonthly', 'quarterly', 'semiannual', 'annual'].includes(row.period);
   return {
     recurringTaskId: row.id,
@@ -390,6 +438,27 @@ export async function toTaskRecurrence(ctx: TaskContext, def: GenDef): Promise<T
     active: upcoming.length > 0,
     upcoming,
     occurrenceCount: count?.n ?? 0,
-    canEdit: await canManageSeries(ctx, { assigneeId: row.defaultAssigneeId, departmentId: row.departmentId }),
+    canEdit: await canManageSeries(ctx, { assigneeId: row.defaultAssigneeId, departmentId: row.departmentId }, known.myDepartment),
   };
+}
+
+/**
+ * The task to open for each series (the recurring list's "Repetições"): its next open occurrence (by
+ * due date), else the last one.
+ */
+export async function nextTaskIds(ctx: Pick<TaskContext, 'db' | 'workspaceId'>, seriesIds: readonly string[]): Promise<Map<string, string>> {
+  if (seriesIds.length === 0) return new Map();
+  const open = sql`${tasks.status} in ('todo', 'in_progress', 'waiting_client')`;
+  const found = await ctx.db
+    .selectDistinctOn([tasks.recurringTaskId], { seriesId: tasks.recurringTaskId, id: tasks.id })
+    .from(tasks)
+    .where(and(eq(tasks.workspaceId, ctx.workspaceId), inArray(tasks.recurringTaskId, [...seriesIds])))
+    .orderBy(
+      tasks.recurringTaskId,
+      sql`case when ${open} then 0 else 1 end`,
+      sql`case when ${open} then ${tasks.dueDate} end asc`,
+      sql`${tasks.dueDate} desc`,
+      tasks.id,
+    );
+  return new Map(found.map((r) => [r.seriesId!, r.id]));
 }

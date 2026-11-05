@@ -12,12 +12,11 @@ import {
   recurringMonths,
   type AssigneeSource,
   type MonthKey,
-  type NonBusinessDayRule,
-  type RecurrencePeriod,
   type RecurringGenerateResponse,
   type RecurringOccurrenceDetail,
   type RecurringTask,
   type RecurringTaskListResponse,
+  type TaskRecurrence,
   type recurringTaskInputSchema,
   type recurringTaskQuerySchema,
   type TaskMemberRef,
@@ -47,10 +46,13 @@ import {
   type GenDef,
 } from './generation';
 import { aggregateOccurrences, CELL_COLUMNS, occurrenceClients, toOccurrenceCell } from './occurrences';
+import { nextTaskIds, toTaskRecurrence } from './task-recurrence';
 import {
   assertClients,
   assertMember,
+  clientRef,
   departmentNames,
+  departmentOfMember,
   getDepartmentOrThrow,
   getTaskCategoryOrThrow,
   memberRef,
@@ -121,6 +123,9 @@ interface Shared {
   stats: Map<string, MonthStats>;
   occurrences: Map<string, number>;
   descriptions: Map<string, string | null>;
+  /** Tasks' recurrences: the rule as the task shows it and the task to open. */
+  recurrences: Map<string, TaskRecurrence>;
+  nextTasks: Map<string, string>;
 }
 
 function toRecurringTask(ctx: TaskContext, def: GenDef, month: MonthKey, shared: Shared): RecurringTask {
@@ -135,21 +140,26 @@ function toRecurringTask(ctx: TaskContext, def: GenDef, month: MonthKey, shared:
   const upcoming = scheduled.find((s) => s.legalDueDate >= ctx.today) ?? scheduled.at(-1);
   const stats = shared.stats.get(row.id);
   const departmentName = row.departmentId ? shared.departments.get(row.departmentId) : undefined;
+  const clientId = row.origin === 'task' && !row.internal ? ([...def.included][0] ?? null) : null;
+  const client = clientId ? shared.clients.find((c) => c.id === clientId) : undefined;
   return {
     id: row.id,
+    origin: row.origin,
     name: row.name,
     description: shared.descriptions.get(row.id) ?? null,
-    // Registry rows only (getDefOrThrow / listRecurring): never `daily` nor `skip` (recurring_tasks_origin_chk).
-    period: row.period as RecurrencePeriod,
+    period: row.period,
     dueDay: row.dueDay,
     dueMonth: row.dueMonth,
     months: recurringMonths(row),
     targetDaysBefore: row.targetDaysBefore,
-    nonBusinessDayRule: row.nonBusinessDayRule as NonBusinessDayRule,
+    nonBusinessDayRule: row.nonBusinessDayRule,
     referenceOffset: row.referenceOffset,
     department: row.departmentId && departmentName ? { id: row.departmentId, name: departmentName } : null,
     category: row.categoryId ? (shared.categories.get(row.categoryId) ?? null) : null,
     assignee: memberRef(ctx, row.defaultAssigneeId),
+    client: client ? clientRef(client) : null,
+    recurrence: shared.recurrences.get(row.id) ?? null,
+    nextTaskId: shared.nextTasks.get(row.id) ?? null,
     regimes: row.regimes,
     clientIds: [...def.included],
     excludedClientIds: [...def.excluded],
@@ -186,6 +196,16 @@ async function loadShared(ctx: TaskContext, defs: GenDef[], month: MonthKey): Pr
     occurrenceCounts(ctx, ids.length === 1 ? ids : undefined),
     Promise.all(defs.map((d) => decryptTaskText(ctx.cipher, RECURRING_DESCRIPTION, d.row.description))),
   ]);
+  // Tasks' recurrences (origin `task`, `?origin=task|all`): the rule and the task to open.
+  const series = defs.filter((d) => d.row.origin === 'task');
+  const myDepartment = series.length > 0 ? await departmentOfMember(ctx.db, ctx.workspaceId, ctx.userId) : null;
+  const [rules, nextTasks] = await Promise.all([
+    Promise.all(series.map((d) => toTaskRecurrence(ctx, d, { occurrenceCount: occurrences.get(d.row.id) ?? 0, myDepartment }))),
+    nextTaskIds(
+      ctx,
+      series.map((d) => d.row.id),
+    ),
+  ]);
   return {
     clients,
     departments,
@@ -193,6 +213,8 @@ async function loadShared(ctx: TaskContext, defs: GenDef[], month: MonthKey): Pr
     stats,
     occurrences,
     descriptions: new Map(defs.map((d, i) => [d.row.id, descriptions[i] ?? null])),
+    recurrences: new Map(series.map((d, i) => [d.row.id, rules[i]!])),
+    nextTasks,
   };
 }
 
@@ -205,8 +227,10 @@ export async function listRecurring(ctx: TaskContext, q: RecurringQuery): Promis
   const month = q.month ?? monthKey(ctx.today);
   if (inBounds(ctx, month)) await ensureOccurrences(ctx, [month]);
   const current = monthKey(ctx.today);
-  const all = await loadDefs(ctx, undefined, { origin: 'registry' });
+  const every = await loadDefs(ctx);
   const isActive = (d: GenDef) => d.row.endCompetence === null || d.row.endCompetence >= current;
+  // The registry by default; tasks' recurrences (managed from their task) only when asked.
+  const all = every.filter((d) => q.origin === 'all' || d.row.origin === q.origin);
   let assigneeDefs: Set<string> | null = null;
   if (q.assigneeId) {
     const rows = await ctx.db
@@ -241,6 +265,10 @@ export async function listRecurring(ctx: TaskContext, q: RecurringQuery): Promis
       active: all.filter(isActive).length,
       ended: all.filter((d) => !isActive(d)).length,
       occurrences: { total, done, canceled },
+      byOrigin: {
+        registry: every.filter((d) => d.row.origin === 'registry' && isActive(d)).length,
+        task: every.filter((d) => d.row.origin === 'task' && isActive(d)).length,
+      },
     },
   };
 }
