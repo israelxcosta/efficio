@@ -133,12 +133,14 @@
     com a visualização `Lista | Quadro | Calendário` (o calendário entra na fase 2). O padrão é
     Minhas + Lista, agrupada por prazo (Atrasadas, Fora da meta, Hoje, Próximos 7 dias, Mais tarde,
     Sem vencimento), como no Effy.
-12. **Auditoria mensal** (fase 2): no desktop, uma **matriz cliente × tarefa recorrente**; cada
-    célula avança A fazer → Em andamento → Concluída com um clique e, concluída, mostra as iniciais
-    de quem concluiu. Quando todas as células de um cliente estão concluídas, o **mês do cliente
-    fica concluído** (com a data da última conclusão). **Reabrir** uma célula concluída pede o
+12. **Auditoria mensal** (fase 2): duas listas em acordeão, **Por cliente** e **Por tarefa**, cujas
+    linhas de ocorrência têm as mesmas colunas (Departamento, Responsável, Prazo, Situação, Data de
+    conclusão e Concluída por, §11.2). O controle de situação avança A fazer → Em andamento →
+    Concluída com um clique e, concluída, mostra só o ✓ verde: quem concluiu e quando ficam nas
+    colunas. Quando todas as ocorrências de um cliente estão concluídas, o **mês do cliente
+    fica concluído** (com a data da última conclusão). **Reabrir** uma ocorrência concluída pede o
     **motivo** e fica no histórico da ocorrência, porque a conclusão é registro de auditoria; só quem
-    concluiu ou um administrador reabre. A visão "Por tarefa" e o celular usam acordeão.
+    concluiu ou um administrador reabre.
 13. **Permissões: o papel define o padrão e a pessoa pode ter ajustes** (fase 3). O colaborador usa
     Tarefas por completo (criar, editar, concluir, comentar, anexar, mover, marcar na auditoria,
     aplicar processos); cadastros, exclusões, financeiro, acessos dos
@@ -583,34 +585,40 @@ os dois estados que importam.
   Effy guardava `_prevStatus`; sem esse dado, volta para A fazer).
 - **Cancelada**: não alterna. Tooltip `Cancelada. Reabra pelo menu`.
 
-### 3.2 Estado na matriz da auditoria (`MatrixStatusCell`, fase 2)
+### 3.2 Controle de situação da auditoria (`OccurrenceCellControl`, fase 2)
 
-A célula mostra o estado da ocorrência (que é uma tarefa). O clique avança só pelos três estados do
-dia a dia; Aguardando cliente e Cancelada são definidos no detalhe da tarefa e aparecem na célula.
+O controle (`components/matrix-cell.tsx`) mostra o estado da ocorrência (que é uma tarefa) nas
+linhas da auditoria (§11.2) e no `RecurringOccurrenceSheet` (§10.4). O clique avança só pelos três
+estados do dia a dia; Aguardando cliente e Cancelada são definidos no detalhe da tarefa e aparecem
+no controle. **Todos os estados têm o mesmo tamanho**: círculo de 32×32 (40×40 com `large`, que é o
+usado em todas as listas da auditoria e no Sheet).
 
-| Estado | Visual (célula de 32×32, ou 40×40 em `pointer-coarse`) | Texto acessível |
+| Estado | Visual | Texto acessível (`aria-label` e tooltip) |
 | --- | --- | --- |
-| A fazer | anel `border border-border-strong`, vazio | "A fazer" |
-| Em andamento | `bg-primary-soft text-primary-soft-fg`, glifo `Contrast` | "Em andamento" |
-| Aguardando cliente | `bg-bg-subtle text-muted`, glifo `CirclePause`; o clique avança para Em andamento | "Aguardando cliente" |
-| Concluída | pílula `bg-success-soft text-success` com `Check` e as **iniciais de quem concluiu** (`text-mini font-semibold`, 52px de largura) | "Concluída por Ana Paula Ribeiro em 12/10/2026 às 14:32" |
+| A fazer | anel `border border-border-strong`, vazio | "A fazer · Ana Paula Ribeiro (responsável do cliente no Fiscal)" |
+| Em andamento | `bg-primary-soft text-primary-soft-fg`, glifo `Contrast` | "Em andamento · …" |
+| Aguardando cliente | `bg-bg-subtle text-muted`, glifo `CirclePause`; o clique avança para Em andamento | "Aguardando cliente · …" |
+| Concluída | `bg-success-soft text-success` com o glifo de Concluída de `TaskStatusGlyph` (`CircleCheck` de 16px, preenchido a 15%), igual ao `TaskStatusButton` (§3.1). **Sem as iniciais**: quem concluiu e quando vão nas colunas Data de conclusão e Concluída por (§11.2), no tooltip e no popover. Some a pílula de 52/60px | "Concluída por Ana Paula Ribeiro em 12/10/2026 às 14:32" (nome completo); com atraso, acrescenta ", 2 dias após o prazo legal" |
 | Cancelada | `CircleX` em `text-subtle`, sem fundo; não conta no progresso nem impede o mês concluído; o clique abre a tarefa | "Cancelada" |
 | Não se aplica | `—` em `text-subtle`, sem botão | "Não se aplica" |
 
-O atraso na matriz é **da coluna** (todos os clientes têm a mesma meta e o mesmo prazo legal no
-período). Por isso ele aparece uma vez, no cabeçalho da coluna ("Prazo legal venceu há 8 dias", em
-`danger`, ou "Meta venceu há 2 dias", em `warning`), e as células continuam neutras. Uma coluna
-inteira de vermelho seria textura, não sinal. O tooltip de cada célula diz o responsável efetivo e a
-origem: "A fazer · Ana Paula Ribeiro (responsável do cliente no Fiscal)".
+Sem permissão de escrita, o mesmo visual fica num `span role="img"` com o mesmo `aria-label` (sai o
+"✓ MC" de `ReadOnlyCell` em `pages/audit.tsx` e o "✓"/"·" do `RecurringOccurrenceSheet`).
 
-**Semanal**: cada semana é uma coluna própria ("Folha semanal · semana de 05/10"), com a mesma célula;
-não há contagem "2/4" dentro de uma célula.
+O atraso é **da tarefa** (todos os clientes têm a mesma meta e o mesmo prazo legal no período). Em
+Por tarefa ele aparece uma vez, no cabeçalho da tarefa ("Prazo legal venceu há 8 dias", em `danger`,
+ou "Meta venceu há 2 dias", em `warning`), e as linhas de cliente continuam neutras: uma coluna
+inteira de vermelho seria textura, não sinal. Em Por cliente cada linha é uma obrigação diferente, e
+o prazo de cada uma leva a sua cor (§11.2).
 
-**Mês concluído** é da linha e é derivado: quando a última célula do cliente fica concluída, a coluna
-de progresso troca "9/9" por `LockKeyhole` de 14px e "Concluído em 28/10" (`text-caption
-text-muted`). Sem cor nova: o cadeado é a forma que diz "fechado". Reabrir uma célula (com motivo,
-§11.6) volta a coluna para "8/9". A célula reaberta alguma vez não ganha marca; o histórico fica no
-popover.
+**Semanal**: cada semana é uma tarefa própria na lista ("Folha semanal · semana de 05/10"); não há
+contagem "2/4" dentro de um controle.
+
+**Mês concluído** é do cliente e é derivado: quando a última ocorrência do cliente fica concluída, a
+linha do cliente troca a nota por "Mês concluído em 28/10" e ganha `LockKeyhole` de 14px ao lado do
+nome (`text-muted`). Sem cor nova: o cadeado é a forma que diz "fechado". Reabrir uma ocorrência
+(com motivo, §11.6) volta a linha para "8 de 9". A ocorrência reaberta alguma vez não ganha marca; o
+histórico fica no popover.
 
 ### 3.3 Prioridade (`PriorityBadge`)
 
@@ -794,8 +802,8 @@ da fase 1 já existem (alguns com outro nome de arquivo, indicado entre parênte
 | `TaskTimeline` | 2 | `taskId` | carregando, com eventos, só a criação, erro, "Ver todo o histórico (N)" |
 | `RecurringTaskSheet`, `RecurrenceRuleFields`, `RecurrenceTermFields`, `ClientExceptionsField` | 2 | `definition \| null`, `readOnly` | criar, editar, leitura, validação; prévia com feriados e referência (§10.3) |
 | `RecurringRow`, `EndRecurringDialog` | 2 | `definition`, `month` | ativa, encerrada, não ocorre no mês |
-| `RecurringOccurrenceSheet` | 2 | `definitionId`, `competence`, `scope` | lista de clientes com `MatrixStatusCell` e o responsável efetivo |
-| `AuditSummary`, `AuditMatrix`, `MatrixStatusCell`, `AuditAccordion` | 2 | §11 | §3.2 e §11 |
+| `RecurringOccurrenceSheet` | 2 | `definitionId`, `competence`, `scope` | lista de clientes com `OccurrenceCellControl` e o responsável efetivo |
+| `AuditSummary`, `OccurrenceCellControl`, `AuditOccurrenceRow` (`lead`: `client` ou `obligation`), `TaskAccordion`, `AuditClientList` | 2 | §11 | §3.2 e §11.2 |
 | `ClientMonthCell` | 2 | `client`, `competence` | progresso, mês concluído (cadeado e data) |
 | `ConclusionPopover`, `ReopenReasonForm`, `AuditHistoryList` | 2 | `occurrence`, `onReopen(reason)`, `canReopen` | com e sem "Reabrir", motivo, histórico da ocorrência (§11.6) |
 | `FlowTemplateRow`, `FlowTemplateSheet`, `FlowStepsEditor`, `ApplyTemplateDialog`, `TemplatePickerDialog`, `FlowBuilderSheet`, `FlowRow` | 2 | §12 | §12 |
@@ -1731,7 +1739,7 @@ quadro, pelo calendário e pelas obrigações do Início.
 - `headerExtra`: `SegmentedControl size="sm"` **Seus clientes (12)** (só quando você é responsável
   por algum) · **Pendentes (18)** · **Todos (30)**, a busca de cliente e um `MemberPicker`
   "Responsável". O escopo de quem abriu define a opção inicial.
-- Corpo: uma linha por cliente (52px), com `MatrixStatusCell`, o nome do cliente (botão que abre a
+- Corpo: uma linha por cliente (52px), com `OccurrenceCellControl` (§3.2: concluída, só o ✓ verde), o nome do cliente (botão que abre a
   **ocorrência** no `TaskSheet`, por cima deste Sheet; ao fechar, volta para a lista), o regime em
   `text-muted`, o **responsável efetivo** (`MemberAvatar sm` e o nome curto; tooltip com a origem:
   "Responsável do cliente no Fiscal", "Responsável padrão" ou "Atribuída só nesta competência") e,
@@ -1766,9 +1774,9 @@ quadro, pelo calendário e pelas obrigações do Início.
 
 **Pergunta da tela:** "Na competência, o que cada cliente já entregou, o que falta e quem concluiu?"
 **Achado:** as pendências que já passaram do prazo legal, e em quantos clientes.
-**Ação mais frequente:** marcar a célula de um cliente; no fim do mês, conferir quais clientes já
+**Ação mais frequente:** marcar a situação da ocorrência de um cliente; no fim do mês, conferir quais clientes já
 estão com o mês concluído.
-**Peça própria do produto:** a matriz cliente × tarefa recorrente, com o mês concluído por cliente
+**Peça própria do produto:** a lista cliente × tarefa recorrente (nas duas direções), com o mês concluído por cliente
 (o "encerramento" do Domínio Processos, aqui derivado das conclusões) e a reabertura com motivo.
 
 ### 11.1 Estrutura
@@ -1794,73 +1802,163 @@ estão com o mês concluído.
    ("Todos os regimes" e `TAX_REGIME_LABELS`), `Select` Departamento (vem com o departamento do
    Início quando se chega por ele), `MemberPicker` Responsável ("Só os meus" no topo), `Select`
    Clientes ("Todos os clientes", "Com pendências", "Mês concluído") e **Limpar**. Com Responsável,
-   ficam os clientes em que a pessoa responde por ao menos uma coluna visível, e as células de outros
+   ficam os clientes em que a pessoa responde por ao menos uma ocorrência visível, e as linhas de outros
    responsáveis ficam com `opacity-50` (continuam clicáveis: o colaborador pode marcar a de um
    colega).
 4. O conteúdo da visão.
 
-### 11.2 Por cliente, a partir de 1024px: `AuditMatrix`
+### 11.2 Linha de ocorrência (`AuditOccurrenceRow`, nas duas visões)
 
-Fica num `Card overflow-hidden` com rolagem própria nos dois eixos. A página nunca rola de lado.
+Um só componente para a linha de uma ocorrência (tarefa × cliente) dentro do acordeão, nas duas
+visões. Muda só a 1ª coluna: **Cliente** em Por tarefa (`lead="client"`) e **Obrigação** em Por
+cliente (`lead="obligation"`). Substitui `AccordionCellRow` e `ClientObligationRow` de
+`pages/audit.tsx`. Mesmo esqueleto de `TaskRow`/`TransactionRow`: cada dado na sua coluna, sem
+textos empilhados na largura de desktop.
 
-- **Linhas**: os clientes com ocorrências na competência, em ordem alfabética (com "Com pendências",
-  os de pendência vencida vêm primeiro). Cada linha tem 52px.
-- **1ª coluna, fixa à esquerda** (264px, `sticky left-0 bg-surface`, com borda direita
-  `border-border-strong` quando a tabela está rolada): o nome (`text-sm font-semibold`, botão que
-  abre a ficha do cliente da Gestão, §13.2, sem honorários) e, embaixo, "Simples Nacional ·
-  12.345.678/0001-90" (`text-xs text-muted tabular`).
-- **Colunas**: uma por recorrente e período (as semanais, uma por semana), ordenadas pela meta e
-  depois pelo nome, com 104px cada. O cabeçalho (72px, fixo no topo) tem o nome curto (até 2 linhas,
-  `text-caption font-semibold`, tooltip com o nome completo, o departamento, o responsável padrão e
-  a referência "ref. 09/2026"), o prazo da coluna ("Meta 15/10 · legal 20/10"; com pendentes, "Prazo
-  legal venceu há 8 dias" em `danger` ou "Meta venceu há 2 dias" em `warning`; na semanal, "semana
-  de 05/10") e "18/23" (`text-mini tabular text-muted`).
-- **Última coluna, fixa à direita** (104px, `ClientMonthCell`): o mês do cliente. Em andamento,
-  "7/9" (`text-[13px] font-medium tabular`) com uma barra de 48px `bg-data` embaixo; com o mês
-  concluído, `LockKeyhole` de 14px e "Concluído em 28/10" (`text-caption text-muted`; tooltip
-  "Última conclusão em 28/10/2026 às 16:40").
-- **Células**: `MatrixStatusCell` centralizada (§3.2).
-- **Leitura cruzada**: o hover ou foco numa célula realça (`bg-surface-muted`) a linha e o cabeçalho
-  da coluna.
-- **Sem regras entre colunas**; uma régua de 1px entre linhas (`border-border`).
+**Colunas**, da esquerda para a direita:
 
-**Interação da célula**
+| Coluna | Conteúdo | Trilho (nível Largo) |
+| --- | --- | --- |
+| Cliente / Obrigação | **Cliente**: o nome (`text-sm font-semibold`, botão que abre a ocorrência no `TaskSheet`; `LockKeyhole` de 12px antes, quando o mês do cliente está concluído) e, embaixo, o regime (`text-xs text-muted`). **Obrigação**: o nome (o mesmo botão) e, ao lado, o período quando não é mensal ("semana de 02/11", "Trimestral", `text-xs text-muted`). Trunca com `title` | `minmax(0,1fr)`, com `@lg:pl-10` **dentro** da coluna: o nome fica alinhado com o nome da linha-mãe, depois da seta de 28px |
+| Departamento | o departamento da recorrente (`text-body-sm text-fg`, trunca com `title`); sem departamento, "Sem departamento" em `text-subtle` | `7rem` |
+| Responsável | `MemberAvatar sm` e o nome curto ("Juliana M.", `text-body-sm`); sem responsável, o círculo tracejado e "Sem responsável" em `text-subtle` (§3.6); tooltip com a origem (`assigneeSourceText`) | `8.5rem` |
+| Prazo | linha 1: a **meta** ("03/11", `text-[13px] font-medium tabular text-fg`, tooltip `deadlineTip`); linha 2: ver "Prazo, linha 2" | `9rem` |
+| Situação | o controle (`OccurrenceCellControl large`, 40px, §3.2) e, com `gap-2`, o rótulo em `text-[13px]` com a cor de `STATUS_TEXT_CLASS` (§3.1). Concluída: só "Concluída" (sai "Concluída por Marina S. em 27/10"); com atraso, "2 dias de atraso" embaixo do rótulo | `11rem` |
+| Data de conclusão | "05/11, 07:45" (`text-[13px] tabular text-fg`, fuso do escritório; fora do ano corrente, "05/11/25, 07:45"; tooltip "05/11/2026 às 07:45"). Vazia quando não concluída | `7.5rem` |
+| Concluída por | `MemberAvatar sm` e o nome curto de quem clicou (`text-body-sm text-fg`), que pode não ser o responsável. Vazia quando não concluída; concluída sem registro da pessoa, "—" em `text-subtle` | `8rem` |
+
+Linha: `flex items-center gap-3 rounded-lg px-2 py-1.5 min-h-13 hover:bg-surface @lg:px-3 @4xl:grid`, com
+opacidade de 70% quando o filtro Responsável é outra pessoa (como hoje). Colunas vazias ficam em
+branco, sem "—": a Situação já diz que está pendente.
+
+**Prazo, linha 2** (`text-xs`, trunca; o tooltip tem o texto inteiro):
+
+- **Por cliente** (cada linha é uma obrigação diferente): pendente, `openDeadlineInfo(cell, today,
+  true)` com `DUE_TONE_CLASS` ("Meta em 3 dias · legal 05/11" em `muted`/`warning`, "Prazo legal
+  venceu há 2 dias" em `danger`); concluída ou cancelada, "legal 05/11" em `text-muted` quando a meta
+  é anterior ao prazo legal, senão nada.
+- **Por tarefa**: nada. O cabeçalho da tarefa, logo acima e no mesmo trilho, diz o prazo e o atraso
+  uma vez (§3.2). Exceção: se as datas da ocorrência diferem das da tarefa, a linha 2 aparece como em
+  Por cliente.
+
+**Níveis por largura do contêiner.** O `@container` é o Card, e os dois cards têm a mesma estrutura
+(`Card @container overflow-hidden` com a `ul p-1.5` dentro, sem padding no Card). Assim, em 1280 o
+contêiner tem 1156px nas duas visões e cai no nível Largo.
+
+| Nível | Contêiner (viewport) | Grade | O que muda |
+| --- | --- | --- | --- |
+| Largo | `@6xl`, a partir de 1152px (1280 em diante) | `@6xl:grid-cols-[minmax(0,1fr)_7rem_8.5rem_9rem_11rem_7.5rem_8rem]` | as 7 colunas. Sobram cerca de 190px para o nome em 1280 e 350px em 1440 (200px no Médio em 1024) |
+| Médio | `@4xl`, de 896 a 1151px (1024 a 1279) | `@4xl:grid-cols-[minmax(0,1fr)_8.5rem_9rem_11rem_7.5rem]` | **Departamento** sai da grade: em Por cliente vai para o subtítulo da obrigação ("Pessoal/DP"); em Por tarefa não se repete, porque está no cabeçalho da tarefa. **Data de conclusão** e **Concluída por** viram uma coluna **Conclusão**: "05/11, 07:45" e, embaixo, "Marina C." (`text-xs text-muted`, sem avatar) |
+| Empilhado | abaixo de `@4xl` (tablet e celular) | `flex items-center gap-3` | a 1ª coluna vira um bloco `flex-1 min-w-0` com as linhas abaixo e o controle de 40px fica à direita (a ordem visual é a do DOM, a mesma do foco) |
+
+Linhas no nível Empilhado (todas `text-xs`, uma linha cada, truncando):
+
+- **Por tarefa**: (1) cliente e cadeado; (2) "Simples Nacional · Juliana M." (`text-muted`);
+  (3) a situação: pendente, o rótulo com a cor de §3.1; concluída, "Concluída em 05/11, 07:45 ·
+  Marina C." ("Concluída" em `text-success`, o resto em `text-muted`).
+- **Por cliente**: (1) obrigação e período; (2) "Pessoal/DP · Juliana M."; (3) "Meta 03/11 · legal
+  05/11" em `text-muted` e, quando o tom não é `muted`, " · Prazo legal venceu há 2 dias" na cor do
+  tom (como hoje); (4) a situação, como em Por tarefa.
+- Com atraso, " · 2 dias de atraso" (`font-medium text-warning`) fecha a linha da situação e pode
+  quebrar para a linha de baixo: é o único texto que não trunca.
+- **A 375px** (contêiner de cerca de 330px): a hora sai ("Concluída em 05/11 · Marina C."), a
+  indentação some abaixo de `@lg` (o fundo `bg-surface-muted/50` da linha aberta já marca o
+  aninhamento), sobram cerca de 250px para o texto e nada rola de lado.
+
+**Cabeçalho de colunas** (a partir de `@4xl`; abaixo, não aparece): primeira linha da região aberta,
+com a mesma grade e o mesmo padding da linha (`px-2 @lg:px-3 pt-1 pb-1.5`), `text-xs font-medium
+text-muted`, em caixa normal, `aria-hidden`. Rótulos: "Cliente" ou "Obrigação" (com `@lg:pl-10`),
+"Departamento" (só no Largo), "Responsável", "Prazo", "Situação" (alinhado com a borda do controle),
+"Data de conclusão" e "Concluída por" (Largo) ou "Conclusão" (Médio).
+
+**Estados da linha** (só tokens existentes):
+
+| Estado | Controle (§3.2) | Rótulo da Situação | Data de conclusão e Concluída por | Linha |
+| --- | --- | --- | --- | --- |
+| A fazer | anel | "A fazer", `text-muted` | em branco | — |
+| Em andamento | `bg-primary-soft`, `Contrast` | "Em andamento", `text-brand-text` | em branco | — |
+| Aguardando cliente | `bg-bg-subtle`, `CirclePause` | "Aguardando cliente", `text-muted` | em branco | — |
+| Cancelada | `CircleX` em `text-subtle` | "Cancelada", `text-subtle` | em branco | nome em `text-muted` |
+| Concluída no prazo | ✓ verde (`bg-success-soft text-success`), sem iniciais | "Concluída", `text-success` | data e pessoa em `text-fg` | — |
+| Concluída com atraso (o dia da conclusão, no fuso do escritório, é depois do prazo legal) | o mesmo ✓ verde: está concluída | "Concluída", `text-success`, e embaixo "2 dias de atraso" (`text-xs font-medium text-warning`; "1 dia de atraso") | data **sem cor** (`text-fg`) e pessoa | — |
+
+Por que a data não fica vermelha: vermelho é para o que pede ação agora (pendência vencida); a
+entrega atrasada já aconteceu, mas é achado de auditoria, então aparece em âmbar e por escrito (não
+depende da cor). Pintar a data deixaria a coluna inteira colorida quando uma obrigação atrasou para
+todos os clientes. Concluída depois da meta e antes do prazo legal não ganha marca: a meta é interna,
+e o resumo já conta as pendentes "fora da meta".
+
+**Acessibilidade**
+
+- O `aria-label` do controle continua dizendo quem concluiu e quando, com o nome completo: "Folha de
+  pagamento, Pão Quente: Concluída por Marina Costa em 05/11/2026 às 07:45" e, com atraso, ", 2 dias
+  após o prazo legal". O tooltip é o mesmo texto, sem tarefa e cliente.
+- As colunas Data de conclusão, Concluída por e Conclusão ficam `aria-hidden`, porque o controle já
+  diz o mesmo (evita leitura dupla). Departamento, Responsável e Prazo levam um prefixo `sr-only`
+  ("Departamento: ", "Responsável: ", "Prazo: ").
+- O rótulo ao lado do controle (ou a linha da situação, no Empilhado) faz o estado não depender só de
+  cor ou de forma. Foco visível `ring-2 ring-ring`; área de toque de 40px em todas as larguras.
+
+**Interação do controle** (nas duas visões e no `RecurringOccurrenceSheet`)
 
 | Ação | Efeito |
 | --- | --- |
-| Clique, **Enter** ou **Espaço** numa célula A fazer, Em andamento ou Aguardando cliente | avança: A fazer → Em andamento → Concluída (Aguardando cliente vai para Em andamento), otimista |
-| Chegar a Concluída | o servidor grava quem concluiu e quando; a célula mostra ✓ e as iniciais; toast "DCTFWeb concluída para Padaria Pão Dourado." com **Desfazer** (volta ao estado anterior sem pedir motivo). Se era a última pendente do cliente, a coluna de progresso vira o cadeado com "pop" e o toast diz "DCTFWeb concluída. Outubro concluído para Padaria Pão Dourado." |
-| Clique ou **Enter** numa célula Concluída | abre o `ConclusionPopover` (§11.6): quem concluiu, quando, o histórico e **Reabrir**, que pede o motivo. Reabrir **nunca** acontece num clique só, porque a conclusão é registro de auditoria |
-| Clique numa célula Cancelada | abre a ocorrência no `TaskSheet` (para reabrir, é por lá) |
-| Teclas **1**, **2** e **3** na célula em foco | definem A fazer, Em andamento ou Concluída direto (em célula Concluída, **1** e **2** abrem o popover) |
-| **Shift+Enter** na célula | abre a ocorrência no `TaskSheet` (comentários, anexos, responsável) |
-| Salvando | a célula fica com `aria-busy` e opacidade de 70%; em erro, volta ao estado anterior e aparece `toastError` |
+| Clique, **Enter** ou **Espaço** num controle A fazer, Em andamento ou Aguardando cliente | avança: A fazer → Em andamento → Concluída (Aguardando cliente vai para Em andamento), otimista |
+| Chegar a Concluída | o servidor grava quem concluiu e quando; o controle vira o ✓ verde com "pop" e, na hora (otimista: agora e você), as colunas Data de conclusão e Concluída por se preenchem e o rótulo vira "Concluída"; toast "DCTFWeb concluída para Padaria Pão Dourado." com **Desfazer** (volta ao estado anterior sem pedir motivo). Se era a última pendente do cliente, o cadeado aparece com "pop" e o toast diz "DCTFWeb concluída. Outubro concluído para Padaria Pão Dourado." |
+| Clique ou **Enter** num controle Concluída | abre o `ConclusionPopover` (§11.6): quem concluiu, quando, o histórico e **Reabrir**, que pede o motivo. Reabrir **nunca** acontece num clique só, porque a conclusão é registro de auditoria |
+| Clique num controle Cancelada | abre a ocorrência no `TaskSheet` (para reabrir, é por lá) |
+| Teclas **1**, **2** e **3** no controle em foco | definem A fazer, Em andamento ou Concluída direto (num controle Concluída, **1** e **2** abrem o popover) |
+| **Shift+Enter** no controle | abre a ocorrência no `TaskSheet` (comentários, anexos, responsável) |
+| Salvando | o controle fica com `aria-busy` e opacidade de 70%; em erro, volta ao estado anterior e aparece `toastError` |
 
-### 11.3 Por tarefa (todas as larguras): `AuditAccordion mode="tarefa"`
+### 11.3 Por tarefa (todas as larguras): `TaskAccordion`
 
-- Cada recorrente da competência é uma linha (padrão de §5) com `CategoryIcon` neutro (`Repeat`),
-  o nome e o selo da periodicidade, "Fiscal · padrão: Ana Paula" no subtítulo, "18/23" com barra
-  (trilho `bg-bg-subtle`, preenchimento `bg-data`) e a meta à direita com o `TaskDueLabel` de meta e
-  prazo legal (§3.5). O chevron fica em `aria-expanded`.
-- Aberta, mostra os clientes daquela tarefa, um por linha, com `MatrixStatusCell` à esquerda, o
-  nome (com `LockKeyhole` de 12px quando o mês do cliente está concluído), o regime, o responsável
-  efetivo (avatar e nome curto) e a linha de conclusão em `text-mini text-muted` ("Concluída por
-  Ana P. em 12/10, 14:32"). É o mesmo componente do `RecurringOccurrenceSheet`.
+- **Linha da tarefa** (botão com `aria-expanded`, `min-h-14`, `px-2 @lg:px-3`, `hover:bg-surface-muted`):
+  à esquerda, a **seta** `ChevronRight` num quadrado de 28px que gira 90° ao abrir, igual à de Por
+  cliente. Saem o ícone `Repeat` de 40px (tudo na auditoria é recorrente, então ele não informa) e o
+  `ChevronDown` da direita. Depois, o nome, o selo de periodicidade e "semana de 02/11" (semanal) e,
+  no subtítulo, "Pessoal/DP · padrão: Juliana M." (`text-xs text-muted`).
+- **Alinhamento** (a partir de `@4xl`): a linha da tarefa usa **a mesma grade e o mesmo padding
+  lateral** das linhas de cliente, para os trilhos coincidirem:
+  - seta, nome e subtítulo ocupam Cliente, Departamento e Responsável (`@6xl:col-span-3`,
+    `@4xl:col-span-2`);
+  - no trilho **Prazo**: a meta ("03/11", `text-[13px] font-medium tabular text-fg`) e, embaixo,
+    `groupDeadlineInfo(col, today, true)` com `DUE_TONE_CLASS` ("Prazo legal hoje" em âmbar),
+    **alinhados à esquerda** (deixa de ser `w-40 text-right`), tooltip `deadlineTip`;
+  - no trilho **Situação**: "1/3" (`text-[13px] font-medium tabular text-fg`) e, embaixo, a barra de
+    `h-1.5` na largura do trilho (trilho `bg-bg-subtle`, preenchimento `bg-data`; `bg-success` em
+    100%, como em Por cliente);
+  - Data de conclusão e Concluída por (ou Conclusão) ficam vazios.
+
+  Assim a contagem fica em cima da coluna que ela soma, e a meta da tarefa em cima da meta de cada
+  cliente.
+- **Abaixo de `@4xl`**: `flex` como hoje, com a seta à esquerda: nome e subtítulo (`flex-1`; abaixo
+  de `@xl`, o prazo vira a 3ª linha), "1/3" com a barra (`w-24`, `@sm:w-28`) e, de `@xl` a `@4xl`, a
+  meta e o prazo à direita (`w-40 text-right`).
+- `aria-label` do botão: "Folha de pagamento: 1 de 3 concluídas, prazo legal hoje. Mostrar
+  clientes." ("Recolher clientes" quando aberta).
+- **Aberta**: o `li` ganha `rounded-lg bg-surface-muted/50` (como em Por cliente) e a região
+  (`role="region"`, "Clientes de Folha de pagamento") fica **sem margem nem padding lateral** (sai o
+  `@sm:ml-8`: a indentação vive na 1ª coluna). Dentro, o cabeçalho de colunas e um
+  `AuditOccurrenceRow lead="client"` por cliente (§11.2).
+- O Card passa a ter a estrutura do de Por cliente: `Card @container overflow-hidden`, sem `p-1.5`,
+  com a `ul p-1.5` dentro.
 - Com "Com pendências", a tarefa aberta mostra só os clientes pendentes, e somem as tarefas sem
-  pendentes.
-- `?recorrente=<id>` abre aquela tarefa e rola até ela.
+  pendentes. `?recorrente=<id>` abre aquela tarefa e rola até ela.
 
-### 11.4 Por cliente abaixo de 1024px (tablet e celular)
+### 11.4 Por cliente (todas as larguras): `AuditClientList`
 
-`AuditAccordion mode="cliente"`. Cada cliente é uma linha de 56px com o avatar de iniciais (36px,
-`bg-primary-soft`), o nome, "Simples Nacional · 7 de 9" e uma barra de 64px à direita; com o mês
-concluído, a barra dá lugar a `LockKeyhole` e "Concluído em 28/10". Aberta, lista as recorrentes do
-cliente com `MatrixStatusCell` de 40px (área de toque), nome, departamento, responsável e o prazo de
-meta e prazo legal à direita, além da linha de conclusão; tocar no nome da recorrente abre a
-ocorrência no `TaskSheet`.
-
-A matriz não aparece abaixo de 1024px. A 375px, o nome trunca, a barra fica com 48px e as linhas das
-recorrentes mostram o prazo embaixo do nome, em vez de à direita.
+- Barra do Card: "40 clientes", a dica de teclado (a partir de `@2xl`) e **Expandir todos** /
+  **Recolher todos**. Navegação nas linhas de cliente: ↑ ↓ Home End movem, → abre e ← fecha.
+- **Linha do cliente** (como está): seta de 28px, o nome com o cadeado do mês concluído, "Simples
+  Nacional · 12.345.678/0001-90" (o CNPJ a partir de `@md`), a barra com "7 de 9" (`w-28`,
+  `@md:w-44`, `@3xl:w-60`) e, a partir de `@3xl`, a nota à direita ("2 atrasadas" em `danger`, "1
+  fora da meta" em `warning`, "Mês concluído em 27/10" em `text-muted`).
+- **Aberta**: o cabeçalho de colunas e um `AuditOccurrenceRow lead="obligation"` por obrigação, com
+  as colunas de §11.2. Em relação a hoje: **ganha Data de conclusão e Concluída por**, a Situação
+  fica só com o controle e o rótulo, e a região perde o `@lg:pl-10` (a indentação vai para a 1ª
+  coluna, como em Por tarefa).
+- Tocar no nome da obrigação abre a ocorrência no `TaskSheet`.
 
 ### 11.5 Mês concluído do cliente
 
@@ -1871,10 +1969,10 @@ administrador faz.
 
 - **Quando**: todas as ocorrências do cliente na competência estão Concluídas; as Canceladas não
   contam e as "Não se aplica" não existem. O momento é o da última conclusão.
-- **Onde aparece**: a coluna de progresso da matriz e a linha do acordeão (cadeado e "Concluído em
-  28/10"), a célula "Clientes" do resumo ("12 de 40 com o mês concluído"), o filtro "Mês concluído"
+- **Onde aparece**: a linha do cliente em Por cliente (cadeado e "Mês concluído em 28/10") e o
+  cadeado antes do nome em Por tarefa, a célula "Clientes" do resumo ("12 de 40 com o mês concluído"), o filtro "Mês concluído"
   e a ficha do cliente (§13.2: "Obrigações de outubro: 9 de 9 concluídas · mês concluído em 28/10").
-- **Como sai**: reabrindo qualquer célula do cliente (com motivo), ou se uma tarefa nova da
+- **Como sai**: reabrindo qualquer ocorrência do cliente (com motivo), ou se uma tarefa nova da
   competência for gerada para ele. A coluna volta ao progresso ("8/9").
 - **O que não muda**: as ocorrências continuam concluídas nas listas e nos relatórios; editar a
   recorrente depois (meta, responsável) não altera as já concluídas.
@@ -1885,7 +1983,7 @@ A conclusão de uma ocorrência é registro de auditoria: reabrir pede o motivo,
 reaberturas ficam no histórico da ocorrência (a mesma linha do tempo do `TaskSheet`, §9.1), que não
 se apaga.
 
-- **`ConclusionPopover`** (`w-80`, `shadow-lg`, `role="dialog"`), aberto pela célula concluída:
+- **`ConclusionPopover`** (`w-80`, `shadow-lg`, `role="dialog"`), aberto pelo controle concluído:
   - cabeçalho `text-caption text-muted`: "DCTFWeb · Padaria Pão Dourado · outubro de 2026";
   - "Concluída por **Ana Paula Ribeiro** em 12/10/2026 às 14:32" (`text-body-sm`);
   - `outline sm` **Reabrir**, só quando a API diz que a pessoa pode (quem concluiu ou quem tem
@@ -1901,14 +1999,14 @@ se apaga.
   rótulo **Motivo da reabertura*** (placeholder "Ex.: guia emitida com valor errado", até 500
   caracteres), um `Select` "Voltar para" (A fazer, padrão, ou Em andamento), `primary sm`
   **Reabrir** e `ghost sm` **Voltar**. Erro: "Escreva o motivo da reabertura." Ao confirmar, a
-  célula volta ao estado escolhido, o registro de conclusão sai da célula, o motivo vai para o
+  controle volta ao estado escolhido, as colunas Data de conclusão e Concluída por se esvaziam, o motivo vai para o
   histórico, o mês do cliente deixa de estar concluído e aparece o toast "DCTFWeb reaberta para
   Padaria Pão Dourado." (sem desfazer: para voltar, conclui-se de novo).
 - **Desfazer logo depois de concluir** (o toast de 6s) não pede motivo; a API aceita esse desfazer
   de quem concluiu por alguns minutos.
 - O mesmo popover aparece no `RecurringOccurrenceSheet` (§10.4) e no acordeão; no `TaskSheet` da
   ocorrência, **Reabrir** abre o mesmo formulário num `Modal max-w-md`.
-- Esc fecha; o foco vai para o primeiro botão ao abrir e volta à célula ao fechar.
+- Esc fecha; o foco vai para o primeiro botão ao abrir e volta ao controle ao fechar.
 
 ### 11.7 Estados e larguras
 
@@ -1919,15 +2017,17 @@ se apaga.
 | Filtros sem resultado | "Nenhum cliente encontrado para os filtros selecionados." e **Limpar filtros** |
 | Tudo concluído (com "Com pendências") | `CircleCheck`, "Nenhuma pendência em outubro" e "Todas as tarefas recorrentes da competência foram concluídas." |
 | Nenhum mês concluído (com "Mês concluído") | "Nenhum cliente com o mês concluído em outubro." e "O mês de um cliente fica concluído quando todas as tarefas recorrentes dele estão concluídas." |
-| Carregando | o cabeçalho da matriz aparece na hora (as colunas vêm das definições); as linhas são esqueletos de 52px |
+| Carregando | `SkeletonRows` de 56px no Card (as linhas de tarefa ou de cliente) |
 | Erro | `ErrorState` dentro do Card |
 
 | | 1440 | 1024 | 768 | 375 |
 | --- | --- | --- | --- | --- |
 | Resumo | 4 células | 4 células | 3 células e departamentos embaixo | 2 × 2, departamentos ocultos |
 | Barra de ferramentas | 1 linha | 2 linhas | 2 linhas | Visão em largura total, depois busca e "Filtros (N)" |
-| Por cliente | matriz, com cerca de 8 colunas de 104px visíveis e rolagem | matriz, com cerca de 5 colunas visíveis e rolagem | acordeão | acordeão |
-| Por tarefa | acordeão | acordeão | acordeão | acordeão |
+| Linhas de ocorrência (as duas visões, §11.2) | Largo: 7 colunas (1280 também) | Médio: Responsável, Prazo, Situação e Conclusão; Departamento sai da grade | Empilhado: 3 ou 4 linhas e o controle à direita | Empilhado, sem a hora da conclusão |
+| Linha da tarefa (Por tarefa) | na grade: Prazo e "1/3" em cima das colunas | na grade | `flex`, prazo à direita | `flex`, prazo como 3ª linha |
+
+Nenhuma largura tem rolagem lateral: a grade só aparece onde cabe, e o resto trunca com `min-w-0`.
 
 ---
 
@@ -2904,8 +3004,8 @@ invalida as chaves de tarefas e o resumo. Os toasts com "Desfazer" duram 6s
 | Trocar o responsável de um cliente (célula ou ficha) | o avatar troca na hora; a célula fica com `aria-busy` e opacidade de 70% até salvar | "Fiscal de Padaria Pão Dourado: agora com Ana Paula." (fase 2: "… 5 tarefas em aberto passaram para ela.") com **Desfazer** |
 | Responsável em lote | o diálogo fecha e as células mudam | "Responsável definido para 3 clientes." com **Desfazer** |
 | Departamento de um membro | o `Select` muda na hora | "Bruno agora está no Fiscal." |
-| Célula da matriz até Concluída (fase 2) | ✓ com as iniciais e "pop" | "DCTFWeb concluída para Padaria Pão Dourado." com **Desfazer** |
-| Célula da matriz (outros passos) | o glifo muda | nenhum (seria barulho a cada clique) |
+| Controle da auditoria até Concluída (fase 2) | ✓ verde (sem iniciais) com "pop"; Data de conclusão e Concluída por se preenchem na hora | "DCTFWeb concluída para Padaria Pão Dourado." com **Desfazer** |
+| Controle da auditoria (outros passos) | o glifo muda | nenhum (seria barulho a cada clique) |
 | Reabrir célula com motivo | o popover fecha, a célula volta ao estado escolhido e o cadeado do mês, se havia, some | "DCTFWeb reaberta para Padaria Pão Dourado." (sem desfazer) |
 | Última célula do cliente concluída | o cadeado aparece na coluna de progresso com "pop" | "DCTFWeb concluída. Outubro concluído para Padaria Pão Dourado." com **Desfazer** |
 | Atribuir uma ocorrência a alguém (só a competência) | o avatar da linha troca | "DCTFWeb de Padaria Pão Dourado em outubro: agora com Bruno." com **Desfazer** |
@@ -3099,6 +3199,6 @@ busca de tarefas e recorrentes e a troca de responsável em lote com a contagem 
       e 375, como administrador e como colaborador, além de `/contas-a-pagar` como colaborador
       (Acesso restrito); nenhuma rolagem horizontal da página a 375px.
 - [ ] `pnpm typecheck && pnpm test`.
-- [ ] Depois de implementado, levar `TaskRow`, `TaskStatusButton`, `MatrixStatusCell`,
+- [ ] Depois de implementado, levar `TaskRow`, `TaskStatusButton`, `OccurrenceCellControl`,
       `MemberAvatar`, `SearchSelect`, `AreaSwitchButton`, `CredentialField` e `PermissionSwitchRow`
       para a tabela de componentes de `docs/design-system.md`.
