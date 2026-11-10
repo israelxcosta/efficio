@@ -374,7 +374,7 @@
     .legal { display: grid; gap: 8px; font-size: .8rem; color: var(--muted); line-height: 1.55; }
 
     /* Telas maiores ---------------------------------------- */
-    @media (min-width: 620px) {
+    @media print, (min-width: 620px) {
       .sheet { padding: 36px 44px 40px; gap: 44px; }
       .facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
@@ -402,6 +402,14 @@
 
       .trio { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+      /* Blocos de texto justificados, ocupando toda a largura do quadro */
+      .hero__lead, .section__intro, .case__text, .example p, .note span,
+      .watch li, .legal p, .cta p, .trio li, .steps span {
+        text-align: justify;
+        hyphens: auto;
+      }
+      .hero__lead, .section__intro, .case__text, .watch li, .tl p, .cta p { max-width: none; }
     }
 
     @media (min-width: 1000px) {
@@ -412,15 +420,17 @@
     /* Impressão / PDF -------------------------------------- */
     @page { size: A4; margin: 11mm 12mm; }
     @media print {
-      html { font-size: 13.5px; }
+      html { font-size: 13px; }
       body { background: #fff; padding: 0; }
+
+      /* Fluxo em bloco: os navegadores só respeitam "não quebrar" de forma confiável em blocos */
       .sheet { display: block; max-width: none; padding: 0; box-shadow: none; border-radius: 0; }
-      .sheet > * + * { margin-top: 18px; }
-      .section, .cases { display: block; }
+      .sheet > * + * { margin-top: 20px; }
+      .section, .cases, .case { display: block; }
       .section > * + * { margin-top: 10px; }
       .cases > * + * { margin-top: 12px; }
+      .case > * + * { margin-top: 10px; }
       .section__intro--screen { display: none; }
-      .section__intro, .case__text, .watch li, .hero__lead { max-width: none; }
 
       .mast { padding-bottom: 12px; }
       .mast__logo { height: 38px; }
@@ -429,17 +439,23 @@
       .hero h1 { font-size: 1.9rem; max-width: none; }
       .fact { padding: 12px 14px; }
       .timeline { margin-top: 0; }
-      .tl p { max-width: none; }
-      .case { padding: 14px 18px 14px 20px; gap: 10px; }
+      .case { padding: 14px 18px 14px 20px; }
       .weeks { gap: 10px; }
       .week { padding-top: 10px; }
-      .day { min-height: 52px; }
+      .day { min-height: 50px; }
       .example, .note { padding: 8px 14px; }
-      .cta { padding: 22px 26px; }
+      .cta { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 32px; align-items: center; padding: 22px 26px; }
+      .cta__logo, .cta h2, .cta p { grid-column: 1; }
+      .cta__actions { grid-column: 2; grid-row: 1 / span 3; flex-direction: column; align-items: flex-start; gap: 10px; }
+      .cta__contacts { flex-direction: column; gap: 2px; }
 
-      h2 { break-after: avoid; }
-      .legend { break-after: avoid; }
-      .hero, .case, .note, .table-wrap, .trio li, .steps li, .cta, .timeline, .legal, .section--keep { break-inside: avoid; }
+      /* Quebras de página planejadas: cada página fecha um grupo inteiro */
+      .print-break { break-before: page; page-break-before: always; margin-top: 0 !important; }
+      h2, .legend { break-after: avoid; page-break-after: avoid; }
+      .hero, .timeline, .note, .case, .case__head, .week, .example, .table-wrap,
+      .trio, .steps li, .watch li, .cta, .legal, .section--keep {
+        break-inside: avoid; page-break-inside: avoid;
+      }
     }
   </style>
 </head>
@@ -564,7 +580,7 @@
         </article>
 
         <!-- Caso 2 -->
-        <article class="case case--warn">
+        <article class="case case--warn print-break">
           <header class="case__head">
             <span class="case__n" aria-hidden="true">2</span>
             <div class="case__title">
@@ -691,9 +707,9 @@
     </section>
 
     <!-- Escala de exemplo -->
-    <section class="section section--keep" aria-labelledby="escala">
+    <section class="section section--keep print-break" aria-labelledby="escala">
       <h2 id="escala">Como manter a empresa aberta de segunda a sábado</h2>
-      <p class="section__intro">Com folgas em dias alternados, o atendimento continua nos seis dias. Exemplo de uma loja com três colaboradores, todos em 5x2:</p>
+      <p class="section__intro">Com folgas em dias alternados, o atendimento continua nos seis dias. Exemplo de loja com três colaboradores em 5x2:</p>
       <div class="table-wrap">
         <table class="roster">
           <caption class="sr-only">Exemplo de escala 5x2 com folgas alternadas para uma loja aberta de segunda a sábado</caption>
@@ -755,7 +771,7 @@
       <ul class="trio">
         <li><strong>Salário mantido</strong>A redução da jornada não autoriza reduzir o salário mensal.</li>
         <li><strong>Hora mais cara</strong>Com o mesmo salário e menos horas, o valor da hora de trabalho aumenta. Isso reflete no custo das horas extras.</li>
-        <li><strong>Cálculo em definição</strong>O divisor usado para calcular o valor da hora na transição ainda aguarda regulamentação. Avisaremos os clientes quando houver definição.</li>
+        <li><strong>Cálculo em definição</strong>O divisor usado para calcular o valor da hora ainda aguarda regulamentação. Avisaremos quando houver definição.</li>
       </ul>
     </section>
 
@@ -773,13 +789,14 @@
     </section>
 
     <!-- Atenção -->
-    <section class="section section--keep" aria-labelledby="atencao">
+    <section class="section section--keep print-break" aria-labelledby="atencao">
       <h2 id="atencao">Fique atento</h2>
       <ul class="watch">
-        <li>Escala 12x36, plantões e turnos de revezamento seguem regras próprias, definidas em lei ou em negociação coletiva. Cada caso precisa de análise.</li>
-        <li>Regimes de compensação diferentes do 5x2 só valem se estiverem previstos em acordo ou convenção coletiva.</li>
+        <li>Plantões e turnos de revezamento seguem regras próprias, definidas em lei ou em negociação coletiva. Cada caso precisa de análise.</li>
+        <li>Regimes de compensação de folgas diferentes do 5x2 dependem de previsão em acordo ou convenção coletiva.</li>
         <li>Empresas terceirizadas que prestam serviços a órgãos públicos têm prazo de 12 meses para se adequar.</li>
         <li>Servidores públicos e empregados com diploma de nível superior e salário a partir de 2,5 vezes o teto do INSS têm regras próprias.</li>
+        <li>Entidades empresariais pediram ao STF o adiamento dos prazos. Até o fechamento deste informativo, o calendário estava mantido.</li>
         <li>Parte das regras ainda depende de regulamentação. Enviaremos novos informativos quando houver novidades.</li>
       </ul>
     </section>
