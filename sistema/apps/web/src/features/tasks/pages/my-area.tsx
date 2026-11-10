@@ -129,7 +129,7 @@ export default function MyAreaPage() {
           <DashSlot rows={4} span={{ wide: 4, medium: 1 }}>
             {o ? <ForYouCardView insights={o.insights} /> : <CardLoading title="Para você" />}
           </DashSlot>
-          <DashSlot rows={4} span={{ wide: 4, medium: 1 }}>
+          <DashSlot rows={4} span={{ wide: 4, medium: 1 }} grow>
             <WidgetCard
               title="Calendário"
               subtitle={calendarFinding}

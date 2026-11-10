@@ -205,6 +205,9 @@ export function RhythmCardView({ overview, monthName, prevMonthName, footer }: {
   const me = overview.productivity.onTimeRate;
   return (
     <WidgetCard title="Seu ritmo" subtitle={rhythmFinding(overview, monthName, prevMonthName)} footer={footer}>
+      {trend.every((p) => p.concluded === 0) ? (
+        <BodyEmpty title="Nenhuma conclusão nos últimos 6 meses." />
+      ) : (
       <div className="flex min-h-0 flex-1 items-end gap-2" aria-hidden>
         {trend.map((p) => (
           <div key={p.month} className="flex min-w-0 flex-1 flex-col items-center gap-1">
@@ -217,6 +220,7 @@ export function RhythmCardView({ overview, monthName, prevMonthName, footer }: {
           </div>
         ))}
       </div>
+      )}
       <p className="mt-3 truncate text-caption text-muted">
         {me !== null ? `Você: ${me}% no prazo` : 'Você: nenhuma concluída no mês'}
         {c?.average && c.average.onTimeRate !== null ? ` · média do ${c.department.name}: ${c.average.onTimeRate}%` : ''}

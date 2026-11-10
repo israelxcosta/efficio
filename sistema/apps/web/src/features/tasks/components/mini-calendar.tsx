@@ -103,17 +103,17 @@ export function MiniCalendar({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon-sm" aria-label="Mês anterior" onClick={() => changeMonth(-1)}>
+        <Button variant="ghost" size="icon-sm" className="size-7" aria-label="Mês anterior" onClick={() => changeMonth(-1)}>
           <ChevronLeft />
         </Button>
         <span className="min-w-0 flex-1 truncate text-center text-body-sm font-semibold text-fg" aria-live="polite">
           {monthLabel}
         </span>
-        <Button variant="ghost" size="icon-sm" aria-label="Próximo mês" onClick={() => changeMonth(1)}>
+        <Button variant="ghost" size="icon-sm" className="size-7" aria-label="Próximo mês" onClick={() => changeMonth(1)}>
           <ChevronRight />
         </Button>
         {month !== monthKey(today) ? (
-          <Button variant="ghost" size="sm" onClick={() => onMonth(monthKey(today))}>
+          <Button variant="ghost" size="sm" className="h-7" onClick={() => onMonth(monthKey(today))}>
             Hoje
           </Button>
         ) : null}
@@ -122,10 +122,10 @@ export function MiniCalendar({
         <ErrorState error={calendar.error} onRetry={() => calendar.refetch()} className="p-3" />
       ) : (
         <Popover.Root open={openDay !== null} onOpenChange={(o) => !o && setOpenDay(null)}>
-          <div role="grid" aria-label={`Calendário de ${monthLabel}`} onKeyDown={onKey} className="mt-2 grid grid-cols-7 gap-y-0.5">
+          <div role="grid" aria-label={`Calendário de ${monthLabel}`} onKeyDown={onKey} className="mt-1.5 grid grid-cols-7">
             <div role="row" className="contents">
               {COLUMN_HEADS.map(([letter, name], i) => (
-                <span key={i} role="columnheader" aria-label={name} className="pb-1 text-center text-micro text-muted">
+                <span key={i} role="columnheader" aria-label={name} className="pb-0.5 text-center text-micro text-muted">
                   {letter}
                 </span>
               ))}
@@ -153,7 +153,7 @@ export function MiniCalendar({
                         setOpenDay(d.date);
                       }}
                       className={cn(
-                        'relative mx-auto flex aspect-square w-full max-w-12 min-w-10 flex-col items-center justify-center rounded-lg text-body-sm transition-colors duration-150 hover:bg-surface-muted',
+                        'relative mx-auto flex h-10 w-full max-w-12 min-w-10 flex-col items-center justify-center rounded-lg text-body-sm transition-colors duration-150 hover:bg-surface-muted',
                         !d.inMonth ? 'text-subtle' : d.weekend || d.holiday ? 'text-muted' : 'text-fg',
                       )}
                     >

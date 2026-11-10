@@ -40,11 +40,29 @@ export function dashGridClass(cols: BoardCols): string {
   return cols === 4 ? 'grid grid-cols-12 gap-4' : cols === 2 ? 'grid grid-cols-2 gap-4' : 'grid grid-cols-1 gap-4';
 }
 
-/** A card of the Início: fixed height by rows and its span on the section grid. */
-export function DashSlot({ rows, span, mediumRows, phoneRows, children }: { rows: Rows; span: SlotSpan; mediumRows?: Rows; phoneRows?: Rows; children: ReactNode }) {
+/**
+ * A card of the Início: fixed height by rows and its span on the section grid. `grow` makes the height a
+ * minimum (a card whose content has a fixed shape, like Minha área's calendar, never overflows it).
+ */
+export function DashSlot({
+  rows,
+  span,
+  mediumRows,
+  phoneRows,
+  grow,
+  children,
+}: {
+  rows: Rows;
+  span: SlotSpan;
+  mediumRows?: Rows;
+  phoneRows?: Rows;
+  grow?: boolean;
+  children: ReactNode;
+}) {
   const cols = useDashCols();
+  const height = heightForRows(slotRows({ rows, mediumRows, phoneRows }, cols), cols);
   return (
-    <div className="min-w-0" style={{ height: heightForRows(slotRows({ rows, mediumRows, phoneRows }, cols), cols), gridColumn: `span ${slotColumns(span, cols)}` }}>
+    <div className="min-w-0" style={{ ...(grow ? { minHeight: height } : { height }), gridColumn: `span ${slotColumns(span, cols)}` }}>
       {children}
     </div>
   );

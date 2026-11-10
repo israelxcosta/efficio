@@ -3799,18 +3799,18 @@ fim de `docs/superpowers/plans/2026-11-05-hub-recorrencia-area-usuario.md`).
 
 **Revisão 4** (plano: `docs/superpowers/plans/2026-11-05-hub-recorrencia-area-usuario.md`)
 
-- [ ] Trilho de 5 itens, páginas do hub com `place: 'hub'`, Tarefas ativo nelas, "Mais" sem elas e ⌘K
+- [x] Trilho de 5 itens, páginas do hub com `place: 'hub'`, Tarefas ativo nelas, "Mais" sem elas e ⌘K
       com todas, mais Grupos por regime e Minha área (§2.2, §2.4, §2.8).
-- [ ] `TasksHub` nos cabeçalhos de Tarefas, Auditoria, Recorrentes e Processos; saem o `TaskCreateHub`,
+- [x] `TasksHub` nos cabeçalhos de Tarefas, Auditoria, Recorrentes e Processos; saem o `TaskCreateHub`,
       a Visualização dos filtros, o segmentado de Recorrentes e os botões dos cabeçalhos (§2.9).
-- [ ] Auditoria enxuta, A1 a A14 (§11.8).
-- [ ] `RepeatField` na criação e no detalhe, "Só esta / Esta e as próximas", a regra no subtítulo das
+- [x] Auditoria enxuta, A1 a A14 (§11.8).
+- [x] `RepeatField` na criação e no detalhe, "Só esta / Esta e as próximas", a regra no subtítulo das
       linhas e as ocorrências seguidas juntas nos grupos futuros (§5.3 e §9.4).
-- [ ] Recorrentes com o filtro Tipo e as linhas de repetição, quando a API mandar as duas origens
+- [x] Recorrentes com o filtro Tipo e as linhas de repetição, quando a API mandar as duas origens
       (§10.1, §10.2 e §18, item 23).
-- [ ] Minha área: avatar como link, menu de conta, linha no "Mais" do celular, faixa, 8 cards e
+- [x] Minha área: avatar como link, menu de conta, linha no "Mais" do celular, faixa, 8 cards e
       `MiniCalendar` (§15.4).
-- [ ] Capturas em 1440, 1024, 768 e 375: hub em largura total e sem Criar no celular; Minha área e
+- [ ] Capturas em 1024 e 768 (feitas 1440 e 375): hub em largura total e sem Criar no celular; Minha área e
       Auditoria sem rolagem lateral; `design-system.md` com `TasksHub`, `RepeatField`, `AccountMenu` e
       `MiniCalendar`.
 
