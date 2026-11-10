@@ -5,8 +5,6 @@ import {
   addMonthKey,
   formatMonthKey,
   MAX_REFERENCE_OFFSET,
-  MONTH_NAMES,
-  NON_BUSINESS_DAY_RULES,
   recurringTaskInputSchema,
   TAX_REGIME_LABELS,
   TAX_REGIMES,
@@ -46,6 +44,7 @@ import {
   referenceOptionLabel,
 } from '../recurring-rules';
 import { ClientPicker, MemberPicker, NONE } from './pickers';
+import { AnchorMonthField, DueDayField, NonBusinessField } from './recurrence-fields';
 
 /** Form state: numbers as strings while typing; `endCompetence` '' = no end. */
 export interface RecurringForm {
@@ -368,14 +367,7 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
             </div>
             <div className="flex flex-col gap-1.5">
               <span className="text-[13px] font-medium text-fg">Se cair em dia não útil</span>
-              <SegmentedControl<NonBusinessDayRule>
-                size="sm"
-                ariaLabel="Se cair em dia não útil"
-                value={form.nonBusinessDayRule}
-                onChange={(v) => !readOnly && set('nonBusinessDayRule', v)}
-                options={NON_BUSINESS_DAY_RULES.map((r) => ({ value: r, label: r === 'anticipate' ? 'Antecipar' : r === 'postpone' ? 'Postergar' : 'Manter' }))}
-                className="self-start"
-              />
+              <NonBusinessField value={form.nonBusinessDayRule} onChange={(v) => set('nonBusinessDayRule', v)} disabled={readOnly} />
               <p className="text-xs text-muted">{NON_BUSINESS_HINTS[form.nonBusinessDayRule]} Vale para o prazo legal; a meta sempre antecipa.</p>
             </div>
             <Preview schedule={schedule} current={current} start={form.startCompetence} />
@@ -480,16 +472,7 @@ function DueFields({ form, errors, readOnly, set }: { form: RecurringForm; error
       </Field>
     );
   }
-  const daySelect = (
-    <Select disabled={readOnly} aria-label="Dia do prazo legal" value={form.dueDay} onChange={(e) => set('dueDay', e.target.value)}>
-      <option value="">Dia</option>
-      {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-        <option key={d} value={String(d)}>
-          {d === 31 ? '31 ou o último dia do mês' : `Dia ${d}`}
-        </option>
-      ))}
-    </Select>
-  );
+  const daySelect = <DueDayField disabled={readOnly} aria-label="Dia do prazo legal" placeholder="Dia" value={form.dueDay} onChange={(v) => set('dueDay', v)} />;
   if (form.period === 'monthly') {
     return (
       <Field label="Prazo legal*" error={errors.dueDay} hint={hint}>
@@ -502,14 +485,14 @@ function DueFields({ form, errors, readOnly, set }: { form: RecurringForm; error
       <span className="text-[13px] font-medium text-fg">Prazo legal*</span>
       <div className="grid gap-2 sm:grid-cols-2">
         {daySelect}
-        <Select disabled={readOnly} aria-label={form.period === 'annual' ? 'Mês do prazo legal' : '1º mês do prazo legal'} value={form.dueMonth} onChange={(e) => set('dueMonth', e.target.value)}>
-          <option value="">{form.period === 'annual' ? 'Mês' : '1º mês'}</option>
-          {MONTH_NAMES.map((m, i) => (
-            <option key={m} value={String(i + 1)}>
-              {m}
-            </option>
-          ))}
-        </Select>
+        <AnchorMonthField
+          annual={form.period === 'annual'}
+          placeholder
+          disabled={readOnly}
+          aria-label={form.period === 'annual' ? 'Mês do prazo legal' : '1º mês do prazo legal'}
+          value={form.dueMonth}
+          onChange={(v) => set('dueMonth', v)}
+        />
       </div>
       {errors.dueDay || errors.dueMonth ? (
         <p role="alert" className="text-xs font-medium text-danger">

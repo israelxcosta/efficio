@@ -1,26 +1,15 @@
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { BriefcaseBusiness, ChevronDown, LogOut, Moon, NotebookPen, Settings, Sun, UserRound, Wallet } from 'lucide-react';
-import { WORKSPACE_KIND_LABELS } from '@effinance/shared';
+import { BriefcaseBusiness, ChevronDown, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTheme } from '@/lib/theme';
 import { useElementSize } from '@/lib/use-element-size';
 import { useAuth } from '@/features/auth/auth-context';
 import { Tooltip } from '@/components/ui/tooltip';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { WorkspaceMenuItems, WorkspaceSheet } from '@/features/workspaces/workspace-switcher';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { WORKSPACE_KIND_ICONS } from '@/features/workspaces/kind-icon';
 import { usePermissions } from '@/features/auth/permissions';
-import { useTaskActions } from '@/features/tasks/task-actions';
 import { lastPathOf, type AreaMemory } from './area-memory';
-import { AREA_HOME, AREA_SHORT_LABELS, isActivePath, railItemsFor, SETTINGS_ITEM, splitRail, type Area, type NavItem } from './nav';
+import { AREA_HOME, AREA_SHORT_LABELS, isActivePath, MY_AREA_ITEM, railItemsFor, SETTINGS_ITEM, splitRail, type Area, type NavItem } from './nav';
 import { MemberAvatar } from '@/components/ui/member-avatar';
 
 interface SidebarProps {
@@ -31,17 +20,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ area, memory }: SidebarProps) {
-  const { user, workspace, logout } = useAuth();
-  const { resolved, toggle } = useTheme();
-  const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
+  const { user, workspace } = useAuth();
+  const { pathname } = useLocation();
   const KindIcon = workspace ? WORKSPACE_KIND_ICONS[workspace.kind] : null;
   // Icons that do not fit the window height go to the "more" menu beside the rail (no scrollbar).
   const rail = useElementSize<HTMLElement>();
   // Only members with both areas see the area label and the switch button.
   const { canAccessFinance, can } = usePermissions();
   const { visible, hidden } = splitRail(railItemsFor(area, can), rail.height);
-  const { openNotes } = useTaskActions();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col items-center border-r border-border bg-bg-subtle py-5 lg:flex print:hidden">
@@ -71,64 +57,45 @@ export function Sidebar({ area, memory }: SidebarProps) {
           </>
         ) : null}
         <SidebarLink {...SETTINGS_ITEM} />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="relative flex size-10 items-center justify-center rounded-full ring-2 ring-surface transition-transform hover:scale-105"
-              aria-label={`Menu do usuário — espaço ${workspace?.name ?? ''}`}
-            >
-              <MemberAvatar size="lg" name={user?.name} userId={user?.id} photoVersion={user?.photoUpdatedAt ?? null} />
-              {/* Shared workspaces get a small badge so the active one is visible at a glance. */}
-              {KindIcon && workspace?.kind !== 'personal' ? (
-                <span className="absolute -right-1 -bottom-1 flex size-[18px] items-center justify-center rounded-full bg-primary text-primary-fg ring-2 ring-bg-subtle">
-                  <KindIcon className="size-2.5" aria-hidden />
-                </span>
-              ) : null}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="end" sideOffset={12} className="w-72">
-            <DropdownMenuLabel>Conta</DropdownMenuLabel>
-            <div className="px-2.5 pb-2">
-              <p className="truncate text-sm font-semibold">{user?.name}</p>
-              <p className="truncate text-xs text-muted">{user?.email}</p>
-              {workspace ? (
-                <p className="mt-1.5 truncate text-xs text-muted">
-                  Espaço atual: <span className="font-semibold text-fg">{workspace.name}</span> · {WORKSPACE_KIND_LABELS[workspace.kind]}
-                </p>
-              ) : null}
-            </div>
-            <DropdownMenuSeparator />
-            <WorkspaceMenuItems onCreate={() => setCreating(true)} />
-            <DropdownMenuSeparator />
-            <DropdownMenuItem icon={<UserRound />} onSelect={() => navigate('/configuracoes')}>
-              Perfil
-            </DropdownMenuItem>
-            <DropdownMenuItem icon={<NotebookPen />} onSelect={openNotes}>
-              Minhas anotações
-            </DropdownMenuItem>
-            <DropdownMenuItem icon={resolved === 'dark' ? <Sun /> : <Moon />} onSelect={toggle}>
-              {resolved === 'dark' ? 'Tema claro' : 'Tema escuro'}
-            </DropdownMenuItem>
-            <DropdownMenuItem icon={<Settings />} onSelect={() => navigate('/configuracoes')}>
-              Configurações
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              icon={<LogOut />}
-              tone="danger"
-              onSelect={async () => {
-                await logout();
-                navigate('/login', { replace: true });
-              }}
-            >
-              Sair
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <AvatarLink
+          name={user?.name ?? ''}
+          userId={user?.id ?? ''}
+          photoVersion={user?.photoUpdatedAt ?? null}
+          active={isActivePath(pathname, MY_AREA_ITEM)}
+          badge={
+            // Shared workspaces get a small badge so the active one is visible at a glance.
+            KindIcon && workspace?.kind !== 'personal' ? (
+              <span className="absolute -right-1 -bottom-1 flex size-[18px] items-center justify-center rounded-full bg-primary text-primary-fg ring-2 ring-bg-subtle">
+                <KindIcon className="size-2.5" aria-hidden />
+              </span>
+            ) : null
+          }
+        />
       </div>
-      <WorkspaceSheet open={creating} onOpenChange={setCreating} />
     </aside>
+  );
+}
+
+/**
+ * The avatar at the foot of the rail: a link to Minha área (spec §2.2), with the ring `ring-primary`
+ * there (`ring-surface` at rest) and the badge of the workspace kind in the corner. No menu.
+ */
+export function AvatarLink({ name, userId, photoVersion, active, badge }: { name: string; userId: string; photoVersion: string | null; active: boolean; badge: ReactNode }) {
+  return (
+    <Tooltip content="Minha área" side="right" delay={150}>
+      <Link
+        to={MY_AREA_ITEM.to}
+        aria-label={`Minha área — ${name}`}
+        aria-current={active ? 'page' : undefined}
+        className={cn(
+          'relative flex size-10 items-center justify-center rounded-full ring-2 transition-transform duration-150 hover:scale-105',
+          active ? 'ring-primary' : 'ring-surface',
+        )}
+      >
+        <MemberAvatar size="lg" name={name} userId={userId} photoVersion={photoVersion} />
+        {badge}
+      </Link>
+    </Tooltip>
   );
 }
 

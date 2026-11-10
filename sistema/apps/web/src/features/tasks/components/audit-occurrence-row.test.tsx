@@ -188,7 +188,7 @@ describe('the client row of "Por cliente" (revision 4)', () => {
     inProgress: 0,
     overduePending: 2,
     targetMissedPending: 0,
-    monthConcludedAt: null,
+    monthConcludedAt: null as string | null,
   };
   const cells = [
     makeCell({ status: 'todo', targetDate: '2026-11-07' }),

@@ -51,6 +51,8 @@ import {
   dueRuleText,
   holidaysText,
   parseRecurringFilters,
+  recurringDeadlineText,
+  recurringFilterCount,
   previewLines,
   targetRuleText,
   toRecurringQuery,
@@ -412,11 +414,43 @@ describe('URL of the new screens', () => {
 
   it('reads and writes the recurring list filters; `recorrente` with `periodo` belongs to the occurrence sheet', () => {
     const f = parseRecurringFilters(p(`busca=das&periodicidade=trimestral&departamento=${ID}&situacao=encerradas&recorrente=nova`));
-    expect(f).toEqual({ search: 'das', period: 'quarterly', department: ID, assignee: '', regime: '', status: 'ended', open: 'nova' });
+    expect(f).toEqual({ search: 'das', period: 'quarterly', department: ID, assignee: '', regime: '', kind: '', status: 'ended', open: 'nova' });
     expect(parseRecurringFilters(p(`recorrente=${ID}&periodo=2026-10`)).open).toBe('');
     expect(parseRecurringFilters(p('recorrente=../x')).open).toBe('');
     expect(writeRecurringFilters(p(''), { period: 'annual', status: 'active', open: ID }).toString()).toBe(`periodicidade=anual&recorrente=${ID}`);
     expect(toRecurringQuery(f, '2026-10')).toMatchObject({ month: '2026-10', search: 'das', period: 'quarterly', status: 'ended' });
+  });
+
+  it('reads the Tipo filter (obligations or repetitions) and asks the API for the matching origin (revision 4)', () => {
+    expect(parseRecurringFilters(p('tipo=repeticoes')).kind).toBe('repetitions');
+    expect(parseRecurringFilters(p('tipo=obrigacoes')).kind).toBe('obligations');
+    expect(parseRecurringFilters(p('tipo=xx')).kind).toBe('');
+    expect(writeRecurringFilters(p(''), { kind: 'repetitions' }).toString()).toBe('tipo=repeticoes');
+    expect(writeRecurringFilters(p('tipo=repeticoes'), { kind: '' }).toString()).toBe('');
+    const base = parseRecurringFilters(p(''));
+    expect(recurringFilterCount({ ...base, kind: 'obligations' })).toBe(1);
+    expect(toRecurringQuery(base, '2026-10').origin).toBe('all');
+    expect(toRecurringQuery({ ...base, kind: 'obligations' }, '2026-10').origin).toBe('registry');
+    expect(toRecurringQuery({ ...base, kind: 'repetitions' }, '2026-10').origin).toBe('task');
+  });
+
+  it('words the Prazo of an obligation and of a repetition', () => {
+    const obligation = { origin: 'registry', period: 'monthly', dueDay: 20, dueMonth: null, targetDaysBefore: 5, nonBusinessDayRule: 'anticipate', referenceOffset: 1, recurrence: null } as const;
+    expect(recurringDeadlineText(obligation)).toEqual({ line1: 'Dia 20', line2: 'meta 5 dias antes · antecipa · ref. mês anterior' });
+    const rule: NonNullable<Parameters<typeof recurringDeadlineText>[0]['recurrence']> = {
+      frequency: 'weekly',
+      interval: 1,
+      weekdays: [1],
+      dueDay: null,
+      nonBusinessDayRule: 'skip',
+      ends: 'count',
+      endDate: '2027-01-25',
+      count: 12,
+      targetDaysBefore: 0,
+    };
+    expect(recurringDeadlineText({ ...obligation, origin: 'task', period: 'weekly', recurrence: rule })).toEqual({ line1: 'Toda segunda', line2: '12 vezes' });
+    expect(recurringDeadlineText({ ...obligation, origin: 'task', recurrence: { ...rule, frequency: 'monthly', weekdays: [], dueDay: 10, ends: 'date', endDate: '2026-12-10', count: null } }).line2).toBe('termina em 12/2026');
+    expect(recurringDeadlineText({ ...obligation, origin: 'task', recurrence: { ...rule, ends: 'never', count: null, targetDaysBefore: 2 } }).line2).toBe('meta 2 dias antes');
   });
 
   it('reads the processes page parameters', () => {

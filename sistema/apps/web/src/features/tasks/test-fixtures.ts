@@ -125,3 +125,36 @@ export function makeCell(patch: Partial<import('@effinance/shared').OccurrenceCe
     ...patch,
   };
 }
+
+/** A personal overview (`GET /tasks/me/overview`) of Marina, on Thursday 2026-11-05. */
+export function makeOverview(patch: Partial<import('@effinance/shared').TaskMyOverviewResponse> = {}): import('@effinance/shared').TaskMyOverviewResponse {
+  const point = (month: string, concluded: number) => ({ month, concluded, onTime: concluded, late: 0, onTimeRate: concluded ? 100 : null });
+  return {
+    today: '2026-11-05',
+    month: '2026-11',
+    department: { id: 'fiscal', name: 'Fiscal' },
+    open: {
+      total: 0,
+      overdue: 0,
+      dueToday: 0,
+      dueTomorrow: 0,
+      next7Days: 0,
+      targetMissed: 0,
+      targetMissedNextLegalDate: null,
+      waitingClient: 0,
+      noDueDate: 0,
+      oldestOverdue: null,
+    },
+    productivity: {
+      ...point('2026-11', 0),
+      averageDays: null,
+      trend: [point('2026-06', 10), point('2026-07', 12), point('2026-08', 9), point('2026-09', 14), point('2026-10', 18), point('2026-11', 0)],
+      rateChange: null,
+    },
+    upcoming: { from: '2026-11-05', to: '2026-11-19', total: 0, tasks: [], occurrences: [] },
+    workload: { dueFrom: '2026-11-05', dueTo: '2026-12-03', concludedFrom: '2026-09-10', days: [] },
+    comparison: null,
+    insights: [],
+    ...patch,
+  };
+}

@@ -21,11 +21,13 @@ import {
   type RecurringTask,
   type RecurringTaskQuery,
   type TaskClientOption,
+  type TaskRecurrence,
   type TaxRegime,
 } from '@effinance/shared';
 import { isUuid } from '@/lib/safe-url';
 import { shortName } from './due';
 import { competenceName } from './occurrence';
+import { repeatShortText } from './repeat-rules';
 
 // ---------------------------------------------------------------------------
 // URL (`busca`, `periodicidade`, `departamento`, `responsavel`, `regime`, `situacao`, `recorrente`)
@@ -46,6 +48,8 @@ export interface RecurringFilters {
   department: string;
   assignee: string;
   regime: TaxRegime | '';
+  /** Tipo (revision 4): obligations (origin registry), repetitions (origin task) or both. */
+  kind: '' | 'obligations' | 'repetitions';
   status: 'active' | 'ended';
   /** Recurring task whose registry is open: an id, `nova` (create) or ''. */
   open: string;
@@ -62,6 +66,7 @@ export function parseRecurringFilters(params: URLSearchParams): RecurringFilters
     department: id(params.get('departamento')),
     assignee: id(params.get('responsavel')),
     regime: (TAX_REGIMES as readonly string[]).includes(regime) ? (regime as TaxRegime) : '',
+    kind: params.get('tipo') === 'obrigacoes' ? 'obligations' : params.get('tipo') === 'repeticoes' ? 'repetitions' : '',
     status: params.get('situacao') === 'encerradas' ? 'ended' : 'active',
     // With `periodo` the parameter belongs to the occurrence sheet.
     open: params.get('periodo') ? '' : open === 'nova' || isUuid(open) ? open : '',
@@ -76,13 +81,14 @@ export function writeRecurringFilters(params: URLSearchParams, patch: Partial<Re
   if (patch.department !== undefined) set('departamento', patch.department);
   if (patch.assignee !== undefined) set('responsavel', patch.assignee);
   if (patch.regime !== undefined) set('regime', patch.regime);
+  if (patch.kind !== undefined) set('tipo', patch.kind === 'obligations' ? 'obrigacoes' : patch.kind === 'repetitions' ? 'repeticoes' : null);
   if (patch.status !== undefined) set('situacao', patch.status === 'ended' ? 'encerradas' : null);
   if (patch.open !== undefined) set('recorrente', patch.open);
   return next;
 }
 
 export function recurringFilterCount(f: RecurringFilters): number {
-  return [f.search, f.period, f.department, f.assignee, f.regime].filter(Boolean).length;
+  return [f.search, f.period, f.department, f.assignee, f.regime, f.kind].filter(Boolean).length;
 }
 
 export function toRecurringQuery(f: RecurringFilters, month: MonthKey): RecurringTaskQuery {
@@ -93,6 +99,7 @@ export function toRecurringQuery(f: RecurringFilters, month: MonthKey): Recurrin
     departmentId: f.department || undefined,
     assigneeId: f.assignee || undefined,
     regime: f.regime || undefined,
+    origin: f.kind === 'obligations' ? 'registry' : f.kind === 'repetitions' ? 'task' : 'all',
     status: f.status,
   };
 }
@@ -162,6 +169,29 @@ export function shortMonthsWarning(r: Rule): string | null {
   const parts = [...groups.entries()].sort(([a], [b]) => b - a).map(([day, names]) => `em ${joinList(names)}, dia ${day}`);
   const text = parts.join('; ');
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
+}
+
+type RepetitionRule = Pick<TaskRecurrence, 'frequency' | 'interval' | 'weekdays' | 'dueDay' | 'nonBusinessDayRule' | 'ends' | 'endDate' | 'count' | 'targetDaysBefore'>;
+
+/**
+ * Column "Prazo" (spec §10.2): an obligation says the legal deadline and, below, the target, the rule and
+ * the reference; a repetition says its rule ("Toda segunda") and, below, how it ends or its target.
+ */
+export function recurringDeadlineText(
+  r: Pick<RecurringTask, 'origin' | 'period' | 'dueDay' | 'dueMonth' | 'targetDaysBefore' | 'nonBusinessDayRule' | 'referenceOffset'> & { recurrence: RepetitionRule | null },
+): { line1: string; line2: string } {
+  if (r.origin !== 'task' || !r.recurrence) return { line1: dueRuleText(r), line2: targetRuleText(r) };
+  const rule = r.recurrence;
+  const short = repeatShortText(rule);
+  const line2 =
+    rule.ends === 'count' && rule.count
+      ? `${rule.count} ${rule.count === 1 ? 'vez' : 'vezes'}`
+      : rule.ends === 'date' && rule.endDate
+        ? `termina em ${rule.endDate.slice(5, 7)}/${rule.endDate.slice(0, 4)}`
+        : rule.targetDaysBefore > 0
+          ? `meta ${rule.targetDaysBefore} ${rule.targetDaysBefore === 1 ? 'dia' : 'dias'} antes`
+          : '';
+  return { line1: `${short.charAt(0).toUpperCase()}${short.slice(1)}`, line2 };
 }
 
 /** Second line of the column: "meta 5 dias antes · antecipa · ref. mês anterior". */

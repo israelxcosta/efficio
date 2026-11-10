@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Copy, Ellipsis, ExternalLink, Hourglass, ListChecks, Repeat, Trash2, UserRoundCheck, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDateBR, TASK_STATUS_LABELS, TASK_STATUSES, todayISO, type ISODate, type Task, type TaskStatus } from '@effinance/shared';
+import { formatDateBR, RECURRENCE_FREQUENCY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES, todayISO, type ISODate, type Task, type TaskStatus } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { CategoryIcon } from '@/components/ui/category-icon';
 import { ConfirmDialog } from '@/components/ui/dialog';
@@ -37,6 +37,8 @@ interface TaskRowProps {
   /** Department at the end of the subtitle (scopes with several departments). */
   showDepartment?: boolean;
   muted?: boolean;
+  /** The following occurrences of the same repetition joined into this row ("+3 até 12/11"). */
+  more?: { count: number; until: ISODate };
 }
 
 /**
@@ -44,7 +46,7 @@ interface TaskRowProps {
  * is, neutral category icon, title with badges, subtitle, columns that appear with the container
  * width (Cliente, Responsável, Situação, Vencimento) and the "⋯" menu.
  */
-export function TaskRow({ task, today: todayProp, density = 'default', hideAssignee, showDepartment, muted }: TaskRowProps) {
+export function TaskRow({ task, today: todayProp, density = 'default', hideAssignee, showDepartment, muted, more }: TaskRowProps) {
   const compact = density === 'compact';
   const options = useTaskOptions();
   const today = todayProp ?? options.data?.today ?? todayISO();
@@ -54,6 +56,8 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
   const closed = task.status === 'done' || task.status === 'canceled';
   const clientName = task.client?.name ?? 'Interna';
   const subtitleHead = task.category?.name ?? null;
+  // An occurrence of a task's repetition: the rule opens the subtitle (no badge: it is not a state).
+  const repetition = task.occurrence?.origin === 'task' ? RECURRENCE_FREQUENCY_LABELS[task.occurrence.period].toLowerCase() : null;
 
   return (
     <div className="@container">
@@ -91,7 +95,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
                   </span>
                 </Badge>
               ) : null}
-              {task.occurrence && !compact ? (
+              {task.occurrence && task.occurrence.origin !== 'task' && !compact ? (
                 <Badge tone="neutral" className="shrink-0 px-1.5 @md:px-2" title="Recorrente">
                   <Repeat aria-hidden />
                   <span className="sr-only @md:not-sr-only">Recorrente</span>
@@ -118,9 +122,16 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
               ) : null}
             </span>
             <span className="mt-0.5 block truncate text-xs text-muted empty:hidden">
+              {repetition ? (
+                <span>
+                  <Repeat className="mr-1 inline size-3 align-[-2px]" aria-hidden />
+                  {repetition}
+                  {subtitleHead ? ' · ' : null}
+                </span>
+              ) : null}
               {subtitleHead ? <span>{subtitleHead}</span> : null}
               <span className={cn(!compact && '@3xl:hidden')}>
-                {subtitleHead ? ' · ' : ''}
+                {subtitleHead || repetition ? ' · ' : ''}
                 <span className={task.client ? undefined : 'text-subtle'}>{clientName}</span>
               </span>
               {showDepartment && task.department ? (
@@ -128,6 +139,12 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
                   {/* Without category the separator exists only while the client is in the subtitle. */}
                   {subtitleHead ? ' · ' : <span className={cn(!compact && '@3xl:hidden')}> · </span>}
                   {task.department.name}
+                </span>
+              ) : null}
+              {more ? (
+                <span className="text-subtle">
+                  {' '}
+                  · +{more.count} até {formatDateBR(more.until).slice(0, 5)}
                 </span>
               ) : null}
             </span>

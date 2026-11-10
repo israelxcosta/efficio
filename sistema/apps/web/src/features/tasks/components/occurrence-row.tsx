@@ -7,7 +7,7 @@ import { CategoryIcon } from '@/components/ui/category-icon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AvatarStack, MemberAvatar } from '@/components/ui/member-avatar';
 import { Tooltip } from '@/components/ui/tooltip';
-import { areaOf } from '@/components/layout/nav';
+import { hostsTaskSheets } from '@/components/layout/nav';
 import { cn, pluralize } from '@/lib/utils';
 import { DUE_TONE_CLASS, shortName } from '../due';
 import { assigneesTip, auditHref, deadlineTip, doneFraction, groupDeadlineInfo, occurrenceParams, pendingText, periodLabel } from '../occurrence';
@@ -29,7 +29,7 @@ export function useOccurrenceSheetLinks() {
   const [params, setParams] = useSearchParams();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const here = areaOf(pathname) === 'gestao';
+  const here = hostsTaskSheets(pathname);
   const openOccurrence = useCallback(
     (o: Pick<RecurringOccurrence, 'recurringTaskId' | 'periodKey'>, view?: OccurrenceView) => {
       const sheet = { ...occurrenceParams(o), ...(view ? { ocorrencias: VIEW_PARAM[view] } : {}) };

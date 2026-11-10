@@ -29,6 +29,7 @@ const ClientReportPage = lazy(() => import('@/features/reports/pages/client-repo
 const SettingsPage = lazy(() => import('@/features/settings/pages/settings'));
 // Gestão de tarefas: Início, Tarefas, Auditoria, Recorrentes, Processos, Clientes, Relatórios, Cadastros.
 const GestaoLayout = lazy(() => import('@/features/tasks/gestao-layout'));
+const MyAreaPage = lazy(() => import('@/features/tasks/pages/my-area'));
 const TaskHomePage = lazy(() => import('@/features/tasks/pages/home'));
 const TasksPage = lazy(() => import('@/features/tasks/pages/tasks'));
 const TaskAuditPage = lazy(() => import('@/features/tasks/pages/audit'));
@@ -86,6 +87,8 @@ export const routes: RouteObject[] = [
           { path: 'tarefas/clientes', element: <TaskClientsPage /> },
           { path: 'tarefas/relatorios', element: <TaskReportsPage /> },
           { path: 'tarefas/cadastros', element: <TaskRegistryPage /> },
+          // Common route (the rail stays the current area's), in this layout for the task sheets.
+          { path: 'minha-area', element: <MyAreaPage /> },
         ],
       },
       // Financeiro (administrators): the same addresses as before, the panel moved to /financeiro.

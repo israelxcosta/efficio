@@ -1,5 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type {
+  MonthKey,
+  TaskMyOverviewResponse,
   ApplyFlowTemplateInput,
   NonBusinessDayRule,
   RecurrencePeriod,
@@ -127,6 +129,15 @@ export function useTaskMembers(options: { enabled?: boolean } = {}) {
     queryFn: () => api<TaskMember[]>('/tasks/members'),
     staleTime: 60_000,
     enabled: options.enabled ?? true,
+  });
+}
+
+/** Minha área (spec §15.4): your numbers, rhythm, next items and insights. */
+export function useMyOverview(month?: MonthKey) {
+  return useQuery({
+    queryKey: qk.taskMyOverview(month),
+    queryFn: () => api<TaskMyOverviewResponse>('/tasks/me/overview', { query: month ? { month } : {} }),
+    placeholderData: keepPreviousData,
   });
 }
 

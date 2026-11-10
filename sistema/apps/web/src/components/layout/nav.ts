@@ -3,10 +3,12 @@ import {
   Building2,
   ChartColumn,
   ChartLine,
+  CircleUserRound,
   ClipboardCheck,
   CreditCard,
   FolderCog,
   HandCoins,
+  Layers,
   House,
   Landmark,
   LayoutGrid,
@@ -136,6 +138,24 @@ export const FINANCE_NAV_ITEMS: NavItem[] = [
 
 export const SETTINGS_ITEM: NavItem = { to: '/configuracoes', label: 'Configurações', icon: Settings, keywords: 'perfil tema senha seguranca 2fa sessoes membros convites assinatura plano integracoes open finance importacoes privacidade exportar lgpd' };
 
+/** Grupos por regime, a view of Recorrentes: in ⌘K (spec §2.8) and in the hub, never in the rail. */
+export const REGIME_GROUPS_ITEM: NavItem = {
+  to: '/tarefas/recorrentes?visao=regimes',
+  label: 'Grupos por regime',
+  icon: Layers,
+  place: 'hub',
+  permission: 'page.recurring',
+  keywords: 'obrigacoes padrao regime simples presumido real mei',
+};
+
+/** Minha área (spec §15.4): a common route, opened by the avatar; in ⌘K and on the phone's "Mais". */
+export const MY_AREA_ITEM: NavItem = {
+  to: '/minha-area',
+  label: 'Minha área',
+  icon: CircleUserRound,
+  keywords: 'perfil eu meu painel anotacoes calendario conta sair tema',
+};
+
 export const AREA_LABELS: Record<Area, string> = { gestao: 'Gestão de tarefas', financeiro: 'Financeiro' };
 /** Short name under the logo. */
 export const AREA_SHORT_LABELS: Record<Area, string> = { gestao: 'Gestão', financeiro: 'Financeiro' };
@@ -199,6 +219,14 @@ export function areaOf(pathname: string): Area | 'common' {
   if (path === '/' || underPath(path, '/tarefas')) return 'gestao';
   if ([...FINANCE_NAV_ITEMS.map((i) => i.to), ...LEGACY_FINANCE_PATHS].some((to) => underPath(path, to))) return 'financeiro';
   return 'common';
+}
+
+/**
+ * Whether the page hosts the task sheets (`?tarefa=`, `?recorrente=&periodo=`): the Gestão pages and
+ * Minha área, a common route mounted in the Gestão layout (spec §15.4).
+ */
+export function hostsTaskSheets(pathname: string): boolean {
+  return areaOf(pathname) === 'gestao' || underPath(routePath(pathname), MY_AREA_ITEM.to);
 }
 
 /**

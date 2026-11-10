@@ -72,14 +72,28 @@ import { INTERNAL, NONE, ClientPicker, MemberPicker } from './pickers';
 import { ReopenDialog } from './reopen';
 import { TaskDueLabel } from './task-status';
 import { TaskTimeline } from './task-timeline';
+import { RepeatFieldView } from './repeat-field';
+import {
+  defaultRepeatForm,
+  patchFor,
+  repeatErrors,
+  repeatModeOf,
+  repeatShortText,
+  seriesLockedFields,
+  toRecurrenceInput,
+  withStartDate,
+  type ApplyScope,
+  type RepeatForm,
+} from '../repeat-rules';
+import { ApplyScopeControl, TaskRepeatField } from './task-repeat';
 
-type Stamp = 'idle' | 'saving' | 'saved' | 'error';
+type Stamp = 'idle' | 'saving' | 'saved' | 'saved-series' | 'error';
 
-/** "Salvando…", "Salvo", "Não foi salvo" (announced politely). */
+/** "Salvando…", "Salvo", "Salvo nesta e nas próximas", "Não foi salvo" (announced politely). */
 function SavedStamp({ state }: { state: Stamp }) {
   return (
     <span aria-live="polite" className={cn('mr-auto text-caption', state === 'error' ? 'font-medium text-danger' : 'text-subtle')}>
-      {state === 'saving' ? 'Salvando…' : state === 'saved' ? 'Salvo' : state === 'error' ? 'Não foi salvo' : ''}
+      {state === 'saving' ? 'Salvando…' : state === 'saved' ? 'Salvo' : state === 'saved-series' ? 'Salvo nesta e nas próximas' : state === 'error' ? 'Não foi salvo' : ''}
     </span>
   );
 }
@@ -128,7 +142,12 @@ function TaskSheet({ open, taskId, isNew, params, onClose, onCreated }: TaskShee
   const { canWriteTasks } = usePermissions();
   const readOnly = !canWriteTasks;
   const [stamp, setStamp] = useState<Stamp>('idle');
-  useEffect(() => setStamp('idle'), [taskId, isNew]);
+  // "Só esta" or "Esta e as próximas" (occurrences of a repetition): back to "Só esta" on another task.
+  const [scope, setScope] = useState<ApplyScope>('occurrence');
+  useEffect(() => {
+    setStamp('idle');
+    setScope('occurrence');
+  }, [taskId, isNew]);
 
   if (isNew) {
     return (
@@ -168,8 +187,9 @@ function TaskSheet({ open, taskId, isNew, params, onClose, onCreated }: TaskShee
   } else if (!task || !options.data) {
     body = <DetailSkeleton />;
   } else {
-    title = <TaskTitle task={task} readOnly={readOnly} onStamp={setStamp} />;
-    body = <TaskDetailBody task={task} options={options.data} readOnly={readOnly} onStamp={setStamp} />;
+    const edit = editScopeOf(task, readOnly, scope);
+    title = <TaskTitle task={task} readOnly={readOnly} onStamp={setStamp} scope={edit.scope} locked={edit.locked.has('title')} />;
+    body = <TaskDetailBody task={task} options={options.data} readOnly={readOnly} onStamp={setStamp} scope={scope} onScope={setScope} />;
     footer = <DetailFooter task={task} stamp={stamp} readOnly={readOnly} onClose={onClose} />;
   }
 
@@ -258,16 +278,31 @@ export function applyTaskPatch(task: TaskDetail, patch: TaskUpdateInput, options
   return next;
 }
 
-function useAutosave(task: TaskDetail, options: TaskOptionsResponse, onStamp: (s: Stamp) => void) {
+/**
+ * What an edit may change on this task: on an occurrence of a repetition, the scope ("Só esta" unless
+ * the person may edit the series) and the fields it locks; elsewhere, the API's locked fields.
+ */
+export function editScopeOf(task: TaskDetail, readOnly: boolean, chosen: ApplyScope): { scope: ApplyScope; canChoose: boolean; locked: Set<TaskLockedField> } {
+  const mode = repeatModeOf(task);
+  if (mode !== 'series') return { scope: 'occurrence', canChoose: false, locked: new Set(task.lockedFields) };
+  const canChoose = !readOnly && Boolean(task.recurrence?.canEdit);
+  const scope = canChoose ? chosen : 'occurrence';
+  return { scope, canChoose, locked: new Set([...task.lockedFields, ...seriesLockedFields(scope)]) };
+}
+
+function useAutosave(task: TaskDetail, options: TaskOptionsResponse, onStamp: (s: Stamp) => void, scope: ApplyScope = 'occurrence') {
   const qc = useQueryClient();
   const update = useUpdateTask();
-  return async (patch: TaskUpdateInput) => {
+  return async (raw: TaskUpdateInput) => {
+    // "Só esta" never sends a field of the series; "Esta e as próximas" always says `applyTo: 'series'`.
+    const patch = patchFor(scope, repeatModeOf(task), raw);
+    if (!patch) return false;
     const before = qc.getQueryData<TaskDetail>(qk.task(task.id)) ?? task;
     qc.setQueryData(qk.task(task.id), applyTaskPatch(before, patch, options));
     onStamp('saving');
     try {
       await update.mutateAsync({ id: task.id, patch });
-      onStamp('saved');
+      onStamp(patch.applyTo === 'series' ? 'saved-series' : 'saved');
       return true;
     } catch (error) {
       qc.setQueryData(qk.task(task.id), before);
@@ -278,14 +313,14 @@ function useAutosave(task: TaskDetail, options: TaskOptionsResponse, onStamp: (s
   };
 }
 
-function TaskTitle({ task, readOnly, onStamp }: { task: TaskDetail; readOnly: boolean; onStamp: (s: Stamp) => void }) {
+function TaskTitle({ task, readOnly, onStamp, scope, locked }: { task: TaskDetail; readOnly: boolean; onStamp: (s: Stamp) => void; scope: ApplyScope; locked: boolean }) {
   const options = useTaskOptions();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(task.title);
-  const save = useAutosave(task, options.data!, onStamp);
+  const save = useAutosave(task, options.data!, onStamp, scope);
   useEffect(() => setValue(task.title), [task.title]);
 
-  if (readOnly || task.lockedFields.includes('title')) return <span>{task.title}</span>;
+  if (readOnly || locked) return <span>{task.title}</span>;
   if (editing) {
     return (
       <Input
@@ -321,20 +356,40 @@ function TaskTitle({ task, readOnly, onStamp }: { task: TaskDetail; readOnly: bo
   );
 }
 
-function TaskDetailBody({ task, options, readOnly, onStamp }: { task: TaskDetail; options: TaskOptionsResponse; readOnly: boolean; onStamp: (s: Stamp) => void }) {
-  const save = useAutosave(task, options, onStamp);
+function TaskDetailBody({
+  task,
+  options,
+  readOnly,
+  onStamp,
+  scope: chosenScope,
+  onScope,
+}: {
+  task: TaskDetail;
+  options: TaskOptionsResponse;
+  readOnly: boolean;
+  onStamp: (s: Stamp) => void;
+  scope: ApplyScope;
+  onScope: (scope: ApplyScope) => void;
+}) {
+  const edit = editScopeOf(task, readOnly, chosenScope);
+  const save = useAutosave(task, options, onStamp, edit.scope);
+  const { can } = usePermissions();
+  const mode = repeatModeOf(task);
+  // A repetition's occurrence is a task like any other: due date and time, not the registry's Prazo block.
+  const registryOccurrence = task.occurrence && task.occurrence.origin !== 'task' ? task.occurrence : null;
   const status = useTaskStatusChange();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [description, setDescription] = useState(task.description ?? '');
   const [reopenTo, setReopenTo] = useState<OpenTaskStatus | null>(null);
   useEffect(() => setDescription(task.description ?? ''), [task.description]);
-  const locked = new Set(task.lockedFields);
+  const locked = edit.locked;
   // A concluded occurrence is an audit record: reopening asks the reason (who concluded it or an administrator).
-  const auditRecord = Boolean(task.occurrence) && task.status === 'done';
+  const auditRecord = Boolean(registryOccurrence) && task.status === 'done';
 
   return (
     <div className="flex flex-col gap-6">
+      {edit.canChoose ? <ApplyScopeControl value={edit.scope} onChange={onScope} /> : null}
       <TaskProperties
         values={{
           status: task.status,
@@ -351,10 +406,12 @@ function TaskDetailBody({ task, options, readOnly, onStamp }: { task: TaskDetail
         options={options}
         readOnly={readOnly}
         locked={locked}
-        occurrence={task.occurrence ? { targetDate: task.occurrence.targetDate, legalDueDate: task.dueDate, task } : undefined}
+        occurrence={registryOccurrence ? { targetDate: registryOccurrence.targetDate, legalDueDate: task.dueDate, task } : undefined}
         assigneeHint={assigneeSourceHint(task)}
         statusLockedReason={auditRecord && !task.canReopen ? 'Só quem concluiu ou um administrador pode reabrir.' : undefined}
-        onOpenRecurring={task.occurrence ? () => navigate(`/tarefas/recorrentes?recorrente=${task.occurrence!.recurringTaskId}`) : undefined}
+        onOpenRecurring={registryOccurrence ? () => navigate(`/tarefas/recorrentes?recorrente=${registryOccurrence.recurringTaskId}`) : undefined}
+        lockHint={mode === 'series' || mode === 'ended' ? (f) => (f === 'startDate' || f === 'dueDate' ? 'Vem da repetição.' : 'Mude em Esta e as próximas.') : undefined}
+        repeat={<TaskRepeatField task={task} today={options.today} readOnly={readOnly} canRegistry={can('registry') && can('page.recurring')} onSeriesSaved={() => onStamp('saved-series')} />}
         onStatus={(s) => {
           if (auditRecord && s !== 'done' && s !== 'canceled') setReopenTo(s as OpenTaskStatus);
           else void status.change(task, s, 'menu');
@@ -426,6 +483,14 @@ interface TaskPropertiesProps {
   /** The status cannot change (a concluded occurrence the member did not conclude). */
   statusLockedReason?: string;
   onOpenRecurring?: () => void;
+  /** Label of the due date: "Começa em" while the task repeats (spec §9.4). */
+  dueLabel?: string;
+  /** The "Repetição" field, on a whole row after the due date and the time. */
+  repeat?: ReactNode;
+  /** Hide "Início" (a repeating task takes its dates from the rule). */
+  hideStartDate?: boolean;
+  /** Hint of a locked field (default: "Vem da tarefa recorrente."). */
+  lockHint?: (field: TaskLockedField) => string;
 }
 
 const FROM_RECURRING = 'Vem da tarefa recorrente.';
@@ -447,9 +512,15 @@ function TaskProperties({
   assigneeHint,
   statusLockedReason,
   onOpenRecurring,
+  dueLabel = 'Vencimento',
+  repeat,
+  hideStartDate,
+  lockHint = () => FROM_RECURRING,
 }: TaskPropertiesProps) {
   const today = options.today;
   const isLocked = (f: TaskLockedField) => locked.has(f);
+  const hintOf = (f: TaskLockedField) => (isLocked(f) ? lockHint(f) : undefined);
+  const timeLocked = isLocked('startTime') || isLocked('endTime');
   const assignee = options.members.find((m) => m.id === values.assigneeId);
   const derivedDepartment = assignee?.department ?? null;
   const [showTime, setShowTime] = useState(Boolean(values.startTime));
@@ -506,7 +577,7 @@ function TaskProperties({
         label="Departamento"
         hint={
           isLocked('departmentId')
-            ? FROM_RECURRING
+            ? lockHint('departmentId')
             : derivedDepartment
               ? `Vem do responsável: ${derivedDepartment.name}.`
               : options.departments.length
@@ -527,7 +598,7 @@ function TaskProperties({
           ))}
         </Select>
       </Field>
-      <Field label="Cliente" hint={isLocked('clientId') ? FROM_RECURRING : undefined}>
+      <Field label="Cliente" hint={hintOf('clientId')}>
         <ClientPicker
           value={values.clientId || INTERNAL}
           onChange={(v) => onChange({ clientId: v === INTERNAL ? null : v })}
@@ -554,14 +625,14 @@ function TaskProperties({
         </div>
       ) : null}
       {occurrence ? null : <Field
-        label="Vencimento"
+        label={dueLabel}
         error={errors.dueDate}
-        hint={overdueDays ? <span className="font-medium text-danger">Venceu há {daysText(overdueDays)}</span> : undefined}
+        hint={overdueDays ? <span className="font-medium text-danger">Venceu há {daysText(overdueDays)}</span> : hintOf('dueDate')}
       >
         <Input
           type="date"
           value={values.dueDate}
-          disabled={readOnly}
+          disabled={readOnly || isLocked('dueDate')}
           className="h-10"
           onChange={(e) => {
             const v = e.target.value;
@@ -572,7 +643,7 @@ function TaskProperties({
           }}
         />
       </Field>}
-      <Field label="Categoria" hint={isLocked('categoryId') ? FROM_RECURRING : undefined}>
+      <Field label="Categoria" hint={hintOf('categoryId')}>
         <Select value={values.categoryId} disabled={readOnly || isLocked('categoryId')} onChange={(e) => onChange({ categoryId: e.target.value || null })}>
           <option value="">Sem categoria</option>
           {options.categories.map((c) => (
@@ -585,6 +656,7 @@ function TaskProperties({
       {occurrence ? null : (
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium text-fg">Horário</span>
+        {timeLocked && !showTime ? <span className="text-xs text-muted">{lockHint('startTime')}</span> : null}
         {showTime ? (
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
@@ -592,7 +664,7 @@ function TaskProperties({
                 type="time"
                 aria-label="Hora de início"
                 value={timeDraft.start}
-                disabled={readOnly}
+                disabled={readOnly || timeLocked}
                 className="h-10 min-w-0 flex-1"
                 onChange={(e) => setTimeDraft((d) => ({ ...d, start: e.target.value }))}
                 onBlur={() => commitTime(timeDraft.start, timeDraft.end)}
@@ -602,7 +674,7 @@ function TaskProperties({
                 type="time"
                 aria-label="Hora de término"
                 value={timeDraft.end}
-                disabled={readOnly}
+                disabled={readOnly || timeLocked}
                 className="h-10 min-w-0 flex-1"
                 onChange={(e) => setTimeDraft((d) => ({ ...d, end: e.target.value }))}
                 onBlur={() => commitTime(timeDraft.start, timeDraft.end)}
@@ -613,7 +685,7 @@ function TaskProperties({
                 {timeError ?? errors.endTime}
               </p>
             ) : null}
-            {!readOnly ? (
+            {!readOnly && !timeLocked ? (
               <Button
                 variant="ghost"
                 size="xs"
@@ -636,7 +708,7 @@ function TaskProperties({
                 variant="ghost"
                 size="sm"
                 className="h-10"
-                disabled={readOnly || !values.dueDate}
+                disabled={readOnly || timeLocked || !values.dueDate}
                 onClick={() => {
                   setShowTime(true);
                   setTimeDraft({ start: '09:00', end: '10:00' });
@@ -650,12 +722,13 @@ function TaskProperties({
         )}
       </div>
       )}
-      {occurrence ? null : more ? (
-        <Field label="Início" error={errors.startDate}>
+      {repeat}
+      {occurrence || hideStartDate ? null : more ? (
+        <Field label="Início" error={errors.startDate} hint={hintOf('startDate')}>
           <Input
             type="date"
             value={values.startDate}
-            disabled={readOnly}
+            disabled={readOnly || isLocked('startDate')}
             className="h-10"
             onChange={(e) => onChange({ startDate: e.target.value || null })}
           />
@@ -986,6 +1059,8 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
 interface NewTaskValues extends PropertyValues {
   title: string;
   description: string;
+  /** "Não se repete / Repete" and the rule (spec §9.4). */
+  repeat: { on: boolean; form: RepeatForm };
 }
 
 /** Defaults of a new task from the URL: the board column, an appointment, a copy, the active filters. */
@@ -1011,10 +1086,12 @@ export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsRes
     startDate: '',
     startTime: appointment ? '09:00' : '',
     endTime: appointment ? '10:00' : '',
+    repeat: { on: false, form: defaultRepeatForm(dueDay ?? today) },
   };
   if (!copy) return base;
   return {
     ...base,
+    repeat: { on: false, form: defaultRepeatForm(copy.dueDate ?? today) },
     title: copy.title,
     description: copy.description ?? '',
     priority: copy.priority,
@@ -1027,6 +1104,43 @@ export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsRes
     startTime: copy.startTime ?? '',
     endTime: copy.endTime ?? '',
   };
+}
+
+/**
+ * The body of `POST /tasks`. Repeating, "Começa em" (the due date field) is the rule's `startDate` and
+ * the task's own start date is not sent: the dates come from the rule.
+ */
+export function newTaskInput(v: NewTaskValues): TaskInput {
+  const repeating = v.repeat.on && Boolean(v.dueDate);
+  return {
+    title: v.title,
+    description: v.description || null,
+    clientId: v.clientId || null,
+    categoryId: v.categoryId || null,
+    assigneeId: v.assigneeId || null,
+    departmentId: v.departmentId || null,
+    priority: v.priority,
+    status: v.status,
+    startDate: repeating ? null : v.startDate || null,
+    dueDate: v.dueDate || null,
+    startTime: v.startTime || null,
+    endTime: v.endTime || null,
+    recurrence: repeating ? toRecurrenceInput(v.repeat.form, v.dueDate as ISODate) : null,
+  };
+}
+
+/** "Tarefa criada." or "Tarefa criada. Repete toda segunda." */
+export function newTaskCreatedToast(input: TaskInput): string {
+  const r = input.recurrence;
+  if (!r) return 'Tarefa criada.';
+  const short = repeatShortText({
+    frequency: r.frequency,
+    interval: r.interval ?? 1,
+    weekdays: r.weekdays ?? [],
+    dueDay: r.dueDay ?? null,
+    nonBusinessDayRule: r.nonBusinessDayRule ?? (r.frequency === 'daily' || r.frequency === 'weekly' ? 'skip' : 'anticipate'),
+  });
+  return `Tarefa criada. Repete ${short}.`;
 }
 
 function NewTaskSheet({
@@ -1059,27 +1173,43 @@ function NewTaskSheet({
   }, [defaults, form]);
 
   const values = form.watch();
-  const { canWriteTasks } = usePermissions();
+  const { canWriteTasks, can } = usePermissions();
+  const [repeatErrs, setRepeatErrs] = useState<ReturnType<typeof repeatErrors>>({});
+  useEffect(() => setRepeatErrs({}), [defaults]);
 
   function setField(patch: TaskUpdateInput) {
     for (const [k, v] of Object.entries(patch)) form.setValue(k as keyof NewTaskValues, (v ?? '') as never, { shouldDirty: true });
+    // A new "Começa em" moves the weekday, day and month of the rule that were still the default.
+    if (patch.dueDate) form.setValue('repeat', { ...form.getValues('repeat'), form: withStartDate(form.getValues('repeat').form, patch.dueDate) });
+  }
+
+  function setRepeat(next: Partial<NewTaskValues['repeat']>) {
+    const current = form.getValues('repeat');
+    form.setValue('repeat', { ...current, ...next }, { shouldDirty: true });
+    if (Object.keys(repeatErrs).length) setRepeatErrs({});
+  }
+
+  function toggleRepeat(on: boolean) {
+    // Turning it on without a due date starts today.
+    if (on && !form.getValues('dueDate')) {
+      const today = (options?.today ?? todayISO()) as ISODate;
+      form.setValue('dueDate', today, { shouldDirty: true });
+      setRepeat({ on, form: withStartDate(form.getValues('repeat').form, today) });
+      return;
+    }
+    setRepeat({ on });
   }
 
   const submit = form.handleSubmit(async (v) => {
-    const input: TaskInput = {
-      title: v.title,
-      description: v.description || null,
-      clientId: v.clientId || null,
-      categoryId: v.categoryId || null,
-      assigneeId: v.assigneeId || null,
-      departmentId: v.departmentId || null,
-      priority: v.priority,
-      status: v.status,
-      startDate: v.startDate || null,
-      dueDate: v.dueDate || null,
-      startTime: v.startTime || null,
-      endTime: v.endTime || null,
-    };
+    if (v.repeat.on) {
+      const errs = repeatErrors(v.repeat.form, (v.dueDate || '') as ISODate | '');
+      if (Object.keys(errs).length) {
+        setRepeatErrs(errs);
+        if (errs.startDate) setErrors({ dueDate: errs.startDate });
+        return;
+      }
+    }
+    const input = newTaskInput(v);
     const parsed = taskInputSchema.safeParse(input);
     if (!parsed.success) {
       const next: typeof errors = {};
@@ -1091,9 +1221,10 @@ function NewTaskSheet({
       return;
     }
     setErrors({});
+    setRepeatErrs({});
     try {
       const task = await create.mutateAsync(input);
-      toast.success('Tarefa criada.');
+      toast.success(newTaskCreatedToast(input));
       onCreated(task.id);
     } catch (error) {
       if (error instanceof ApiRequestError) {
@@ -1138,6 +1269,21 @@ function NewTaskSheet({
             errors={errors}
             onStatus={(s) => form.setValue('status', s)}
             onChange={setField}
+            dueLabel={values.repeat.on ? 'Começa em' : 'Vencimento'}
+            hideStartDate={values.repeat.on}
+            repeat={
+              <RepeatFieldView
+                on={values.repeat.on}
+                onToggle={toggleRepeat}
+                form={values.repeat.form}
+                onForm={(f) => setRepeat({ form: f })}
+                start={(values.dueDate || '') as ISODate | ''}
+                today={options.today}
+                errors={repeatErrs}
+                readOnly={!canWriteTasks}
+                canRegistry={can('registry') && can('page.recurring')}
+              />
+            }
           />
           <Controller
             control={form.control}

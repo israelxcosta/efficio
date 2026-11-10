@@ -2,12 +2,10 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Building2, ChevronRight, ChevronsUpDown, CircleCheck, ClipboardCheck, LockKeyhole, Search, SearchX, SlidersHorizontal, X } from 'lucide-react';
 import {
-  formatCNPJ,
   RECURRENCE_PERIOD_LABELS,
   TAX_REGIME_LABELS,
   TAX_REGIMES,
   todayISO,
-  type AuditClientRow,
   type AuditMatrixResponse,
   type TaskOptionsResponse,
   type TaxRegime,
@@ -34,7 +32,6 @@ import {
   auditFilterCount,
   auditListKey,
   autoExpandedClients,
-  clientPending,
   clientProgress,
   parseAuditFilters,
   taskRowLabel,
@@ -45,11 +42,10 @@ import {
   type AuditFilters,
   type AuditView,
 } from '../audit-logic';
-import { DUE_TONE_CLASS, shortDate, shortName } from '../due';
-import { dateTimeBR } from '../format';
+import { DUE_TONE_CLASS, shortDate } from '../due';
 import { competenceName, deadlineTip, groupDeadlineInfo, periodLabel } from '../occurrence';
 import { toggleClass, SummaryLabel } from '../components/tasks-summary';
-import { AUDIT_ROW_GRID, AuditColumnsHeader, AuditOccurrenceRow } from '../components/audit-occurrence-row';
+import { AUDIT_ROW_GRID, AuditClientRowView, AuditColumnsHeader, AuditOccurrenceRow, ProgressTrack } from '../components/audit-occurrence-row';
 import { MemberPicker } from '../components/pickers';
 
 /** Auditoria mensal (spec §11): the recurring tasks of a competence, by client (a list) or by task. */
@@ -301,7 +297,7 @@ function AuditToolbar({ filters, options, onChange }: { filters: AuditFilters; o
       <div className="hidden flex-wrap items-center gap-2 sm:flex">
         {view}
         {period}
-        <div className="grid w-full min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))_auto] min-[1360px]:w-auto min-[1360px]:flex-1">
+        <div className="grid w-full min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))_auto] 2xl:w-auto 2xl:flex-1">
           <div className="relative sm:col-span-2 lg:col-span-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label={searchLabel} className="h-9 rounded-[10px] pl-9 text-[13px]" />
@@ -459,33 +455,6 @@ interface SharedProps {
   monthName: string;
 }
 
-/** Lock of a concluded month, with the moment of the last conclusion. */
-function MonthLock({ client, today }: { client: AuditClientRow; today: string }) {
-  if (!client.monthConcludedAt) return null;
-  return (
-    <Tooltip content={`Mês concluído. Última conclusão em ${dateTimeBR(client.monthConcludedAt)}`}>
-      <span role="img" tabIndex={-1} aria-label={`Mês concluído em ${shortDate(client.monthConcludedAt.slice(0, 10), today)}`} className="inline-flex shrink-0 text-muted">
-        <LockKeyhole className="size-3.5" aria-hidden />
-      </span>
-    </Tooltip>
-  );
-}
-
-/** Wide lists: what is left of the client's month, beside the bar ("2 atrasadas", "Mês concluído em 27/10"). */
-function ClientMonthNote({ client, today }: { client: AuditClientRow; today: string }) {
-  const pending = clientPending(client);
-  const [text, tone] = client.monthConcludedAt
-    ? [`Mês concluído em ${shortDate(client.monthConcludedAt.slice(0, 10), today)}`, 'text-muted']
-    : client.overduePending > 0
-      ? [`${client.overduePending} ${client.overduePending === 1 ? 'atrasada' : 'atrasadas'}`, 'font-medium text-danger']
-      : client.targetMissedPending > 0
-        ? [`${client.targetMissedPending} fora da meta`, 'font-medium text-warning']
-        : pending > 0
-          ? [`${pending} ${pending === 1 ? 'pendente' : 'pendentes'}`, 'text-muted']
-          : ['', ''];
-  return <span className={cn('hidden min-w-0 flex-1 truncate pl-4 text-right text-xs @3xl:block', tone)}>{text}</span>;
-}
-
 /**
  * "Por cliente" (§11.2, as a list in every width): each client in a row — the arrow that opens it,
  * the name, the bar of what is concluded in the competence with "N de M" — and, opened, the month's
@@ -526,16 +495,22 @@ function AuditClientList({ data, filters, today, announce, monthName }: SharedPr
     } else toggle(id, action.type === 'expand');
   }
 
+  const hintId = 'audit-client-keys';
   return (
     <Card className="@container overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-border px-4 py-2.5">
-        <span className="text-xs font-medium text-muted">{pluralize(items.length, 'cliente', 'clientes')}</span>
-        <span className="ml-auto hidden text-xs text-subtle @2xl:inline">↑ ↓ navegam · → abre · ← fecha</span>
-        <Button variant="ghost" size="sm" className="-mr-2 h-8" onClick={() => setOpen(allOpen ? new Set() : new Set(items.map((i) => i.client.id)))}>
-          <ChevronsUpDown /> {allOpen ? 'Recolher todos' : 'Expandir todos'}
-        </Button>
+      <div className="border-b border-border">
+        <div className="flex items-center gap-3 px-4 py-2.5">
+          <span className="text-xs font-medium text-muted">{pluralize(items.length, 'cliente', 'clientes')}</span>
+          <Button variant="ghost" size="sm" className="-mr-2 ml-auto h-8" onClick={() => setOpen(allOpen ? new Set() : new Set(items.map((i) => i.client.id)))}>
+            <ChevronsUpDown /> {allOpen ? 'Recolher todos' : 'Expandir todos'}
+          </Button>
+        </div>
+        <AuditColumnsHeader view="client" />
       </div>
-      <ul className="p-1.5" aria-label={`Clientes de ${monthName}`}>
+      <span id={hintId} className="sr-only">
+        Use as setas para navegar entre os clientes; seta para a direita abre e para a esquerda fecha.
+      </span>
+      <ul className="p-1.5" aria-label={`Clientes de ${monthName}`} aria-describedby={hintId}>
         {items.map(({ client, items: cells }, index) => {
           const expanded = open.has(client.id);
           const progress = clientProgress(client);
@@ -552,46 +527,19 @@ function AuditClientList({ data, filters, today, announce, monthName }: SharedPr
                 onFocus={() => setFocus(index)}
                 onKeyDown={(e) => onRowKey(e, index, client.id)}
                 onClick={() => toggle(client.id)}
-                className="group/client flex min-h-14 w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @lg:gap-3 @lg:px-3"
+                className={cn(
+                  'group/client flex min-h-14 w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @lg:px-3',
+                  AUDIT_ROW_GRID,
+                )}
               >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted transition-colors group-hover/client:bg-bg-subtle group-hover/client:text-fg" aria-hidden>
-                  <ChevronRight className={cn('size-4 transition-transform duration-150', expanded && 'rotate-90')} />
-                </span>
-                <span className="min-w-0 flex-1 @3xl:w-80 @3xl:flex-none">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-sm font-semibold text-fg">{client.name}</span>
-                    <MonthLock client={client} today={today} />
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs text-muted">
-                    {TAX_REGIME_LABELS[client.taxRegime]}
-                    <span className="hidden @md:inline">{client.document ? ` · ${formatCNPJ(client.document)}` : ''}</span>
-                    <span className="@3xl:hidden">
-                      {client.overduePending > 0 ? (
-                        <span className="text-danger">
-                          {' '}
-                          · {client.overduePending} {client.overduePending === 1 ? 'atrasada' : 'atrasadas'}
-                        </span>
-                      ) : null}
-                      {client.monthConcludedAt ? ` · concluído em ${shortDate(client.monthConcludedAt.slice(0, 10), today)}` : null}
-                    </span>
-                  </span>
-                </span>
-                <span className="flex w-28 shrink-0 items-center gap-2 @md:w-44 @3xl:w-60">
-                  <span className="block h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
-                    <span className={cn('block h-full rounded-full', progress.ratio === 1 ? 'bg-success' : 'bg-data')} style={{ width: `${progress.ratio * 100}%` }} />
-                  </span>
-                  <span className="tabular w-14 shrink-0 text-right text-[13px] font-medium whitespace-nowrap text-fg">{progress.text}</span>
-                </span>
-                <ClientMonthNote client={client} today={today} />
+                <AuditClientRowView client={client} cells={cells.map((c) => c.cell)} today={today} expanded={expanded} regionId={regionId} />
               </button>
               {expanded ? (
                 <div id={regionId} role="region" aria-label={`Obrigações de ${client.name} em ${monthName}`} className="pb-2">
                   {cells.length === 0 ? (
                     <p className="px-2 py-2 text-body-sm text-muted @lg:pr-3 @lg:pl-13">{filters.clients === 'pending' ? 'Nenhuma pendência deste cliente.' : 'Nenhuma obrigação nesta competência.'}</p>
                   ) : (
-                    <>
-                      <AuditColumnsHeader lead="obligation" />
-                      <ul>
+                    <ul>
                         {cells.map(({ column, cell }) => (
                           <AuditOccurrenceRow
                             key={cell.taskId}
@@ -606,8 +554,7 @@ function AuditClientList({ data, filters, today, announce, monthName }: SharedPr
                             dimmed={Boolean(filters.assignee) && cell.assignee?.id !== filters.assignee}
                           />
                         ))}
-                      </ul>
-                    </>
+                    </ul>
                   )}
                 </div>
               ) : null}
@@ -634,14 +581,28 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.recurring, data.competence]);
 
+  const allOpen = items.length > 0 && items.every((i) => open.has(`${i.column.recurringTaskId}:${i.column.periodKey}`));
   return (
     <Card className="@container overflow-hidden">
+      <div className="border-b border-border">
+        <div className="flex items-center gap-3 px-4 py-2.5">
+          <span className="text-xs font-medium text-muted">{pluralize(items.length, 'tarefa recorrente', 'tarefas recorrentes')}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-mr-2 ml-auto h-8"
+            onClick={() => setOpen(allOpen ? new Set() : new Set(items.map((i) => `${i.column.recurringTaskId}:${i.column.periodKey}`)))}
+          >
+            <ChevronsUpDown /> {allOpen ? 'Recolher todas' : 'Expandir todas'}
+          </Button>
+        </div>
+        <AuditColumnsHeader view="task" />
+      </div>
       <ul className="p-1.5" aria-label={`Tarefas recorrentes de ${monthName}`}>
         {items.map(({ column: col, cells }) => {
           const k = `${col.recurringTaskId}:${col.periodKey}`;
           const expanded = open.has(k);
           const live = col.total - col.canceled;
-          const ratio = col.done / Math.max(1, live);
           const dl = groupDeadlineInfo(col, today, true);
           const inline = groupDeadlineInfo(col, today);
           const regionId = `audit-task-${k}`;
@@ -684,7 +645,7 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
                     <span className="mt-0.5 block truncate text-xs text-muted">
                       {/* Narrow: the name keeps the room; the week goes to the subtitle */}
                       {col.period === 'weekly' ? <span className="@md:hidden">{periodLabel(col, today)} · </span> : null}
-                      {[col.department?.name, col.defaultAssignee ? `padrão: ${shortName(col.defaultAssignee.name)}` : null].filter(Boolean).join(' · ') || 'Sem departamento'}
+                      {col.department?.name ?? 'Sem departamento'}
                     </span>
                     <span className={cn('mt-0.5 block truncate text-xs @xl:hidden', DUE_TONE_CLASS[inline.tone])}>{inline.text}</span>
                   </span>
@@ -697,23 +658,14 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
                   <span className={cn('block truncate text-xs', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span>
                 </span>
                 {/* Situação track: "1/3" and the bar */}
-                <span className="flex w-24 shrink-0 flex-col items-end gap-1 @sm:w-28 @4xl:w-auto @4xl:min-w-0 @4xl:items-start">
-                  <span className="tabular text-[13px] font-medium text-fg">
-                    {col.done}/{live}
-                  </span>
-                  <span className="block h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
-                    <span className={cn('block h-full rounded-full', ratio === 1 ? 'bg-success' : 'bg-data')} style={{ width: `${ratio * 100}%` }} />
-                  </span>
-                </span>
+                <ProgressTrack done={col.done} live={live} />
               </button>
               {expanded ? (
                 <div id={regionId} role="region" aria-label={`Clientes de ${col.name}`} className="pb-2">
                   {cells.length === 0 ? (
                     <p className="px-2 py-2 text-body-sm text-muted @lg:pr-3 @lg:pl-13">Nenhum cliente {filters.clients === 'pending' ? 'pendente' : 'nesta tarefa'}.</p>
                   ) : (
-                    <>
-                      <AuditColumnsHeader lead="client" />
-                      <ul>
+                    <ul>
                         {cells.map((cell) => (
                           <AuditOccurrenceRow
                             key={cell.taskId}
@@ -728,8 +680,7 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
                             dimmed={Boolean(filters.assignee) && cell.assignee?.id !== filters.assignee}
                           />
                         ))}
-                      </ul>
-                    </>
+                    </ul>
                   )}
                 </div>
               ) : null}

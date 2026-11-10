@@ -31,6 +31,11 @@ describe('app routes', () => {
     for (const item of GESTAO_NAV_ITEMS) expect(inside).toContain(item.to === '/' ? '' : item.to.slice(1));
   });
 
+  it('mounts Minha área in the Gestão layout, so the task sheets open over it (spec §15.4)', () => {
+    const gestao = children.find((r) => paths(r.children).includes(''))!;
+    expect(paths(gestao.children)).toContain('minha-area');
+  });
+
   it('keeps settings and the 404 for everyone', () => {
     expect(paths(children)).toEqual(expect.arrayContaining(['configuracoes', '*']));
   });

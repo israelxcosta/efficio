@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { CalendarDays, ClipboardCheck, Copy, Ellipsis, Eye, Pencil, Power, Repeat, Search, SearchX, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, Copy, Ellipsis, ExternalLink, Eye, Pencil, Power, Repeat, Search, SearchX, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   RECURRENCE_FREQUENCY_LABELS,
@@ -38,7 +38,9 @@ import { ADMIN_ONLY_REASON, SUBSCRIPTION_REASON, usePermissions, WriteGate } fro
 import { ApiRequestError } from '@/lib/api';
 import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
-import { recurringInputOf, useDeleteRecurring, useRecurringTask, useRecurringTasks, useSaveRecurring, useTaskOptions } from '../api';
+import { recurringInputOf, useDeleteRecurring, useRecurringTask, useRecurringTasks, useSaveRecurring, useTaskOptions, useUpdateTask } from '../api';
+import { repeatShortText } from '../repeat-rules';
+import { useTaskSheetLinks } from '../task-links';
 import { shortName } from '../due';
 import { recurringActions } from '../actions';
 import { competenceName } from '../occurrence';
@@ -49,10 +51,10 @@ import {
   endedLabel,
   parseRecurringFilters,
   recurringFilterCount,
-  targetRuleText,
   toRecurringQuery,
   writeRecurringFilters,
   type RecurringFilters,
+  recurringDeadlineText,
 } from '../recurring-rules';
 import { NeutralIcon } from '../components/neutral-icon';
 import { MemberPicker } from '../components/pickers';
@@ -79,6 +81,9 @@ export default function RecurringTasksPage() {
   const [reactivating, setReactivating] = useState<RecurringTask | null>(null);
   const [deleting, setDeleting] = useState<RecurringTask | null>(null);
   const [duplicating, setDuplicating] = useState<RecurringTask | null>(null);
+  const [stopping, setStopping] = useState<RecurringTask | null>(null);
+  const { openTask } = useTaskSheetLinks();
+  const updateTask = useUpdateTask();
   const save = useSaveRecurring();
   const remove = useDeleteRecurring();
   const data = list.data;
@@ -87,18 +92,25 @@ export default function RecurringTasksPage() {
   const openId = filters.open && filters.open !== 'nova' ? filters.open : null;
   const fromList = data?.items.find((r) => r.id === openId);
   const fetched = useRecurringTask(openId && !fromList ? openId : null, month);
-  const openRecurring = fromList ?? fetched.data ?? null;
+  const candidate = fromList ?? fetched.data ?? null;
+  // A repetition is edited in its task (spec §10.6): `?recorrente=<id>` of one opens the task instead.
+  const openRecurring = candidate?.origin === 'task' ? null : candidate;
+  useEffect(() => {
+    if (candidate?.origin !== 'task') return;
+    if (candidate.nextTaskId) openTask(candidate.nextTaskId);
+    else update({ open: '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidate?.id, candidate?.origin]);
 
   function update(patch: Partial<RecurringFilters>) {
     setParams(writeRecurringFilters(params, patch), { replace: true });
   }
 
   const monthName = competenceName(month).split(' ')[0];
+  // Revision 4: the permission note left the top (it lives in the read-only registry's footer).
   const description = data
-    ? `${data.summary.active} ${data.summary.active === 1 ? 'ativa' : 'ativas'} · ${monthName}: ${data.summary.occurrences.done} de ${data.summary.occurrences.total - data.summary.occurrences.canceled} concluídas${isAdmin ? '' : ` · ${ADMIN_ONLY_REASON}`}`
-    : isAdmin
-      ? 'Obrigações que se repetem, por departamento e cliente.'
-      : ADMIN_ONLY_REASON;
+    ? `${data.summary.active} ${data.summary.active === 1 ? 'ativa' : 'ativas'} · ${monthName}: ${data.summary.occurrences.done} de ${data.summary.occurrences.total - data.summary.occurrences.canceled} concluídas`
+    : 'Obrigações e repetições, por departamento e cliente.';
 
   const emptyAll = data && data.items.length === 0 && count === 0 && data.summary.active + data.summary.ended === 0;
 
@@ -132,7 +144,7 @@ export default function RecurringTasksPage() {
                 <span className="hidden w-44 @4xl:block">Aplica-se a</span>
                 <span className="hidden w-36 @2xl:block">Responsáveis</span>
                 <span className="w-40">{monthName!.charAt(0).toUpperCase() + monthName!.slice(1)}</span>
-                <span className="w-52 text-right">Prazo legal e meta</span>
+                <span className="w-52 text-right">Prazo</span>
                 <span className="w-8" aria-hidden />
               </div>
             )}
@@ -162,7 +174,7 @@ export default function RecurringTasksPage() {
                     icon={<SearchX />}
                     title="Nenhuma tarefa recorrente com esses filtros"
                     action={
-                      <Button variant="outline" onClick={() => update({ search: '', period: '', department: '', assignee: '', regime: '' })}>
+                      <Button variant="outline" onClick={() => update({ search: '', period: '', department: '', assignee: '', regime: '', kind: '' })}>
                         Limpar filtros
                       </Button>
                     }
@@ -174,6 +186,9 @@ export default function RecurringTasksPage() {
                 <ul className={cn(list.isPlaceholderData && 'opacity-60 transition-opacity')}>
                   {data!.items.map((r) => (
                     <li key={r.id}>
+                      {r.origin === 'task' ? (
+                        <RepetitionRow recurring={r} monthName={monthName!} onOpen={() => r.nextTaskId && openTask(r.nextTaskId)} onStop={() => setStopping(r)} />
+                      ) : (
                       <RecurringRow
                         recurring={r}
                         monthName={monthName!}
@@ -185,6 +200,7 @@ export default function RecurringTasksPage() {
                         onReactivate={() => setReactivating(r)}
                         onDelete={() => setDeleting(r)}
                       />
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -209,6 +225,24 @@ export default function RecurringTasksPage() {
         readOnlyReason={isAdmin ? SUBSCRIPTION_REASON : ADMIN_ONLY_REASON}
       />
       <EndRecurringDialog recurring={ending} current={month} onOpenChange={(o) => !o && setEnding(null)} />
+      <ConfirmDialog
+        open={stopping !== null}
+        onOpenChange={(o) => !o && setStopping(null)}
+        title={`Parar de repetir “${stopping?.name ?? ''}”?`}
+        description="Esta tarefa continua. As próximas não serão criadas."
+        confirmLabel="Parar de repetir"
+        loading={updateTask.isPending}
+        onConfirm={async () => {
+          if (!stopping?.nextTaskId) return;
+          try {
+            await updateTask.mutateAsync({ id: stopping.nextTaskId, patch: { recurrence: null } });
+            toast.success('Não repete mais.');
+            setStopping(null);
+          } catch (error) {
+            toastError(error);
+          }
+        }}
+      />
       <ConfirmDialog
         open={reactivating !== null}
         onOpenChange={(o) => !o && setReactivating(null)}
@@ -259,9 +293,11 @@ function RecurringFiltersBar({
 }: {
   filters: RecurringFilters;
   options: TaskOptionsResponse | undefined;
-  counts: { active: number; ended: number } | undefined;
+  counts: { active: number; ended: number; byOrigin?: Record<'registry' | 'task', number> } | undefined;
   onChange: (patch: Partial<RecurringFilters>) => void;
 }) {
+  // Tipo appears when there are both origins (or one is already chosen).
+  const showKind = Boolean(filters.kind) || Boolean(counts?.byOrigin && counts.byOrigin.task > 0 && counts.byOrigin.registry > 0);
   const [search, setSearch] = useState(filters.search);
   const [sheet, setSheet] = useState(false);
   useEffect(() => {
@@ -277,8 +313,15 @@ function RecurringFiltersBar({
   const count = recurringFilterCount(filters);
   const clear = () => {
     setSearch('');
-    onChange({ search: '', period: '', department: '', assignee: '', regime: '' });
+    onChange({ search: '', period: '', department: '', assignee: '', regime: '', kind: '' });
   };
+  const kindSelect = (sm: boolean) => (
+    <Select size_={sm ? 'sm' : 'md'} aria-label="Tipo" value={filters.kind} onChange={(e) => onChange({ kind: e.target.value as RecurringFilters['kind'] })}>
+      <option value="">Todos os tipos</option>
+      <option value="obligations">Obrigações</option>
+      <option value="repetitions">Repetições</option>
+    </Select>
+  );
   const status = (
     <SegmentedControl<'active' | 'ended'>
       size="sm"
@@ -334,7 +377,12 @@ function RecurringFiltersBar({
   );
   return (
     <Card className="p-4">
-      <div className="hidden gap-2 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))_auto_auto]">
+      <div
+        className={cn(
+          'hidden gap-2 sm:grid sm:grid-cols-2 lg:grid-cols-3',
+          showKind ? 'xl:grid-cols-[minmax(0,1.4fr)_repeat(5,minmax(0,1fr))_auto_auto]' : 'xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))_auto_auto]',
+        )}
+      >
         <div className="relative sm:col-span-2 lg:col-span-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar tarefa recorrente" aria-label="Buscar tarefa recorrente" className="h-9 rounded-[10px] pl-9 text-[13px]" />
@@ -343,6 +391,7 @@ function RecurringFiltersBar({
         {departmentSelect(true)}
         {assigneePicker(true)}
         {regimeSelect(true)}
+        {showKind ? kindSelect(true) : null}
         <div className="flex items-center">{status}</div>
         {count > 0 ? (
           <Button variant="ghost" size="sm" className="h-9" onClick={clear}>
@@ -381,6 +430,7 @@ function RecurringFiltersBar({
           <Field label="Departamento">{departmentSelect(false)}</Field>
           <Field label="Responsável">{assigneePicker(false)}</Field>
           <Field label="Regime">{regimeSelect(false)}</Field>
+          {showKind ? <Field label="Tipo">{kindSelect(false)}</Field> : null}
         </div>
       </Sheet>
     </Card>
@@ -411,6 +461,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
   ].filter(Boolean);
   const head = [r.department?.name, r.category?.name].filter(Boolean).join(' · ');
   const actions = recurringActions(r, { canEdit, canDelete });
+  const deadline = recurringDeadlineText(r);
 
   return (
     <div className="@container">
@@ -472,8 +523,8 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
           )}
         </div>
         <div className="hidden w-52 text-right @xl:block">
-          <p className="tabular text-[13px] font-medium text-fg">{dueRuleText(r)}</p>
-          <p className="line-clamp-2 text-xs text-muted">{targetRuleText(r)}</p>
+          <p className="tabular text-[13px] font-medium text-fg">{deadline.line1}</p>
+          <p className="line-clamp-2 text-xs text-muted">{deadline.line2}</p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -517,6 +568,104 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
               <DropdownMenuItem icon={<Trash2 />} tone="danger" onSelect={onDelete}>
                 Excluir
               </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A repetition (origin task, spec §10.2): the same skeleton as an obligation; the rule in the subtitle,
+ * its client (or Interna), its responsible, the month's occurrences and the rule as the Prazo. The click
+ * opens the next open occurrence, where the repetition is edited.
+ */
+function RepetitionRow({ recurring: r, monthName, onOpen, onStop }: { recurring: RecurringTask; monthName: string; onOpen: () => void; onStop: () => void }) {
+  const navigate = useNavigate();
+  const m = r.month;
+  const live = m.total - m.canceled;
+  const deadline = recurringDeadlineText(r);
+  const rule = r.recurrence ? repeatShortText(r.recurrence) : '';
+  const client = r.client?.name ?? 'Interna';
+  return (
+    <div className="@container">
+      <div className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-surface-muted @lg:px-4">
+        <button type="button" onClick={onOpen} disabled={!r.nextTaskId} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left">
+          {r.category ? <CategoryIcon icon={r.category.icon} color={r.category.color} /> : <NeutralIcon icon={Repeat} />}
+          <span className="min-w-0 flex-1">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className={cn('min-w-0 truncate text-sm font-semibold', r.active ? 'text-fg' : 'text-muted')}>{r.name}</span>
+            </span>
+            <span className="mt-0.5 block truncate text-xs text-muted">
+              <Repeat className="mr-1 inline size-3 align-[-2px]" aria-hidden />
+              {rule}
+              <span className="@4xl:hidden"> · {client}</span>
+            </span>
+            <span className="mt-0.5 block truncate text-xs text-muted @xl:hidden">
+              {m.occurs ? `${m.done} de ${live}` : `Não ocorre em ${monthName}`} · {deadline.line1}
+            </span>
+          </span>
+        </button>
+        <div className="hidden w-32 min-w-0 @3xl:block">
+          <span className={cn('block truncate text-body-sm', r.department ? 'text-fg' : 'text-subtle')}>{r.department?.name ?? 'Sem departamento'}</span>
+        </div>
+        <div className="hidden w-44 min-w-0 @4xl:block">
+          <span className={cn('block truncate text-body-sm', r.client ? 'text-fg' : 'text-subtle')}>{client}</span>
+        </div>
+        <div className="hidden w-36 min-w-0 items-center gap-2 @2xl:flex">
+          {r.assignee ? (
+            <>
+              <MemberAvatar name={r.assignee.name} userId={r.assignee.id} />
+              <span className="truncate text-body-sm text-fg">{shortName(r.assignee.name)}</span>
+            </>
+          ) : (
+            <span className="text-body-sm text-subtle">Sem responsável</span>
+          )}
+        </div>
+        <div className="hidden w-40 @xl:block">
+          {m.occurs && live > 0 ? (
+            <>
+              <span className="tabular text-[13px] font-medium text-fg">
+                {m.done} de {live}
+              </span>
+              {m.overdue > 0 ? <span className="text-mini text-danger"> · {m.overdue} {m.overdue === 1 ? 'atrasada' : 'atrasadas'}</span> : null}
+              <span className="mt-1 block h-1.5 w-28 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
+                <span className="block h-full rounded-full bg-data" style={{ width: `${(m.done / live) * 100}%` }} />
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-subtle">{`Não ocorre em ${monthName}`}</span>
+          )}
+        </div>
+        <div className="hidden w-52 text-right @xl:block">
+          <p className="tabular text-[13px] font-medium text-fg">{deadline.line1}</p>
+          {deadline.line2 ? <p className="line-clamp-2 text-xs text-muted">{deadline.line2}</p> : null}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 pointer-coarse:opacity-100"
+              aria-label={`Ações de ${r.name}`}
+            >
+              <Ellipsis className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem icon={<ExternalLink />} disabled={!r.nextTaskId} onSelect={onOpen}>
+              Abrir tarefa
+            </DropdownMenuItem>
+            <DropdownMenuItem icon={<CalendarDays />} onSelect={() => navigate(CALENDAR_HREF)}>
+              Ver no calendário
+            </DropdownMenuItem>
+            {r.recurrence?.canEdit && r.active && r.nextTaskId ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem icon={<Power />} onSelect={onStop}>
+                  Parar de repetir
+                </DropdownMenuItem>
+              </>
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>

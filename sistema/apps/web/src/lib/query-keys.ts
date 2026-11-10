@@ -47,6 +47,8 @@ export const qk = {
   taskCategories: ['tasks', 'categories'] as const,
   taskMembers: ['tasks', 'members'] as const,
   taskActivity: ['tasks', 'activity'] as const,
+  /** Minha área (`GET /tasks/me/overview`); under `tasks`, so task changes refresh it. */
+  taskMyOverview: (month?: string) => ['tasks', 'me', 'overview', month ?? ''] as const,
   taskHistory: (id: string) => ['tasks', 'history', id] as const,
   taskCalendar: (params?: Params) => ['tasks', 'calendar', params ?? {}] as const,
   taskReport: (params?: Params) => ['tasks', 'report', params ?? {}] as const,

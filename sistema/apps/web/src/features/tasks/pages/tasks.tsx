@@ -234,6 +234,7 @@ export default function TasksPage() {
                               key={item.key}
                               task={item.task}
                               today={today}
+                              more={item.more}
                               hideAssignee={filters.scope === 'mine'}
                               showDepartment={filters.scope === 'all'}
                               muted={item.task.status === 'done' || item.task.status === 'canceled'}

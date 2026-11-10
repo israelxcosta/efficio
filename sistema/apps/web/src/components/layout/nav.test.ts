@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { areaOf, FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS, isActivePath, navItemsFor, RAIL_GAP_PX, RAIL_ITEM_PX, railItemsFor, splitRail } from './nav';
+import { areaOf, FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS, hostsTaskSheets, isActivePath, MY_AREA_ITEM, navItemsFor, RAIL_GAP_PX, RAIL_ITEM_PX, railItemsFor, splitRail } from './nav';
 
 const items = Array.from({ length: 12 }, (_, i) => i);
 const heightFor = (slots: number) => slots * RAIL_ITEM_PX + (slots - 1) * RAIL_GAP_PX;
@@ -101,5 +101,24 @@ describe('isActivePath', () => {
   it('keeps sub-paths active for finance items', () => {
     expect(isActivePath('/cartoes/123', { to: '/cartoes' })).toBe(true);
     expect(isActivePath('/cartoesx', { to: '/cartoes' })).toBe(false);
+  });
+});
+
+describe('Minha área (spec §15.4)', () => {
+  it('is a common route that still hosts the task sheets', () => {
+    expect(areaOf('/minha-area')).toBe('common');
+    expect(hostsTaskSheets('/minha-area')).toBe(true);
+    expect(hostsTaskSheets('/Minha-Area')).toBe(true);
+    expect(hostsTaskSheets('/minha-area?tarefa=x')).toBe(true);
+    expect(hostsTaskSheets('/tarefas/auditoria')).toBe(true);
+    expect(hostsTaskSheets('/')).toBe(true);
+    expect(hostsTaskSheets('/configuracoes')).toBe(false);
+    expect(hostsTaskSheets('/extrato')).toBe(false);
+    expect(hostsTaskSheets('/minha-areax')).toBe(false);
+  });
+
+  it('has its item for ⌘K and the "Mais"', () => {
+    expect(MY_AREA_ITEM).toMatchObject({ to: '/minha-area', label: 'Minha área' });
+    expect(MY_AREA_ITEM.keywords).toContain('perfil');
   });
 });

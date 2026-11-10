@@ -20,7 +20,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { lastPathOf, type AreaMemory } from './area-memory';
-import { AREA_LABELS, isActivePath, railItemsFor, SETTINGS_ITEM, type Area, type NavItem } from './nav';
+import { AREA_LABELS, isActivePath, MY_AREA_ITEM, railItemsFor, SETTINGS_ITEM, type Area, type NavItem } from './nav';
+import { MemberAvatar } from '@/components/ui/member-avatar';
 import { useMyOverdueTasks, useOverdueBills } from './notifications';
 import { useDeadlinesSummary } from '@/features/deadlines/api';
 
@@ -31,7 +32,7 @@ const menuRow = 'flex items-center gap-3 rounded-md px-3 py-3 text-sm font-semib
  * (Gestão: Início · Tarefas · + · Clientes · Mais).
  */
 export function MobileNav({ area, memory, onSearch }: { area: Area; memory: AreaMemory; onSearch: () => void }) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { canAccessFinance, can } = usePermissions();
   const { openNotes, openDeadlines } = useTaskActions();
   const navigate = useNavigate();
@@ -79,6 +80,20 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
       </nav>
       <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Menu" description={AREA_LABELS[area]}>
         <div className="flex flex-col gap-1">
+          {/* The phone's door to the page the rail's avatar opens on the computer (spec §2.4). */}
+          <Link
+            to={MY_AREA_ITEM.to}
+            onClick={close}
+            aria-current={isActivePath(pathname, MY_AREA_ITEM) ? 'page' : undefined}
+            className={cn('flex h-14 items-center gap-3 rounded-md px-3', isActivePath(pathname, MY_AREA_ITEM) ? 'bg-primary-soft text-primary-soft-fg' : 'text-fg hover:bg-bg-subtle')}
+          >
+            <MemberAvatar size="md" name={user?.name} userId={user?.id} photoVersion={user?.photoUpdatedAt ?? null} />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold">{user?.name}</span>
+              <span className="block text-caption text-muted">Minha área</span>
+            </span>
+          </Link>
+          <span className="my-1 h-px bg-border" aria-hidden />
           <p className="eyebrow px-3 pb-1 text-subtle">Espaço</p>
           <WorkspaceList
             onSwitched={close}

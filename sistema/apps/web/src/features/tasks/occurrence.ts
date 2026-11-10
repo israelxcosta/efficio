@@ -145,7 +145,16 @@ export function doneFraction(o: Pick<RecurringOccurrence, 'done' | 'total' | 'ca
 // The list: tasks and aggregated occurrences grouped by work date
 // ---------------------------------------------------------------------------
 
-export type ListItem = { type: 'task'; key: string; task: Task; work: ISODate | null } | { type: 'occurrence'; key: string; occurrence: RecurringOccurrence; work: ISODate };
+export type ListItem =
+  | {
+      type: 'task';
+      key: string;
+      task: Task;
+      work: ISODate | null;
+      /** The following occurrences of the same repetition in the group, joined into this row ("+3 até 12/11"). */
+      more?: { count: number; until: ISODate };
+    }
+  | { type: 'occurrence'; key: string; occurrence: RecurringOccurrence; work: ISODate };
 
 export function occurrenceKey(o: Pick<RecurringOccurrence, 'recurringTaskId' | 'periodKey'>): string {
   return `${o.recurringTaskId}:${o.periodKey}`;
@@ -174,16 +183,45 @@ export function groupListItems(tasks: Task[], occurrences: RecurringOccurrence[]
     if (o.pending === 0) continue;
     push(occurrenceBucket(o, today), { type: 'occurrence', key: occurrenceKey(o), occurrence: o, work: o.targetDate });
   }
-  return TASK_DUE_BUCKETS.filter((b) => groups.has(b)).map((bucket) => ({
-    bucket,
+  return TASK_DUE_BUCKETS.filter((b) => groups.has(b)).map((bucket) => {
     // Stable: tasks keep the API order among themselves; occurrences slot in by work date.
-    items: [...groups.get(bucket)!].sort((a, b) => (a.work ?? '9999-12-31').localeCompare(b.work ?? '9999-12-31')),
-  }));
+    const items = [...groups.get(bucket)!].sort((a, b) => (a.work ?? '9999-12-31').localeCompare(b.work ?? '9999-12-31'));
+    return { bucket, items: JOINED_BUCKETS.has(bucket) ? joinSeries(items) : items };
+  });
 }
 
-/** Items counted like the API (an aggregated occurrence counts its clients). */
+/** Future groups where the occurrences of one repetition become one row; the others ask action each. */
+const JOINED_BUCKETS = new Set<TaskDueBucket>(['next7Days', 'later']);
+
+/**
+ * The occurrences of the same repetition (origin `task`) in a group, joined into the nearest one with
+ * "+N até <date>", even with other tasks between them (spec §5.3). The registry's come aggregated.
+ */
+function joinSeries(items: ListItem[]): ListItem[] {
+  const firstOf = new Map<string, Extract<ListItem, { type: 'task' }>>();
+  const out: ListItem[] = [];
+  for (const item of items) {
+    const series = item.type === 'task' && item.task.occurrence?.origin === 'task' ? item.task.occurrence.recurringTaskId : null;
+    if (!series || item.type !== 'task') {
+      out.push(item);
+      continue;
+    }
+    const first = firstOf.get(series);
+    if (!first) {
+      const copy = { ...item };
+      firstOf.set(series, copy);
+      out.push(copy);
+      continue;
+    }
+    const until = item.task.dueDate ?? item.work ?? first.more?.until ?? '';
+    first.more = { count: (first.more?.count ?? 0) + 1, until: first.more && first.more.until > until ? first.more.until : until };
+  }
+  return out;
+}
+
+/** Items counted like the API (an aggregated occurrence counts its clients; a joined row, its series). */
 export function itemCount(items: ListItem[]): number {
-  return items.reduce((n, i) => n + (i.type === 'task' ? 1 : i.occurrence.pending), 0);
+  return items.reduce((n, i) => n + (i.type === 'task' ? 1 + (i.more?.count ?? 0) : i.occurrence.pending), 0);
 }
 
 // ---------------------------------------------------------------------------

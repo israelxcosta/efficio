@@ -37,7 +37,7 @@ import { useTaskSheetLinks } from '@/features/tasks/task-links';
 import { useTaskActions } from '@/features/tasks/task-actions';
 import { shortDate } from '@/features/tasks/due';
 import { lastPathOf, type AreaMemory } from './area-memory';
-import { FINANCE_NAV_ITEMS, navItemsFor, SETTINGS_ITEM, type Area, type NavItem } from './nav';
+import { FINANCE_NAV_ITEMS, MY_AREA_ITEM, navItemsFor, REGIME_GROUPS_ITEM, SETTINGS_ITEM, type Area, type NavItem } from './nav';
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
@@ -115,7 +115,8 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
 
   const r = search.data;
   const { transactions, accounts, categories, contacts, tasks, recurringTasks, unions } = visibleSearchHits(r, canAccessFinance, can);
-  const gestaoItems = navItemsFor('gestao', can);
+  // Every Gestão page, the hub's included, plus Grupos por regime (a view of Recorrentes).
+  const gestaoItems = [...navItemsFor('gestao', can), ...(can('page.recurring') ? [REGIME_GROUPS_ITEM] : [])];
   const today = todayISO();
 
   // Phase 3: the deadlines sheet (everyone) and a new union (`registry`, Cadastros visible).
@@ -378,6 +379,9 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                     {area === 'financeiro' ? 'Ir para a gestão de tarefas' : 'Ir para o financeiro'}
                   </Command.Item>
                 ) : null}
+                <Command.Item value={`${MY_AREA_ITEM.label} ${MY_AREA_ITEM.keywords ?? ''}`} className={itemClass} onSelect={() => run(() => navigate(MY_AREA_ITEM.to))}>
+                  <MY_AREA_ITEM.icon /> {MY_AREA_ITEM.label}
+                </Command.Item>
                 <Command.Item value={`${SETTINGS_ITEM.label} ${SETTINGS_ITEM.keywords ?? ''}`} className={itemClass} onSelect={() => run(() => navigate(SETTINGS_ITEM.to))}>
                   <SETTINGS_ITEM.icon /> {SETTINGS_ITEM.label}
                 </Command.Item>

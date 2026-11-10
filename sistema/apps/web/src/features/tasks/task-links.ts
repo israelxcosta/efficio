@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import type { TaskStatus } from '@effinance/shared';
-import { areaOf } from '@/components/layout/nav';
+import { hostsTaskSheets } from '@/components/layout/nav';
 
 // The task sheet opens over any Gestão page through the URL (spec §2.5): `?tarefa=<id>` for an
 // existing task, `?nova=1` to create one (with `&horario=1` for an appointment, `&estado=` from a
@@ -65,7 +65,7 @@ export function useTaskSheetLinks() {
   const [params, setParams] = useSearchParams();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const here = areaOf(pathname) === 'gestao';
+  const here = hostsTaskSheets(pathname);
 
   const openTask = useCallback(
     (id: string) => {

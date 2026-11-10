@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { Client } from '@effinance/shared';
 import { settingsTabsFor } from '@/features/settings/pages/settings';
 import { activeByRegime, filterClients, type ClientFilters } from './client-filters';
-import { applyTaskPatch, newTaskDefaults } from './components/task-sheet';
+import { applyTaskPatch, newTaskCreatedToast, newTaskDefaults, newTaskInput } from './components/task-sheet';
+import { defaultRepeatForm } from './repeat-rules';
 import { clientOptionsFor, memberOptions } from './components/pickers';
 import { resolveHomeDepartment } from './home-view';
+import { groupListItems, itemCount } from './occurrence';
 import { CONTABIL, FISCAL, makeDetail, makeOptions, makeTask } from './test-fixtures';
 import { optimisticTask, statusMessage } from './use-task-status';
 
@@ -82,6 +84,23 @@ describe('task sheet', () => {
     expect(newTaskDefaults(new URLSearchParams('nova=1&departamento=x'), o, undefined)).toMatchObject({ status: 'todo', departmentId: '', dueDate: '' });
   });
 
+  it('starts a new task as "Não se repete", with the rule seeded by its due date', () => {
+    expect(newTaskDefaults(new URLSearchParams('nova=1'), o, undefined).repeat).toEqual({ on: false, form: defaultRepeatForm(o.today) });
+    expect(newTaskDefaults(new URLSearchParams('nova=1&prazo=2026-11-10'), o, undefined).repeat.form.weekdays).toEqual([2]);
+  });
+
+  it('sends the recurrence from "Começa em" only when it repeats, and says it in the toast (spec §9.4)', () => {
+    const base = newTaskDefaults(new URLSearchParams('nova=1'), o, undefined);
+    const plain = newTaskInput({ ...base, title: 'Balancete', dueDate: '2026-11-10' });
+    expect(plain.recurrence).toBeNull();
+    expect(newTaskCreatedToast(plain)).toBe('Tarefa criada.');
+    const weekly = { ...defaultRepeatForm('2026-11-10'), frequency: 'weekly' as const, weekdays: [1] };
+    const repeating = newTaskInput({ ...base, title: 'Reunião semanal', dueDate: '2026-11-10', repeat: { on: true, form: weekly } });
+    expect(repeating.recurrence).toMatchObject({ frequency: 'weekly', weekdays: [1], startDate: '2026-11-10', nonBusinessDayRule: 'skip' });
+    expect(repeating.dueDate).toBe('2026-11-10');
+    expect(newTaskCreatedToast(repeating)).toBe('Tarefa criada. Repete toda segunda.');
+  });
+
   it('copies a task to duplicate it, as a new open task', () => {
     const copy = makeDetail({ title: 'DAS', status: 'done', priority: 'urgent', client: { id: 'c1', name: 'Padaria' }, description: 'Guia' });
     expect(newTaskDefaults(new URLSearchParams('nova=1'), o, copy)).toMatchObject({ title: 'DAS', status: 'todo', priority: 'urgent', clientId: 'c1', description: 'Guia' });
@@ -145,5 +164,46 @@ describe('settings', () => {
     expect(settingsTabsFor(false)).toEqual(['perfil', 'seguranca', 'membros', 'privacidade']);
     expect(settingsTabsFor(true)).toContain('integracoes');
     expect(settingsTabsFor(true)).toContain('assinatura');
+  });
+});
+
+describe('occurrences of a repetition in the future groups (spec §5.3, revision 4)', () => {
+  const TODAY = '2026-11-05';
+  const occ = (id: string, due: string, origin: 'task' | 'registry' = 'task', series = 's1') =>
+    makeTask({
+      id,
+      title: 'Reunião semanal',
+      kind: 'recurring',
+      dueDate: due,
+      occurrence: {
+        recurringTaskId: series,
+        origin,
+        period: 'weekly',
+        periodKey: due,
+        competence: due.slice(0, 7),
+        referenceMonth: due.slice(0, 7),
+        legalDueDate: due,
+        targetDate: due,
+        assigneeSource: 'default',
+      } as unknown as NonNullable<ReturnType<typeof makeTask>['occurrence']>,
+    });
+
+  it('joins the following ones of a series into the nearest, with how many more and until when', () => {
+    const tasks = [occ('a', '2026-11-07'), makeTask({ id: 'x', dueDate: '2026-11-09' }), occ('b', '2026-11-10'), occ('c', '2026-11-11'), occ('d', '2026-11-12')];
+    const next7 = groupListItems(tasks, [], TODAY).find((g) => g.bucket === 'next7Days')!;
+    expect(next7.items).toHaveLength(2);
+    const first = next7.items[0]!;
+    expect(first.type === 'task' && first.task.id).toBe('a');
+    expect(first.type === 'task' && first.more).toEqual({ count: 3, until: '2026-11-12' });
+    expect(next7.items[1]!.type === 'task' && next7.items[1]!.task.id).toBe('x');
+    // The group header keeps the whole count.
+    expect(itemCount(next7.items)).toBe(5);
+  });
+
+  it('keeps each overdue occurrence on its own row, and never joins the registry ones', () => {
+    const overdue = groupListItems([occ('a', '2026-11-02'), occ('b', '2026-11-03')], [], TODAY).find((g) => g.bucket === 'overdue')!;
+    expect(overdue.items).toHaveLength(2);
+    const registry = groupListItems([occ('a', '2026-11-07', 'registry'), occ('b', '2026-11-10', 'registry')], [], TODAY).find((g) => g.bucket === 'next7Days')!;
+    expect(registry.items).toHaveLength(2);
   });
 });

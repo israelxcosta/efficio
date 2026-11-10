@@ -18,6 +18,8 @@ interface TaskActions {
   /** "Minhas anotações" (avatar menu, "Mais", ⌘K) in both areas. */
   openNotes: () => void;
   newNote: () => void;
+  /** Opens one note (Minha área's card). */
+  editNote: (note: TaskNote) => void;
   /** "Vencimentos" (strip of the home page, bell, "Mais", ⌘K), over the current page. */
   openDeadlines: (kind?: DeadlineKind, group?: DeadlineGroupKey) => void;
 }
@@ -50,6 +52,7 @@ export function TaskActionsProvider({ children }: { children: ReactNode }) {
       openFlowBuilder: () => setBuilder(true),
       openNotes: () => setNotes(true),
       newNote: () => setNote({ note: null }),
+      editNote: (n) => setNote({ note: n }),
       openDeadlines: (kind, group) => openDeadlinesRef.current(kind, group),
     }),
     [],
