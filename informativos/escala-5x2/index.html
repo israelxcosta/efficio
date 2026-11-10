@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fim da escala 6x1 e nova escala 5x2 | Efficio Contabilidade</title>
+  <meta name="description" content="Informativo Efficio: o que muda com a Emenda Constitucional 141/2026, que acaba com a escala 6x1, garante dois dias de descanso por semana e reduz a jornada para 40 horas semanais.">
+  <meta name="theme-color" content="#004AAD">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Fim da escala 6x1: o que muda com a escala 5x2">
+  <meta property="og:description" content="Dois dias de descanso por semana e jornada de 40 horas. Veja exemplos e descubra o que a sua empresa precisa ajustar.">
+  <meta property="og:image" content="infografico-escala-5x2.png">
+  <meta property="og:locale" content="pt_BR">
+
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      /* Layout: folha única em coluna. A grade semanal de 7 dias
+         (azul cheio = dia trabalhado, azul claro = folga) é o elemento que se repete. */
+      --blue: #004aad;        /* marca: dias trabalhados, destaques */
+      --blue-deep: #06214d;   /* títulos e rodapé */
+      --blue-tint: #e8f0fc;   /* folgas e fundos suaves */
+      --page: #eef3fb;
+      --paper: #ffffff;
+      --ink: #1a2233;
+      --muted: #566176;
+      --line: #d9e2f0;
+      --ok: #146c43;      --ok-bg: #e3f4ea;      /* nada muda */
+      --warn: #7a4a00;    --warn-bg: #fff0cc;    /* ajustar a jornada */
+      --change: #a52a17;  --change-bg: #fde7e2;  /* mudar a escala */
+      --font-head: "Poppins", "Segoe UI", system-ui, sans-serif;
+      --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+      --radius: 16px;
+      color-scheme: light;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      line-height: 1.6;
+      font-feature-settings: "calt" 0;
+      -webkit-font-smoothing: antialiased;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    img, svg { max-width: 100%; }
+    a { color: var(--blue); }
+    a:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; border-radius: 6px; }
+    p { margin: 0; }
+
+    h1, h2, h3 {
+      font-family: var(--font-head);
+      color: var(--blue-deep);
+      line-height: 1.2;
+      margin: 0;
+      text-wrap: balance;
+    }
+    h2 { font-size: clamp(1.35rem, 2.6vw, 1.7rem); font-weight: 700; letter-spacing: -.01em; }
+    h3 { font-size: 1.08rem; font-weight: 600; }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+    .icon { width: 1.15em; height: 1.15em; flex: none; }
+
+    /* Folha ------------------------------------------------ */
+    .sheet {
+      display: grid;
+      gap: 36px;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px 16px 28px;
+      background: var(--paper);
+    }
+    .sheet > * { min-width: 0; }
+
+    .section { display: grid; gap: 18px; }
+    .section__intro { color: var(--muted); max-width: 65ch; }
+
+    /* Cabeçalho -------------------------------------------- */
+    .mast {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 12px 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .mast__logo { height: 44px; width: auto; display: block; }
+    .mast__meta { display: grid; gap: 2px; font-size: .86rem; color: var(--muted); text-align: right; }
+    .mast__meta strong {
+      font-family: var(--font-head); font-weight: 600; color: var(--blue);
+      letter-spacing: .08em; text-transform: uppercase; font-size: .76rem;
+    }
+    .mast__pdf { font-weight: 600; font-size: .84rem; }
+
+    /* Abertura --------------------------------------------- */
+    .hero {
+      display: grid; gap: 22px;
+      padding: clamp(22px, 4.5vw, 40px);
+      border-radius: 22px;
+      background: var(--blue);
+      color: #fff;
+    }
+    .hero__eyebrow {
+      justify-self: start;
+      font-family: var(--font-head); font-weight: 600; font-size: .76rem;
+      letter-spacing: .12em; text-transform: uppercase;
+      padding: 5px 13px; border-radius: 999px;
+      background: rgba(255, 255, 255, .16);
+    }
+    .hero h1 {
+      color: #fff;
+      font-size: clamp(1.75rem, 4.6vw, 2.7rem);
+      font-weight: 800; letter-spacing: -.02em; line-height: 1.12;
+      max-width: 18ch;
+    }
+    .hero__lead { font-size: 1.04rem; max-width: 62ch; color: #e6eefb; }
+
+    .facts { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 12px; }
+    .fact {
+      display: grid; gap: 4px; align-content: start;
+      padding: 16px 18px;
+      border-radius: 14px;
+      background: var(--paper);
+      color: var(--muted);
+      font-size: .92rem; line-height: 1.45;
+    }
+    .fact__num {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-family: var(--font-head); font-weight: 800; font-size: 1.55rem; line-height: 1.15;
+      color: var(--blue);
+      font-variant-numeric: tabular-nums;
+    }
+    .fact__num .icon { width: .8em; height: .8em; color: var(--muted); }
+
+    /* Linha do tempo --------------------------------------- */
+    .timeline { list-style: none; margin: 6px 0 0; padding: 0; display: grid; }
+    .tl { position: relative; display: grid; gap: 4px; align-content: start; padding: 0 0 22px 38px; }
+    .tl:last-child { padding-bottom: 0; }
+    .tl::before {
+      content: ""; position: absolute; left: 9px; top: 4px; bottom: -4px; width: 4px;
+      border-radius: 2px; background: var(--line);
+    }
+    .tl:last-child::before { display: none; }
+    .tl::after {
+      content: ""; position: absolute; left: 0; top: 2px; width: 22px; height: 22px;
+      border-radius: 50%; border: 4px solid var(--blue); background: var(--paper);
+    }
+    .tl--done::after { background: var(--blue); }
+    .tl--done::before { background: linear-gradient(180deg, var(--blue) 0, var(--blue) 42%, var(--line) 42%); }
+    .tl__date {
+      font-family: var(--font-head); font-weight: 700; font-size: 1.2rem; color: var(--blue);
+      font-variant-numeric: tabular-nums; line-height: 1.2;
+    }
+    .tl__title { font-family: var(--font-head); font-weight: 600; color: var(--blue-deep); }
+    .tl p { font-size: .93rem; color: var(--muted); max-width: 34ch; }
+    .tl__now {
+      justify-self: start; margin-top: 6px;
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: .78rem; font-weight: 600; color: var(--blue-deep);
+      padding: 4px 11px; border-radius: 999px; background: var(--blue-tint);
+    }
+    .tl__now::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+
+    .note {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 14px 16px; border-radius: 12px;
+      background: var(--blue-tint); color: var(--blue-deep);
+      font-size: .93rem;
+    }
+    .note .icon { margin-top: 3px; color: var(--blue); }
+
+    /* Legenda ---------------------------------------------- */
+    .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: .86rem; color: var(--muted); }
+    .legend li { display: inline-flex; align-items: center; gap: 8px; }
+    .swatch { width: 22px; height: 16px; border-radius: 5px; flex: none; }
+    .swatch--work { background: var(--blue); }
+    .swatch--off { background: var(--blue-tint); border: 1.5px dashed #8fb0e3; }
+    .swatch--new { background: var(--paper); border: 2px solid var(--blue-deep); }
+
+    /* Casos ------------------------------------------------ */
+    .cases { display: grid; gap: 20px; }
+    .case {
+      display: grid; gap: 18px;
+      padding: 20px 18px 20px 22px;
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--tone);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+    .case--ok { --tone: var(--ok); --tone-bg: var(--ok-bg); }
+    .case--warn { --tone: var(--warn); --tone-bg: var(--warn-bg); }
+    .case--change { --tone: var(--change); --tone-bg: var(--change-bg); }
+
+    .case__head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+    .case__n {
+      display: grid; place-items: center; flex: none;
+      width: 34px; height: 34px; border-radius: 50%;
+      background: var(--blue-deep); color: #fff;
+      font-family: var(--font-head); font-weight: 700;
+    }
+    .case__title { flex: 1 1 260px; display: grid; gap: 2px; }
+    .case__title span { font-size: .9rem; color: var(--muted); }
+    .pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 7px 14px; border-radius: 999px;
+      background: var(--tone-bg); color: var(--tone);
+      font-family: var(--font-head); font-weight: 600; font-size: .88rem;
+      white-space: nowrap;
+    }
+    .case__text { max-width: 68ch; }
+
+    .weeks { display: grid; gap: 14px; }
+    .week {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px 12px; align-items: end;
+      padding-top: 14px; border-top: 1px dashed var(--line);
+    }
+    .week:first-child { padding-top: 0; border-top: 0; }
+    .week__when { display: grid; gap: 2px; font-size: .84rem; color: var(--muted); line-height: 1.35; }
+    .week__when strong { font-family: var(--font-head); font-weight: 600; font-size: .95rem; color: var(--blue-deep); }
+    .week__days {
+      grid-row: 2; grid-column: 1 / -1;
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px;
+    }
+    .week__total {
+      grid-row: 1; grid-column: 2;
+      display: grid; justify-items: end; line-height: 1.15;
+      font-size: .76rem; color: var(--muted);
+    }
+    .week__total strong {
+      font-family: var(--font-head); font-weight: 700; font-size: 1.35rem; color: var(--blue-deep);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .day {
+      position: relative;
+      display: grid; gap: 1px; justify-items: center; align-content: center;
+      min-height: 56px; padding: 7px 1px;
+      border-radius: 10px;
+      border: 2px solid transparent;
+    }
+    .day__name { font-size: .64rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .85; }
+    .day__val {
+      font-family: var(--font-head); font-weight: 700; font-size: .72rem;
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    .day--work { background: var(--blue); color: #fff; }
+    .day--off { background: var(--blue-tint); color: var(--blue); border: 1.5px dashed #8fb0e3; }
+    .day--new { background: var(--paper); color: var(--blue-deep); border: 2px solid var(--blue-deep); }
+    .day--new::after {
+      content: "nova";
+      position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+      padding: 0 6px; border-radius: 999px;
+      background: var(--blue-deep); color: #fff;
+      font-size: .58rem; font-weight: 600; line-height: 1.5; letter-spacing: .04em;
+    }
+
+    .delta {
+      justify-self: start; margin-top: 4px;
+      padding: 2px 9px; border-radius: 999px;
+      background: var(--page); color: var(--blue-deep);
+      font-size: .76rem; font-weight: 600;
+    }
+
+    .example {
+      display: grid; gap: 4px;
+      padding: 14px 16px; border-radius: 12px;
+      background: var(--page);
+      font-size: .94rem;
+    }
+    .example__label {
+      font-family: var(--font-head); font-weight: 600; font-size: .72rem;
+      letter-spacing: .1em; text-transform: uppercase; color: var(--blue);
+    }
+
+    /* Escala de exemplo ------------------------------------ */
+    .table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+    .roster { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .76rem; }
+    .roster thead th:first-child { width: 104px; }
+    .roster th, .roster td { padding: 6px 2px; text-align: center; }
+    .roster thead th {
+      font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--muted); padding-top: 12px;
+    }
+    .roster th[scope="row"], .roster thead th:first-child { text-align: left; padding-left: 10px; white-space: nowrap; }
+    .roster tbody th { font-family: var(--font-head); font-weight: 600; color: var(--blue-deep); }
+    .slot {
+      position: relative;
+      display: grid; place-items: center;
+      height: 30px; border-radius: 8px;
+      font-family: var(--font-head); font-weight: 600; font-size: .58rem;
+    }
+    .slot--work { background: var(--blue); color: #fff; }
+    .slot--work .icon { width: 16px; height: 16px; }
+    .slot--off { background: var(--blue-tint); color: var(--blue); border: 1.5px dashed #8fb0e3; }
+    .roster tfoot th, .roster tfoot td {
+      border-top: 1px solid var(--line); padding: 10px 2px 12px;
+      font-weight: 600; color: var(--blue-deep); font-variant-numeric: tabular-nums;
+    }
+    .roster tfoot th { font-weight: 500; color: var(--muted); }
+
+    /* Salário ---------------------------------------------- */
+    .trio { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+    .trio li {
+      display: grid; gap: 4px; align-content: start;
+      padding: 16px 18px; border-radius: 14px;
+      border: 1px solid var(--line);
+      font-size: .94rem;
+    }
+    .trio strong { font-family: var(--font-head); font-weight: 600; color: var(--blue-deep); font-size: 1rem; }
+
+    /* Passo a passo ---------------------------------------- */
+    .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; counter-reset: step; }
+    .steps li {
+      counter-increment: step;
+      display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; align-content: start;
+      padding: 14px 16px; border-radius: 14px; background: var(--page);
+      font-size: .93rem;
+    }
+    .steps li::before {
+      content: counter(step);
+      grid-row: 1 / span 2;
+      display: grid; place-items: center;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--blue); color: #fff;
+      font-family: var(--font-head); font-weight: 700;
+    }
+    .steps strong { font-family: var(--font-head); font-weight: 600; color: var(--blue-deep); font-size: .98rem; }
+    .steps span { grid-column: 2; color: var(--muted); }
+
+    /* Atenção ---------------------------------------------- */
+    .watch { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+    .watch li { position: relative; padding-left: 22px; max-width: 72ch; }
+    .watch li::before {
+      content: ""; position: absolute; left: 2px; top: .62em;
+      width: 8px; height: 8px; border-radius: 2px; background: var(--blue);
+    }
+
+    /* Contato e rodapé ------------------------------------- */
+    .cta {
+      display: grid; gap: 16px;
+      padding: clamp(22px, 4vw, 34px);
+      border-radius: 22px;
+      background: var(--blue-deep); color: #fff;
+    }
+    .cta__logo { height: 34px; width: auto; display: block; }
+    .cta h2 { color: #fff; }
+    .cta p { color: #d5e0f3; max-width: 58ch; }
+    .cta__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 12px 22px; border-radius: 999px;
+      background: #fff; color: var(--blue);
+      font-family: var(--font-head); font-weight: 600; text-decoration: none;
+    }
+    .btn:hover { background: var(--blue-tint); }
+    .btn:focus-visible { outline-color: #fff; }
+    .cta__contacts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: .93rem; }
+    .cta__contacts a { color: #fff; }
+
+    .legal { display: grid; gap: 8px; font-size: .8rem; color: var(--muted); line-height: 1.55; }
+
+    /* Telas maiores ---------------------------------------- */
+    @media (min-width: 620px) {
+      .sheet { padding: 36px 44px 40px; gap: 44px; }
+      .facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+      .timeline { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .tl { padding: 36px 20px 0 0; }
+      .tl::before { left: 0; right: 0; top: 9px; bottom: auto; width: auto; height: 4px; }
+      .tl:last-child::before { display: block; right: 50%; background: linear-gradient(90deg, var(--line), rgba(217, 226, 240, 0)); }
+      .tl::after { top: 0; }
+      .tl--done::before { background: linear-gradient(90deg, var(--blue) 0, var(--blue) 42%, var(--line) 42%); }
+
+      .case { padding: 24px 24px 24px 26px; }
+      .week { grid-template-columns: 172px minmax(0, 1fr) 84px; gap: 16px; align-items: center; }
+      .week__days { grid-row: auto; grid-column: auto; gap: 6px; }
+      .week__total { grid-row: auto; grid-column: auto; }
+      .day { min-height: 62px; }
+      .day__name { font-size: .68rem; }
+      .day__val { font-size: .95rem; }
+
+      .roster { font-size: .88rem; }
+      .roster thead th:first-child { width: 160px; }
+      .roster th, .roster td { padding: 8px 5px; }
+      .roster th[scope="row"], .roster thead th:first-child { padding-left: 16px; }
+      .roster tfoot th, .roster tfoot td { padding: 10px 5px 12px; }
+      .slot { height: 36px; border-radius: 9px; font-size: .76rem; }
+
+      .trio { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (min-width: 1000px) {
+      body { padding: 32px 16px; }
+      .sheet { border-radius: 26px; box-shadow: 0 24px 60px rgba(0, 53, 128, .12); }
+    }
+
+    /* Impressão / PDF -------------------------------------- */
+    @page { size: A4; margin: 11mm 12mm; }
+    @media print {
+      html { font-size: 13.5px; }
+      body { background: #fff; padding: 0; }
+      .sheet { display: block; max-width: none; padding: 0; box-shadow: none; border-radius: 0; }
+      .sheet > * + * { margin-top: 18px; }
+      .section, .cases { display: block; }
+      .section > * + * { margin-top: 10px; }
+      .cases > * + * { margin-top: 12px; }
+      .section__intro--screen { display: none; }
+      .section__intro, .case__text, .watch li, .hero__lead { max-width: none; }
+
+      .mast { padding-bottom: 12px; }
+      .mast__logo { height: 38px; }
+      .mast__pdf { display: none; }
+      .hero { padding: 18px 22px; gap: 10px; border-radius: 18px; }
+      .hero h1 { font-size: 1.9rem; max-width: none; }
+      .fact { padding: 12px 14px; }
+      .timeline { margin-top: 0; }
+      .tl p { max-width: none; }
+      .case { padding: 14px 18px 14px 20px; gap: 10px; }
+      .weeks { gap: 10px; }
+      .week { padding-top: 10px; }
+      .day { min-height: 52px; }
+      .example, .note { padding: 8px 14px; }
+      .cta { padding: 22px 26px; }
+
+      h2 { break-after: avoid; }
+      .legend { break-after: avoid; }
+      .hero, .case, .note, .table-wrap, .trio li, .steps li, .cta, .timeline, .legal, .section--keep { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ícones -->
+  <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></g></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></g></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.2"/></g></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M4 12h15M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-whatsapp" viewBox="0 0 24 24"><path fill="currentColor" d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.49s1.07 2.89 1.22 3.09c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.04 21.5h-.01a9.4 9.4 0 0 1-4.8-1.32l-.34-.2-3.57.94.95-3.48-.22-.36a9.4 9.4 0 0 1-1.44-5.01c0-5.2 4.23-9.43 9.44-9.43 2.52 0 4.89.98 6.67 2.77a9.37 9.37 0 0 1 2.76 6.67c0 5.2-4.23 9.43-9.44 9.43zm8.03-17.46A11.28 11.28 0 0 0 12.04.72C5.78.72.69 5.8.69 12.06c0 2 .52 3.95 1.52 5.67L.6 23.6l6-1.57a11.3 11.3 0 0 0 5.43 1.38h.01c6.25 0 11.34-5.09 11.35-11.34 0-3.03-1.18-5.88-3.32-8.03z"/></symbol>
+  </svg>
+
+  <main class="sheet">
+
+    <!-- Cabeçalho -->
+    <header class="mast">
+      <a href="../../" aria-label="Efficio Contabilidade - página inicial">
+        <img class="mast__logo" src="../../assets/logo.png" alt="Efficio Contabilidade" width="500" height="171">
+      </a>
+      <div class="mast__meta">
+        <strong>Informativo · Departamento Pessoal</strong>
+        <span>Novembro de 2026</span>
+        <a class="mast__pdf" href="informativo-escala-5x2.pdf" download>Baixar em PDF</a>
+      </div>
+    </header>
+
+    <!-- Abertura -->
+    <section class="hero" aria-labelledby="titulo">
+      <p class="hero__eyebrow">Nova jornada de trabalho</p>
+      <h1 id="titulo">Fim da escala 6x1: o que muda com a escala 5x2</h1>
+      <p class="hero__lead">A Emenda Constitucional nº 141/2026 garante dois dias de descanso remunerado por semana e reduz a jornada máxima de 44 para 40 horas semanais, em duas etapas, sem redução de salário. Veja em qual situação a sua empresa se encaixa e o que precisa ser ajustado.</p>
+      <ul class="facts">
+        <li class="fact">
+          <strong class="fact__num">5x2</strong>
+          Cinco dias de trabalho e dois de descanso remunerado por semana.
+        </li>
+        <li class="fact">
+          <strong class="fact__num">44h <svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg><span class="sr-only">para</span> 40h</strong>
+          Jornada semanal máxima: 42 horas na 1ª etapa e 40 horas na 2ª.
+        </li>
+        <li class="fact">
+          <strong class="fact__num">Salário igual</strong>
+          A redução da jornada não pode diminuir o salário.
+        </li>
+      </ul>
+    </section>
+
+    <!-- Prazos -->
+    <section class="section section--keep" aria-labelledby="prazos">
+      <h2 id="prazos">Quando começa a valer</h2>
+      <ol class="timeline">
+        <li class="tl tl--done">
+          <span class="tl__date">16/10/2026</span>
+          <span class="tl__title">Emenda promulgada</span>
+          <p>Publicação da EC 141/2026. Começa o prazo de dois meses para as empresas se adaptarem.</p>
+          <span class="tl__now">Estamos aqui</span>
+        </li>
+        <li class="tl">
+          <span class="tl__date">16/12/2026</span>
+          <span class="tl__title">1ª etapa</span>
+          <p>Dois dias de descanso por semana para todos. Jornada máxima de 42 horas semanais.</p>
+        </li>
+        <li class="tl">
+          <span class="tl__date">16/12/2027</span>
+          <span class="tl__title">2ª etapa</span>
+          <p>Jornada máxima de 40 horas semanais.</p>
+        </li>
+      </ol>
+      <p class="note">
+        <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
+        <span>Parte da imprensa conta o prazo em 60 dias e indica 15/12/2026 como data de início. Por segurança, deixe os novos horários prontos até <strong>15/12/2026</strong>.</span>
+      </p>
+    </section>
+
+    <!-- Casos -->
+    <section class="section" aria-labelledby="casos">
+      <h2 id="casos">Qual é o caso da sua empresa?</h2>
+      <p class="section__intro section__intro--screen">Cada quadro mostra uma semana de trabalho. Compare a jornada de hoje com a de cada etapa.</p>
+      <ul class="legend" aria-label="Legenda">
+        <li><span class="swatch swatch--work"></span>Dia trabalhado</li>
+        <li><span class="swatch swatch--off"></span>Folga remunerada</li>
+        <li><span class="swatch swatch--new"></span>Nova folga</li>
+      </ul>
+
+      <div class="cases">
+
+        <!-- Caso 1 -->
+        <article class="case case--ok">
+          <header class="case__head">
+            <span class="case__n" aria-hidden="true">1</span>
+            <div class="case__title">
+              <h3>Já trabalha em 5x2 com 40 horas semanais</h3>
+              <span>Segunda a sexta, 8 horas por dia</span>
+            </div>
+            <span class="pill"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Nada muda</span>
+          </header>
+
+          <div class="weeks">
+            <div class="week" role="img" aria-label="Hoje e depois da mudança: segunda a sexta, 8 horas por dia. Sábado e domingo de folga. Total de 40 horas por semana.">
+              <div class="week__when"><strong>Hoje e depois</strong>sem alteração</div>
+              <ol class="week__days">
+                <li class="day day--work"><span class="day__name">Seg</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Ter</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Qua</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Qui</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Sex</span><span class="day__val">8h</span></li>
+                <li class="day day--off"><span class="day__name">Sáb</span><span class="day__val">Folga</span></li>
+                <li class="day day--off"><span class="day__name">Dom</span><span class="day__val">Folga</span></li>
+              </ol>
+              <div class="week__total"><strong>40h</strong>por semana</div>
+            </div>
+          </div>
+
+          <p class="case__text">A empresa já cumpre os dois dias de descanso e o limite de 40 horas. Contratos, horários e folha de pagamento continuam como estão.</p>
+          <div class="example">
+            <span class="example__label">Exemplo</span>
+            <p>Escritório que funciona de segunda a sexta, das 8h às 17h, com 1 hora de almoço.</p>
+          </div>
+        </article>
+
+        <!-- Caso 2 -->
+        <article class="case case--warn">
+          <header class="case__head">
+            <span class="case__n" aria-hidden="true">2</span>
+            <div class="case__title">
+              <h3>Já trabalha em 5x2, mas compensa o sábado durante a semana</h3>
+              <span>44 horas semanais em cinco dias</span>
+            </div>
+            <span class="pill"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>Reduzir a jornada</span>
+          </header>
+
+          <div class="weeks">
+            <div class="week" role="img" aria-label="Hoje: segunda a sexta, 8 horas e 48 minutos por dia. Sábado e domingo de folga. Total de 44 horas por semana.">
+              <div class="week__when"><strong>Hoje</strong>até 15/12/2026</div>
+              <ol class="week__days">
+                <li class="day day--work"><span class="day__name">Seg</span><span class="day__val">8h48</span></li>
+                <li class="day day--work"><span class="day__name">Ter</span><span class="day__val">8h48</span></li>
+                <li class="day day--work"><span class="day__name">Qua</span><span class="day__val">8h48</span></li>
+                <li class="day day--work"><span class="day__name">Qui</span><span class="day__val">8h48</span></li>
+                <li class="day day--work"><span class="day__name">Sex</span><span class="day__val">8h48</span></li>
+                <li class="day day--off"><span class="day__name">Sáb</span><span class="day__val">Folga</span></li>
+                <li class="day day--off"><span class="day__name">Dom</span><span class="day__val">Folga</span></li>
+              </ol>
+              <div class="week__total"><strong>44h</strong>por semana</div>
+            </div>
+
+            <div class="week" role="img" aria-label="A partir de 16/12/2026: segunda a sexta, 8 horas e 24 minutos por dia. Sábado e domingo de folga. Total de 42 horas por semana.">
+              <div class="week__when"><strong>A partir de 16/12/2026</strong>1ª etapa<span class="delta">24 min a menos por dia</span></div>
+              <ol class="week__days">
+                <li class="day day--work"><span class="day__name">Seg</span><span class="day__val">8h24</span></li>
+                <li class="day day--work"><span class="day__name">Ter</span><span class="day__val">8h24</span></li>
+                <li class="day day--work"><span class="day__name">Qua</span><span class="day__val">8h24</span></li>
+                <li class="day day--work"><span class="day__name">Qui</span><span class="day__val">8h24</span></li>
+                <li class="day day--work"><span class="day__name">Sex</span><span class="day__val">8h24</span></li>
+                <li class="day day--off"><span class="day__name">Sáb</span><span class="day__val">Folga</span></li>
+                <li class="day day--off"><span class="day__name">Dom</span><span class="day__val">Folga</span></li>
+              </ol>
+              <div class="week__total"><strong>42h</strong>por semana</div>
+            </div>
+
+            <div class="week" role="img" aria-label="A partir de 16/12/2027: segunda a sexta, 8 horas por dia. Sábado e domingo de folga. Total de 40 horas por semana.">
+              <div class="week__when"><strong>A partir de 16/12/2027</strong>2ª etapa<span class="delta">48 min a menos que hoje</span></div>
+              <ol class="week__days">
+                <li class="day day--work"><span class="day__name">Seg</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Ter</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Qua</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Qui</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Sex</span><span class="day__val">8h</span></li>
+                <li class="day day--off"><span class="day__name">Sáb</span><span class="day__val">Folga</span></li>
+                <li class="day day--off"><span class="day__name">Dom</span><span class="day__val">Folga</span></li>
+              </ol>
+              <div class="week__total"><strong>40h</strong>por semana</div>
+            </div>
+          </div>
+
+          <p class="case__text">A escala continua sendo 5x2. O que muda é a carga da semana: as horas do sábado, hoje distribuídas de segunda a sexta, deixam de existir. A jornada diária diminui 24 minutos na 1ª etapa e mais 24 minutos na 2ª.</p>
+          <div class="example">
+            <span class="example__label">Exemplo</span>
+            <p>Oficina que funciona de segunda a sexta, das 7h às 16h48, com 1 hora de almoço. Em 16/12/2026 a saída passa para 16h24. Em 16/12/2027, para 16h. O salário continua o mesmo.</p>
+          </div>
+        </article>
+
+        <!-- Caso 3 -->
+        <article class="case case--change">
+          <header class="case__head">
+            <span class="case__n" aria-hidden="true">3</span>
+            <div class="case__title">
+              <h3>Trabalha em escala 6x1</h3>
+              <span>Seis dias de trabalho e um de folga</span>
+            </div>
+            <span class="pill"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg>Mudar para 5x2</span>
+          </header>
+
+          <div class="weeks">
+            <div class="week" role="img" aria-label="Hoje: segunda a sábado, 7 horas e 20 minutos por dia. Domingo de folga. Total de 44 horas por semana.">
+              <div class="week__when"><strong>Hoje</strong>até 15/12/2026</div>
+              <ol class="week__days">
+                <li class="day day--work"><span class="day__name">Seg</span><span class="day__val">7h20</span></li>
+                <li class="day day--work"><span class="day__name">Ter</span><span class="day__val">7h20</span></li>
+                <li class="day day--work"><span class="day__name">Qua</span><span class="day__val">7h20</span></li>
+                <li class="day day--work"><span class="day__name">Qui</span><span class="day__val">7h20</span></li>
+                <li class="day day--work"><span class="day__name">Sex</span><span class="day__val">7h20</span></li>
+                <li class="day day--work"><span class="day__name">Sáb</span><span class="day__val">7h20</span></li>
+                <li class="day day--off"><span class="day__name">Dom</span><span class="day__val">Folga</span></li>
+              </ol>
+              <div class="week__total"><strong>44h</strong>por semana</div>
+            </div>
+
+            <div class="week" role="img" aria-label="A partir de 16/12/2026: cinco dias de 8 horas e 24 minutos. Folga na quarta-feira e no domingo. Total de 42 horas por semana.">
+              <div class="week__when"><strong>A partir de 16/12/2026</strong>1ª etapa<span class="delta">1 folga a mais por semana</span></div>
+              <ol class="week__days">
+                <li class="day day--work"><span class="day__name">Seg</span><span class="day__val">8h24</span></li>
+                <li class="day day--work"><span class="day__name">Ter</span><span class="day__val">8h24</span></li>
+                <li class="day day--new"><span class="day__name">Qua</span><span class="day__val">Folga</span></li>
+                <li class="day day--work"><span class="day__name">Qui</span><span class="day__val">8h24</span></li>
+                <li class="day day--work"><span class="day__name">Sex</span><span class="day__val">8h24</span></li>
+                <li class="day day--work"><span class="day__name">Sáb</span><span class="day__val">8h24</span></li>
+                <li class="day day--off"><span class="day__name">Dom</span><span class="day__val">Folga</span></li>
+              </ol>
+              <div class="week__total"><strong>42h</strong>por semana</div>
+            </div>
+
+            <div class="week" role="img" aria-label="A partir de 16/12/2027: cinco dias de 8 horas. Folga na quarta-feira e no domingo. Total de 40 horas por semana.">
+              <div class="week__when"><strong>A partir de 16/12/2027</strong>2ª etapa<span class="delta">4 horas a menos que hoje</span></div>
+              <ol class="week__days">
+                <li class="day day--work"><span class="day__name">Seg</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Ter</span><span class="day__val">8h</span></li>
+                <li class="day day--new"><span class="day__name">Qua</span><span class="day__val">Folga</span></li>
+                <li class="day day--work"><span class="day__name">Qui</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Sex</span><span class="day__val">8h</span></li>
+                <li class="day day--work"><span class="day__name">Sáb</span><span class="day__val">8h</span></li>
+                <li class="day day--off"><span class="day__name">Dom</span><span class="day__val">Folga</span></li>
+              </ol>
+              <div class="week__total"><strong>40h</strong>por semana</div>
+            </div>
+          </div>
+
+          <p class="case__text">A empresa passa a conceder dois dias de descanso por semana. <strong>As folgas não precisam ser em dias seguidos:</strong> uma deve cair preferencialmente no domingo e a outra pode ser em qualquer dia, como a quarta-feira deste exemplo. O segundo dia de descanso vale também para quem trabalha seis dias com jornada menor.</p>
+          <div class="example">
+            <span class="example__label">Exemplo</span>
+            <p>Mercado em que o colaborador trabalha de segunda a sábado, 7h20 por dia. Em 16/12/2026 ele passa a trabalhar cinco dias de 8h24, com folga na quarta-feira e no domingo. Em 16/12/2027, cinco dias de 8 horas. O salário continua o mesmo.</p>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- Escala de exemplo -->
+    <section class="section section--keep" aria-labelledby="escala">
+      <h2 id="escala">Como manter a empresa aberta de segunda a sábado</h2>
+      <p class="section__intro">Com folgas em dias alternados, o atendimento continua nos seis dias. Exemplo de uma loja com três colaboradores, todos em 5x2:</p>
+      <div class="table-wrap">
+        <table class="roster">
+          <caption class="sr-only">Exemplo de escala 5x2 com folgas alternadas para uma loja aberta de segunda a sábado</caption>
+          <thead>
+            <tr>
+              <th scope="col">Equipe</th>
+              <th scope="col">Seg</th><th scope="col">Ter</th><th scope="col">Qua</th><th scope="col">Qui</th><th scope="col">Sex</th><th scope="col">Sáb</th><th scope="col">Dom</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Colaborador A</th>
+              <td><span class="slot slot--off">Folga</span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--off">Folga</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Colaborador B</th>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--off">Folga</span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--off">Folga</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Colaborador C</th>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--off">Folga</span></td>
+              <td><span class="slot slot--work"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="sr-only">Trabalha</span></span></td>
+              <td><span class="slot slot--off">Folga</span></td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Pessoas na loja</th>
+              <td>2</td><td>3</td><td>2</td><td>3</td><td>2</td><td>3</td><td>0<span class="sr-only"> (loja fechada)</span></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="note">
+        <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
+        <span>Empresas que abrem aos domingos podem conceder as duas folgas em outros dias da semana, respeitando o rodízio de domingos previsto na lei e na convenção coletiva da categoria.</span>
+      </p>
+    </section>
+
+    <!-- Salário -->
+    <section class="section section--keep" aria-labelledby="salario">
+      <h2 id="salario">E o salário?</h2>
+      <ul class="trio">
+        <li><strong>Salário mantido</strong>A redução da jornada não autoriza reduzir o salário mensal.</li>
+        <li><strong>Hora mais cara</strong>Com o mesmo salário e menos horas, o valor da hora de trabalho aumenta. Isso reflete no custo das horas extras.</li>
+        <li><strong>Cálculo em definição</strong>O divisor usado para calcular o valor da hora na transição ainda aguarda regulamentação. Avisaremos os clientes quando houver definição.</li>
+      </ul>
+    </section>
+
+    <!-- Passo a passo -->
+    <section class="section section--keep" aria-labelledby="passos">
+      <h2 id="passos">O que fazer até 15/12/2026</h2>
+      <ol class="steps">
+        <li><strong>Levante as jornadas</strong><span>Liste o horário e os dias de trabalho de cada colaborador.</span></li>
+        <li><strong>Identifique o caso de cada um</strong><span>5x2 com 40 horas, 5x2 com 44 horas ou 6x1.</span></li>
+        <li><strong>Defina os novos horários e folgas</strong><span>Considere os dias de maior movimento e a cobertura de cada setor.</span></li>
+        <li><strong>Consulte a convenção coletiva</strong><span>Cláusulas incompatíveis com a nova regra perdem a validade em dezembro.</span></li>
+        <li><strong>Formalize por escrito</strong><span>Aditivo ao contrato de trabalho e novo quadro de horários, assinados pelo colaborador.</span></li>
+        <li><strong>Atualize o ponto e a folha</strong><span>Ajuste o controle de ponto e envie os novos horários à Efficio.</span></li>
+      </ol>
+    </section>
+
+    <!-- Atenção -->
+    <section class="section section--keep" aria-labelledby="atencao">
+      <h2 id="atencao">Fique atento</h2>
+      <ul class="watch">
+        <li>Escala 12x36, plantões e turnos de revezamento seguem regras próprias, definidas em lei ou em negociação coletiva. Cada caso precisa de análise.</li>
+        <li>Regimes de compensação diferentes do 5x2 só valem se estiverem previstos em acordo ou convenção coletiva.</li>
+        <li>Empresas terceirizadas que prestam serviços a órgãos públicos têm prazo de 12 meses para se adequar.</li>
+        <li>Servidores públicos e empregados com diploma de nível superior e salário a partir de 2,5 vezes o teto do INSS têm regras próprias.</li>
+        <li>Parte das regras ainda depende de regulamentação. Enviaremos novos informativos quando houver novidades.</li>
+      </ul>
+    </section>
+
+    <!-- Contato -->
+    <section class="cta" aria-labelledby="contato">
+      <img class="cta__logo" src="../../assets/logo-branco.png" alt="Efficio Contabilidade" width="500" height="171">
+      <h2 id="contato">Dúvidas sobre a escala da sua empresa?</h2>
+      <p>Fale com o Departamento Pessoal da Efficio. Analisamos as jornadas da sua equipe e orientamos cada ajuste.</p>
+      <div class="cta__actions">
+        <a class="btn" href="https://wa.me/5519996859637?text=Ol%C3%A1!%20Li%20o%20informativo%20sobre%20a%20escala%205x2%20e%20gostaria%20de%20orienta%C3%A7%C3%A3o." target="_blank" rel="noopener">
+          <svg class="icon" aria-hidden="true"><use href="#i-whatsapp"/></svg>
+          WhatsApp (19) 99685-9637
+        </a>
+        <ul class="cta__contacts">
+          <li><a href="mailto:contato@efficio.com.br">contato@efficio.com.br</a></li>
+          <li><a href="https://www.instagram.com/efficio.contabilidade/" target="_blank" rel="noopener">@efficio.contabilidade</a></li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="legal">
+      <p><strong>Base legal:</strong> Emenda Constitucional nº 141, de 16 de outubro de 2026, que alterou os incisos XIII e XV do art. 7º da Constituição Federal. Conteúdo informativo, atualizado em 10/11/2026. Não substitui a análise do caso concreto nem a consulta à convenção coletiva da categoria.</p>
+      <p>Efficio Contabilidade · Av. Padre Jaime, n.º 1865, Sala 12, Vila Ricci, Mogi Guaçu - SP · CNPJ 60.020.568/0001-04</p>
+    </footer>
+
+  </main>
+
+</body>
+</html>
