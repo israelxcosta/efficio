@@ -1,7 +1,7 @@
 // Delinquency report: how each client pays its receivables (late count, days late, interest and
-// fines charged), the monthly average delay, the client score (payments minus the rework penalty,
-// shared `clientScore`) and the open past-due items used by the collection message. Receivables =
-// income linked to a client, without the interest/fine rows themselves.
+// fines charged), each month split into on time / paid late / open late, the client score (score v2 of
+// the last 12 months minus the rework penalty, shared `clientScore`) and the open past-due items used by
+// the collection message. Receivables = income linked to a client, without the interest/fine rows.
 
 import { and, asc, eq, gte, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -15,6 +15,7 @@ import {
   type DelinquencyReportResponse,
   type LateFeeKind,
   type MonthKey,
+  SCORE_WINDOW_MONTHS,
   TASK_TIME_ZONE,
   type delinquencyReportQuerySchema,
 } from '@effinance/shared';
@@ -48,6 +49,8 @@ function lateDays(r: Receivable, now: string): number {
   return Math.max(0, diffInDays(end, r.date));
 }
 
+const monthIndex = (key: MonthKey) => Number(key.slice(0, 4)) * 12 + Number(key.slice(5, 7)) - 1;
+
 const average = (values: number[]) => (values.length ? Math.round((values.reduce((a, v) => a + v, 0) / values.length) * 10) / 10 : null);
 
 export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: DelinquencyQuery): Promise<DelinquencyReportResponse> {
@@ -55,6 +58,9 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
   const currentMonth = monthKey(now);
   const firstMonth = addMonthKey(currentMonth, -(q.months - 1));
   const from = `${firstMonth}-01`;
+  // The score always reads the last 12 months (SCORE_WINDOW_MONTHS), whatever the period shown.
+  const scoreFrom = `${addMonthKey(currentMonth, -(SCORE_WINDOW_MONTHS - 1))}-01`;
+  const queryFrom = from < scoreFrom ? from : scoreFrom;
 
   // Late fees of each receivable, summed per row through the partial index on late_fee_of (no id
   // lists: a long period of a large office would exceed the bind-parameter limit).
@@ -86,8 +92,8 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
         isNull(transactions.lateFeeOf),
         isNull(transactions.creditCardId),
         or(
-          // In the period: settled, or due before today (due today is not late yet).
-          and(gte(transactions.date, from), lte(transactions.date, now), or(eq(transactions.paid, true), lt(transactions.date, now))),
+          // In the period or the score window: settled, or due before today (due today is not late yet).
+          and(gte(transactions.date, queryFrom), lte(transactions.date, now), or(eq(transactions.paid, true), lt(transactions.date, now))),
           // Anything still open past due, whatever the date.
           and(eq(transactions.paid, false), lt(transactions.date, now)),
         ),
@@ -99,6 +105,7 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
   const feesOf = (r: Receivable) => (r.interest > 0 || r.fine > 0 ? { interest: r.interest, fine: r.fine } : undefined);
 
   const inPeriod = (r: Receivable) => r.date >= from;
+  const inScoreWindow = (r: Receivable) => r.date >= scoreFrom;
 
   // --- per month (by due month) -------------------------------------------------------------------
   const months: MonthKey[] = [];
@@ -106,14 +113,27 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
   const monthly: DelinquencyMonth[] = months.map((month) => {
     const due = rows.filter((r) => inPeriod(r) && r.date.startsWith(month));
     const late = due.filter((r) => lateDays(r, now) > 0);
+    // Due rows are settled or open past due (the query), so each falls in exactly one of the three.
+    const onTime = due.filter((r) => r.paid && lateDays(r, now) === 0);
+    const paidLate = due.filter((r) => r.paid && lateDays(r, now) > 0);
+    const openLate = due.filter((r) => !r.paid);
+    const sum = (items: Receivable[]) => items.reduce((a, r) => a + r.amount, 0);
     return {
       month,
       dueCount: due.length,
       lateCount: late.length,
       lateRate: due.length ? late.length / due.length : 0,
       avgDaysLate: average(late.map((r) => lateDays(r, now))),
-      dueAmount: due.reduce((a, r) => a + r.amount, 0),
-      lateAmount: late.reduce((a, r) => a + r.amount, 0),
+      dueAmount: sum(due),
+      lateAmount: sum(late),
+      onTimeCount: onTime.length,
+      paidLateCount: paidLate.length,
+      openLateCount: openLate.length,
+      onTimeAmount: sum(onTime),
+      paidLateAmount: sum(paidLate),
+      openLateAmount: sum(openLate),
+      paidLateAvgDays: average(paidLate.map((r) => lateDays(r, now))),
+      partial: month === currentMonth,
     };
   });
 
@@ -133,12 +153,14 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
     const client = details.get(contactId);
     if (!client) continue;
     const period = list.filter(inPeriod);
-    const late = period.filter((r) => lateDays(r, now) > 0);
     const open = list.filter((r) => !r.paid).sort((a, b) => a.date.localeCompare(b.date));
+    // Rows fetched only for the score window: a client with nothing due or open in the period is not listed.
+    if (period.length === 0 && open.length === 0) continue;
+    const late = period.filter((r) => lateDays(r, now) > 0);
     const withFees = period.map(feesOf).filter((f): f is { interest: number; fine: number } => Boolean(f));
-    const history = period.map((r) => ({
+    const history = list.filter(inScoreWindow).map((r) => ({
       daysLate: lateDays(r, now),
-      monthsAgo: Math.max(0, months.length - 1 - months.indexOf(monthKey(r.date))),
+      monthsAgo: Math.max(0, monthIndex(currentMonth) - monthIndex(monthKey(r.date))),
     }));
     const clientRework = rework.get(contactId) ?? noRework();
     const score = clientScore(history, open.length, clientRework);
@@ -197,6 +219,8 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
       paidWithFeesCount: allFees.length,
       probability: weight ? clients.reduce((a, c) => a + c.probability * c.dueCount, 0) / weight : 0,
       clientsAtRisk: clients.filter((c) => c.risk === 'alto' || c.risk === 'critico').length,
+      reworkCount: clients.reduce((a, c) => a + c.rework.last90Days, 0),
+      reworkClients: clients.filter((c) => c.rework.last90Days > 0).length,
     },
     monthly,
     clients,

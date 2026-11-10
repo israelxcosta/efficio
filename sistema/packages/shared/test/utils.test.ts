@@ -192,4 +192,3 @@ describe('delinquency score', () => {
     expect([1000, 800, 799, 600, 599, 400, 399, 0].map(riskOf)).toEqual(['baixo', 'baixo', 'moderado', 'moderado', 'alto', 'alto', 'critico', 'critico']);
   });
 });
-});

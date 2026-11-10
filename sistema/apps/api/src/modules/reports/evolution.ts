@@ -1,5 +1,5 @@
-// Client-base evolution (GET /reports/evolution): month by month, contracts started, clients inactivated,
-// the active base and the monthly fees in force at the end of the month (shared `clientBaseEvolution`,
+// Client-base evolution (GET /reports/evolution): month by month, contracts started and clients
+// inactivated (with who), the active base and the monthly fees in force at the end of the month (shared `clientBaseEvolution`,
 // over the client rows and their fee periods — one row per client and per contract year), what was
 // billed and received from clients (SQL aggregates per month over `transactions`), and the current
 // month against the previous one. Months are the office's (America/Sao_Paulo); the current month
@@ -95,7 +95,14 @@ export async function evolutionReport(db: DbExecutor, workspaceId: string, q: Ev
 
   const [clients, fees, billed, received] = await Promise.all([
     db
-      .select({ id: contacts.id, contractStartDate: contacts.contractStartDate, inactivatedAt: contacts.inactivatedAt })
+      .select({
+        id: contacts.id,
+        name: contacts.name,
+        tradeName: contacts.tradeName,
+        contractStartDate: contacts.contractStartDate,
+        inactivatedAt: contacts.inactivatedAt,
+        inactivationReason: contacts.inactivationReason,
+      })
       .from(contacts)
       .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.kind, 'client'))),
     db
@@ -110,7 +117,14 @@ export async function evolutionReport(db: DbExecutor, workspaceId: string, q: Ev
   const receivedOf = new Map(received.map((r) => [r.month, r.amount]));
   const months: EvolutionMonth[] = clientBaseEvolution({
     // A client always has a contract start (contacts_client_chk).
-    clients: clients.map((c) => ({ id: c.id, contractStartDate: c.contractStartDate!, inactivatedAt: c.inactivatedAt })),
+    // Names are stored in clear (searchable); listed like everywhere: trade name, else the legal name.
+    clients: clients.map((c) => ({
+      id: c.id,
+      name: c.tradeName || c.name,
+      contractStartDate: c.contractStartDate!,
+      inactivatedAt: c.inactivatedAt,
+      inactivationReason: c.inactivationReason,
+    })),
     fees,
     from: first,
     to: current,

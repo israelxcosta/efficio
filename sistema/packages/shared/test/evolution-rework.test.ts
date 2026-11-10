@@ -8,10 +8,12 @@ import {
   delinquencyScore,
   evolutionChange,
   evolutionComparison,
+  EVOLUTION_METRIC_LABELS,
   evolutionReportQuerySchema,
   reworkPenalty,
   reworkWindows,
   taskCategoryInputSchema,
+  type EvolutionClient,
   type EvolutionMonth,
 } from '../src';
 
@@ -22,67 +24,73 @@ describe('rework windows and penalty', () => {
     expect(reworkWindows('2028-02-29').yearFrom).toBe('2027-03-01');
   });
 
-  it('takes 4 points per rework in the last 90 days and 1 per older one in 12 months, up to 20', () => {
+  it('takes 40 points per rework in the last 90 days and 10 per older one in 12 months, up to 200', () => {
     expect(reworkPenalty({ last90Days: 0, last12Months: 0 })).toBe(0);
-    expect(reworkPenalty({ last90Days: 1, last12Months: 1 })).toBe(4);
-    expect(reworkPenalty({ last90Days: 0, last12Months: 3 })).toBe(3);
-    expect(reworkPenalty({ last90Days: 2, last12Months: 5 })).toBe(11);
-    expect(reworkPenalty({ last90Days: 5, last12Months: 5 })).toBe(20);
-    expect(reworkPenalty({ last90Days: 6, last12Months: 10 })).toBe(20);
-    expect(reworkPenalty({ last90Days: 0, last12Months: 25 })).toBe(20);
+    expect(reworkPenalty({ last90Days: 1, last12Months: 1 })).toBe(40);
+    expect(reworkPenalty({ last90Days: 0, last12Months: 3 })).toBe(30);
+    expect(reworkPenalty({ last90Days: 2, last12Months: 5 })).toBe(110);
+    expect(reworkPenalty({ last90Days: 5, last12Months: 5 })).toBe(200);
+    expect(reworkPenalty({ last90Days: 6, last12Months: 10 })).toBe(200);
+    expect(reworkPenalty({ last90Days: 0, last12Months: 25 })).toBe(200);
   });
 });
 
 describe('client score', () => {
-  const history = [
-    { daysLate: 0, monthsAgo: 0 },
-    { daysLate: 12, monthsAgo: 1 },
-    { daysLate: 0, monthsAgo: 2 },
-  ];
+  const months = (n: number, daysLate: (i: number) => number) => Array.from({ length: n }, (_, i) => ({ monthsAgo: i, daysLate: daysLate(i) }));
 
-  it('is the payment score minus the rework penalty', () => {
-    const payment = delinquencyScore(history, 1);
-    const score = clientScore(history, 1, { last90Days: 2, last12Months: 3 });
-    expect(score).toEqual({
-      ...payment,
-      score: payment.score - 9,
-      paymentScore: payment.score,
-      reworkPenalty: 9,
+  it('takes the rework from the punctuality: 3 in 90 days move a year on time from 916 to 796', () => {
+    expect(clientScore(months(12, () => 0), 0, { last90Days: 3, last12Months: 3 })).toEqual({
+      probability: delinquencyScore(months(12, () => 0), 0).probability,
+      score: 796,
+      risk: 'moderado',
+      lowHistory: false,
+      punctuality: 916,
+      openPenalty: 0,
+      paymentScore: 916,
+      reworkPenalty: 120,
+    });
+    expect(clientScore(months(12, () => 0), 0, { last90Days: 9, last12Months: 9 })).toMatchObject({ score: 716, reworkPenalty: 200 });
+  });
+
+  it('adds the open penalty and the rework penalty over the punctuality', () => {
+    expect(clientScore(months(12, () => 5), 2, { last90Days: 1, last12Months: 2 })).toMatchObject({
+      punctuality: 771,
+      openPenalty: 100,
+      paymentScore: 671,
+      reworkPenalty: 50,
+      score: 621,
+      risk: 'moderado',
     });
   });
 
   it('without rework it is the payment score', () => {
-    const payment = delinquencyScore(history, 0);
-    expect(clientScore(history, 0)).toEqual({ ...payment, paymentScore: payment.score, reworkPenalty: 0 });
+    const payment = delinquencyScore(months(6, () => 3), 1);
+    expect(clientScore(months(6, () => 3), 1)).toEqual({ ...payment, paymentScore: payment.score, reworkPenalty: 0 });
   });
 
   it('recomputes the risk band after the penalty', () => {
-    // No history: 20% chance of paying late, score 800 (the lowest "Bom pagador").
-    expect(delinquencyScore([], 0)).toMatchObject({ score: 800, risk: 'baixo' });
-    expect(clientScore([], 0, { last90Days: 1, last12Months: 1 })).toMatchObject({ score: 796, risk: 'moderado', paymentScore: 800 });
+    expect(clientScore([], 0, { last90Days: 1, last12Months: 1 })).toMatchObject({ score: 760, risk: 'moderado', paymentScore: 800 });
   });
 
   it('never goes below zero', () => {
     const awful = Array.from({ length: 12 }, (_, i) => ({ daysLate: 90, monthsAgo: i }));
-    const payment = delinquencyScore(awful, 12);
-    expect(payment.score).toBe(0);
-    expect(clientScore(awful, 12, { last90Days: 5, last12Months: 5 })).toMatchObject({ score: 0, risk: 'critico', reworkPenalty: 20 });
+    expect(clientScore(awful, 12, { last90Days: 5, last12Months: 5 })).toMatchObject({ score: 0, risk: 'critico', reworkPenalty: 200 });
   });
 });
 
 describe('client base evolution', () => {
-  const clients = [
-    { id: 'a', contractStartDate: '2025-12-15', inactivatedAt: null },
-    { id: 'b', contractStartDate: '2026-08-10', inactivatedAt: null },
-    { id: 'c', contractStartDate: '2026-09-01', inactivatedAt: '2026-10-05' },
+  const clients: EvolutionClient[] = [
+    { id: 'a', name: 'Alfa', contractStartDate: '2025-12-15', inactivatedAt: null, inactivationReason: null },
+    { id: 'b', name: 'Beta', contractStartDate: '2026-08-10', inactivatedAt: null, inactivationReason: null },
+    { id: 'c', name: 'Gama', contractStartDate: '2026-09-01', inactivatedAt: '2026-10-05', inactivationReason: 'default' },
     // Started and left on the same day: new and churned in September, never in a month-end base.
-    { id: 'd', contractStartDate: '2026-09-30', inactivatedAt: '2026-09-30' },
+    { id: 'd', name: 'Delta', contractStartDate: '2026-09-30', inactivatedAt: '2026-09-30', inactivationReason: 'other' },
     // Leap-day contract: its third year starts on 2026-02-28.
-    { id: 'e', contractStartDate: '2024-02-29', inactivatedAt: null },
+    { id: 'e', name: 'Épsilon', contractStartDate: '2024-02-29', inactivatedAt: null, inactivationReason: null },
     // Starts after today: not in October yet.
-    { id: 'f', contractStartDate: '2026-10-25', inactivatedAt: null },
+    { id: 'f', name: 'Zeta', contractStartDate: '2026-10-25', inactivatedAt: null, inactivationReason: null },
     // Inactivation recorded for the end of the month: still active today.
-    { id: 'g', contractStartDate: '2025-01-01', inactivatedAt: '2026-10-31' },
+    { id: 'g', name: 'Eta', contractStartDate: '2025-01-01', inactivatedAt: '2026-10-31', inactivationReason: 'contract_end' },
   ];
   const fees = [
     { clientId: 'a', periodIndex: 0, amount: 50_000 },
@@ -109,6 +117,8 @@ describe('client base evolution', () => {
         recurringFees: 92_000,
         clientsWithFee: 3,
         averageFee: 30_667,
+        newList: [{ id: 'b', name: 'Beta', fee: 30_000 }],
+        churnedList: [],
       },
       {
         month: '2026-09',
@@ -121,6 +131,12 @@ describe('client base evolution', () => {
         recurringFees: 112_000,
         clientsWithFee: 4,
         averageFee: 28_000,
+        // Delta left on its first day: out of the base, so it brings and takes no fee.
+        newList: [
+          { id: 'd', name: 'Delta', fee: 0 },
+          { id: 'c', name: 'Gama', fee: 20_000 },
+        ],
+        churnedList: [{ id: 'd', name: 'Delta', fee: 0, reason: 'other' }],
       },
       {
         month: '2026-10',
@@ -133,8 +149,17 @@ describe('client base evolution', () => {
         recurringFees: 92_000,
         clientsWithFee: 3,
         averageFee: 30_667,
+        newList: [],
+        // The fee it had at the end of the previous month.
+        churnedList: [{ id: 'c', name: 'Gama', fee: 20_000, reason: 'default' }],
       },
     ]);
+    // Bridge of the fees: previous + new − churned + adjustments = current (no renewal here).
+    for (let i = 1; i < months.length; i++) {
+      const m = months[i]!;
+      const flows = m.newList.reduce((a, c) => a + c.fee, 0) - m.churnedList.reduce((a, c) => a + c.fee, 0);
+      expect(months[i - 1]!.recurringFees + flows).toBe(m.recurringFees);
+    }
     // The base moves exactly by the net change.
     for (let i = 1; i < months.length; i++) {
       expect(months[i]!.activeClients - months[i - 1]!.activeClients).toBe(months[i]!.netChange);
@@ -154,7 +179,7 @@ describe('client base evolution', () => {
 
   it('keeps a client without a registered period in the base, out of the fees and the average', () => {
     const [month] = clientBaseEvolution({
-      clients: [clients[0]!, { id: 'x', contractStartDate: '2026-01-01', inactivatedAt: null }],
+      clients: [clients[0]!, { id: 'x', name: 'Xis', contractStartDate: '2026-01-01', inactivatedAt: null, inactivationReason: null }],
       fees,
       from: '2026-05',
       to: '2026-05',
@@ -190,6 +215,8 @@ describe('evolution comparison', () => {
       recurringFees: 0,
       clientsWithFee: 0,
       averageFee: 0,
+      newList: [],
+      churnedList: [],
       billed: 0,
       received: 0,
       ...values,
@@ -214,6 +241,10 @@ describe('evolution comparison', () => {
 });
 
 describe('contract', () => {
+  it('names the metrics with the words of the office', () => {
+    expect(EVOLUTION_METRIC_LABELS).toMatchObject({ activeClients: 'Clientes ativos', recurringFees: 'Honorário mensal recorrente' });
+  });
+
   it('reads 12 months by default and accepts 1 to 36', () => {
     expect(evolutionReportQuerySchema.parse({})).toEqual({ months: 12 });
     expect(evolutionReportQuerySchema.parse({ months: '24' })).toEqual({ months: 24 });

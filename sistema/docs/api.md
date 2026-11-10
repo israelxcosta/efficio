@@ -190,27 +190,35 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
   `dueAmount`, `lateAmount`. `summary`: os mesmos totais do período, `openCount`/`openAmount`/
   `openClients`, `interestTotal`/`fineTotal`, `paidWithFeesCount`, `probability` (média das
   probabilidades ponderada por `dueCount`) e `clientsAtRisk` (risco `alto` ou `critico`).
-- **Score de pagamento** (`delinquencyScore` em `packages/shared/src/utils/delinquency.ts`, testado
-  no contrato): cada recebível do período pesa `0,5^(meses atrás / 6)` (meia-vida de 6 meses).
-  `probability = (atrasados ponderados + 1) / (total ponderado + 5)` (sem histórico = 20%).
-  `paymentScore = 1000 × (1 − probability) − 150 × min(1, atraso médio ponderado / 60) − 60 × em aberto`,
-  limitado a 0..1000.
-- **Score do cliente** (`clientScore` em `packages/shared/src/utils/rework.ts`, testado; o mesmo para
-  API e web): `score = max(0, paymentScore − reworkPenalty)`, com a penalidade de retrabalho (veja
-  "Retrabalho": 4 pontos por retrabalho nos últimos 90 dias + 1 por retrabalho entre 90 dias e 12
-  meses, no máximo 20). As janelas do retrabalho são fixas, qualquer que seja `months`. Faixas
-  (`riskOf`, sobre o `score` final): ≥ 800 `baixo` (bom pagador), ≥ 600 `moderado`, ≥ 400 `alto`,
-  abaixo `critico`. `probability` e `lowHistory` (menos de 3 recebíveis no período) continuam só dos
-  pagamentos. Cada linha traz `paymentScore`, `reworkPenalty` e `rework` (`ClientRework`: contagens e
-  as 5 últimas tarefas de retrabalho dos 12 meses).
+- **Score v2 de pagamento** (`delinquencyScore` em `packages/shared/src/utils/delinquency.ts`, testado
+  no contrato com os valores da spec `docs/projeto-melhorias-dashboards.md` §5.2): sempre sobre os
+  recebíveis dos **últimos 12 meses** (`SCORE_WINDOW_MONTHS`, mais os em aberto vencidos), qualquer que
+  seja `months` (a consulta busca `max(months, 12)` meses; contagens, `monthly` e `summary` continuam no
+  período). Peso `w = 0,5^(meses atrás / 6)`; gravidade `lateSeverity(d)` = 0 no prazo · 0,25 (1–5 dias)
+  · 0,5 (6–15) · 0,75 (16–30) · 1 (> 30). `probability = (Σ w·[atrasou] + 1) / (Σ w + 5)` (a chance de
+  atrasar, qualquer atraso igual; sem histórico = 20%). `punctuality = 1000 × (1 − (Σ w·g + 1) / (Σ w +
+  5))` (sem histórico = 800). `openPenalty = min(250, 50 × em aberto vencidos)`. `paymentScore =
+  punctuality − openPenalty`, arredondado, 0..1000. `lowHistory` = menos de 3 recebíveis na janela.
+- **Score do cliente** (`clientScore` em `packages/shared/src/utils/rework.ts`, o mesmo para API e web):
+  `score = punctuality − openPenalty − reworkPenalty`, arredondado e limitado a 0..1000, com a
+  penalidade de retrabalho (veja "Retrabalho": 40 pontos por retrabalho nos últimos 90 dias + 10 por
+  retrabalho entre 90 dias e 12 meses, no máximo 200). Faixas (`riskOf`, sobre o `score` final): ≥ 800
+  `baixo` ("Baixo risco"), ≥ 600 `moderado`, ≥ 400 `alto`, abaixo `critico`. Cada linha traz
+  `punctuality`, `openPenalty`, `paymentScore`, `reworkPenalty` e `rework` (`ClientRework`: contagens e
+  as 5 últimas tarefas de retrabalho dos 12 meses). Um cliente com linhas só na janela do score (nada
+  vencido nem em aberto no período) não é listado.
+- `monthly` também quebra cada mês em `onTimeCount`/`paidLateCount`/`openLateCount` (pago até o
+  vencimento · pago depois · vencido em aberto; somam `dueCount`), os três valores, `paidLateAvgDays`
+  (média dos pagos com atraso, 1 casa) e `partial` (mês corrente). `summary.reworkCount` (retrabalhos
+  em 90 dias dos clientes do relatório) e `summary.reworkClients` (quantos têm algum).
 - **Relatório do cliente** (web, `/relatorios/cliente/:id?meses=`, botão em cada linha): lê todos
   os lançamentos de receita do cliente em `GET /transactions?contactId=&type=income` (páginas de
   200) e calcula no navegador (`features/reports/client-report/client-report.ts`, testado) o
   histórico, pontualidade, faixas de atraso, mapa de pagamentos, ano a ano e o score da linha
-  (`periodScore`, mesma janela e regras deste relatório). O retrabalho do cliente vem ao lado do
-  histórico, em `GET /reports/clients/:id/rework`; para o score bater com a linha, o web passa
-  `rework` a `clientScore` (pendente no web: hoje `periodScore` ainda usa `delinquencyScore`, sem a
-  penalidade).
+  (`periodScore`). O retrabalho do cliente vem ao lado do histórico, em `GET /reports/clients/:id/rework`;
+  para o score bater com a linha, o web usa a janela fixa de 12 meses e passa `rework` a `clientScore`
+  (pendente no web, tarefa 10 do plano: hoje `periodScore` usa a janela de `?meses=` e
+  `delinquencyScore`, já v2, sem o retrabalho).
 - Consultas: um SELECT com junção em `contacts` e a soma dos juros/multa de cada linha por
   subconsulta correlacionada (índice parcial em `late_fee_of`) — sem listas de ids, que estourariam
   o limite de parâmetros num escritório grande; os dados de contato vêm decifrados em lotes.
@@ -223,8 +231,12 @@ no fuso do escritório (`America/Sao_Paulo`: o "hoje" é `todayIn`). Valores em 
 (`partial: true`):
 
 - `newClients`: clientes com **início de contrato** (`contractStartDate`) no mês, até `asOf` (contrato
-  que começa depois de hoje espera o dia).
-- `churnedClients`: clientes com **data de inativação** (`inactivatedAt`) no mês, até `asOf`. A data
+  que começa depois de hoje espera o dia). `newList` (por nome: `id`, `name` = nome fantasia, senão a
+  razão social, `fee` = honorário com que entra na base do `asOf`, 0 sem vigência ou se já saiu).
+- `churnedClients`: clientes com **data de inativação** (`inactivatedAt`) no mês, até `asOf`;
+  `churnedList` (por nome, com `reason` = `inactivationReason` e `fee` = o honorário que tinham no fim do
+  mês anterior). Ponte do honorário: `anterior + Σ newList.fee − Σ churnedList.fee + reajustes =
+  recurringFees` (reajustes = vigência nova, cliente que ganhou ou perdeu vigência). A data
   sempre existe para um inativo (`contacts_inactivation_chk`: inativo ⇔ data e motivo). Limite: a
   reativação apaga a data (não há histórico de inativações), então quem saiu e voltou aparece como
   ativo desde o início do contrato.
@@ -243,7 +255,8 @@ no fuso do escritório (`America/Sao_Paulo`: o "hoje" é `todayIn`). Valores em 
   (despesas pagas com `discountOf`): o que entrou de fato.
 
 `comparison` (`EvolutionComparison`): o mês atual contra o anterior em cada métrica de
-`EVOLUTION_METRICS` (rótulos em `EVOLUTION_METRIC_LABELS`): `current`, `previous`, `diff` e `diffPercent`
+`EVOLUTION_METRICS` (rótulos em `EVOLUTION_METRIC_LABELS`: "Clientes ativos", "Honorário mensal
+recorrente", "Ticket médio"…): `current`, `previous`, `diff` e `diffPercent`
 = `diff / |previous|` (0,25 = +25%; `null` quando o anterior é 0). O mês anterior é calculado mesmo com
 `months = 1`. O mês atual é parcial (recebido até hoje; faturado do mês inteiro). Regras puras e testadas
 em `packages/shared/src/utils/evolution.ts` (`clientBaseEvolution`, `evolutionChange`,
@@ -263,10 +276,15 @@ ausente na edição mantém o valor gravado (formulários antigos não apagam a 
   incidentes — inclusive a "recorrência em qualquer tarefa").
 - **Janelas** (`reworkWindows(hoje)`, hoje incluído): `last90Days` = abertas a partir de `hoje − 89`;
   `last12Months` = a partir de `hoje − 12 meses + 1 dia` (inclui as dos 90 dias).
-- **Penalidade** (`reworkPenalty`): `min(20, 4 × last90Days + 1 × (last12Months − last90Days))`, na escala
-  0..1000 do score. Constantes em `packages/shared/src/utils/rework.ts` (`REWORK_PENALTY_*`).
+- **Penalidade** (`reworkPenalty`): `min(200, 40 × last90Days + 10 × (last12Months − last90Days))`, na
+  escala 0..1000 do score (spec §6.2: 3 retrabalhos em 90 dias levam um cliente pontual de 916 a 796).
+  Os pesos são decisão de produto e podem ser ajustados pelo usuário/escritório em
+  `packages/shared/src/utils/rework.ts` (`REWORK_PENALTY_RECENT`, `REWORK_PENALTY_OLDER`,
+  `REWORK_PENALTY_MAX`) — a mesma regra vale para API e web.
 - `ClientRework` = contagens + `latest` (até 5, mais recente primeiro: `id`, `title`, `date` de abertura,
-  `status`, `dueDate`, `category`). Vai em cada linha do relatório de inadimplência e em
+  `status`, `dueDate`, `category`). `title` é `null` para quem não pode ler tarefas (`clientRework(…,
+  canReadTasks)`); hoje nenhuma chave de permissão restringe a leitura de tarefas (todo membro as lê),
+  então a rota sempre manda o título — quando existir uma chave assim, é ela que a rota passa. Vai em cada linha do relatório de inadimplência e em
   `GET /reports/clients/:id/rework` (`ClientReworkResponse`: `contactId`, `today`, `windows`, `penalty`,
   `rework`), que o relatório do cliente lê ao lado do histórico (`/transactions`).
 - Consultas (`modules/reports/rework.ts`): contagens por `GROUP BY` e as últimas por `row_number()` por

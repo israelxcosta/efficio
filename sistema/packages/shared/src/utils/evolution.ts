@@ -3,15 +3,19 @@
 // unit-tested; the API adds what was billed and received (SQL aggregates).
 
 import { EVOLUTION_METRICS } from '../constants';
-import type { ClientBaseMonth, EvolutionChange, EvolutionComparison, EvolutionMonth } from '../types';
+import type { InactivationReason } from '../constants';
+import type { ClientBaseMonth, EvolutionChange, EvolutionChurnRef, EvolutionClientRef, EvolutionComparison, EvolutionMonth } from '../types';
 import { addMonthKey, minISO, monthRange, type ISODate, type MonthKey } from './dates';
 import { feePeriodIndexAt } from './fees';
 
 export interface EvolutionClient {
   id: string;
+  /** As listed: trade name, else the legal name. */
+  name: string;
   contractStartDate: ISODate;
   /** Inactivation date (null while active). A reactivation clears it, so it reads as never inactivated. */
   inactivatedAt: ISODate | null;
+  inactivationReason: InactivationReason | null;
 }
 
 export interface EvolutionFee {
@@ -35,6 +39,9 @@ const within = (day: ISODate | null, from: ISODate, to: ISODate) => day !== null
  * client inactivated on a day is out of that day's base, so the base always moves by the net change.
  * The fee of an active client is the one of the period containing `asOf` (`feePeriodIndexAt`); without
  * a registered period the client stays in the base and out of the fees and the average.
+ * `newList` carries each new client's fee in that base (0 when not in it), `churnedList` the fee the
+ * churned one had at the end of the previous month, so previous + Σ new − Σ churned + adjustments
+ * (renewals, periods gained or lost) = recurringFees. Lists by name.
  */
 export function clientBaseEvolution(input: {
   clients: readonly EvolutionClient[];
@@ -45,36 +52,45 @@ export function clientBaseEvolution(input: {
 }): ClientBaseMonth[] {
   const { clients, today } = input;
   const feeOf = new Map(input.fees.map((f) => [`${f.clientId}:${f.periodIndex}`, f.amount]));
+  /** The fee in the base of `day` (undefined: not active, or active without a registered period). */
+  const feeOn = (client: EvolutionClient, day: ISODate) =>
+    activeOn(client, day) ? feeOf.get(`${client.id}:${feePeriodIndexAt(client.contractStartDate, day)}`) : undefined;
+  const byName = (a: EvolutionClientRef, b: EvolutionClientRef) => a.name.localeCompare(b.name, 'pt-BR');
   const months: ClientBaseMonth[] = [];
   for (let month = input.from; month <= input.to; month = addMonthKey(month, 1)) {
     const range = monthRange(month);
     const asOf = minISO(range.to, today);
-    let newClients = 0;
-    let churnedClients = 0;
+    const previousEnd = monthRange(addMonthKey(month, -1)).to;
+    const newList: EvolutionClientRef[] = [];
+    const churnedList: EvolutionChurnRef[] = [];
     let activeClients = 0;
     let recurringFees = 0;
     let clientsWithFee = 0;
     for (const client of clients) {
-      if (within(client.contractStartDate, range.from, asOf)) newClients += 1;
-      if (within(client.inactivatedAt, range.from, asOf)) churnedClients += 1;
+      const fee = feeOn(client, asOf);
+      if (within(client.contractStartDate, range.from, asOf)) newList.push({ id: client.id, name: client.name, fee: fee ?? 0 });
+      if (within(client.inactivatedAt, range.from, asOf)) {
+        churnedList.push({ id: client.id, name: client.name, fee: feeOn(client, previousEnd) ?? 0, reason: client.inactivationReason ?? 'other' });
+      }
       if (!activeOn(client, asOf)) continue;
       activeClients += 1;
-      const amount = feeOf.get(`${client.id}:${feePeriodIndexAt(client.contractStartDate, asOf)}`);
-      if (amount === undefined) continue;
-      recurringFees += amount;
+      if (fee === undefined) continue;
+      recurringFees += fee;
       clientsWithFee += 1;
     }
     months.push({
       month,
       asOf,
       partial: range.to > today,
-      newClients,
-      churnedClients,
+      newClients: newList.length,
+      churnedClients: churnedList.length,
       activeClients,
-      netChange: newClients - churnedClients,
+      netChange: newList.length - churnedList.length,
       recurringFees,
       clientsWithFee,
       averageFee: clientsWithFee > 0 ? Math.round(recurringFees / clientsWithFee) : 0,
+      newList: newList.sort(byName),
+      churnedList: churnedList.sort(byName),
     });
   }
   return months;

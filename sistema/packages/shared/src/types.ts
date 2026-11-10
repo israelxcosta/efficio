@@ -775,11 +775,14 @@ export interface DelinquencyClient {
   score: number;
   /** Band of the final `score`. */
   risk: DelinquencyRisk;
-  /** Fewer than 3 receivables in the period: the score leans on the default. */
+  /** Fewer than 3 receivables in the score window (12 months): the score leans on the default. */
   lowHistory: boolean;
   /** Score from the payments alone (`delinquencyScore`), before the rework penalty. */
   paymentScore: number;
-  /** Points taken for rework (utils/rework.ts: 4 per rework in 90 days, 1 per older one in 12 months, up to 20). */
+  /** Punctuality (0..1000) and the open penalty: the parts of the score (`score` = punctuality − openPenalty − reworkPenalty). */
+  punctuality: number;
+  openPenalty: number;
+  /** Points taken for rework (utils/rework.ts: 40 per rework in 90 days, 10 per older one in 12 months, up to 200). */
   reworkPenalty: number;
   /** Tasks of the client in rework categories (fixed windows of 90 days and 12 months, whatever `months`). */
   rework: ClientRework;
@@ -802,7 +805,8 @@ export interface ReworkWindows {
 /** A rework task in the short list of a client. */
 export interface ReworkTask {
   id: string;
-  title: string;
+  /** Null for a member who cannot read the task (the count and the category stay). */
+  title: string | null;
   /** Day the task was opened (office time zone): what places it in the windows. */
   date: ISODate;
   status: TaskStatus;
@@ -854,6 +858,22 @@ export interface ClientBaseMonth {
   clientsWithFee: number;
   /** recurringFees ÷ clientsWithFee, rounded (0 without any). */
   averageFee: number;
+  /** Contracts started in the month, by name, with the fee each one brings to `recurringFees` (0 when none). */
+  newList: EvolutionClientRef[];
+  /** Clients inactivated in the month, by name, with the fee they had at the end of the previous month. */
+  churnedList: EvolutionChurnRef[];
+}
+
+export interface EvolutionClientRef {
+  id: string;
+  /** Trade name, else the legal name. */
+  name: string;
+  /** Monthly fee (cents) in the month's base (new) or in the previous month's base (churned). */
+  fee: number;
+}
+
+export interface EvolutionChurnRef extends EvolutionClientRef {
+  reason: InactivationReason;
 }
 
 export interface EvolutionMonth extends ClientBaseMonth {
@@ -899,6 +919,17 @@ export interface DelinquencyMonth {
   avgDaysLate: number | null;
   dueAmount: number;
   lateAmount: number;
+  /** "Como cada mês foi pago": paid by the due date · paid after it · still open past due (dueCount = sum). */
+  onTimeCount: number;
+  paidLateCount: number;
+  openLateCount: number;
+  onTimeAmount: number;
+  paidLateAmount: number;
+  openLateAmount: number;
+  /** Average days late of the ones paid late (1 decimal); null when none. */
+  paidLateAvgDays: number | null;
+  /** The current month (still running). */
+  partial: boolean;
 }
 
 export interface DelinquencyReportResponse {
@@ -921,6 +952,9 @@ export interface DelinquencyReportResponse {
     probability: number;
     /** Clients with risk 'alto' or 'critico'. */
     clientsAtRisk: number;
+    /** Rework tasks in the last 90 days over the clients of the report, and how many clients have any. */
+    reworkCount: number;
+    reworkClients: number;
   };
   monthly: DelinquencyMonth[];
   /** Clients with receivables in the period or open past due; most open amount first. */

@@ -100,12 +100,13 @@ sistema/
 - **Fatura do cartão** é identificada pelo mês de vencimento; compra no dia do fechamento vai para a
   próxima (`utils/invoice.ts`).
 - **Juros e multa** (`utils/late-fees.ts`): sugestão de 2% + 1% a.m. pro rata.
-- **Score de inadimplência** (`utils/delinquency.ts`): probabilidade
-  `(atrasos ponderados + 1)/(total ponderado + 5)`, peso `0,5^(meses/6)`; score
-  `1000×(1−p) − até 150 (média de dias, 60+ = tudo) − 60 por recebível vencido em aberto`;
-  faixas ≥800 Bom pagador, ≥600 Atenção, ≥400 Risco alto, <400 Crítico. **Score do cliente**
-  (`utils/rework.ts`: `clientScore` = score de pagamento − até 20 pontos de retrabalho, 4 por retrabalho
-  em 90 dias e 1 por mais antigo em 12 meses). **Evolução da base** (`utils/evolution.ts`:
+- **Score de inadimplência v2** (`utils/delinquency.ts`, spec `docs/projeto-melhorias-dashboards.md`
+  §5.2): janela fixa de 12 meses, peso `0,5^(meses/6)`; probabilidade `(atrasos ponderados + 1)/(total
+  ponderado + 5)`; pontualidade `1000×(1 − (Σ peso×gravidade + 1)/(total + 5))` com `lateSeverity`
+  (0/0,25/0,5/0,75/1); −50 por recebível vencido em aberto, até −250; faixas ≥800 Baixo risco, ≥600
+  Atenção, ≥400 Risco alto, <400 Crítico. **Score do cliente**
+  (`utils/rework.ts`: `clientScore` = pontualidade − em aberto − retrabalho, 40 por retrabalho em 90
+  dias e 10 por mais antigo em 12 meses, até 200). **Evolução da base** (`utils/evolution.ts`:
   `clientBaseEvolution`, `evolutionComparison`).
 - **Geração de honorários** (em andamento): `generateFeesSchema`, `feeEmployeesSchema`,
   `FEE_CATEGORY` (Serviços Prestados / Honorários contábeis | Folha de pagamento) e os campos

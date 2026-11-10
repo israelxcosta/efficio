@@ -3,7 +3,7 @@
 // (vitest.config.ts).
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { delinquencyScore } from '@effinance/shared';
+import { addDays, delinquencyScore } from '@effinance/shared';
 import type { App } from '../src/app';
 import { createAccount, createTestApp, registerUser, resetDb, type Client } from './helpers';
 
@@ -146,9 +146,11 @@ describe('delinquency report', () => {
       overdue: [],
     });
 
-    // Score from the history the report passes (recent months weigh more; open items cost points).
+    // Score v2 over the last 12 months whatever the period: July (paid on time, before the 3-month
+    // period) is in the history; recent months weigh more, delays by severity, open items cost 50.
     const scoreA = delinquencyScore(
       [
+        { monthsAgo: 3, daysLate: 0 },
         { monthsAgo: 2, daysLate: 15 },
         { monthsAgo: 1, daysLate: 40 },
         { monthsAgo: 0, daysLate: 10 },
@@ -156,17 +158,31 @@ describe('delinquency report', () => {
       2,
     );
     const scoreB = delinquencyScore([0, 1, 2].map((monthsAgo) => ({ monthsAgo, daysLate: 0 })), 0);
-    expect(clientA).toMatchObject({ score: 347, risk: 'critico', probability: scoreA.probability });
-    expect(scoreA.score).toBe(347);
-    expect(clientB).toMatchObject({ score: 870, risk: 'baixo', probability: scoreB.probability });
-    expect(scoreB.score).toBe(870);
+    expect(scoreA).toMatchObject({ score: 568, punctuality: 668, openPenalty: 100, risk: 'alto' });
+    expect(scoreB).toMatchObject({ score: 870, punctuality: 870, openPenalty: 0, risk: 'baixo' });
+    expect(clientA).toMatchObject({ score: 568, paymentScore: 568, punctuality: 668, openPenalty: 100, reworkPenalty: 0, risk: 'alto', probability: scoreA.probability });
+    expect(clientB).toMatchObject({ score: 870, punctuality: 870, risk: 'baixo', probability: scoreB.probability });
 
-    // By due month: one late of two each month; the 25/10 fee is not due yet.
-    expect(report.monthly).toEqual([
-      { month: '2026-08', dueCount: 2, lateCount: 1, lateRate: 0.5, avgDaysLate: 15, dueAmount: 155000, lateAmount: 35000 },
-      { month: '2026-09', dueCount: 2, lateCount: 1, lateRate: 0.5, avgDaysLate: 40, dueAmount: 155000, lateAmount: 35000 },
-      { month: '2026-10', dueCount: 2, lateCount: 1, lateRate: 0.5, avgDaysLate: 10, dueAmount: 155000, lateAmount: 35000 },
-    ]);
+    // By due month: one late of two each month (August paid late, September and October still open);
+    // the 25/10 fee is not due yet; October is the current month.
+    const month = (m: string, late: 'paid' | 'open', days: number, partial = false) => ({
+      month: m,
+      dueCount: 2,
+      lateCount: 1,
+      lateRate: 0.5,
+      avgDaysLate: days,
+      dueAmount: 155000,
+      lateAmount: 35000,
+      onTimeCount: 1,
+      paidLateCount: late === 'paid' ? 1 : 0,
+      openLateCount: late === 'open' ? 1 : 0,
+      onTimeAmount: 120000,
+      paidLateAmount: late === 'paid' ? 35000 : 0,
+      openLateAmount: late === 'open' ? 35000 : 0,
+      paidLateAvgDays: late === 'paid' ? days : null,
+      partial,
+    });
+    expect(report.monthly).toEqual([month('2026-08', 'paid', 15), month('2026-09', 'open', 40), month('2026-10', 'open', 10, true)]);
     expect(report.summary).toEqual({
       dueCount: 6,
       lateCount: 3,
@@ -180,13 +196,33 @@ describe('delinquency report', () => {
       paidWithFeesCount: 1,
       probability: expect.closeTo((scoreA.probability + scoreB.probability) / 2, 10),
       clientsAtRisk: 1,
+      reworkCount: 0,
+      reworkClients: 0,
     });
 
-    // A longer period brings July in (paid on time); the default is 12 months.
+    // A longer period brings July into the counts; the score stays the 12 months' (default period).
     const four = (await c.get('/reports/delinquency?months=4')).body;
     expect(four.from).toBe('2026-07-01');
-    expect(four.clients[0]).toMatchObject({ contactId: a, dueCount: 4, onTimeCount: 1, lateCount: 3, score: 387 });
+    expect(four.clients[0]).toMatchObject({ contactId: a, dueCount: 4, onTimeCount: 1, lateCount: 3, score: 568, punctuality: 668 });
     expect((await c.get('/reports/delinquency')).body.from).toBe('2025-11-01');
+  });
+
+  it('scores over 12 months whatever the period', async () => {
+    const a = await createClient(c, BAKERY);
+    // 40 days late 8 to 10 months ago, on time in the last 6.
+    for (const m of ['2025-12', '2026-01', '2026-02']) await receivable(c, a, `${m}-10`, 35000, { paidAt: addDays(`${m}-10`, 40) });
+    for (const m of ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10']) await receivable(c, a, `${m}-10`, 35000, { paidAt: `${m}-10` });
+    const six = (await c.get('/reports/delinquency?months=6')).body.clients[0];
+    const year = (await c.get('/reports/delinquency?months=12')).body.clients[0];
+    expect(six.dueCount).toBe(6);
+    expect(year.dueCount).toBe(9);
+    expect(six.score).toBe(year.score);
+    expect(six.punctuality).toBe(year.punctuality);
+    expect(six.lowHistory).toBe(false);
+    // A client whose only receivables are older than the period is not listed (nothing due or open in it).
+    const old = await createClient(c, SOFTWARE);
+    await receivable(c, old, '2026-01-15', 50000, { paidAt: '2026-01-15' });
+    expect((await c.get('/reports/delinquency?months=6')).body.clients.map((x: any) => x.contactId)).toEqual([a]);
   });
 
   it('keeps open items from before the period and drops what was settled', async () => {

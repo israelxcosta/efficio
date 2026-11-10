@@ -33,9 +33,9 @@ describe('demo seed: rework and the client-base evolution', () => {
 
     const report = (await marina.get('/reports/delinquency?months=12')).body;
     const byName = (name: string) => report.clients.find((c: any) => c.tradeName === name);
-    expect(byName('Rota Sul')).toMatchObject({ reworkPenalty: 9, rework: { last90Days: 2, last12Months: 3 } });
-    expect(byName('Pão Quente')).toMatchObject({ reworkPenalty: 5, rework: { last90Days: 1, last12Months: 2 } });
-    expect(byName('Ju Prado Design')).toMatchObject({ reworkPenalty: 4, rework: { last90Days: 1, last12Months: 1 } });
+    expect(byName('Rota Sul')).toMatchObject({ reworkPenalty: 90, rework: { last90Days: 2, last12Months: 3 } });
+    expect(byName('Pão Quente')).toMatchObject({ reworkPenalty: 50, rework: { last90Days: 1, last12Months: 2 } });
+    expect(byName('Ju Prado Design')).toMatchObject({ reworkPenalty: 40, rework: { last90Days: 1, last12Months: 1 } });
     expect(byName('Tecnova')).toMatchObject({ reworkPenalty: 0, rework: { last90Days: 0, last12Months: 0 } });
     const rotaSul = (await marina.get(`/reports/clients/${byName('Rota Sul').contactId}/rework`)).body;
     expect(rotaSul.rework.latest.map((t: any) => t.title)).toEqual([
@@ -59,5 +59,9 @@ describe('demo seed: rework and the client-base evolution', () => {
     expect(months.slice(2).every((m: any) => m.billed > 0)).toBe(true);
     expect(months.slice(2, -1).every((m: any) => m.received > 0)).toBe(true);
     expect(evolution.comparison.metrics.newClients).toMatchObject({ current: 0, previous: 1, diff: -1 });
+    // Who came in and who left, with the reasons of the seed.
+    expect(months[10].newList.map((c: any) => c.name)).toEqual(['Vida Saudável']);
+    expect(months[5].churnedList).toEqual([expect.objectContaining({ name: 'Arte & Forma', reason: 'company_closure' })]);
+    expect(months[9].churnedList).toEqual([expect.objectContaining({ name: 'Bom Preço', reason: 'accounting_transfer' })]);
   });
 });

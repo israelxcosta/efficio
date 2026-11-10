@@ -62,8 +62,9 @@ export async function reworkByClient(
   db: DbExecutor,
   workspaceId: string,
   today: ISODate,
-  clientId?: string,
+  options: { clientId?: string; canReadTasks?: boolean } = {},
 ): Promise<Map<string, ClientRework>> {
+  const { clientId, canReadTasks = true } = options;
   const windows = reworkWindows(today);
   const where = reworkWhere(workspaceId, windows, clientId);
   const [counts, latest] = await Promise.all([
@@ -98,7 +99,8 @@ export async function reworkByClient(
   for (const row of latest) {
     const task: ReworkTask = {
       id: row.id,
-      title: row.title,
+      // Without access to the tasks the list keeps the count, date, status and category, not the title.
+      title: canReadTasks ? row.title : null,
       date: row.date,
       status: row.status,
       dueDate: row.dueDate,
@@ -111,10 +113,18 @@ export async function reworkByClient(
 
 export const noRework = (): ClientRework => ({ ...NO_REWORK, latest: [] });
 
-/** GET /reports/clients/:id/rework: the rework of one client of the workspace (404 otherwise). */
-export async function clientRework(db: DbExecutor, workspaceId: string, clientId: string): Promise<ClientReworkResponse> {
+/**
+ * GET /reports/clients/:id/rework: the rework of one client of the workspace (404 otherwise). Titles
+ * only for who can read the tasks (`canReadTasks`; null otherwise).
+ */
+export async function clientRework(
+  db: DbExecutor,
+  workspaceId: string,
+  clientId: string,
+  canReadTasks: boolean,
+): Promise<ClientReworkResponse> {
   await getClientOrThrow(db, workspaceId, clientId);
   const today = todayIn(TASK_TIME_ZONE);
-  const rework = (await reworkByClient(db, workspaceId, today, clientId)).get(clientId) ?? noRework();
+  const rework = (await reworkByClient(db, workspaceId, today, { clientId, canReadTasks })).get(clientId) ?? noRework();
   return { contactId: clientId, today, windows: reworkWindows(today), penalty: reworkPenalty(rework), rework };
 }

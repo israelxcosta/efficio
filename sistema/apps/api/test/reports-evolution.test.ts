@@ -52,7 +52,7 @@ async function seedOffice(owner: Client) {
   const leaving = await createClient(owner, { tradeName: 'Saiu', contractStartDate: '2026-09-01' });
   await fee(owner, leaving, 30_000);
   expect((await owner.post(`/clients/${leaving}/inactivate`, { date: '2026-10-05', reason: 'contract_end' })).status).toBe(200);
-  await createClient(owner, { tradeName: 'Sem vigência', contractStartDate: '2026-09-15' });
+  const noFee = await createClient(owner, { tradeName: 'Sem vigência', contractStartDate: '2026-09-15' });
   const future = await createClient(owner, { tradeName: 'Futuro', contractStartDate: '2026-10-28' });
   await fee(owner, future, 70_000);
 
@@ -67,12 +67,13 @@ async function seedOffice(owner: Client) {
   await income(owner, { contactId: null, date: '2026-10-12', amount: 40_000, accountId: account }, { paidAt: '2026-10-12' });
   const supplier = (await owner.post('/contacts', { name: 'Papelaria Central' })).body.id;
   expect((await owner.post('/transactions', { type: 'expense', description: 'Papel', amount: 9_999, date: '2026-10-12', accountId: account, contactId: supplier })).status).toBe(201);
+  return { old, august, leaving, noFee, future };
 }
 
 describe('client-base evolution', () => {
   it('counts new, churned and active clients, the fees in force, billed and received, month by month', async () => {
     const owner = await registerUser(app, 'Dona do Escritório');
-    await seedOffice(owner);
+    const { august, leaving, noFee } = await seedOffice(owner);
 
     const res = await owner.get('/reports/evolution?months=3');
     expect(res.status).toBe(200);
@@ -89,6 +90,8 @@ describe('client-base evolution', () => {
         recurringFees: 160_000,
         clientsWithFee: 2,
         averageFee: 80_000,
+        newList: [{ id: august, name: 'Agosto', fee: 50_000 }],
+        churnedList: [],
         billed: 5_000,
         received: 5_000,
       },
@@ -103,6 +106,11 @@ describe('client-base evolution', () => {
         recurringFees: 190_000,
         clientsWithFee: 3,
         averageFee: 63_333,
+        newList: [
+          { id: leaving, name: 'Saiu', fee: 30_000 },
+          { id: noFee, name: 'Sem vigência', fee: 0 },
+        ],
+        churnedList: [],
         billed: 160_000,
         received: 110_000,
       },
@@ -117,6 +125,9 @@ describe('client-base evolution', () => {
         recurringFees: 160_000,
         clientsWithFee: 2,
         averageFee: 80_000,
+        // "Futuro" starts after today; "Saiu" leaves with the fee it had at the end of September.
+        newList: [],
+        churnedList: [{ id: leaving, name: 'Saiu', fee: 30_000, reason: 'contract_end' }],
         billed: 140_000,
         received: 51_500 + 107_800,
       },

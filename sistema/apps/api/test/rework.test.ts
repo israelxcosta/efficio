@@ -1,6 +1,6 @@
 // Rework (retrabalho): task categories flagged `isRework` (migration 0020, edited with `registry`), the
 // rework of a client (GET /reports/clients/:id/rework) and its weight in the delinquency report's score
-// (shared `clientScore`: 4 points per rework in 90 days, 1 per older one in 12 months, up to 20).
+// (shared `clientScore`: 40 points per rework in 90 days, 10 per older one in 12 months, up to 200).
 // Today is pinned to 2026-10-20 (vitest.config.ts): the windows start on 2026-07-23 and 2025-10-21.
 
 import { readFile } from 'node:fs/promises';
@@ -11,6 +11,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { riskOf } from '@effinance/shared';
 import type { App } from '../src/app';
 import { executeRows } from '../src/lib/sql';
+import { withTenant } from '../src/lib/tenant';
+import { clientRework } from '../src/modules/reports/rework';
 import { admin, createAccount, createTestApp, registerUser, resetDb, type Client } from './helpers';
 import { createClient, member } from './task-helpers';
 
@@ -131,7 +133,7 @@ describe('rework of a client', () => {
       contactId: x,
       today: '2026-10-20',
       windows: { recentFrom: '2026-07-23', yearFrom: '2025-10-21' },
-      penalty: 10,
+      penalty: 100,
       rework: {
         last90Days: 2,
         last12Months: 4,
@@ -143,9 +145,9 @@ describe('rework of a client', () => {
         ],
       },
     });
-    // Six in 90 days: the penalty stops at 20 and the list at 5, newest first.
+    // Six in 90 days: the penalty stops at 200 and the list at 5, newest first.
     const other = (await owner.get(`/reports/clients/${y}/rework`)).body;
-    expect(other).toMatchObject({ penalty: 20, rework: { last90Days: 6, last12Months: 6 } });
+    expect(other).toMatchObject({ penalty: 200, rework: { last90Days: 6, last12Months: 6 } });
     expect(other.rework.latest.map((t: any) => t.title)).toEqual(['Correção 6', 'Correção 5', 'Correção 4', 'Correção 3', 'Correção 2']);
 
     // Unflagging the category takes the rework away.
@@ -184,14 +186,30 @@ describe('rework of a client', () => {
     // Same payment history: same payment score; the rework makes the difference.
     expect(row(x).paymentScore).toBe(row(clean).paymentScore);
     expect(row(x)).toMatchObject({
-      reworkPenalty: 10,
-      score: row(x).paymentScore - 10,
-      risk: riskOf(row(x).paymentScore - 10),
+      reworkPenalty: 100,
+      score: row(x).paymentScore - 100,
+      risk: riskOf(row(x).paymentScore - 100),
       rework: { last90Days: 2, last12Months: 4 },
     });
     expect(row(x).rework.latest).toHaveLength(4);
-    expect(row(y)).toMatchObject({ reworkPenalty: 20, score: row(y).paymentScore - 20, rework: { last90Days: 6 } });
+    expect(row(y)).toMatchObject({ reworkPenalty: 200, score: row(y).paymentScore - 200, rework: { last90Days: 6 } });
     expect(row(y).rework.latest).toHaveLength(5);
     expect(row(clean)).toMatchObject({ reworkPenalty: 0, score: row(clean).paymentScore, rework: { last90Days: 0, last12Months: 0, latest: [] } });
+    // One paid receivable, on time: punctuality 1000 × (1 − 1/6) = 833; X loses 100 (a band below).
+    expect(row(clean)).toMatchObject({ score: 833, risk: 'baixo' });
+    expect(row(x)).toMatchObject({ score: 733, risk: 'moderado' });
+    // The summary counts the 90 days over the clients of the report.
+    expect(report.summary).toMatchObject({ reworkCount: 8, reworkClients: 2 });
+  });
+
+  it('hides the titles from a member who cannot read tasks (the count and the category stay)', async () => {
+    const { owner, x } = await scenario();
+    const ws = (await owner.get('/auth/me')).body.workspace.id as string;
+    const hidden = await withTenant(app.db, ws, (db) => clientRework(db, ws, x, false));
+    expect(hidden.rework).toMatchObject({ last90Days: 2, last12Months: 4 });
+    expect(hidden.rework.latest.map((t) => t.title)).toEqual([null, null, null, null]);
+    expect(hidden.rework.latest[0]!.category.name).toBe('Retrabalho');
+    const shown = await withTenant(app.db, ws, (db) => clientRework(db, ws, x, true));
+    expect(shown.rework.latest[0]!.title).toBe('Refazer DCTFWeb de setembro');
   });
 });

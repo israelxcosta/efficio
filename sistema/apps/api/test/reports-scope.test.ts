@@ -99,11 +99,11 @@ describe('reports: every query filters by the workspace', () => {
     const report = await run((db) => evolution.evolutionReport(db, ws, evolutionReportQuerySchema.parse({ months: 3 })));
     expect(report.months.map((m) => m.newClients)).toEqual([0, 0, 0]);
     expect(report.months[1]).toMatchObject({ activeClients: 1, recurringFees: 80_000, billed: 100_000, received: 80_300 });
-    expect((await run((db) => rework.clientRework(db, ws, client))).rework).toMatchObject({ last90Days: 1, last12Months: 1 });
+    expect((await run((db) => rework.clientRework(db, ws, client, true))).rework).toMatchObject({ last90Days: 1, last12Months: 1 });
     expect((await run((db) => rework.reworkByClient(db, ws, '2026-10-20'))).get(client)).toMatchObject({ last90Days: 1 });
     expect(rework.noRework()).toEqual({ last90Days: 0, last12Months: 0, latest: [] });
     const row = (await run((db) => delinquency.delinquencyReport(db, ws, delinquencyReportQuerySchema.parse({})))).clients[0];
-    expect(row).toMatchObject({ contactId: client, reworkPenalty: 4 });
+    expect(row).toMatchObject({ contactId: client, reworkPenalty: 40 });
 
     // 2. Every service entry point ran.
     expect([...called].sort()).toEqual(exportedFunctions(evolutionModule, reworkModule, delinquencyModule));

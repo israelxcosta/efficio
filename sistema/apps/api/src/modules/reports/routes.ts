@@ -15,6 +15,9 @@ import { delinquencyReport } from './delinquency';
 import { evolutionReport } from './evolution';
 import { clientRework } from './rework';
 
+/** No permission key gates reading tasks (every member reads them): see the rework route. */
+const TASKS_READABLE_BY_EVERY_MEMBER = true;
+
 export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   // Financial module: owner/editor only, reads included (lib/finance-access.ts).
   financeOnly(app);
@@ -41,7 +44,9 @@ export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
     evolutionReport(req.db, req.workspaceId, req.query),
   );
   // Rework of one client, read next to its history (`GET /transactions?contactId=…`) by the client report.
+  // Titles go to who can read tasks: today every member reads every task (modules/tasks/access.ts has no
+  // key for reading), so always; a permission that gates reading tasks is what this flag will carry.
   app.get('/clients/:id/rework', { schema: { params: idParams } }, async (req) =>
-    clientRework(req.db, req.workspaceId, req.params.id),
+    clientRework(req.db, req.workspaceId, req.params.id, TASKS_READABLE_BY_EVERY_MEMBER),
   );
 };

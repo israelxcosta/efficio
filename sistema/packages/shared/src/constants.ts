@@ -55,7 +55,7 @@ export const DELINQUENCY_RISKS = ['baixo', 'moderado', 'alto', 'critico'] as con
 export type DelinquencyRisk = (typeof DELINQUENCY_RISKS)[number];
 
 export const DELINQUENCY_RISK_LABELS: Record<DelinquencyRisk, string> = {
-  baixo: 'Bom pagador',
+  baixo: 'Baixo risco',
   moderado: 'Atenção',
   alto: 'Risco alto',
   critico: 'Crítico',
@@ -77,9 +77,9 @@ export type EvolutionMetric = (typeof EVOLUTION_METRICS)[number];
 export const EVOLUTION_METRIC_LABELS: Record<EvolutionMetric, string> = {
   newClients: 'Clientes novos',
   churnedClients: 'Encerrados',
-  activeClients: 'Base ativa',
+  activeClients: 'Clientes ativos',
   netChange: 'Variação líquida',
-  recurringFees: 'Honorários recorrentes',
+  recurringFees: 'Honorário mensal recorrente',
   averageFee: 'Ticket médio',
   billed: 'Faturado',
   received: 'Recebido',
