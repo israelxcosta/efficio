@@ -1161,6 +1161,8 @@ export const taskCategories = pgTable(
     name: text().notNull(),
     icon: text().$type<IconName>().notNull().default('tag'),
     color: text().notNull().default('#152B61'),
+    /** Migration 0020: its tasks are rework (retrabalho) and weigh on the client's score (reports). */
+    isRework: boolean().notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

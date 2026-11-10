@@ -775,6 +775,12 @@ export const delinquencyReportQuerySchema = z.object({
 });
 export type DelinquencyReportQuery = z.input<typeof delinquencyReportQuerySchema>;
 
+/** Month-by-month evolution of the client base: the last `months` months, the current one included. */
+export const evolutionReportQuerySchema = z.object({
+  months: z.coerce.number().int().min(1).max(36).default(12),
+});
+export type EvolutionReportQuery = z.input<typeof evolutionReportQuerySchema>;
+
 export const comparisonReportQuerySchema = z.object({
   aFrom: isoDateSchema,
   aTo: isoDateSchema,
@@ -1072,6 +1078,11 @@ export const taskCategoryInputSchema = z.object({
   name: requiredName(60),
   icon: iconSchema.default('tag'),
   color: colorSchema.default(DEFAULT_COLOR),
+  /**
+   * Tasks of the category are rework (retrabalho): they count against the client's score. Optional:
+   * absent on creation = false; absent on an edit keeps the stored value (forms of earlier versions).
+   */
+  isRework: z.boolean().optional(),
 });
 export type TaskCategoryInput = z.input<typeof taskCategoryInputSchema>;
 

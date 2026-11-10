@@ -141,6 +141,13 @@
       "when": 1793898021709,
       "tag": "0019_task_recurrence",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794334931179,
+      "tag": "0020_task_category_rework",
+      "breakpoints": true
     }
   ]
 }

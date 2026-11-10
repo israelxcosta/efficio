@@ -103,7 +103,10 @@ sistema/
 - **Score de inadimplência** (`utils/delinquency.ts`): probabilidade
   `(atrasos ponderados + 1)/(total ponderado + 5)`, peso `0,5^(meses/6)`; score
   `1000×(1−p) − até 150 (média de dias, 60+ = tudo) − 60 por recebível vencido em aberto`;
-  faixas ≥800 Bom pagador, ≥600 Atenção, ≥400 Risco alto, <400 Crítico.
+  faixas ≥800 Bom pagador, ≥600 Atenção, ≥400 Risco alto, <400 Crítico. **Score do cliente**
+  (`utils/rework.ts`: `clientScore` = score de pagamento − até 20 pontos de retrabalho, 4 por retrabalho
+  em 90 dias e 1 por mais antigo em 12 meses). **Evolução da base** (`utils/evolution.ts`:
+  `clientBaseEvolution`, `evolutionComparison`).
 - **Geração de honorários** (em andamento): `generateFeesSchema`, `feeEmployeesSchema`,
   `FEE_CATEGORY` (Serviços Prestados / Honorários contábeis | Folha de pagamento) e os campos
   `feeCompetence`, `feeKind`, `feeOf`, `employees` em `Transaction`.
@@ -193,7 +196,7 @@ sequenceDiagram
 | `transfers` | `/transfers` | transferência/aplicação/resgate (`deriveTransferKind`) |
 | `statement` | `/statement` | extrato por data efetiva com saldo corrente |
 | `dashboard` | `/dashboard` | payload único: resumo, 6 meses, categorias, vencimentos (50 + totais), faturas a pagar, saúde, insights |
-| `reports` | `/reports/*` | overview, categories, contacts, comparison, cashflow, delinquency |
+| `reports` | `/reports/*` | overview, categories, contacts, comparison, cashflow, delinquency (score do cliente = pagamentos − retrabalho), evolution (base de clientes mês a mês, `evolution.ts`), retrabalho do cliente (`/clients/:id/rework`, `rework.ts`) |
 | `fee-charges` | `/fee-charges/*` | gerar honorários da competência (vigência do fim do mês, `ON CONFLICT`) e "+ Empregados" |
 | `search` | `/search` | lançamentos, contas, categorias, contatos (financeiro só com `finance`); tarefas, recorrentes e sindicatos para todos; ordena pela distância de hoje |
 | `imports` | `/imports` | OFX/CSV: prévia, duplicados, sugestão de categoria, lote com desfazer |
@@ -230,7 +233,8 @@ sequenceDiagram
   calendário e de "quem viu", CHECK do modelo de contrato) · 0017 remoção do responsável por cliente
   (`task_client_responsibles`) · 0018 marcador de geração (`task_generation_state`/`_marks` + gatilhos),
   `recurring_tasks.catalog_key` e índice de conclusões (`tasks_completed_idx`) · 0019 recorrência em qualquer
-  tarefa (`recurring_tasks.origin`/`internal`/regra por data, `tasks.occurrence_origin`, índice das internas). Escritas
+  tarefa (`recurring_tasks.origin`/`internal`/regra por data, `tasks.occurrence_origin`, índice das internas) · 0020
+  categoria de retrabalho (`task_categories.is_rework`). Escritas
   para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tarefas usam `todayIn('America/Sao_Paulo')` (o dia do escritório, não o do servidor

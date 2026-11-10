@@ -26,6 +26,9 @@ function client(patch: Partial<DelinquencyClient>): DelinquencyClient {
     score: 900,
     risk: 'baixo',
     lowHistory: false,
+    paymentScore: patch.score ?? 900,
+    reworkPenalty: 0,
+    rework: { last90Days: 0, last12Months: 0, latest: [] },
     overdue: [],
     ...patch,
   };

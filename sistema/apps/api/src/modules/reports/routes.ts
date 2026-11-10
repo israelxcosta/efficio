@@ -5,11 +5,15 @@ import {
   comparisonReportQuerySchema,
   contactReportQuerySchema,
   delinquencyReportQuerySchema,
+  evolutionReportQuerySchema,
   overviewReportQuerySchema,
 } from '@effinance/shared';
 import { financeOnly } from '../../lib/finance-access';
+import { idParams } from '../common/params';
 import { cashflowReport, categoryReport, comparisonReport, contactReport, overviewReport } from './service';
 import { delinquencyReport } from './delinquency';
+import { evolutionReport } from './evolution';
+import { clientRework } from './rework';
 
 export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   // Financial module: owner/editor only, reads included (lib/finance-access.ts).
@@ -32,5 +36,12 @@ export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   );
   app.get('/delinquency', { schema: { querystring: delinquencyReportQuerySchema } }, async (req) =>
     delinquencyReport(req.db, req.workspaceId, req.query),
+  );
+  app.get('/evolution', { schema: { querystring: evolutionReportQuerySchema } }, async (req) =>
+    evolutionReport(req.db, req.workspaceId, req.query),
+  );
+  // Rework of one client, read next to its history (`GET /transactions?contactId=…`) by the client report.
+  app.get('/clients/:id/rework', { schema: { params: idParams } }, async (req) =>
+    clientRework(req.db, req.workspaceId, req.params.id),
   );
 };

@@ -61,6 +61,30 @@ export const DELINQUENCY_RISK_LABELS: Record<DelinquencyRisk, string> = {
   critico: 'Crítico',
 };
 
+/** Metrics of the client-base evolution report compared month over month (GET /reports/evolution). */
+export const EVOLUTION_METRICS = [
+  'newClients',
+  'churnedClients',
+  'activeClients',
+  'netChange',
+  'recurringFees',
+  'averageFee',
+  'billed',
+  'received',
+] as const;
+export type EvolutionMetric = (typeof EVOLUTION_METRICS)[number];
+
+export const EVOLUTION_METRIC_LABELS: Record<EvolutionMetric, string> = {
+  newClients: 'Clientes novos',
+  churnedClients: 'Encerrados',
+  activeClients: 'Base ativa',
+  netChange: 'Variação líquida',
+  recurringFees: 'Honorários recorrentes',
+  averageFee: 'Ticket médio',
+  billed: 'Faturado',
+  received: 'Recebido',
+};
+
 export const ACCOUNT_TYPES = [
   'checking',
   'savings',

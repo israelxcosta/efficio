@@ -16,6 +16,7 @@ import type {
   UnionSituation,
   ContactKind,
   DelinquencyRisk,
+  EvolutionMetric,
   FeeEntryKind,
   GenerateFeesSkipReason,
   Frequency,
@@ -770,13 +771,123 @@ export interface DelinquencyClient {
   fineTotal: number;
   /** Chance (0..1) of paying the next receivable late, from the history (recent months weigh more). */
   probability: number;
-  /** 0..1000, higher is a better payer. */
+  /** Client score, 0..1000 (higher is better): `max(0, paymentScore − reworkPenalty)` (shared `clientScore`). */
   score: number;
+  /** Band of the final `score`. */
   risk: DelinquencyRisk;
   /** Fewer than 3 receivables in the period: the score leans on the default. */
   lowHistory: boolean;
+  /** Score from the payments alone (`delinquencyScore`), before the rework penalty. */
+  paymentScore: number;
+  /** Points taken for rework (utils/rework.ts: 4 per rework in 90 days, 1 per older one in 12 months, up to 20). */
+  reworkPenalty: number;
+  /** Tasks of the client in rework categories (fixed windows of 90 days and 12 months, whatever `months`). */
+  rework: ClientRework;
   /** Open past-due receivables, oldest first (for the collection message). */
   overdue: DelinquencyOverdueItem[];
+}
+
+/** Rework tasks of a client (tasks in categories marked `isRework`). `last12Months` includes `last90Days`. */
+export interface ReworkCounts {
+  last90Days: number;
+  last12Months: number;
+}
+
+/** First day of each rework window (office time zone, today included): see `reworkWindows`. */
+export interface ReworkWindows {
+  recentFrom: ISODate;
+  yearFrom: ISODate;
+}
+
+/** A rework task in the short list of a client. */
+export interface ReworkTask {
+  id: string;
+  title: string;
+  /** Day the task was opened (office time zone): what places it in the windows. */
+  date: ISODate;
+  status: TaskStatus;
+  dueDate: ISODate | null;
+  category: TaskCategoryRef;
+}
+
+/**
+ * Rework of a client: tasks with the client in rework categories, opened in the windows (canceled
+ * tasks and occurrences of recurring tasks do not count), and the latest ones of the 12 months.
+ */
+export interface ClientRework extends ReworkCounts {
+  /** Up to 5, most recent first. */
+  latest: ReworkTask[];
+}
+
+/** GET /reports/clients/:id/rework: the rework of one client, next to its history (`/transactions`). */
+export interface ClientReworkResponse {
+  contactId: string;
+  /** Today in the office time zone. */
+  today: ISODate;
+  windows: ReworkWindows;
+  /** Points the rework takes from the client's score (`reworkPenalty`). */
+  penalty: number;
+  rework: ClientRework;
+}
+
+/**
+ * One month of the client-base evolution (GET /reports/evolution). Counts read the contract start and
+ * the inactivation date; the base and the fees are those of `asOf` (the month's last day, or today).
+ */
+export interface ClientBaseMonth {
+  month: MonthKey;
+  /** Last day counted: the month's last day, or today in the current month. */
+  asOf: ISODate;
+  /** The current month, counted up to today. */
+  partial: boolean;
+  /** Contracts started in the month (up to `asOf`). */
+  newClients: number;
+  /** Clients inactivated in the month (by the inactivation date, up to `asOf`). */
+  churnedClients: number;
+  /** Clients active on `asOf`: started, and not inactivated on or before that day. */
+  activeClients: number;
+  /** newClients − churnedClients (= activeClients − the previous month's). */
+  netChange: number;
+  /** Monthly fees (honorário mensal, cents) of the periods in force on `asOf`, over the active clients. */
+  recurringFees: number;
+  /** Active clients with a fee period registered for `asOf`. */
+  clientsWithFee: number;
+  /** recurringFees ÷ clientsWithFee, rounded (0 without any). */
+  averageFee: number;
+}
+
+export interface EvolutionMonth extends ClientBaseMonth {
+  /** Receivables of clients due in the month (paid or not; interest/fine rows aside), cents. */
+  billed: number;
+  /** What came in from clients in the month by payment date: receivables + interest + fines − discounts. */
+  received: number;
+}
+
+export interface EvolutionChange {
+  current: number;
+  previous: number;
+  /** current − previous. */
+  diff: number;
+  /** diff ÷ |previous| (0.25 = +25%); null when previous is 0. */
+  diffPercent: number | null;
+}
+
+export interface EvolutionComparison {
+  current: MonthKey;
+  previous: MonthKey;
+  metrics: Record<EvolutionMetric, EvolutionChange>;
+}
+
+export interface EvolutionReportResponse {
+  /** Today in the office time zone (America/Sao_Paulo). */
+  today: ISODate;
+  /** First day of the first month and today. */
+  from: ISODate;
+  to: ISODate;
+  /** Oldest first; the last one is the current month (partial). */
+  months: EvolutionMonth[];
+  /** The current month against the previous one (the previous is computed even with months = 1). */
+  comparison: EvolutionComparison;
 }
 
 export interface DelinquencyMonth {
@@ -975,6 +1086,8 @@ export interface TaskCategory {
   name: string;
   icon: IconName;
   color: string;
+  /** Its tasks are rework (retrabalho) and count against the client's score (migration 0020). */
+  isRework: boolean;
   taskCount: number;
   createdAt: string;
 }

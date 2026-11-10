@@ -308,6 +308,7 @@ export async function listCategories(ctx: TaskContext): Promise<TaskCategory[]> 
     name: category.name,
     icon: category.icon,
     color: category.color,
+    isRework: category.isRework,
     taskCount,
     createdAt: category.createdAt.toISOString(),
   }));
@@ -325,7 +326,7 @@ export async function createCategory(
 ): Promise<TaskCategory> {
   const [row] = await ctx.db
     .insert(taskCategories)
-    .values({ workspaceId: ctx.workspaceId, ...input })
+    .values({ workspaceId: ctx.workspaceId, ...input, isRework: input.isRework ?? false })
     .returning({ id: taskCategories.id });
   return getCategory(ctx, row!.id);
 }
@@ -336,6 +337,7 @@ export async function updateCategory(
   input: CategoryInput,
 ): Promise<TaskCategory> {
   await getTaskCategoryOrThrow(ctx.db, ctx.workspaceId, id);
+  // `isRework` absent (forms of earlier versions) keeps the stored flag: Drizzle skips undefined keys.
   await ctx.db
     .update(taskCategories)
     .set(input)

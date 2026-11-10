@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   addMonths,
   daysLate,
+  clientScore,
   delinquencyScore,
+  DELINQUENCY_RISK_LABELS,
+  lateSeverity,
   riskOf,
+  SCORE_WINDOW_MONTHS,
   suggestLateFees,
   discountAmount,
   earnsDiscount,
@@ -139,16 +143,20 @@ describe('discount for paying on time', () => {
 describe('delinquency score', () => {
   const months = (n: number, daysLate: (i: number) => number) => Array.from({ length: n }, (_, i) => ({ monthsAgo: i, daysLate: daysLate(i) }));
 
-  it('starts a client without history at 20% (good payer, low history)', () => {
-    expect(delinquencyScore([], 0)).toEqual({ probability: 0.2, score: 800, risk: 'baixo', lowHistory: true });
+  it('grades a delay by how long it was', () => {
+    expect([0, 1, 5, 6, 15, 16, 30, 31, 184].map(lateSeverity)).toEqual([0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1, 1]);
+  });
+
+  it('starts a client without history at 800, low risk', () => {
+    expect(delinquencyScore([], 0)).toEqual({ probability: 0.2, score: 800, risk: 'baixo', lowHistory: true, punctuality: 800, openPenalty: 0 });
+    expect(DELINQUENCY_RISK_LABELS.baixo).toBe('Baixo risco');
+    expect(SCORE_WINDOW_MONTHS).toBe(12);
   });
 
   it('rewards a year paid on time', () => {
     const s = delinquencyScore(months(12, () => 0), 0);
     expect(s.probability).toBeLessThan(0.1);
-    expect(s.score).toBeGreaterThan(900);
-    expect(s.risk).toBe('baixo');
-    expect(s.lowHistory).toBe(false);
+    expect(s).toMatchObject({ score: 916, punctuality: 916, risk: 'baixo', lowHistory: false });
   });
 
   it('weighs recent delays more than old ones', () => {
@@ -158,21 +166,30 @@ describe('delinquency score', () => {
     expect(recent.score).toBeLessThan(old.score);
   });
 
-  it('penalizes long delays and what is still open', () => {
-    const short = delinquencyScore(months(12, (i) => (i % 3 === 0 ? 5 : 0)), 0);
-    const long = delinquencyScore(months(12, (i) => (i % 3 === 0 ? 60 : 0)), 0);
-    expect(short.probability).toBeCloseTo(long.probability);
-    expect(long.score).toBe(short.score - 138); // 150 × (60 − 5) / 60
-    expect(delinquencyScore(months(12, () => 0), 2).score).toBe(delinquencyScore(months(12, () => 0), 0).score - 120);
+  it('separates short delays from long ones', () => {
+    expect(delinquencyScore(months(12, () => 5), 0)).toMatchObject({ score: 771, risk: 'moderado' });
+    expect(delinquencyScore(months(12, () => 45), 0)).toMatchObject({ score: 337, risk: 'critico' });
+    expect(delinquencyScore(months(8, (i) => (i === 3 ? 18 : 0)), 0)).toMatchObject({ score: 855, risk: 'baixo' });
   });
 
-  it('flags a client with months open as critical', () => {
+  it('keeps the chance of paying late about any delay', () => {
+    expect(delinquencyScore(months(12, () => 5), 0).probability).toBeCloseTo(delinquencyScore(months(12, () => 45), 0).probability);
+  });
+
+  it('takes 50 per open item, up to 250', () => {
+    expect(delinquencyScore(months(12, () => 5), 2)).toMatchObject({ score: 671, openPenalty: 100 });
+    expect(delinquencyScore(months(12, () => 0), 8)).toMatchObject({ score: 666, openPenalty: 250 });
+  });
+
+  it('never goes below zero', () => {
     const s = delinquencyScore(months(10, (i) => (i < 8 ? 30 * (8 - i) : 0)), 8);
     expect(s.risk).toBe('critico');
-    expect(s.score).toBe(0);
+    expect(s.score).toBeGreaterThanOrEqual(0);
+    expect(clientScore(months(10, (i) => (i < 8 ? 30 * (8 - i) : 0)), 8, { last90Days: 9, last12Months: 9 }).score).toBe(0);
   });
 
   it('maps scores to risk bands', () => {
     expect([1000, 800, 799, 600, 599, 400, 399, 0].map(riskOf)).toEqual(['baixo', 'baixo', 'moderado', 'moderado', 'alto', 'alto', 'critico', 'critico']);
   });
+});
 });

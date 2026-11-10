@@ -60,7 +60,11 @@ function makeCnpj(base: string): string {
 
 interface DemoClient {
   input: Omit<ClientInput, 'contractStartDate'> & { feeDueDay: number };
-  /** Contract start, in months before today (day 1 of that month). */
+  /**
+   * Contract start, in months before today (day 1 of that month). Spread so the client-base evolution
+   * (GET /reports/evolution) has something to show over 12 months: contracts started 11, 10, 9 and 1
+   * months ago, inactivations 6 and 2 months ago, and Alicerce's renewal pending since 2 months ago.
+   */
   startedMonthsAgo: number;
   /** Monthly fee of the current period (cents); earlier periods were ~7% cheaper each. */
   fee: number;
@@ -139,7 +143,7 @@ const DEMO_CLIENTS: DemoClient[] = [
       city: 'Valinhos',
       state: 'SP',
     },
-    startedMonthsAgo: 26,
+    startedMonthsAgo: 10,
     fee: 125000,
     employeeFee: 4000,
     discountBps: 300,
@@ -178,7 +182,7 @@ const DEMO_CLIENTS: DemoClient[] = [
       city: 'Campinas',
       state: 'SP',
     },
-    startedMonthsAgo: 14,
+    startedMonthsAgo: 11,
     fee: 18000,
     employeeFee: 0,
   },
@@ -219,7 +223,7 @@ const DEMO_CLIENTS: DemoClient[] = [
       city: 'Sumaré',
       state: 'SP',
     },
-    startedMonthsAgo: 2,
+    startedMonthsAgo: 1,
     fee: 95000,
     employeeFee: 3500,
   },

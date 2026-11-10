@@ -1,6 +1,7 @@
 // Task module demo data, part of the demo seed: the office team (four colleagues of Marina who cannot
 // sign in — only Marina can), the departments Fiscal, Contábil, Pessoal/DP and Societário, task
-// categories, the responsible of each client per department, ~25 tasks of an accounting office (some
+// categories (one of them, "Retrabalho", flagged as rework with six corrections for Rota Sul, Pão Quente
+// and Ju Prado opened on past days), ~25 tasks of an accounting office (some
 // overdue, some concluded on time or late, appointments, subtasks and comments) and, from phase 2,
 // the office's recurring obligations (DAS, DCTFWeb, EFD-Reinf, folha, FGTS Digital, eSocial, SPED,
 // DEFIS, DASN-SIMEI, ECD, ECF, a weekly check…) with occurrences of the previous and the current
@@ -29,7 +30,7 @@ import {
   rolePermissions,
 } from '@effinance/shared';
 import type { DbExecutor } from './client';
-import { contacts, tasks, users, workspaceMembers } from './schema';
+import { contacts, taskEvents, tasks, users, workspaceMembers } from './schema';
 import { todayIn } from '../lib/clock';
 import { getCipher } from '../lib/crypto/keyring';
 import { withTenant } from '../lib/tenant';
@@ -355,6 +356,40 @@ export async function seedTasks(
       dueDate: day(-1),
     });
     await changeTaskStatus(as('ana'), nota.id, 'done');
+
+    // --- rework (migration 0020): corrections redone for three clients, opened on past days so they fall
+    // in the score's windows (90 days and 12 months): Rota Sul 2 + 1, Pão Quente 1 + 1, Ju Prado 1.
+    const retrabalho = (
+      await createCategory(admin, taskCategoryInputSchema.parse({ name: 'Retrabalho', icon: 'wrench', color: '#DC2626', isRework: true }))
+    ).id;
+    const rework = async (who: Who, input: TaskInput, openedDaysAgo: number, doneAfterDays?: number) => {
+      const created = await task(who, { ...input, categoryId: retrabalho });
+      // 13:00 UTC is 10:00 in São Paulo: the same office day as `day(-n)`.
+      const openedAt = new Date(`${day(-openedDaysAgo)}T13:00:00Z`);
+      const byId = and(eq(tasks.workspaceId, workspaceId), eq(tasks.id, created.id));
+      const eventsOf = (kind: 'created' | 'status') =>
+        and(eq(taskEvents.workspaceId, workspaceId), eq(taskEvents.taskId, created.id), eq(taskEvents.kind, kind));
+      await tx.update(tasks).set({ createdAt: openedAt }).where(byId);
+      await tx.update(taskEvents).set({ createdAt: openedAt }).where(eventsOf('created'));
+      if (doneAfterDays !== undefined) {
+        await changeTaskStatus(as(who), created.id, 'done');
+        const doneAt = new Date(`${day(-openedDaysAgo + doneAfterDays)}T19:00:00Z`);
+        await tx.update(tasks).set({ completedAt: doneAt }).where(byId);
+        await tx.update(taskEvents).set({ createdAt: doneAt }).where(eventsOf('status'));
+      }
+    };
+    await rework('ana', { title: 'Retificar SPED Fiscal com CFOP errado', clientId: client('Rota Sul'), dueDate: day(-18), priority: 'high' }, 20, 2);
+    await rework('juliana', { title: 'Refazer folha dos motoristas: horas extras a menor', clientId: client('Rota Sul'), dueDate: day(-50) }, 55, 3);
+    await rework('ana', { title: 'Reenviar EFD-Reinf rejeitada', clientId: client('Rota Sul'), dueDate: day(-148) }, 150, 1);
+    await rework('marina', {
+      title: 'Corrigir apuração do Simples: receita no anexo errado',
+      clientId: client('Pão Quente'),
+      status: 'in_progress',
+      dueDate: day(3),
+      priority: 'urgent',
+    }, 8);
+    await rework('ana', { title: 'Reemitir guia do DAS de março', clientId: client('Pão Quente'), dueDate: day(-208) }, 210, 1);
+    await rework('marina', { title: 'Refazer a declaração de faturamento', clientId: client('Ju Prado Design'), dueDate: day(-43) }, 45, 2);
 
     // --- phase 2: recurring obligations, processes, notes, an attachment ---------------------------
     const staff = [...withStaff].map(client).filter((v): v is string => v !== null);

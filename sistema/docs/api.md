@@ -82,6 +82,8 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/reports/comparison` | `comparisonReportQuerySchema` | `ComparisonReportResponse` |
 | GET | `/api/reports/cashflow` | `cashflowReportQuerySchema` | `CashflowReportResponse` |
 | GET | `/api/reports/delinquency?months=3..24` | `delinquencyReportQuerySchema` (padrão 12) | `DelinquencyReportResponse` — veja "Relatório de inadimplência" |
+| GET | `/api/reports/evolution?months=1..36` | `evolutionReportQuerySchema` (padrão 12) | `EvolutionReportResponse` — veja "Evolução da base de clientes" |
+| GET | `/api/reports/clients/:id/rework` | — | `ClientReworkResponse` — retrabalho do cliente (veja "Retrabalho"); 404 fora do espaço ou se não for cliente |
 | GET | `/api/search?q=` | `searchQuerySchema` | `SearchResponse` — descrição, nomes e CPF/CNPJ exato; sem `finance`, só clientes em `contacts` (listas financeiras vazias); `tasks`, `recurringTasks` e `unions` (fase 3) para todos; acessos de clientes nunca |
 
 ## Regras de negócio
@@ -188,20 +190,88 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
   `dueAmount`, `lateAmount`. `summary`: os mesmos totais do período, `openCount`/`openAmount`/
   `openClients`, `interestTotal`/`fineTotal`, `paidWithFeesCount`, `probability` (média das
   probabilidades ponderada por `dueCount`) e `clientsAtRisk` (risco `alto` ou `critico`).
-- **Score** (`delinquencyScore` em `packages/shared/src/utils/delinquency.ts`, testado no contrato):
-  cada recebível do período pesa `0,5^(meses atrás / 6)` (meia-vida de 6 meses).
+- **Score de pagamento** (`delinquencyScore` em `packages/shared/src/utils/delinquency.ts`, testado
+  no contrato): cada recebível do período pesa `0,5^(meses atrás / 6)` (meia-vida de 6 meses).
   `probability = (atrasados ponderados + 1) / (total ponderado + 5)` (sem histórico = 20%).
-  `score = 1000 × (1 − probability) − 150 × min(1, atraso médio ponderado / 60) − 60 × em aberto`,
-  limitado a 0..1000. Faixas (`riskOf`): ≥ 800 `baixo` (bom pagador), ≥ 600 `moderado`, ≥ 400
-  `alto`, abaixo `critico`. `lowHistory` = menos de 3 recebíveis no período.
+  `paymentScore = 1000 × (1 − probability) − 150 × min(1, atraso médio ponderado / 60) − 60 × em aberto`,
+  limitado a 0..1000.
+- **Score do cliente** (`clientScore` em `packages/shared/src/utils/rework.ts`, testado; o mesmo para
+  API e web): `score = max(0, paymentScore − reworkPenalty)`, com a penalidade de retrabalho (veja
+  "Retrabalho": 4 pontos por retrabalho nos últimos 90 dias + 1 por retrabalho entre 90 dias e 12
+  meses, no máximo 20). As janelas do retrabalho são fixas, qualquer que seja `months`. Faixas
+  (`riskOf`, sobre o `score` final): ≥ 800 `baixo` (bom pagador), ≥ 600 `moderado`, ≥ 400 `alto`,
+  abaixo `critico`. `probability` e `lowHistory` (menos de 3 recebíveis no período) continuam só dos
+  pagamentos. Cada linha traz `paymentScore`, `reworkPenalty` e `rework` (`ClientRework`: contagens e
+  as 5 últimas tarefas de retrabalho dos 12 meses).
 - **Relatório do cliente** (web, `/relatorios/cliente/:id?meses=`, botão em cada linha): lê todos
   os lançamentos de receita do cliente em `GET /transactions?contactId=&type=income` (páginas de
   200) e calcula no navegador (`features/reports/client-report/client-report.ts`, testado) o
-  histórico, pontualidade, faixas de atraso, mapa de pagamentos, ano a ano e o mesmo score da linha
-  (`periodScore`, mesma janela e regras deste relatório).
+  histórico, pontualidade, faixas de atraso, mapa de pagamentos, ano a ano e o score da linha
+  (`periodScore`, mesma janela e regras deste relatório). O retrabalho do cliente vem ao lado do
+  histórico, em `GET /reports/clients/:id/rework`; para o score bater com a linha, o web passa
+  `rework` a `clientScore` (pendente no web: hoje `periodScore` ainda usa `delinquencyScore`, sem a
+  penalidade).
 - Consultas: um SELECT com junção em `contacts` e a soma dos juros/multa de cada linha por
   subconsulta correlacionada (índice parcial em `late_fee_of`) — sem listas de ids, que estourariam
   o limite de parâmetros num escritório grande; os dados de contato vêm decifrados em lotes.
+
+## Evolução da base de clientes
+
+`GET /reports/evolution?months=N` (1–36, padrão 12; só `finance`): os últimos N meses, o atual incluído,
+no fuso do escritório (`America/Sao_Paulo`: o "hoje" é `todayIn`). Valores em centavos. Cada mês
+(`EvolutionMonth`, o mais antigo primeiro) conta até `asOf` = último dia do mês, ou hoje no mês atual
+(`partial: true`):
+
+- `newClients`: clientes com **início de contrato** (`contractStartDate`) no mês, até `asOf` (contrato
+  que começa depois de hoje espera o dia).
+- `churnedClients`: clientes com **data de inativação** (`inactivatedAt`) no mês, até `asOf`. A data
+  sempre existe para um inativo (`contacts_inactivation_chk`: inativo ⇔ data e motivo). Limite: a
+  reativação apaga a data (não há histórico de inativações), então quem saiu e voltou aparece como
+  ativo desde o início do contrato.
+- `activeClients`: base no `asOf` — contrato iniciado e não inativado até esse dia (inativado no dia
+  já não conta). Assim a base sempre anda pela variação: `activeClients = anterior + netChange`.
+- `netChange = newClients − churnedClients`.
+- `recurringFees`: soma do honorário mensal (`client_fees.amount`, sem taxa por empregado e sem
+  desconto) da vigência que contém o `asOf` (`feePeriodIndexAt`; 29/02 cai em 28/02), só da base
+  ativa; `clientsWithFee` = ativos com essa vigência cadastrada (renovação pendente fica na base e
+  fora dos honorários); `averageFee` (ticket médio) = `round(recurringFees / clientsWithFee)`, 0 sem
+  nenhum (a mesma regra de `summary.averageFee` em `/clients`).
+- `billed` (faturado): recebíveis de clientes (receitas com `contacts.kind = 'client'`, fora do cartão,
+  sem as linhas de juros/multa) com **vencimento** no mês, pagos ou não.
+- `received` (recebido): pelo **dia do pagamento** (`coalesce(paidAt, date)`) no mês — receitas pagas de
+  clientes (recebíveis e suas linhas de juros/multa) menos os descontos por pontualidade concedidos
+  (despesas pagas com `discountOf`): o que entrou de fato.
+
+`comparison` (`EvolutionComparison`): o mês atual contra o anterior em cada métrica de
+`EVOLUTION_METRICS` (rótulos em `EVOLUTION_METRIC_LABELS`): `current`, `previous`, `diff` e `diffPercent`
+= `diff / |previous|` (0,25 = +25%; `null` quando o anterior é 0). O mês anterior é calculado mesmo com
+`months = 1`. O mês atual é parcial (recebido até hoje; faturado do mês inteiro). Regras puras e testadas
+em `packages/shared/src/utils/evolution.ts` (`clientBaseEvolution`, `evolutionChange`,
+`evolutionComparison`); a API lê os clientes e as vigências do espaço (uma linha por cliente e por ano de
+contrato) e soma faturado/recebido em SQL (`GROUP BY` mês). Antes, materializa as séries sem fim até o
+fim do mês atual, como os demais relatórios.
+
+## Retrabalho
+
+Categoria de tarefa com `isRework: true` (migração 0020; cadastro e edição com `registry`, como as demais
+categorias). No `POST`/`PUT /tasks/categories`, `isRework` é opcional: ausente na criação = `false`;
+ausente na edição mantém o valor gravado (formulários antigos não apagam a marca).
+
+- **Retrabalho de um cliente** = tarefas com o cliente numa categoria de retrabalho, contadas pelo **dia
+  em que foram abertas** (`created_at` no fuso `America/Sao_Paulo`). Não contam tarefas canceladas
+  (abertas por engano), internas (sem cliente) nem ocorrências de recorrentes (geradas, não são
+  incidentes — inclusive a "recorrência em qualquer tarefa").
+- **Janelas** (`reworkWindows(hoje)`, hoje incluído): `last90Days` = abertas a partir de `hoje − 89`;
+  `last12Months` = a partir de `hoje − 12 meses + 1 dia` (inclui as dos 90 dias).
+- **Penalidade** (`reworkPenalty`): `min(20, 4 × last90Days + 1 × (last12Months − last90Days))`, na escala
+  0..1000 do score. Constantes em `packages/shared/src/utils/rework.ts` (`REWORK_PENALTY_*`).
+- `ClientRework` = contagens + `latest` (até 5, mais recente primeiro: `id`, `title`, `date` de abertura,
+  `status`, `dueDate`, `category`). Vai em cada linha do relatório de inadimplência e em
+  `GET /reports/clients/:id/rework` (`ClientReworkResponse`: `contactId`, `today`, `windows`, `penalty`,
+  `rework`), que o relatório do cliente lê ao lado do histórico (`/transactions`).
+- Consultas (`modules/reports/rework.ts`): contagens por `GROUP BY` e as últimas por `row_number()` por
+  cliente, sempre com `workspace_id` (teste de escopo em `test/reports-scope.test.ts`); usa o índice
+  `tasks_category_idx`.
 
 ## Gerar honorários e "+ Empregados"
 
@@ -776,9 +846,9 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) está i
 | POST | `/api/tasks/departments` | `taskDepartmentInputSchema` | `TaskDepartment` (201) | admin |
 | PUT | `/api/tasks/departments/:id` | `taskDepartmentInputSchema` | `TaskDepartment` | admin |
 | DELETE | `/api/tasks/departments/:id` | — | 204; 409 com membros, recorrentes ou tarefas (`details`) | admin |
-| GET | `/api/tasks/categories` | — | `TaskCategory[]` (com `taskCount`) | todos |
-| POST | `/api/tasks/categories` | `taskCategoryInputSchema` | `TaskCategory` (201) | admin |
-| PUT | `/api/tasks/categories/:id` | `taskCategoryInputSchema` | `TaskCategory` | admin |
+| GET | `/api/tasks/categories` | — | `TaskCategory[]` (com `taskCount` e `isRework`) | todos |
+| POST | `/api/tasks/categories` | `taskCategoryInputSchema` (`isRework` opcional, padrão `false`) | `TaskCategory` (201) | admin |
+| PUT | `/api/tasks/categories/:id` | `taskCategoryInputSchema` (`isRework` ausente mantém o gravado) | `TaskCategory` | admin |
 | DELETE | `/api/tasks/categories/:id` | — | 204 (tarefas, recorrentes e etapas ficam sem categoria) | admin |
 | GET | `/api/tasks/home` | `taskHomeQuerySchema` (`departmentId` = id ou `all`, `month`) | `TaskHomeResponse` | todos (outro depto./`all`: admin) |
 | GET | `/api/tasks/dashboard` | `taskDashboardQuerySchema` (= `taskHomeQuerySchema`) | `TaskDashboardResponse` (cards do dashboard do Effy) | todos (outro depto./`all`: admin; `fees` só `finance`, `incomplete` só `registry`) |
@@ -1348,6 +1418,12 @@ departamento, só os seus itens) e `month` (competência dos cards de tarefas, p
   só presença, nunca os valores cifrados (`CLIENT_COMPLETENESS_FIELDS`, `completenessFieldsOf`).
 
 Testes: `test/tasks-dashboard.test.ts`.
+
+## Banco (migração 0020)
+
+- `task_categories.is_rework boolean not null default false`: categorias de retrabalho (veja
+  "Retrabalho" em Contas/relatórios). Sem índice novo: as contagens leem `tasks` por
+  `(workspace_id, category_id)` (`tasks_category_idx`). Reexecutável (`IF NOT EXISTS`) e roda no PGlite.
 
 ## Banco (migração 0019)
 

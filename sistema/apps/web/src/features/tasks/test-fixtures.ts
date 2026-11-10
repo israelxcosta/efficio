@@ -63,7 +63,7 @@ export function makeOptions(patch: Partial<TaskOptionsResponse> = {}): TaskOptio
       { id: 'rafael', name: 'Rafael Lima', role: 'viewer', isAdmin: false, department: null, isYou: false, permissionOverrides: {}, photoUpdatedAt: null },
     ],
     departments: [CONTABIL, FISCAL],
-    categories: [{ id: 'cat', name: 'Impostos', icon: 'receipt', color: '#152B61', taskCount: 0, createdAt: '2026-01-01T00:00:00Z' }],
+    categories: [{ id: 'cat', name: 'Impostos', icon: 'receipt', color: '#152B61', isRework: false, taskCount: 0, createdAt: '2026-01-01T00:00:00Z' }],
     clients: [
       { id: 'c1', name: 'Padaria', legalName: 'Padaria Pão Quente Ltda', taxRegime: 'simples_nacional', status: 'active', contractStartDate: '2025-01-01', inactivatedAt: null },
       { id: 'c2', name: 'Antiga', legalName: 'Antiga Ltda', taxRegime: 'real_profit', status: 'inactive', contractStartDate: '2020-01-01', inactivatedAt: '2026-01-01' },

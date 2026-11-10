@@ -1,13 +1,13 @@
 // Delinquency report: how each client pays its receivables (late count, days late, interest and
-// fines charged), the monthly average delay, a payment score per client and the open past-due
-// items used by the collection message. Receivables = income linked to a client, without the
-// interest/fine rows themselves.
+// fines charged), the monthly average delay, the client score (payments minus the rework penalty,
+// shared `clientScore`) and the open past-due items used by the collection message. Receivables =
+// income linked to a client, without the interest/fine rows themselves.
 
 import { and, asc, eq, gte, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import {
   addMonthKey,
-  delinquencyScore,
+  clientScore,
   diffInDays,
   monthKey,
   type DelinquencyClient,
@@ -15,13 +15,15 @@ import {
   type DelinquencyReportResponse,
   type LateFeeKind,
   type MonthKey,
+  TASK_TIME_ZONE,
   type delinquencyReportQuerySchema,
 } from '@effinance/shared';
 import type { z } from 'zod';
 import type { DbExecutor } from '../../db/client';
 import { contacts, transactions } from '../../db/schema';
-import { today } from '../../lib/clock';
+import { today, todayIn } from '../../lib/clock';
 import { getClientContacts } from '../clients/service';
+import { noRework, reworkByClient } from './rework';
 
 type DelinquencyQuery = z.output<typeof delinquencyReportQuerySchema>;
 
@@ -123,6 +125,8 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
     byClient.set(r.contactId, list);
   }
   const details = new Map((await getClientContacts(db, workspaceId, [...byClient.keys()])).map((c) => [c.id, c]));
+  // Rework windows are fixed (90 days and 12 months in the office's day), whatever `months` is.
+  const rework = await reworkByClient(db, workspaceId, todayIn(TASK_TIME_ZONE));
 
   const clients: DelinquencyClient[] = [];
   for (const [contactId, list] of byClient) {
@@ -136,7 +140,8 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
       daysLate: lateDays(r, now),
       monthsAgo: Math.max(0, months.length - 1 - months.indexOf(monthKey(r.date))),
     }));
-    const score = delinquencyScore(history, open.length);
+    const clientRework = rework.get(contactId) ?? noRework();
+    const score = clientScore(history, open.length, clientRework);
     clients.push({
       contactId,
       name: client.name,
@@ -157,6 +162,7 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
       interestTotal: withFees.reduce((a, f) => a + f.interest, 0),
       fineTotal: withFees.reduce((a, f) => a + f.fine, 0),
       ...score,
+      rework: clientRework,
       overdue: open.map((r) => ({
         id: r.id,
         description: r.description,
