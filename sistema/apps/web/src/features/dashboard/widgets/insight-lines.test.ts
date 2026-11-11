@@ -42,6 +42,13 @@ describe('finding lines', () => {
     expect(portfolioInsight(0, 163714)).toBeNull();
   });
 
+  it('portfolio: the change of the base against the previous month', () => {
+    expect(portfolioInsight(8, 163714, { diff: 2, previous: '2026-10' })).toBe(`8 ativos · +2 vs outubro · ticket médio ${formatBRL(163714)}`);
+    expect(portfolioInsight(8, null, { diff: 0, previous: '2026-10' })).toBe('8 ativos · igual a outubro');
+    expect(portfolioInsight(8, 163714, { diff: -1, previous: '2026-10' })).toBe(`8 ativos · −1 vs outubro · ticket médio ${formatBRL(163714)}`);
+    expect(portfolioInsight(8, 163714, null)).toBe(`8 ativos · ticket médio ${formatBRL(163714)}`);
+  });
+
   it('cash flow: on which side most periods fall', () => {
     const rows = (up: number) =>
       Array.from({ length: 6 }, (_, i) => (i < up ? { receita: 200, despesa: 100 } : { receita: 100, despesa: 200 }));

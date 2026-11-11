@@ -61,6 +61,7 @@ import {
 import { toggleClass, SummaryLabel } from '../components/tasks-summary';
 import { ClientPicker, MemberPicker } from '../components/pickers';
 import { withSheetParams } from '../task-links';
+import { ReworkBadge } from '../components/registry-sheets';
 
 const PRESETS: { value: ReportPreset; label: string }[] = [
   { value: 'month', label: 'Mês' },
@@ -102,6 +103,7 @@ export default function TaskReportsPage() {
   const options = useTaskOptions();
   const { user } = useAuth();
   const today = options.data?.today ?? todayISO();
+  const reworkKeys = useMemo(() => new Set((options.data?.categories ?? []).filter((c) => c.isRework).map((c) => c.id)), [options.data]);
   const f = parseReportFilters(params, today);
   const range = reportRange(f);
   const report = useTaskReport(toReportQuery(f));
@@ -207,7 +209,15 @@ export default function TaskReportsPage() {
             <PunctualityBlock className="lg:col-span-6" title="Por departamento" subtitle="Onde o atraso se concentra" rows={r?.byDepartment} active={f.department} onPick={(key) => update({ department: key ?? '' })} mutedNull="Sem departamento" />
             <AssigneeBlock className="lg:col-span-6" r={r} active={f.assignee} onPick={(key) => update({ assignee: key ?? 'none' })} />
             <PunctualityBlock className="lg:col-span-6" title="Por cliente" rows={r?.byClient} max={8} active={f.client} onPick={(key) => update({ client: key ?? 'internal' })} mutedNull="Interna" />
-            <PunctualityBlock className="lg:col-span-6" title="Por categoria" rows={r?.byCategory} active={f.category} onPick={(key) => key && update({ category: key })} mutedNull="Sem categoria" />
+            <PunctualityBlock
+              className="lg:col-span-6"
+              title="Por categoria"
+              rows={r?.byCategory}
+              active={f.category}
+              onPick={(key) => key && update({ category: key })}
+              mutedNull="Sem categoria"
+              reworkKeys={reworkKeys}
+            />
           </div>
           <DetailTable r={r} f={f} today={today} label={label} onPage={(page) => update({ page })} onLastMonths={() => update({ preset: 'last-3' })} />
           <p className="hidden text-caption text-muted print:block">
@@ -429,8 +439,9 @@ function ReportSummary({ r, situation, onSituation }: { r: TaskReportResponse | 
           {number(s?.doneLate ?? 0, s && s.doneLate > 0 ? 'danger' : undefined)}
           {s ? <p className="mt-1 text-body-sm text-muted">concluídas depois do prazo</p> : null}
         </SummaryButton>
-        <SummaryButton className="border-t md:border-l-0 lg:border-t-0 lg:border-l" pressed={situation === 'open'} label="Em aberto" aria={s ? `Em aberto: ${s.open + s.overdue}. Filtrar.` : 'Em aberto'} onClick={() => toggle('open')}>
-          {number(s ? s.open + s.overdue : 0)}
+        <SummaryButton className="border-t md:border-l-0 lg:border-t-0 lg:border-l" pressed={situation === 'open'} label="Em aberto" aria={s ? `Em aberto: ${s.open}, mais ${s.overdue} atrasadas. Filtrar.` : 'Em aberto'} onClick={() => toggle('open')}>
+          {/* One definition of "Em aberto" on the page (spec §3, Q8): without the overdue ones, like "Por situação". */}
+          {number(s?.open ?? 0)}
           {s ? (
             <p className="mt-1 text-body-sm text-muted">
               {s.overdue > 0 ? (
@@ -451,7 +462,7 @@ function ReportSummary({ r, situation, onSituation }: { r: TaskReportResponse | 
                   }}
                   className={cn('-mx-1 px-1 font-medium text-danger underline decoration-border-strong underline-offset-4', toggleClass)}
                 >
-                  {s.overdue} {s.overdue === 1 ? 'atrasada' : 'atrasadas'}
+                  {`+ ${s.overdue} ${s.overdue === 1 ? 'atrasada' : 'atrasadas'}`}
                 </span>
               ) : (
                 'nada atrasado'
@@ -611,13 +622,15 @@ interface PunctualityBlockProps {
   onPick: (key: string | null) => void;
   className?: string;
   mutedNull?: string;
+  /** Keys of rework categories: "Retrabalho" badge next to the name (spec §6.1). */
+  reworkKeys?: ReadonlySet<string>;
 }
 
-function PunctualityBlock({ title, subtitle, rows, max = 8, active, onPick, className, mutedNull }: PunctualityBlockProps) {
+function PunctualityBlock({ title, subtitle, rows, max = 8, active, onPick, className, mutedNull, reworkKeys }: PunctualityBlockProps) {
   const [order, setOrder] = useState<PunctualityOrder>('late');
   return (
     <Block className={className} title={title} subtitle={subtitle} action={<OrderControl value={order} onChange={setOrder} />}>
-      {rows ? <PunctualityList rows={capRows(sortPunctuality(rows, order), max)} active={active} onPick={onPick} mutedNull={mutedNull} /> : <SkeletonRows rows={4} />}
+      {rows ? <PunctualityList rows={capRows(sortPunctuality(rows, order), max)} active={active} onPick={onPick} mutedNull={mutedNull} reworkKeys={reworkKeys} /> : <SkeletonRows rows={4} />}
     </Block>
   );
 }
@@ -640,7 +653,21 @@ function OrderControl({ value, onChange }: { value: PunctualityOrder; onChange: 
 }
 
 /** Punctuality per department/person/client/category (§14.1): bar on time vs late, the rate and the counts. */
-function PunctualityList({ rows, active, onPick, avatars, mutedNull = 'Sem responsável' }: { rows: TaskBreakdownRow[]; active: string; onPick: (key: string | null) => void; avatars?: boolean; mutedNull?: string }) {
+function PunctualityList({
+  rows,
+  active,
+  onPick,
+  avatars,
+  mutedNull = 'Sem responsável',
+  reworkKeys,
+}: {
+  rows: TaskBreakdownRow[];
+  active: string;
+  onPick: (key: string | null) => void;
+  avatars?: boolean;
+  mutedNull?: string;
+  reworkKeys?: ReadonlySet<string>;
+}) {
   if (rows.length === 0) return <p className="rounded-lg border border-dashed border-border-strong/80 px-4 py-6 text-center text-body-sm text-muted">Nenhuma tarefa no período.</p>;
   const maxDone = Math.max(1, ...rows.filter((r) => r.key !== '__others__').map((r) => r.done));
   return (
@@ -655,6 +682,7 @@ function PunctualityList({ rows, active, onPick, avatars, mutedNull = 'Sem respo
             <span className="flex min-w-0 items-center gap-2 [grid-area:name]">
               {avatars && !others ? <MemberAvatar name={r.key ? r.label : null} unassigned={!r.key} /> : null}
               <span className={cn('truncate text-body-sm', r.key === null || others ? 'text-subtle' : 'text-fg', pressed && 'font-semibold')}>{label}</span>
+              {r.key && reworkKeys?.has(r.key) ? <ReworkBadge className="shrink-0" /> : null}
             </span>
             <span className="mt-1 flex h-2 min-w-0 overflow-hidden [grid-area:bar] @md:mt-0" aria-hidden>
               {r.doneOnTime > 0 ? <span className="h-full rounded-l-full bg-data last:rounded-r-full" style={{ width: `${(r.doneOnTime / maxDone) * 100}%` }} /> : null}

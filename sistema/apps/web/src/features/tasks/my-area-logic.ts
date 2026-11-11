@@ -125,6 +125,14 @@ export function insightHref(link: TaskInsight['link']): string | null {
 }
 
 /** "2 pedem atenção", "1 pede atenção" or "Tudo em dia" (danger and warning ask attention). */
+/** Insights the strip on top already shows ("Atrasadas", "Hoje"): Para você leaves them out (spec §3, Q2). */
+const IN_THE_STRIP: ReadonlySet<TaskInsight['key']> = new Set(['overdue', 'dueToday']);
+
+export function forYouInsights(insights: readonly TaskInsight[]): { shown: TaskInsight[]; hidden: number } {
+  const shown = insights.filter((i) => !IN_THE_STRIP.has(i.key));
+  return { shown, hidden: insights.length - shown.length };
+}
+
 export function insightsFinding(insights: TaskInsight[]): string {
   const n = insights.filter((i) => i.tone === 'danger' || i.tone === 'warning').length;
   if (n === 0) return 'Tudo em dia';

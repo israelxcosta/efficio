@@ -128,8 +128,8 @@ function YearTable({ analysis: a }: { analysis: ClientAnalysis }) {
   );
 }
 
-/** Distribution of the payments by days after the due date. */
-export function PaymentTimingCard({ analysis: a, className }: { analysis: ClientAnalysis; className?: string }) {
+/** Distribution of the payments by days after the due date; `children` closes the card (the compact facts). */
+export function PaymentTimingCard({ analysis: a, className, children }: { analysis: ClientAnalysis; className?: string; children?: React.ReactNode }) {
   const buckets = paymentBuckets(a.receivables);
   return (
     <Card className={cn('flex flex-col p-5 print:break-inside-avoid', className)}>
@@ -149,6 +149,7 @@ export function PaymentTimingCard({ analysis: a, className }: { analysis: Client
           </li>
         ))}
       </ul>
+      {children}
     </Card>
   );
 }

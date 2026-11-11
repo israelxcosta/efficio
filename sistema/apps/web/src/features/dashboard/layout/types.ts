@@ -72,6 +72,8 @@ export interface WidgetSpec {
 /** Per-widget options that live in the widget header (persisted with the layout). */
 export interface DashboardPrefs {
   fluxoModo: 'D' | 'S' | 'M' | 'A';
+  /** "Clientes ativos" line on the cash flow (mode M), on the right axis (spec §4.5). */
+  fluxoClientes: boolean;
   projecaoDias: 30 | 60 | 90;
   proximosFiltro: 'todos' | 'pagar' | 'receber';
   evolucaoTipo: 'expense' | 'income';

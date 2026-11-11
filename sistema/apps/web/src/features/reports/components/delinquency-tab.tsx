@@ -1,58 +1,27 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router';
-import { AlarmClock, CalendarX2, Coins, Percent } from 'lucide-react';
-import { DELINQUENCY_RISKS, DELINQUENCY_RISK_LABELS, formatBRL, formatDateBR, formatPercent, type DelinquencyClient, type DelinquencyReportResponse } from '@effinance/shared';
-import { Card, CardHeader } from '@/components/ui/card';
+import { AlarmClock, CalendarX2, Coins, Percent, TrendingDown, TrendingUp } from 'lucide-react';
+import { addMonths, formatBRL, formatPercent, SCORE_WINDOW_MONTHS, startOfMonth, type DelinquencyClient, type DelinquencyReportResponse } from '@effinance/shared';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { ErrorState } from '@/components/ui/misc';
-import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn, pluralize } from '@/lib/utils';
 import { useDelinquencyReport } from '../api';
 import { collectionName } from '../delinquency-message';
-import { countByRisk, formatChance, formatDays, probabilityZone } from '../delinquency-view';
+import { formatDays, lateTrend } from '../delinquency-view';
 import { CollectionMessageDialog } from './collection-message-dialog';
 import { DelinquencyChart } from './delinquency-chart';
 import { DelinquencyClients, DelinquencyClientsEmpty } from './delinquency-clients';
-import { RISK_TONE, RiskBadge, Thermometer } from './delinquency-gauges';
+import { PortfolioRiskCardView } from './delinquency-gauges';
+import { useReportMonths } from './report-months';
 
-const MONTH_OPTIONS = [6, 12, 24] as const;
-type Months = (typeof MONTH_OPTIONS)[number];
-const DEFAULT_MONTHS: Months = 12;
+const wholePercent = (ratio: number) => `${Math.round(ratio * 100)}%`;
 
-/** Period of the report, kept in the URL (`?meses=6|24`; 12 is the default and stays out). */
-export function useDelinquencyMonths(): [Months, (months: Months) => void] {
-  const [params, setParams] = useSearchParams();
-  const raw = Number(params.get('meses'));
-  const months = (MONTH_OPTIONS as readonly number[]).includes(raw) ? (raw as Months) : DEFAULT_MONTHS;
-  const set = (next: Months) => {
-    const p = new URLSearchParams(params);
-    if (next === DEFAULT_MONTHS) p.delete('meses');
-    else p.set('meses', String(next));
-    setParams(p, { replace: true });
-  };
-  return [months, set];
-}
-
-/** Header control of the tab (in place of the reports' period filter). */
-export function DelinquencyMonthsControl() {
-  const [months, setMonths] = useDelinquencyMonths();
-  return (
-    <SegmentedControl<`${Months}`>
-      ariaLabel="Período do relatório de inadimplência"
-      value={`${months}`}
-      onChange={(v) => setMonths(Number(v) as Months)}
-      options={MONTH_OPTIONS.map((m) => ({ value: `${m}`, label: `${m} meses` }))}
-    />
-  );
-}
-
-const THERMOMETER_HELP =
-  'Chance média de uma mensalidade ser paga com atraso, pelo histórico de cada cliente no período: os meses recentes pesam mais (um atraso de 6 meses atrás vale metade) e quem tem pouco histórico parte de 20%. A média da carteira pondera cada cliente pelo número de mensalidades. Zonas: até 20% Bom pagador · 20–40% Atenção · 40–60% Risco alto · acima de 60% Crítico.';
-
-/** "Inadimplência": how clients pay their fees (late count, days late, interest/fines), a portfolio thermometer and a score per client. */
+/**
+ * "Inadimplência": how clients pay their fees (late share, days late, interest/fines), how each month
+ * was paid, the portfolio by risk and the score of each client (12 months, with the rework).
+ */
 export function DelinquencyTab() {
-  const [months] = useDelinquencyMonths();
+  const [months] = useReportMonths();
   const report = useDelinquencyReport(months);
   const [messageFor, setMessageFor] = useState<DelinquencyClient | null>(null);
   const r = report.data;
@@ -60,13 +29,13 @@ export function DelinquencyTab() {
   if (report.isError) return <ErrorState error={report.error} onRetry={() => report.refetch()} />;
 
   return (
-    <div className={cn('@container flex flex-col gap-4 transition-opacity', report.isPlaceholderData && 'opacity-70')}>
+    <div className={cn('@container flex flex-col gap-4 transition-opacity', report.isPlaceholderData && 'opacity-70')} aria-busy={!r}>
       <DelinquencyKpis r={r} />
       {!r ? (
         <>
           <div className="grid gap-4 xl:grid-cols-5">
-            <Skeleton className="h-[300px] rounded-xl xl:col-span-2" />
-            <Skeleton className="h-[300px] rounded-xl xl:col-span-3" />
+            <Skeleton className="h-[360px] rounded-xl xl:col-span-2" />
+            <Skeleton className="h-[360px] rounded-xl xl:col-span-3" />
           </div>
           <Skeleton className="h-96 rounded-xl" />
         </>
@@ -75,9 +44,15 @@ export function DelinquencyTab() {
       ) : (
         <>
           <div className="grid gap-4 xl:grid-cols-5">
-            <PortfolioCard r={r} months={months} className="xl:col-span-2" />
+            <PortfolioRiskCardView
+              className="xl:col-span-2"
+              clients={r.clients}
+              probability={r.summary.probability}
+              from={addMonths(startOfMonth(r.to), -(SCORE_WINDOW_MONTHS - 1))}
+              to={r.to}
+            />
             <div className="min-w-0 xl:col-span-3">
-              <DelinquencyChart monthly={r.monthly} />
+              <DelinquencyChart monthly={r.monthly} clients={r.clients} lateRate={r.summary.lateRate} />
             </div>
           </div>
           <DelinquencyClients clients={r.clients} months={months} onMessage={setMessageFor} />
@@ -92,7 +67,11 @@ function DelinquencyKpis({ r }: { r: DelinquencyReportResponse | undefined }) {
   const s = r?.summary;
   const loading = <Skeleton className="h-7 w-28" />;
   const worst = useMemo(() => r?.clients.reduce<DelinquencyClient | null>((w, c) => (c.maxDaysLate > (w?.maxDaysLate ?? 0) ? c : w), null) ?? null, [r]);
+  const trend = useMemo(() => (r ? lateTrend(r.monthly) : null), [r]);
   const fees = s ? s.interestTotal + s.fineTotal : 0;
+  const worse = trend ? Math.round(trend.recent * 100) > Math.round(trend.previous * 100) : false;
+  const better = trend ? Math.round(trend.recent * 100) < Math.round(trend.previous * 100) : false;
+  const TrendIcon = better ? TrendingDown : TrendingUp;
   return (
     <div className="grid grid-cols-1 gap-3 @[420px]:grid-cols-2 @[1000px]:grid-cols-4">
       <KpiCard
@@ -109,9 +88,23 @@ function DelinquencyKpis({ r }: { r: DelinquencyReportResponse | undefined }) {
         compact
         icon={<Percent className="text-warning" />}
         label="Taxa de atraso"
-        info="Parte das mensalidades vencidas no período que foram pagas depois do vencimento ou seguem em aberto"
+        info="Parte das mensalidades vencidas no período que foram pagas depois do vencimento ou seguem em aberto. No rodapé, os últimos 3 meses completos contra os 3 anteriores."
         value={s ? formatPercent(s.lateRate) : loading}
-        footerContent={<span className="truncate">{s ? `${s.lateCount} de ${s.dueCount} mensalidades com atraso` : '—'}</span>}
+        footerContent={
+          !s ? (
+            '—'
+          ) : trend ? (
+            <span className="flex min-w-0 items-center gap-1 truncate">
+              <span className={cn('inline-flex shrink-0 items-center gap-1 font-semibold', worse ? 'text-danger' : better ? 'text-success' : 'text-fg')}>
+                {worse || better ? <TrendIcon className="size-3.5" aria-hidden /> : null}
+                {wholePercent(trend.recent)}
+              </span>
+              <span className="truncate">{`nos últimos 3 meses (eram ${wholePercent(trend.previous)})`}</span>
+            </span>
+          ) : (
+            <span className="truncate">{`${s.lateCount} de ${s.dueCount} mensalidades com atraso`}</span>
+          )
+        }
       />
       <KpiCard
         compact
@@ -141,77 +134,5 @@ function DelinquencyKpis({ r }: { r: DelinquencyReportResponse | undefined }) {
         }
       />
     </div>
-  );
-}
-
-/** Portfolio thermometer: average chance of paying late, its zone, the real late rate and clients per risk band. */
-function PortfolioCard({ r, months, className }: { r: DelinquencyReportResponse; months: number; className?: string }) {
-  const s = r.summary;
-  const zone = probabilityZone(s.probability);
-  const byRisk = countByRisk(r.clients);
-  const total = r.clients.length;
-  const oneIn = s.probability > 0 ? Math.max(1, Math.round(1 / s.probability)) : null;
-  return (
-    <Card className={cn('flex flex-col p-4 sm:p-5', className)}>
-      <CardHeader title="Termômetro de inadimplência" subtitle={`Carteira · vencimentos de ${formatDateBR(r.from)} a ${formatDateBR(r.to)}`} info={THERMOMETER_HELP} />
-      {/* Phones: thermometer + headline, stats below. Side card: stats under the headline. Full width: three columns. */}
-      <div className="@container mt-4 flex flex-1 flex-col justify-center">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5 gap-y-4 @[720px]:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] @[720px]:gap-x-10">
-          <div className="@[400px]:row-span-2 @[720px]:row-span-1">
-            <Thermometer probability={s.probability} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-start justify-between gap-3">
-              <span className="text-caption leading-snug font-medium text-muted">Chance média de atraso</span>
-              <span className={cn('tabular text-kpi leading-none font-semibold tracking-tight', RISK_TONE[zone].text)}>{formatChance(s.probability)}</span>
-            </div>
-            <div className="mt-1.5 flex justify-end">
-              <RiskBadge risk={zone} />
-            </div>
-            <p className="mt-2 text-caption text-muted">
-              {oneIn === null
-                ? 'Nenhum atraso no histórico recente da carteira.'
-                : oneIn <= 1
-                  ? 'Pelo histórico, praticamente toda mensalidade tende a atrasar.'
-                  : `Pelo histórico, cerca de 1 em cada ${oneIn} mensalidades tende a atrasar.`}
-            </p>
-          </div>
-          <div className="col-span-2 flex min-w-0 flex-col gap-3 @[400px]:col-span-1 @[400px]:col-start-2 @[720px]:col-start-3 @[720px]:row-start-1">
-            <dl className="flex flex-col gap-1.5 border-t border-border pt-3 text-body-sm @[720px]:border-t-0 @[720px]:pt-0">
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted">Taxa de atraso real ({months} meses)</dt>
-                <dd className="tabular font-semibold text-fg">{formatPercent(s.lateRate)}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted">Clientes em risco alto ou crítico</dt>
-                <dd className={cn('tabular font-semibold whitespace-nowrap', s.clientsAtRisk > 0 ? 'text-danger' : 'text-fg')}>
-                  {s.clientsAtRisk} de {total}
-                </dd>
-              </div>
-            </dl>
-            <div>
-              <div
-                role="img"
-                aria-label={`Clientes por faixa: ${DELINQUENCY_RISKS.map((k) => `${DELINQUENCY_RISK_LABELS[k]} ${byRisk[k]}`).join(', ')}`}
-                className="flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-bg-subtle"
-              >
-                {DELINQUENCY_RISKS.filter((k) => byRisk[k] > 0).map((k) => (
-                  <span key={k} className={cn('h-full min-w-1', RISK_TONE[k].bg)} style={{ width: `${(byRisk[k] / Math.max(1, total)) * 100}%` }} />
-                ))}
-              </div>
-              <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                {DELINQUENCY_RISKS.map((k) => (
-                  <li key={k} className={cn('flex items-center gap-1.5 text-caption whitespace-nowrap', byRisk[k] === 0 ? 'text-subtle' : 'text-muted')}>
-                    <span className={cn('size-2 shrink-0 rounded-[3px]', RISK_TONE[k].bg, byRisk[k] === 0 && 'opacity-40')} aria-hidden />
-                    {DELINQUENCY_RISK_LABELS[k]}
-                    <span className="tabular font-semibold text-fg">{byRisk[k]}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
   );
 }

@@ -27,7 +27,7 @@ import {
   RhythmCardView,
 } from '../components/my-area-cards';
 import { useOccurrenceSheetLinks } from '../components/occurrence-row';
-import { appointmentsToday, greeting, myAreaDescription, myMetricCells, officeHour } from '../my-area-logic';
+import { appointmentsToday, forYouInsights, greeting, myAreaDescription, myMetricCells, officeHour } from '../my-area-logic';
 import { competenceName } from '../occurrence';
 import { useTaskActions } from '../task-actions';
 import { useTaskSheetLinks } from '../task-links';
@@ -83,6 +83,7 @@ export default function MyAreaPage() {
   const monthName = competenceName(o?.month ?? monthKey(today)).split(' ')[0]!;
   const prevMonthName = competenceName(addMonthKey(o?.month ?? monthKey(today), -1)).split(' ')[0]!;
   const role = workspace ? ROLE_LABELS[workspace.role] : '';
+  const forYou = forYouInsights(o?.insights ?? []);
   const cells: MetricCell[] = o
     ? myMetricCells(o, appointmentsToday(o))
     : ['Atrasadas', 'Hoje', 'Próximos 7 dias', `Concluídas em ${monthName}`].map((label, i) => ({ key: String(i), label, value: '', loading: true, hero: i === 0 }));
@@ -127,7 +128,7 @@ export default function MyAreaPage() {
             />
           </DashSlot>
           <DashSlot rows={4} span={{ wide: 4, medium: 1 }}>
-            {o ? <ForYouCardView insights={o.insights} /> : <CardLoading title="Para você" />}
+            {o ? <ForYouCardView insights={forYou.shown} hidden={forYou.hidden} /> : <CardLoading title="Para você" />}
           </DashSlot>
           <DashSlot rows={4} span={{ wide: 4, medium: 1 }} grow>
             <WidgetCard

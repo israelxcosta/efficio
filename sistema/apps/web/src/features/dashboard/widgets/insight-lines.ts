@@ -3,7 +3,7 @@
 // returns null without data and the card falls back to its short description. Windows other than
 // the chosen month ("Hoje · ", "Próximos 15 dias · ") are added by the card, not here.
 
-import { formatBRL, formatCompactBRL, type DashboardResponse, type ISODate, type MonthSummary } from '@effinance/shared';
+import { formatBRL, formatCompactBRL, MONTH_NAMES, type DashboardResponse, type ISODate, type MonthKey, type MonthSummary } from '@effinance/shared';
 import type { ProjectionSummary } from '@/components/charts/chart-scale';
 
 const pct = (part: number, total: number) => Math.round((part / total) * 100);
@@ -92,11 +92,19 @@ export function balancesInsight(total: number, count: number): string | null {
   return `${formatBRL(total)} em ${count} ${count === 1 ? 'conta' : 'contas'}`;
 }
 
-/** "8 ativos · ticket médio R$ 1.637,14". */
-export function portfolioInsight(active: number, averageTicket: number | null): string | null {
+/**
+ * "8 ativos · +2 vs outubro · ticket médio R$ 1.637,14" (the change of the base against the previous
+ * month, from the evolution report, when given).
+ */
+export function portfolioInsight(active: number, averageTicket: number | null, change?: { diff: number; previous: MonthKey } | null): string | null {
   if (active <= 0) return null;
-  const head = `${active} ${active === 1 ? 'ativo' : 'ativos'}`;
-  return averageTicket !== null ? `${head} · ticket médio ${formatBRL(averageTicket)}` : head;
+  const parts = [`${active} ${active === 1 ? 'ativo' : 'ativos'}`];
+  if (change) {
+    const month = MONTH_NAMES[Number(change.previous.slice(5, 7)) - 1]!.toLowerCase();
+    parts.push(change.diff === 0 ? `igual a ${month}` : `${change.diff > 0 ? '+' : '−'}${Math.abs(change.diff)} vs ${month}`);
+  }
+  if (averageTicket !== null) parts.push(`ticket médio ${formatBRL(averageTicket)}`);
+  return parts.join(' · ');
 }
 
 /**

@@ -7,8 +7,11 @@ import type {
   ComparisonReportQuery,
   ComparisonReportResponse,
   ContactReportQuery,
+  ClientReworkResponse,
   ContactReportResponse,
   DelinquencyReportResponse,
+  EvolutionReportQuery,
+  EvolutionReportResponse,
   OverviewReportQuery,
   OverviewReportResponse,
   Transaction,
@@ -36,6 +39,20 @@ export const useCashflowReport = (p: CashflowReportQuery, enabled = true) =>
   useReport<CashflowReportResponse>('cashflow', p, enabled);
 /** Late payments of clients over the last `months` months (3..24), by due date up to today. */
 export const useDelinquencyReport = (months: number) => useReport<DelinquencyReportResponse>('delinquency', { months });
+/** Client base month by month (new, churned, active, monthly fee, billed, received), ending in the current month. */
+export const useEvolutionReport = (p: EvolutionReportQuery, enabled = true) => useReport<EvolutionReportResponse>('evolution', p, enabled);
+
+/**
+ * Rework of one client (90 days and 12 months), loaded with the client report (display query, no UI
+ * toggle). Under the reports key, so saving a task category ("Conta como retrabalho") refreshes it.
+ */
+export function useClientRework(contactId: string | undefined) {
+  return useQuery({
+    queryKey: qk.report('client-rework', { contactId }),
+    queryFn: () => api<ClientReworkResponse>(`/reports/clients/${encodeURIComponent(contactId!)}/rework`),
+    enabled: Boolean(contactId),
+  });
+}
 
 /**
  * Every income transaction of a client, all dates (the list endpoint pages at 200: read them all).

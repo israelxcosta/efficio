@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { labelTicks, statementHref } from './cashflow-card';
+import { m } from '@/features/reports/evolution/test-fixtures';
+import { evolutionMonthsFor, labelTicks, statementHref, withActiveClients } from './cashflow-card';
 
 describe('statementHref', () => {
   it('opens the statement on the period of the clicked bar', () => {
@@ -38,5 +39,23 @@ describe('labelTicks', () => {
     const months = ['Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out'].map((label) => ({ label }));
     expect(labelTicks(months, 6 * 40)).toHaveLength(6);
     expect(labelTicks(days.slice(0, 6), 6 * 40)!.length).toBeLessThan(6);
+  });
+});
+
+describe('Clientes ativos no Fluxo de caixa', () => {
+  it('asks the evolution for the 6 months of the chart, up to 36', () => {
+    expect(evolutionMonthsFor('2026-11', '2026-11')).toBe(6);
+    expect(evolutionMonthsFor('2026-05', '2026-11')).toBe(12);
+    expect(evolutionMonthsFor('2023-01', '2026-11')).toBe(36);
+    expect(evolutionMonthsFor('2027-02', '2026-11')).toBe(6);
+  });
+
+  it('puts the active clients of each month on its row, null where the evolution has none', () => {
+    expect(withActiveClients([{ start: '2026-09-01' }, { start: '2026-10-01' }], m)).toEqual([
+      { start: '2026-09-01', clientes: 4, clientesDiff: 2 },
+      { start: '2026-10-01', clientes: 3, clientesDiff: -1 },
+    ]);
+    expect(withActiveClients([{ start: '2026-06-01' }], m)[0]).toMatchObject({ clientes: null, clientesDiff: null });
+    expect(withActiveClients([{ start: '2026-10-01' }], undefined)[0]).toMatchObject({ clientes: null });
   });
 });

@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { ArrowUpRight, Building2, ChevronDown, FileChartColumn, Info, MessageCircle, Search, SearchX } from 'lucide-react';
+import { ArrowUpRight, Building2, ChevronDown, FileChartColumn, Info, MessageCircle, RotateCcw, Search, SearchX } from 'lucide-react';
 import { formatBRL, formatCNPJ, formatDateBR, formatPhone, type DelinquencyClient } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -10,22 +10,34 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn, initials, pluralize } from '@/lib/utils';
 import { collectionName } from '../delinquency-message';
-import { DELINQUENCY_SORT_LABELS, filterClients, formatChance, formatDays, sortClients, type DelinquencySort } from '../delinquency-view';
-import { RISK_TONE, RiskBadge, ScoreBar } from './delinquency-gauges';
+import {
+  CLIENT_SCOPE_LABELS,
+  DELINQUENCY_SORT_LABELS,
+  filterClients,
+  formatChance,
+  formatDays,
+  reworkText,
+  scopeClients,
+  scoreParts,
+  sortClients,
+  type ClientScope,
+  type DelinquencySort,
+} from '../delinquency-view';
+import { RISK_TONE, RiskBadge, ScoreBar, ScoreComposition } from './delinquency-gauges';
 
-/** How the score is computed (packages/shared/src/utils/delinquency.ts), in plain words. */
+/** How the score is computed (packages/shared/src/utils/delinquency.ts and rework.ts): fixed copy of spec §5.3. */
 export const SCORE_HELP =
-  'Score de 0 a 1000 (maior = melhor pagador). Parte de 1000 × (1 − chance de atraso), desconta até 150 pontos pela média de dias de atraso (60 dias ou mais = desconto total) e 60 pontos por mensalidade vencida em aberto. A chance de atraso é a parte das mensalidades pagas com atraso, com os meses recentes pesando mais (um mês de 6 meses atrás vale metade) e um ponto de partida de 20% para quem tem pouco histórico. Faixas: 800+ Bom pagador · 600–799 Atenção · 400–599 Risco alto · abaixo de 400 Crítico.';
+  'Score de 0 a 1000 (maior = melhor), sempre sobre os últimos 12 meses. Parte da pontualidade: cada mensalidade atrasada pesa pela gravidade (1 a 5 dias 25%, 6 a 15 dias 50%, 16 a 30 dias 75%, mais de 30 dias 100%), os meses recentes valem mais (6 meses atrás vale metade) e quem tem pouco histórico parte de 20%. Depois desconta 50 pontos por mensalidade vencida em aberto (até 250), 40 por retrabalho nos últimos 90 dias e 10 por retrabalho de até 12 meses (até 200). Faixas: 800+ Baixo risco · 600–799 Atenção · 400–599 Risco alto · abaixo de 400 Crítico.';
 
-const LOW_HISTORY_HELP = 'Menos de 3 mensalidades no período: o score ainda se apoia no ponto de partida de 20% de chance de atraso.';
+const LOW_HISTORY_HELP = 'Menos de 3 mensalidades nos últimos 12 meses: o score ainda se apoia no ponto de partida de 20% de chance de atraso.';
 
 export const receivablesHref = (contactId: string) => `/contas-a-receber?status=overdue&modo=year&contato=${encodeURIComponent(contactId)}`;
 
-/** The client's financial report; carries the period so its score matches the row's. */
-export const clientReportHref = (contactId: string, months: number) =>
-  `/relatorios/cliente/${encodeURIComponent(contactId)}${months === 12 ? '' : `?meses=${months}`}`;
+/** The client's financial report (its score is always of 12 months, like the row's). */
+export const clientReportHref = (contactId: string) => `/relatorios/cliente/${encodeURIComponent(contactId)}`;
 
 const SORTS: DelinquencySort[] = ['open', 'score', 'late'];
+const SCOPES: ClientScope[] = ['active', 'all'];
 
 interface Props {
   clients: DelinquencyClient[];
@@ -37,8 +49,11 @@ interface Props {
 export function DelinquencyClients({ clients, months, onMessage }: Props) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<DelinquencySort>('open');
+  const [scope, setScope] = useState<ClientScope>('active');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const rows = useMemo(() => sortClients(filterClients(clients, query), sort), [clients, query, sort]);
+  const scoped = useMemo(() => scopeClients(clients, scope), [clients, scope]);
+  const hidden = clients.length - scoped.length;
+  const rows = useMemo(() => sortClients(filterClients(scoped, query), sort), [scoped, query, sort]);
   const toggle = (id: string) => setExpanded((current) => (current === id ? null : id));
   const ariaSort = (key: DelinquencySort) => (sort === key ? (key === 'score' ? 'ascending' : 'descending') : undefined);
 
@@ -49,7 +64,8 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
           <div className="min-w-0">
             <h2 className="text-[15px] font-semibold tracking-tight text-fg">Empresas</h2>
             <p className="mt-0.5 text-xs text-muted">
-              {pluralize(clients.length, 'cliente', 'clientes')} com mensalidades nos últimos {months} meses ou valores vencidos em aberto
+              {`${pluralize(scoped.length, scope === 'active' ? 'cliente ativo' : 'cliente', scope === 'active' ? 'clientes ativos' : 'clientes')} com mensalidades nos últimos ${months} meses ou valores vencidos em aberto`}
+              {hidden > 0 ? ` · ${pluralize(hidden, 'inativo em dia oculto', 'inativos em dia ocultos')}` : ''}
             </p>
           </div>
         </div>
@@ -64,6 +80,13 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
               aria-label="Buscar empresas"
             />
           </div>
+          <SegmentedControl<ClientScope>
+            size="sm"
+            ariaLabel="Clientes"
+            value={scope}
+            onChange={setScope}
+            options={SCOPES.map((v) => ({ value: v, label: CLIENT_SCOPE_LABELS[v] }))}
+          />
           <div className="flex items-center gap-2 sm:ml-auto">
             <span className="text-caption text-muted">Ordenar por</span>
             <SegmentedControl<DelinquencySort>
@@ -82,11 +105,21 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
           className="m-4"
           icon={<SearchX />}
           title="Nenhuma empresa encontrada"
-          description={`Nada corresponde a "${query.trim()}". Busque pela razão social, nome fantasia, responsável ou CNPJ.`}
+          description={
+            query.trim()
+              ? `Nada corresponde a "${query.trim()}". Busque pela razão social, nome fantasia, responsável ou CNPJ.`
+              : 'Só há clientes inativos em dia no período. Escolha "Todos" para vê-los.'
+          }
           action={
-            <Button variant="outline" size="sm" onClick={() => setQuery('')}>
-              Limpar busca
-            </Button>
+            query.trim() ? (
+              <Button variant="outline" size="sm" onClick={() => setQuery('')}>
+                Limpar busca
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setScope('all')}>
+                Ver todos
+              </Button>
+            )
           }
         />
       ) : (
@@ -95,10 +128,8 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
           <ul className="divide-y divide-border lg:hidden">
             {rows.map((c) => (
               <li key={c.contactId} className="flex flex-col gap-3 p-4">
-                <div className="flex items-start gap-3">
-                  <ClientName client={c} expanded={expanded === c.contactId} onToggle={() => toggle(c.contactId)} />
-                  <ScoreCell client={c} compact />
-                </div>
+                <ClientName client={c} expanded={expanded === c.contactId} onToggle={() => toggle(c.contactId)} />
+                {/* The score is the 5th statistic, so the name keeps the whole width. */}
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                   <Stat label="Atrasos">
                     <LateCell client={c} />
@@ -112,10 +143,13 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
                   <Stat label="Em aberto">
                     <OpenCell client={c} />
                   </Stat>
+                  <Stat label="Score">
+                    <ScoreCell client={c} compact />
+                  </Stat>
                 </dl>
                 <div className="flex flex-wrap items-center gap-2">
                   <MessageButton client={c} onMessage={onMessage} />
-                  <ReportButton client={c} months={months} />
+                  <ReportButton client={c} />
                   <Button asChild variant="ghost" size="sm">
                     <Link to={receivablesHref(c.contactId)}>
                       Contas a receber <ArrowUpRight />
@@ -190,7 +224,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <MessageButton client={c} onMessage={onMessage} />
-                            <ReportButton client={c} months={months} />
+                            <ReportButton client={c} />
                             <Tooltip content="Ver vencidos em contas a receber">
                               <Link
                                 to={receivablesHref(c.contactId)}
@@ -319,16 +353,33 @@ function OpenCell({ client: c, align = 'left' }: { client: DelinquencyClient; al
   );
 }
 
-function ScoreCell({ client: c, compact }: { client: DelinquencyClient; compact?: boolean }) {
+/**
+ * Score of a client: the number and its band, the bar, the chance of paying late and, when there is
+ * any, "3 retrabalhos em 90 dias". Hover (or focus) shows the composition; screen readers get it in one
+ * line ("Pontualidade 608 · em aberto −100 · retrabalho −90 = 418").
+ */
+export function ScoreCell({ client: c, compact }: { client: DelinquencyClient; compact?: boolean }) {
+  const rework = reworkText(c.rework.last90Days);
+  const parts = scoreParts(c);
   return (
-    <div className={cn('flex flex-col gap-1', compact ? 'w-[132px] shrink-0 items-end text-right' : 'min-w-0')}>
-      <div className={cn('flex items-baseline gap-1.5', compact && 'justify-end')}>
-        <span className={cn('tabular text-[15px] leading-none font-bold', c.risk === 'baixo' ? 'text-fg' : RISK_TONE[c.risk].text)}>{c.score}</span>
-        <RiskBadge risk={c.risk} className="h-4 px-1.5" />
-      </div>
+    <div className={cn('flex min-w-0 flex-col gap-1', compact && 'max-w-[220px]')}>
+      <Tooltip
+        content={
+          <div className="w-[200px]">
+            <p className="mb-1">Composição do score</p>
+            <ScoreComposition tone="inverse" s={c} />
+          </div>
+        }
+      >
+        <span tabIndex={0} className="flex w-fit cursor-default items-baseline gap-1.5 rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-brand-500/25">
+          <span className={cn('tabular text-[15px] leading-none font-bold', RISK_TONE[c.risk].text)}>{c.score}</span>
+          <RiskBadge risk={c.risk} className="h-4 px-1.5" />
+          <span className="sr-only">{`Composição: ${parts}`}</span>
+        </span>
+      </Tooltip>
       <ScoreBar score={c.score} risk={c.risk} />
       <span className="text-micro leading-tight text-muted">
-        {formatChance(c.probability)} de chance de atrasar
+        {`${formatChance(c.probability)} de chance de atrasar`}
         {c.lowHistory ? (
           <Tooltip content={LOW_HISTORY_HELP}>
             <span tabIndex={0} className="block w-fit cursor-help whitespace-nowrap text-subtle underline decoration-dotted underline-offset-2">
@@ -337,6 +388,12 @@ function ScoreCell({ client: c, compact }: { client: DelinquencyClient; compact?
           </Tooltip>
         ) : null}
       </span>
+      {rework ? (
+        <span className="flex items-center gap-1 text-micro leading-tight text-muted">
+          <RotateCcw className="size-3 shrink-0" aria-hidden />
+          {rework}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -362,11 +419,11 @@ function MessageButton({ client: c, onMessage }: { client: DelinquencyClient; on
 }
 
 /** Opens the client's financial report (whole history and analysis); "Relatório do cliente" on hover. */
-function ReportButton({ client: c, months }: { client: DelinquencyClient; months: number }) {
+function ReportButton({ client: c }: { client: DelinquencyClient }) {
   return (
     <Tooltip content="Relatório do cliente">
       <Link
-        to={clientReportHref(c.contactId, months)}
+        to={clientReportHref(c.contactId)}
         aria-label={`Relatório financeiro de ${collectionName(c)}`}
         className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-muted transition-colors outline-none hover:bg-bg-subtle hover:text-fg focus-visible:ring-[3px] focus-visible:ring-brand-500/25 [&_svg]:size-4"
       >
@@ -411,6 +468,7 @@ function OpenItems({ client: c }: { client: DelinquencyClient }) {
       <p className="mt-2 border-t border-border pt-2 text-caption text-muted">
         No período: {c.onTimeCount} no prazo · {c.lateCount} com atraso
         {c.maxDaysLate > 0 ? ` (máx. ${formatDays(c.maxDaysLate)})` : ''}
+        {c.rework.last90Days > 0 || c.rework.last12Months > 0 ? ` · Retrabalho: ${c.rework.last90Days} em 90 dias${c.rework.last12Months > c.rework.last90Days ? `, ${c.rework.last12Months} em 12 meses` : ''}` : ''}
         {c.responsibleName || c.phone ? (
           <>
             {' · '}

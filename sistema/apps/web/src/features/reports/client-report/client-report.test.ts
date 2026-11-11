@@ -86,14 +86,33 @@ describe('analyzeClient', () => {
     expect(a.months.find((m) => m.month === '2026-10')).toMatchObject({ overdue: true, lateCount: 1, avgDaysLate: 17 });
   });
 
-  it('scores the delinquency report window, like its row', () => {
+  it('scores the last 12 months, like the delinquency row', () => {
     expect(a.scoreMonths).toBe(12);
     expect(a.score.score).toBeGreaterThan(0);
     expect(a.score.score).toBeLessThan(800);
-    // Only what fell due inside the window counts (the overdue item counts whatever its date).
-    const short = periodScore(list, today, 3);
-    const full = periodScore(list, today, 12);
-    expect(short.score).not.toBe(full.score);
+    // What fell due before the window does not count (the overdue items count whatever their date).
+    const old = clientReceivables([tx({ date: '2025-06-10', paid: true, paidAt: '2025-09-10' }), ...list.map((r) => tx({ date: r.dueDate, paid: r.paidAt !== null, paidAt: r.paidAt }))], today);
+    expect(periodScore(old, today)).toEqual(periodScore(old.filter((r) => r.dueDate >= '2025-11-01'), today));
+    expect(periodScore(list, today)).toMatchObject({ punctuality: a.score.punctuality, openPenalty: 50, reworkPenalty: 0, paymentScore: a.score.score });
+  });
+
+  it('discounts rework', () => {
+    const onTimeYear = clientReceivables(
+      Array.from({ length: 12 }, (_, i) => {
+        const due = `${i < 2 ? 2025 : 2026}-${String(((i + 10) % 12) + 1).padStart(2, '0')}-05`;
+        return tx({ date: due, paid: true, paidAt: due });
+      }),
+      today,
+    );
+    const base = periodScore(onTimeYear, today);
+    expect(periodScore(onTimeYear, today, { last90Days: 2, last12Months: 3 })).toMatchObject({ paymentScore: base.score, reworkPenalty: 90, score: base.score - 90 });
+    expect(analyzeClient(onTimeYear, today, { last90Days: 2, last12Months: 3 }).score.reworkPenalty).toBe(90);
+  });
+
+  it('splits what is open in each month into overdue and upcoming', () => {
+    expect(a.months.find((m) => m.month === '2026-10')).toMatchObject({ overdueAmount: 100000, upcomingAmount: 0 });
+    expect(a.months.find((m) => m.month === '2026-11')).toMatchObject({ overdueAmount: 0, upcomingAmount: 100000 });
+    expect(a.months.find((m) => m.month === '2026-09')).toMatchObject({ overdueAmount: 0, upcomingAmount: 0 });
   });
 
   it('spreads the payments by how many days after the due date they came', () => {

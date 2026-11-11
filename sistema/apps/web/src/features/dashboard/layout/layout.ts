@@ -20,6 +20,7 @@ export const GRID = { maxCols: 4, minRow: 2, maxRow: 7, gap: 16 } as const;
 
 export const DEFAULT_PREFS: DashboardPrefs = {
   fluxoModo: 'M',
+  fluxoClientes: true,
   projecaoDias: 90,
   proximosFiltro: 'todos',
   evolucaoTipo: 'expense',
@@ -28,6 +29,7 @@ export const DEFAULT_PREFS: DashboardPrefs = {
 
 const PREF_VALUES: { [K in keyof DashboardPrefs]: readonly DashboardPrefs[K][] } = {
   fluxoModo: ['D', 'S', 'M', 'A'],
+  fluxoClientes: [true, false],
   projecaoDias: [30, 60, 90],
   proximosFiltro: ['todos', 'pagar', 'receber'],
   evolucaoTipo: ['expense', 'income'],

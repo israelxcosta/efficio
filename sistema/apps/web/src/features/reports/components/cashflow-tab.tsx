@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { axisProps, CHART_COLORS, LegendDot, moneyAxisFormatter, MoneyTooltip } from '@/components/charts/chart-utils';
+import { niceDomain, trimLeadingEmpty, yAxisWidth } from '@/components/charts/chart-scale';
 import { useAccounts } from '@/features/accounts/api';
 import { useCashflowReport } from '../api';
 import { GRANULARITY_OPTIONS } from './categories-tab';
@@ -22,14 +23,20 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
   const report = useCashflowReport({ from, to, granularity, accountId: accountId || undefined });
   const r = report.data;
 
-  const data = (r?.periods ?? []).map((p) => ({
+  // Leading periods without movement say nothing (spec §3, Q6): the charts start at the first one, 4 at least.
+  const periods = r?.periods ?? [];
+  const shown = periods.slice(trimLeadingEmpty(periods.map((p) => p.inflow + p.outflow)));
+  const data = shown.map((p) => ({
     label: p.label,
     entradas: p.inflow,
     saidas: -p.outflow,
     saldo: p.balance,
     projected: p.projected,
   }));
-  const projected = (r?.periods ?? []).filter((p) => p.projected);
+  const projected = shown.filter((p) => p.projected);
+  // The flow and the running balance live on different scales: one chart each, one axis each.
+  const flowAxis = niceDomain(data.flatMap((d) => [d.entradas, d.saidas]));
+  const balanceAxis = niceDomain(data.map((d) => d.saldo));
   const totals = (r?.periods ?? []).reduce(
     (acc, p) => ({ in: acc.in + p.inflow, out: acc.out + p.outflow, pin: acc.pin + p.pendingInflow, pout: acc.pout + p.pendingOutflow }),
     { in: 0, out: 0, pin: 0, pout: 0 },
@@ -55,44 +62,49 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
       </div>
 
       <Card className="p-5">
-        <CardHeader title="Fluxo de caixa" subtitle="Entradas e saídas por período com saldo acumulado" icon={<Waves />} />
+        <CardHeader title="Fluxo de caixa" subtitle="Entradas e saídas por período" icon={<Waves />} />
         <div className="mt-3 flex flex-wrap gap-4">
           <LegendDot color={CHART_COLORS.income} label="Entradas" />
           <LegendDot color={CHART_COLORS.expense} label="Saídas" />
-          <LegendDot color={CHART_COLORS.brand} label="Saldo acumulado" />
         </div>
-        <div className="mt-2 h-80">
+        <div className="mt-2 h-72">
           {report.isPending ? (
             <Skeleton className="h-full" />
           ) : data.length === 0 ? (
             <EmptyState className="h-full" title="Sem dados no período" />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data} margin={{ left: -4, right: 8, top: 8 }} stackOffset="sign">
+              <ComposedChart data={data} margin={{ left: 0, right: 8, top: 8 }} stackOffset="sign">
                 <CartesianGrid vertical={false} stroke="var(--app-chart-grid)" strokeDasharray="4 4" />
                 <XAxis dataKey="label" {...axisProps} />
-                <YAxis {...axisProps} tickFormatter={moneyAxisFormatter} width={60} />
-                {projected.length ? (
-                  <ReferenceArea
-                    x1={projected[0]!.label}
-                    x2={projected[projected.length - 1]!.label}
-                    fill="var(--app-chart-accent)"
-                    fillOpacity={0.06}
-                    stroke="var(--app-chart-accent)"
-                    strokeOpacity={0.2}
-                    strokeDasharray="4 4"
-                    label={{ value: 'Projeção', position: 'insideTop', fill: 'var(--app-muted)', fontSize: 11 }}
-                  />
-                ) : null}
-                <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ entradas: 'Entradas', saidas: 'Saídas', saldo: 'Saldo acumulado' }} />} />
+                <YAxis {...axisProps} domain={flowAxis.domain} ticks={flowAxis.ticks} interval={0} tickFormatter={moneyAxisFormatter} width={yAxisWidth(flowAxis.ticks)} />
+                {projected.length ? <ProjectionArea from={projected[0]!.label} to={projected[projected.length - 1]!.label} /> : null}
+                <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ entradas: 'Entradas', saidas: 'Saídas' }} />} />
                 <Bar dataKey="entradas" name="entradas" stackId="flow" fill={CHART_COLORS.income} radius={[3, 3, 0, 0]} maxBarSize={34} />
                 <Bar dataKey="saidas" name="saidas" stackId="flow" fill={CHART_COLORS.expense} radius={[3, 3, 0, 0]} maxBarSize={34} />
-                <Line type="linear" dataKey="saldo" name="saldo" stroke="var(--app-fg)" strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>
       </Card>
+
+      {data.length > 0 ? (
+        <Card className="p-5">
+          <CardHeader title="Saldo acumulado" subtitle={r ? `Saldo no fim de cada período · termina em ${formatBRL(r.closingBalance)}` : undefined} />
+          <div className="mt-2 h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
+                <CartesianGrid vertical={false} stroke="var(--app-chart-grid)" strokeDasharray="4 4" />
+                <XAxis dataKey="label" {...axisProps} />
+                <YAxis {...axisProps} domain={balanceAxis.domain} ticks={balanceAxis.ticks} interval={0} tickFormatter={moneyAxisFormatter} width={yAxisWidth(balanceAxis.ticks)} />
+                {projected.length ? <ProjectionArea from={projected[0]!.label} to={projected[projected.length - 1]!.label} /> : null}
+                <Tooltip cursor={{ stroke: 'var(--app-border-strong)' }} content={<MoneyTooltip names={{ saldo: 'Saldo acumulado' }} />} />
+                <Line type="linear" dataKey="saldo" name="saldo" stroke="var(--app-fg)" strokeWidth={2} dot={{ r: 2.5, fill: 'var(--app-fg)', strokeWidth: 0 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      ) : null}
 
       {r && r.periods.length ? (
         <Card className="overflow-hidden">
@@ -129,5 +141,21 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+/** The projected periods, shaded with the word "Projeção". */
+function ProjectionArea({ from, to }: { from: string; to: string }) {
+  return (
+    <ReferenceArea
+      x1={from}
+      x2={to}
+      fill="var(--app-chart-accent)"
+      fillOpacity={0.06}
+      stroke="var(--app-chart-accent)"
+      strokeOpacity={0.2}
+      strokeDasharray="4 4"
+      label={{ value: 'Projeção', position: 'insideTop', fill: 'var(--app-muted)', fontSize: 11 }}
+    />
   );
 }

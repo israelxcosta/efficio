@@ -10,6 +10,7 @@ import {
   commitCols,
   compact,
   displaySpan,
+  DEFAULT_PREFS,
   emptyLayout,
   firstFit,
   fitCount,
@@ -453,6 +454,13 @@ describe('sanitize', () => {
     expect(out.cells).toEqual({ 4: { inadimplencia: { x: 0, y: 0 } } });
     expect(out.visible).toEqual({ evolucao: true });
     expect(out.prefs).toEqual({ fluxoModo: 'S', proximosFiltro: 'receber' });
+  });
+
+  it('keeps the "Clientes ativos" line choice of the cash flow only as a boolean', () => {
+    const base = { v: 2, sizes: {}, cells: {}, visible: {} };
+    expect(sanitizeLayout({ ...base, prefs: { fluxoClientes: false } }, WIDGET_SPECS, 'business').prefs).toEqual({ fluxoClientes: false });
+    expect(sanitizeLayout({ ...base, prefs: { fluxoClientes: 'x' } }, WIDGET_SPECS, 'business').prefs).toEqual({});
+    expect(DEFAULT_PREFS.fluxoClientes).toBe(true);
   });
 
   it('clamps cells to the grid, pushes overlaps down and drops hidden cards and bad cells', () => {

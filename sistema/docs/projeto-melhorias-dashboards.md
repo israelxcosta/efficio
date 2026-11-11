@@ -1,6 +1,7 @@
 # Projeto de melhorias: dashboards e relatórios
 
-> Dono: `ui-saas-designer`. Status: **proposta** (10/11/2026). Plano de implementação dos itens 2 a 4:
+> Dono: `ui-saas-designer`. Status: **onda 1 implementada** (10/11/2026: API e web; capturas em
+> `scratchpad/melhorias-shots/`). Plano de implementação dos itens 2 a 4:
 > `docs/superpowers/plans/2026-11-10-evolucao-score-retrabalho.md`.
 > Escopo: **Painel financeiro** (`/financeiro`), **Início da Gestão** (`/`), **Minha área**
 > (`/minha-area`), **Relatórios** financeiros (`/relatorios`, incluindo Inadimplência e

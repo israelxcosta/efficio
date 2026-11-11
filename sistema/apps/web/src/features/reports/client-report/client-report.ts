@@ -3,14 +3,17 @@
 
 import {
   addMonthKey,
-  delinquencyScore,
+  clientScore,
   diffInDays,
   formatBRL,
   monthKey,
-  type DelinquencyScore,
+  NO_REWORK,
+  SCORE_WINDOW_MONTHS,
+  type ClientScore,
   type FeeEntryKind,
   type ISODate,
   type MonthKey,
+  type ReworkCounts,
   type Transaction,
 } from '@effinance/shared';
 import { pluralize } from '@/lib/utils';
@@ -99,6 +102,9 @@ export interface ClientMonth {
   avgDaysLate: number | null;
   /** Something of this month is still open past due. */
   overdue: boolean;
+  /** Open amounts of the month: past due, and not due yet (hatched over the received in the chart). */
+  overdueAmount: number;
+  upcomingAmount: number;
 }
 
 export interface ClientAnalysis {
@@ -130,9 +136,11 @@ export interface ClientAnalysis {
   /** Share late among what fell due in the last 6 months and in the 6 before (null without data). */
   recentLateRate: number | null;
   previousLateRate: number | null;
-  /** Score of the delinquency report over its window of `scoreMonths` months (same as its row). */
-  score: DelinquencyScore;
+  /** The client's score over the last `scoreMonths` (12) months with the rework, the same as its delinquency row. */
+  score: ClientScore;
   scoreMonths: number;
+  /** The rework counts behind `score.reworkPenalty` (zeros when not given). */
+  rework: ReworkCounts;
   firstDue: ISODate | null;
   lastPayment: ISODate | null;
 }
@@ -147,20 +155,21 @@ function lateRate(items: readonly ClientReceivable[]): number | null {
 }
 
 /**
- * The delinquency report's score for this client (apps/api/src/modules/reports/delinquency.ts), so
- * the report and its row agree: receivables due from the first day of the window up to today
- * (settled, or due before today), recent months weighing more, plus every open one past due.
+ * The client's score as the delinquency report computes it (apps/api/src/modules/reports/delinquency.ts),
+ * so the report and its row agree whatever period the report shows: receivables due in the last 12
+ * months (`SCORE_WINDOW_MONTHS`) up to today (settled, or due before today), recent months weighing
+ * more, every open one past due, and the rework penalty (shared `clientScore`).
  */
-export function periodScore(receivables: readonly ClientReceivable[], today: ISODate, months: number): DelinquencyScore {
+export function periodScore(receivables: readonly ClientReceivable[], today: ISODate, rework?: ReworkCounts): ClientScore {
   const current = monthKey(today);
-  const from = `${addMonthKey(current, -(months - 1))}-01`;
+  const from = `${addMonthKey(current, -(SCORE_WINDOW_MONTHS - 1))}-01`;
   const history = receivables
     .filter((r) => r.dueDate >= from && r.dueDate <= today && (r.paidAt !== null || r.dueDate < today))
     .map((r) => ({ daysLate: r.daysLate, monthsAgo: Math.max(0, monthIndex(current) - monthIndex(monthKey(r.dueDate))) }));
-  return delinquencyScore(history, receivables.filter((r) => r.status === 'vencido').length);
+  return clientScore(history, receivables.filter((r) => r.status === 'vencido').length, rework);
 }
 
-export function analyzeClient(receivables: readonly ClientReceivable[], today: ISODate, scoreMonths = 12): ClientAnalysis {
+export function analyzeClient(receivables: readonly ClientReceivable[], today: ISODate, rework?: ReworkCounts): ClientAnalysis {
   const sum = (pick: (r: ClientReceivable) => number, items: readonly ClientReceivable[] = receivables) => items.reduce((acc, r) => acc + pick(r), 0);
   const paid = receivables.filter((r) => r.paidAt);
   const late = receivables.filter(isLate);
@@ -188,6 +197,8 @@ export function analyzeClient(receivables: readonly ClientReceivable[], today: I
         lateCount: lateItems.length,
         avgDaysLate: lateItems.length ? Math.round(sum((r) => r.daysLate, lateItems) / lateItems.length) : null,
         overdue: items.some((r) => r.status === 'vencido'),
+        overdueAmount: sum((r) => (r.status === 'vencido' ? r.amount : 0), items),
+        upcomingAmount: sum((r) => (r.status === 'aberto' ? r.amount : 0), items),
       });
     }
   }
@@ -219,8 +230,9 @@ export function analyzeClient(receivables: readonly ClientReceivable[], today: I
     months,
     recentLateRate: lateRate(recent),
     previousLateRate: lateRate(previous),
-    score: periodScore(receivables, today, scoreMonths),
-    scoreMonths,
+    score: periodScore(receivables, today, rework),
+    scoreMonths: SCORE_WINDOW_MONTHS,
+    rework: rework ?? NO_REWORK,
     firstDue: receivables.length ? receivables.reduce((min, r) => (r.dueDate < min ? r.dueDate : min), receivables[0]!.dueDate) : null,
     lastPayment: payments.length ? payments[payments.length - 1]! : null,
   };

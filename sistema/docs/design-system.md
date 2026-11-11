@@ -164,6 +164,12 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 | RepeatField        | "Não se repete · Repete" (`SegmentedControl sm`) e, ligado, o bloco `rounded-lg border p-3` com Frequência + "A cada", dias da semana (7 botões `aria-pressed`), Dia/Mês (`recurrence-fields.tsx`, os mesmos do `RecurringTaskSheet`), dia não útil, Termina, "Meta e referência" recolhido, resumo `aria-live` e o aviso da primeira data (`repeat-field.tsx`, regras em `repeat-rules.ts`) |
 | AccountMenu        | menu de conta do cabeçalho de Minha área (`components/layout/account-menu.tsx`): botão `outline` com o ícone do tipo de espaço, o nome (`max-w-56`) e chevron; menu `w-72` com Conta, espaços e Nova empresa, tema, Configurações e Sair (`danger`). O avatar do trilho é um link para `/minha-area` (`AvatarLink`, anel `ring-primary` quando ativo) |
 | MiniCalendar       | mês de segunda a domingo (42 dias, dias de 40px), ponto de 5px por dia (`danger` atrasado, `data` em aberto, `border-strong` só concluídas), `Popover w-72` do dia com até 5 itens e "Novo compromisso", teclado de seletor de data (`mini-calendar.tsx`, `mini-calendar-logic.ts`) |
+| PortfolioRiskCard  | "Carteira por risco" da Inadimplência (`PortfolioRiskCardView`, `reports/components/delinquency-gauges.tsx`), no lugar do termômetro (sem degradê): número-herói "2 de 10" (`danger` só com alguém em risco) + "clientes em risco alto ou crítico", `StackBar md` na ordem Crítico → Risco alto → Atenção → Baixo risco, faixas com quadradinho, contagem, nomes (os de mais em aberto primeiro, 3 + "e mais N") e o valor em aberto à direita ("—" sem clientes, "em dia" sem aberto); rodapé com a chance média ("cerca de 1 em cada 3 mensalidades") e "N clientes com retrabalho (M tarefas em 90 dias)". Cores do risco (`RISK_TONE`): Baixo risco neutro (`--app-chart-neutral`), Atenção `warning`, Risco alto `aging-3`, Crítico `danger`; sem verde |
+| Gráfico "Como cada mês foi pago" | barras empilhadas por mês de vencimento (`delinquency-chart.tsx`): no prazo `--app-data`, pago com atraso `--app-warning`, vencido em aberto `stripeFill('danger')`; `SegmentedControl sm` Quantidade · Valor (estado local; abaixo de 480px de card desce para baixo do título); taxa de atraso `text-micro` no topo do segmento mais alto (vermelha acima da média do período); mês corrente com opacidade 0,6, rótulo "Nov/26 / parcial" em duas linhas e sem taxa; meses iniciais vazios cortados (`trimLeadingEmpty`); um eixo (`niceDomain`); tooltip com a média de dias **só das pagas com atraso** e a idade da vencida em aberto mais antiga |
+| ScoreComposition   | partes do score em linhas com o valor à direita (`delinquency-gauges.tsx`): Pontualidade, Em aberto (N) −X, Retrabalho (2 + 1 antiga) −Y, "= score"; `tone="inverse"` no tooltip escuro da coluna Score (as partes zeradas saem) e `full` no relatório do cliente (todas as partes, rótulos longos "2 vencidas", "2 em 90 dias + 1"). Leitor de tela recebe a mesma composição numa linha (`scoreParts`) |
+| ReworkCard         | card "Retrabalho" do relatório do cliente (`client-report/rework-card.tsx`): achado "2 em 90 dias · 3 em 12 meses · −90 pontos no score"; até 5 tarefas (título, "Aberta em", selo `warning` da categoria com o ícone, situação), pontos de cada uma à direita (−40 em `danger`; −10 com "há mais de 90 dias") e "Abrir tarefa ↗" só com título legível; sem retrabalho, `EmptyState compact` "Nenhum retrabalho nos últimos 12 meses"; rodapé com a regra e "Ver categorias" (`page.registry`) |
+| Ponte do honorário | lista com sinais (+ / − / =) e barras horizontais de 4px proporcionais ao maior valor (`evolution/evolution-bridge.tsx`), não cascata: Base anterior (`--app-chart-neutral`), Novos (`data`), Reajustes (`data/45`; negativo em `danger`), Encerrados (`danger`), Base do mês (`primary`, 6px, separada por filete); abaixo "Quem entrou (N)" / "Quem saiu (N)" com iniciais, nome, "contrato iniciado em …" ou o motivo, e "+R$ …/mês" (`success`) / "−R$ …/mês" (`danger`), 5 de cada e "+ N" que expande |
+| Eixo duplo         | proibido, com **uma** exceção: a linha "Clientes ativos" do Fluxo de caixa (modo M) no eixo da direita (inteiro, sem grade própria, marcas "8 cl." alinhadas às do R$, `--app-fg` 1,5px com pontos de 3px, rótulo "8 clientes" no último ponto); o chip "Clientes ativos (eixo direito)" na legenda liga/desliga (`fluxoClientes`) |
 
 ## 4. Padrões de tela
 
@@ -220,6 +226,31 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
   edição em Sheet.
 - **Relatórios**: abas por análise, seletor de período global, gráficos Recharts com tooltips
   formatados em R$, tabelas de apoio e frases de insight.
+  - **Evolução** (`?aba=evolucao`, 2ª aba, ícone `TrendingUp`; janela `6 · 12 · 24 meses` no
+    cabeçalho, `?meses=` fora do padrão 12): linha "Mês de referência" (`?ref=YYYY-MM`, some no mês
+    corrente; "Voltar a novembro (mês atual)"), 4 `KpiCard compact` (Clientes ativos, Honorário
+    mensal recorrente, Ticket médio, Faturado no mês) com a comparação no rodapé e cor só no sinal
+    da base e do honorário; abaixo de 560px de contêiner os 4 viram uma lista num card. "Carteira
+    mês a mês" (3/5: barras divergentes de novos/encerrados com rótulos "+1"/"−1", linha em degraus
+    dos ativos com "8 ativos" no fim, um eixo de contagem com passos inteiros, mês de referência
+    sombreado, clique troca o mês) + ponte do honorário (2/5); "Faturado, recebido e honorário
+    mensal" na largura toda (barras + linha tracejada do honorário no mesmo eixo, mês parcial
+    hachurado); tabela "Mês a mês" semântica (mais recente primeiro, linha de referência
+    destacada, Novos/Encerrados abrem um `Popover` com os nomes, a mais antiga com "—" nas
+    variações; abaixo de `md` vira lista por mês com "+ N meses"); nota das reativações e "Dados de
+    dd/mm/aaaa"; imprime em A4 paisagem.
+  - **Inadimplência**: KPI "Taxa de atraso" com a tendência dos últimos 3 meses completos contra os 3
+    anteriores; Carteira por risco (2/5) + "Como cada mês foi pago" (3/5); "Empresas" com o filtro
+    `Ativos · Todos` (padrão Ativos: inativos sem nada em aberto saem, "N inativos em dia ocultos"
+    no subtítulo); coluna Score com "N retrabalhos em 90 dias" (`RotateCcw` 12px) e a composição no
+    tooltip; no celular o score é a 5ª estatística da grade e o nome fica com a largura toda; o link
+    do relatório do cliente não leva o período (o score é sempre de 12 meses).
+  - **Relatório do cliente**: bloco "Score de 12 meses" com a composição em linhas (espera o
+    retrabalho carregar para não pular), 4 `MiniStat` (Faturado, Recebido, Em aberto,
+    Pontualidade) e os outros 4 números num `dl` compacto no fim de "Quando paga"; "Faturado e
+    recebido por mês" (3/5) com o em aberto empilhado sobre o recebido, hachurado (vencido `danger`,
+    a vencer cinza, rótulo "vencido"/"a vencer") + Vigências (2/5); "Em aberto" (3/5) + Retrabalho
+    (2/5).
 
 ## 5. Revisão "livro-razão" (out/2026)
 

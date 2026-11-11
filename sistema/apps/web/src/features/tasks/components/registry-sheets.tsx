@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -10,6 +10,7 @@ import {
   type TaskDepartment,
   type TaskMember,
 } from '@effinance/shared';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CategoryIcon } from '@/components/ui/category-icon';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -157,7 +158,38 @@ export function DepartmentSheet({
   );
 }
 
-/** New or edited task category (spec §13.5): name, icon, colour and the preview. */
+/** What "Conta como retrabalho" does, in the words of spec §6.1 (fixed copy). */
+export const REWORK_FIELD_HELP =
+  'Tarefas desta categoria abertas para um cliente reduzem o score dele: −40 pontos por tarefa nos últimos 90 dias e −10 pelas de até 12 meses (até −200). Use em categorias como Retificação ou Correção.';
+
+/** The "Conta como retrabalho" checkbox of the category sheet, with its description tied to it. */
+export function ReworkField({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
+  const id = useId();
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-3">
+      <Checkbox id={id} checked={checked} onCheckedChange={onChange} aria-describedby={`${id}-help`} className="mt-px" />
+      <div className="min-w-0">
+        <label htmlFor={id} className="block cursor-pointer text-[13px] font-medium text-fg">
+          Conta como retrabalho
+        </label>
+        <p id={`${id}-help`} className="mt-0.5 text-caption text-muted">
+          {REWORK_FIELD_HELP}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Badge next to the name of a rework category (Cadastros and the tasks report). */
+export function ReworkBadge({ className }: { className?: string }) {
+  return (
+    <Badge tone="warning" className={className}>
+      Retrabalho
+    </Badge>
+  );
+}
+
+/** New or edited task category (spec §13.5 and §6.1): name, icon, colour, rework and the preview. */
 export function TaskCategorySheet({
   open,
   category,
@@ -171,6 +203,7 @@ export function TaskCategorySheet({
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<IconName>('tag');
   const [color, setColor] = useState<string>(DEFAULT_COLOR);
+  const [isRework, setIsRework] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
@@ -178,11 +211,12 @@ export function TaskCategorySheet({
     setName(category?.name ?? '');
     setIcon(category?.icon ?? 'tag');
     setColor(category?.color ?? DEFAULT_COLOR);
+    setIsRework(category?.isRework ?? false);
     setError(undefined);
   }, [open, category]);
 
   async function submit() {
-    const parsed = taskCategoryInputSchema.safeParse({ name, icon, color });
+    const parsed = taskCategoryInputSchema.safeParse({ name, icon, color, isRework });
     if (!parsed.success) {
       setError(firstIssue(parsed.error.issues, 'name') ?? 'Revise os campos');
       return;
@@ -226,11 +260,13 @@ export function TaskCategorySheet({
         <Field label="Cor">
           <ColorPicker value={color} onChange={setColor} />
         </Field>
+        <ReworkField checked={isRework} onChange={setIsRework} />
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium text-fg">Prévia</span>
           <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
             <CategoryIcon tinted icon={icon} color={color} />
-            <span className="text-sm font-semibold text-fg">{name.trim() || 'Nova categoria'}</span>
+            <span className="min-w-0 truncate text-sm font-semibold text-fg">{name.trim() || 'Nova categoria'}</span>
+            {isRework ? <ReworkBadge /> : null}
           </div>
         </div>
       </div>

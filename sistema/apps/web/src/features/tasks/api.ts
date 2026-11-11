@@ -311,7 +311,11 @@ export function useSaveTaskCategory() {
       id
         ? api<TaskCategory>(`/tasks/categories/${id}`, { method: 'PUT', body: input })
         : api<TaskCategory>('/tasks/categories', { method: 'POST', body: input }),
-    onSuccess: () => void invalidateTasks(qc),
+    // "Conta como retrabalho" changes the clients' scores in the financial reports.
+    onSuccess: () => {
+      void invalidateTasks(qc);
+      void qc.invalidateQueries({ queryKey: ['reports'] });
+    },
   });
 }
 
@@ -319,7 +323,10 @@ export function useDeleteTaskCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<void>(`/tasks/categories/${id}`, { method: 'DELETE' }),
-    onSuccess: () => void invalidateTasks(qc),
+    onSuccess: () => {
+      void invalidateTasks(qc);
+      void qc.invalidateQueries({ queryKey: ['reports'] });
+    },
   });
 }
 

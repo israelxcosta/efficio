@@ -2,7 +2,7 @@
 // insights' links and the grouping of "Minhas tarefas" by client.
 import { describe, expect, it } from 'vitest';
 import type { TaskInsight } from '@effinance/shared';
-import { appointmentsToday, greeting, groupMineByClient, insightHref, insightsFinding, myAreaDescription, myMetricCells, officeHour, rhythmFinding } from './my-area-logic';
+import { appointmentsToday, forYouInsights, greeting, groupMineByClient, insightHref, insightsFinding, myAreaDescription, myMetricCells, officeHour, rhythmFinding } from './my-area-logic';
 import { makeOccurrence, makeOverview, makeTask } from './test-fixtures';
 
 describe('header', () => {
@@ -70,6 +70,16 @@ describe('the four numbers', () => {
 });
 
 describe('Para você', () => {
+  it('leaves out what the strip already says (overdue and due today)', () => {
+    const insights: TaskInsight[] = [
+      { key: 'overdue', tone: 'danger', text: '1 tarefa atrasada.', link: { dueBucket: 'overdue' } },
+      { key: 'dueToday', tone: 'warning', text: '2 vencem hoje.', link: null },
+      { key: 'dueTomorrow', tone: 'info', text: '1 vence amanhã.', link: null },
+    ];
+    expect(forYouInsights(insights)).toEqual({ shown: [insights[2]], hidden: 2 });
+    expect(forYouInsights([])).toEqual({ shown: [], hidden: 0 });
+  });
+
   it('links each insight to the filter of "Minhas"', () => {
     expect(insightHref({ situation: 'waiting' })).toBe('/tarefas?escopo=minhas&situacao=aguardando');
     expect(insightHref({ dueDate: '2026-11-06' })).toBe('/tarefas?escopo=minhas&vencimento=2026-11-06');

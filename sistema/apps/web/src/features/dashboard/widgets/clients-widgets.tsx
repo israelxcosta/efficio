@@ -27,7 +27,7 @@ import { useTone } from '@/lib/theme';
 import { useElementSize } from '@/lib/use-element-size';
 import { cn, pluralize } from '@/lib/utils';
 import { REGIME_COLORS } from '@/features/clients/clients-summary';
-import { useContactReport } from '@/features/reports/api';
+import { useContactReport, useEvolutionReport } from '@/features/reports/api';
 import type { WidgetProps } from '../layout/types';
 import { FitList, WidgetCard } from '../layout/widget-card';
 import { feesMonthInsight, portfolioInsight } from './insight-lines';
@@ -153,6 +153,9 @@ function RegimeShares({ slices, total }: { slices: CategoryAmount[]; total: numb
 /** Active and inactive clients, the monthly fixed fees and how they split by tax regime. */
 export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
   const clients = useOfficeClients();
+  // The change of the base against the previous month (spec §4.1): the evolution of the current month.
+  const evolution = useEvolutionReport({ months: 1 });
+  const comparison = evolution.data?.comparison;
   const tone = useTone();
   const chartBox = useElementSize();
   const data = clients.data;
@@ -285,16 +288,28 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
 
   return (
     <WidgetCard
-      subtitle={(summary && portfolioInsight(summary.active, summary.averageFee || null)) ?? 'Clientes ativos, inativos e honorários'}
+      subtitle={
+        (summary &&
+          portfolioInsight(summary.active, summary.averageFee || null, comparison ? { diff: comparison.metrics.activeClients.diff, previous: comparison.previous } : null)) ??
+        'Clientes ativos, inativos e honorários'
+      }
       info="Honorário fixo: soma dos honorários mensais vigentes hoje dos clientes ativos (sem a taxa por empregado). O gráfico divide esse total por regime tributário; entre parênteses, os clientes ativos de cada regime."
       alert={alert}
       footer={
         summary ? (
           <div className="flex items-center justify-between gap-3">
             <p className="min-w-0 truncate text-caption text-muted">{pluralize(summary.active + summary.inactive, 'empresa', 'empresas')} na carteira</p>
-            <Link to="/clientes" className="shrink-0 text-caption font-medium whitespace-nowrap text-brand-text hover:underline">
-              Ver clientes →
-            </Link>
+            <span className="flex shrink-0 items-center gap-2 text-caption">
+              <Link to="/relatorios?aba=evolucao" className="font-medium whitespace-nowrap text-brand-text hover:underline">
+                Ver evolução →
+              </Link>
+              <span className="text-subtle" aria-hidden>
+                ·
+              </span>
+              <Link to="/clientes" className="font-medium whitespace-nowrap text-brand-text hover:underline">
+                Ver clientes →
+              </Link>
+            </span>
           </div>
         ) : undefined
       }

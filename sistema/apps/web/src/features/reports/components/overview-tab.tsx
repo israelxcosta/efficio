@@ -8,23 +8,48 @@ import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { TransactionRow } from '@/features/transactions/components/transaction-row';
 import { InsightList } from '@/features/dashboard/components/insights-tab';
+import { cn } from '@/lib/utils';
+import type { ChangeParts } from '@/features/dashboard/kpi-logic';
 import { useOverviewReport } from '../api';
+import { overviewChanges, previousRange } from '../period-compare';
+
+const CHANGE_TONE = { success: 'text-success', danger: 'text-danger', muted: 'text-muted' } as const;
+
+/** "+20,0% vs outubro" with the colour on the change only; "—" without a base. */
+function ChangeHint({ change, label }: { change: ChangeParts | null | undefined; label: string }) {
+  if (change === undefined) return null;
+  if (change === null) return <span className="text-subtle">sem base {label.replace(/^vs /, 'em ')}</span>;
+  return (
+    <span>
+      <span className={cn('tabular font-semibold', CHANGE_TONE[change.tone])}>{change.text}</span> {label}
+    </span>
+  );
+}
 
 export function OverviewTab({ from, to }: { from: string; to: string }) {
   const report = useOverviewReport({ from, to });
+  // The same report for the period before (spec §3, Q7): every figure says if it got better.
+  const previous = previousRange(from, to);
+  const before = useOverviewReport({ from: previous.from, to: previous.to });
   if (report.isError) return <ErrorState error={report.error} onRetry={() => report.refetch()} />;
   const o = report.data;
   const v = (n: number | undefined) => (n === undefined ? '—' : formatBRL(n));
   const totalSplit = o ? o.fixedExpense + o.variableExpense + o.installmentExpense : 0;
+  const changes = o && before.data && !before.isPlaceholderData ? overviewChanges(o, before.data) : undefined;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <MiniStat label="Receitas" value={v(o?.income)} tone="success" />
-        <MiniStat label="Despesas" value={v(o?.expense)} />
-        <MiniStat label="Resultado" value={v(o?.net)} tone={o && o.net < 0 ? 'danger' : undefined} />
-        <MiniStat label="Margem" value={o ? formatPercent(o.savingsRate ?? 0, 1) : '—'} />
-        <MiniStat label="Gasto médio diário" value={v(o?.averageDailyExpense)} className="col-span-2 lg:col-span-1" />
+        <MiniStat label="Receitas" value={v(o?.income)} tone="success" hint={<ChangeHint change={changes?.income} label={previous.label} />} />
+        <MiniStat label="Despesas" value={v(o?.expense)} hint={<ChangeHint change={changes?.expense} label={previous.label} />} />
+        <MiniStat label="Resultado" value={v(o?.net)} tone={o && o.net < 0 ? 'danger' : undefined} hint={<ChangeHint change={changes?.net} label={previous.label} />} />
+        <MiniStat label="Margem" value={o ? formatPercent(o.savingsRate ?? 0, 1) : '—'} hint={<ChangeHint change={changes?.savingsRate} label={previous.label} />} />
+        <MiniStat
+          label="Gasto médio diário"
+          value={v(o?.averageDailyExpense)}
+          className="col-span-2 lg:col-span-1"
+          hint={<ChangeHint change={changes?.averageDailyExpense} label={previous.label} />}
+        />
       </div>
 
       <Card className="p-5">

@@ -37,7 +37,7 @@ import {
   useTaskOptions,
   useTasks,
 } from '../api';
-import { DepartmentSheet, TaskCategorySheet } from '../components/registry-sheets';
+import { DepartmentSheet, ReworkBadge, TaskCategorySheet } from '../components/registry-sheets';
 import { namesSummary } from '../format';
 import { tasksHref } from '../url-state';
 import { UnionsTab, useUnionsHeader } from '@/features/unions/components/unions-tab';
@@ -337,7 +337,10 @@ function CategoriesTab({
             <div key={c.id} className={rowClass}>
               <CategoryIcon icon={c.icon} color={c.color} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-fg">{c.name}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm font-semibold text-fg">{c.name}</span>
+                  {c.isRework ? <ReworkBadge className="shrink-0" /> : null}
+                </span>
                 <span className="mt-0.5 block text-xs text-muted">{pluralize(c.taskCount, 'tarefa', 'tarefas')}</span>
               </span>
               <Link to={tasksHref({ scope: 'all', category: c.id, situation: 'all' })} className="hidden text-caption font-medium text-brand-text hover:underline @md:inline">

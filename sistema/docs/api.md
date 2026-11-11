@@ -211,14 +211,15 @@ vencimento no período que estão pagos ou já venceram (vencendo hoje ainda nã
   vencimento · pago depois · vencido em aberto; somam `dueCount`), os três valores, `paidLateAvgDays`
   (média dos pagos com atraso, 1 casa) e `partial` (mês corrente). `summary.reworkCount` (retrabalhos
   em 90 dias dos clientes do relatório) e `summary.reworkClients` (quantos têm algum).
-- **Relatório do cliente** (web, `/relatorios/cliente/:id?meses=`, botão em cada linha): lê todos
-  os lançamentos de receita do cliente em `GET /transactions?contactId=&type=income` (páginas de
-  200) e calcula no navegador (`features/reports/client-report/client-report.ts`, testado) o
-  histórico, pontualidade, faixas de atraso, mapa de pagamentos, ano a ano e o score da linha
-  (`periodScore`). O retrabalho do cliente vem ao lado do histórico, em `GET /reports/clients/:id/rework`;
-  para o score bater com a linha, o web usa a janela fixa de 12 meses e passa `rework` a `clientScore`
-  (pendente no web, tarefa 10 do plano: hoje `periodScore` usa a janela de `?meses=` e
-  `delinquencyScore`, já v2, sem o retrabalho).
+- **Relatório do cliente** (web, `/relatorios/cliente/:id`, botão em cada linha; `?meses=` só para o
+  link de volta à inadimplência): lê todos os lançamentos de receita do cliente em
+  `GET /transactions?contactId=&type=income` (páginas de 200) e calcula no navegador
+  (`features/reports/client-report/client-report.ts`, testado) o histórico, pontualidade, faixas de
+  atraso, mapa de pagamentos, ano a ano e o score da linha (`periodScore`). O retrabalho do cliente
+  vem ao lado do histórico, em `GET /reports/clients/:id/rework` (carrega com a página, chave
+  `['reports', 'client-rework', …]`); para o score bater com a linha, `periodScore` usa sempre a
+  janela fixa de 12 meses (`SCORE_WINDOW_MONTHS`) e passa as contagens a `clientScore`. Salvar ou
+  excluir uma categoria de tarefa invalida `['reports']` (o "Conta como retrabalho" muda o score).
 - Consultas: um SELECT com junção em `contacts` e a soma dos juros/multa de cada linha por
   subconsulta correlacionada (índice parcial em `late_fee_of`) — sem listas de ids, que estourariam
   o limite de parâmetros num escritório grande; os dados de contato vêm decifrados em lotes.

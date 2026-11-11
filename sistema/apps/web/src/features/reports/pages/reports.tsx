@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { AlarmClock, GitCompareArrows, LayoutDashboard, Tags, Users, Waves } from 'lucide-react';
+import { AlarmClock, GitCompareArrows, LayoutDashboard, Tags, TrendingUp, Users, Waves } from 'lucide-react';
 import { PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { CashflowTab } from '../components/cashflow-tab';
 import { CategoriesTab } from '../components/categories-tab';
 import { ComparisonTab } from '../components/comparison-tab';
 import { ContactsTab } from '../components/contacts-tab';
-import { DelinquencyMonthsControl, DelinquencyTab } from '../components/delinquency-tab';
+import { DelinquencyTab } from '../components/delinquency-tab';
+import { ReportMonthsControl } from '../components/report-months';
+import { EvolutionTab } from '../evolution/evolution-tab';
 import { OverviewTab } from '../components/overview-tab';
 import { useActiveMonth } from '@/lib/active-month';
 import { PeriodFilter, presetRange, type ReportPeriod } from '../components/period-filter';
 
-type Tab = 'overview' | 'categories' | 'contacts' | 'comparison' | 'cashflow' | 'inadimplencia';
+type Tab = 'overview' | 'evolucao' | 'categories' | 'contacts' | 'comparison' | 'cashflow' | 'inadimplencia';
 
 /**
  * Each report keeps its own period while the app is open. "Mês" follows the active month and
@@ -29,6 +31,7 @@ const DEFAULT_PERIOD: Partial<Record<Tab, ReportPeriod>> = {
 /** What each report counts, in the office's words (competência vs caixa). */
 const DESCRIPTIONS: Record<Tab, string> = {
   overview: 'Receitas, despesas e resultado do período pelo regime de competência (data de vencimento).',
+  evolucao: 'Clientes, honorário mensal e faturamento mês a mês, comparados ao mês anterior.',
   categories: 'Despesas e receitas por categoria, mês a mês, pelo regime de competência.',
   contacts: 'Movimentação por cliente e fornecedor, pelo regime de competência.',
   comparison: 'Dois períodos lado a lado, pelo regime de competência.',
@@ -65,7 +68,9 @@ export default function ReportsPage() {
         description={DESCRIPTIONS[tab]}
         actions={
           tab === 'inadimplencia' ? (
-            <DelinquencyMonthsControl />
+            <ReportMonthsControl ariaLabel="Período do relatório de inadimplência" />
+          ) : tab === 'evolucao' ? (
+            <ReportMonthsControl ariaLabel="Janela da evolução" />
           ) : tab !== 'comparison' ? (
             <PeriodFilter value={period} activeMonth={activeMonth} onChange={setPeriod} onMonthChange={setActiveMonth} />
           ) : null
@@ -76,9 +81,10 @@ export default function ReportsPage() {
         <SegmentedControl
           ariaLabel="Relatório"
           value={tab}
-          onChange={(t) => update({ aba: t === 'overview' ? null : t, meses: null })}
+          onChange={(t) => update({ aba: t === 'overview' ? null : t, meses: null, ref: null })}
           options={[
             { value: 'overview', label: 'Visão geral', icon: <LayoutDashboard /> },
+            { value: 'evolucao', label: 'Evolução', icon: <TrendingUp /> },
             { value: 'categories', label: 'Categorias', icon: <Tags /> },
             { value: 'contacts', label: 'Contatos', icon: <Users /> },
             { value: 'comparison', label: 'Comparação', icon: <GitCompareArrows /> },
@@ -89,6 +95,7 @@ export default function ReportsPage() {
       </div>
 
       {tab === 'overview' ? <OverviewTab from={range.from} to={range.to} /> : null}
+      {tab === 'evolucao' ? <EvolutionTab /> : null}
       {tab === 'categories' ? <CategoriesTab from={range.from} to={range.to} /> : null}
       {tab === 'contacts' ? <ContactsTab from={range.from} to={range.to} /> : null}
       {tab === 'comparison' ? <ComparisonTab /> : null}

@@ -156,11 +156,15 @@ export function MyTasksCardView({ data, loading, error, onRetry, today, onNewTas
 const INSIGHT_TONE_CLASS: Record<TaskInsight['tone'], string> = { danger: 'text-danger', warning: 'text-warning', success: 'text-success', info: 'text-muted' };
 
 /** The API's insights (up to 6, in its order), each one a link to "Minhas" with its filter when it has one. */
-export function ForYouCardView({ insights }: { insights: TaskInsight[] }) {
+export function ForYouCardView({ insights, hidden = 0 }: { insights: TaskInsight[]; hidden?: number }) {
   return (
-    <WidgetCard title="Para você" subtitle={insightsFinding(insights)}>
+    <WidgetCard title="Para você" subtitle={insights.length === 0 && hidden > 0 ? 'Sem outros avisos' : insightsFinding(insights)}>
       {insights.length === 0 ? (
-        <BodyEmpty title="Tudo em dia" />
+        hidden > 0 ? (
+          <BodyEmpty title="Sem outros avisos" description="As atrasadas e as de hoje estão na faixa acima." />
+        ) : (
+          <BodyEmpty title="Tudo em dia" />
+        )
       ) : (
         <ul className="flex flex-col gap-0.5">
           {insights.slice(0, 6).map((i, n) => {
