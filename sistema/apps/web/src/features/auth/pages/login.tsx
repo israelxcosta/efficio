@@ -19,6 +19,37 @@ import { landingPath } from '@/components/layout/area-memory';
 
 type LoginForm = z.input<typeof loginSchema>;
 
+/** The login is the office's portal: clients and the team sign in with the e-mail the office registered. */
+export const PORTAL_LOGIN_COPY = {
+  title: 'Portal Efficio',
+  subtitle: 'Entre com o e-mail cadastrado pelo escritório.',
+} as const;
+
+/**
+ * Access is by invitation of the office, so the login offers no sign-up. The only way to the sign-up
+ * screen is from an invite (the invite page sends here with `from: /convite/...`).
+ */
+export function LoginFooter({ state, fromInvite }: { state: unknown; fromInvite: boolean }) {
+  if (fromInvite) {
+    return (
+      <>
+        Ainda não tem acesso?{' '}
+        <Link to="/cadastro" state={state} className="font-semibold text-brand-text hover:underline">
+          Criar acesso com o convite
+        </Link>
+      </>
+    );
+  }
+  return (
+    <>
+      Primeiro acesso? Use o link do convite que o escritório enviou para o seu e-mail.{' '}
+      <Link to="/site" className="font-semibold text-brand-text hover:underline">
+        Voltar ao site
+      </Link>
+    </>
+  );
+}
+
 export default function LoginPage() {
   const { user, workspace, loading, login } = useAuth();
   const navigate = useNavigate();
@@ -65,21 +96,14 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Bem-vindo de volta"
-      subtitle="Entre para acompanhar suas finanças."
-      footer={
-        <>
-          Ainda não tem conta?{' '}
-          <Link to="/cadastro" state={location.state} className="font-semibold text-brand-text hover:underline">
-            Criar conta grátis
-          </Link>
-        </>
-      }
+      title={PORTAL_LOGIN_COPY.title}
+      subtitle={PORTAL_LOGIN_COPY.subtitle}
+      footer={<LoginFooter state={location.state} fromInvite={from.startsWith('/convite')} />}
     >
       {IS_DEMO ? (
         <p className="mb-4 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-[13px] text-fg">
           <strong className="font-semibold">Ambiente de testes.</strong> A conta de demonstração já está
-          preenchida — é só clicar em Entrar. Você também pode criar sua própria conta.
+          preenchida — é só clicar em Entrar.
         </p>
       ) : null}
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>

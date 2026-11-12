@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthLayout title="Esqueci minha senha" subtitle="Informe seu e-mail e enviaremos um link para redefinir a senha." footer={footer}>
+    <AuthLayout title="Esqueci minha senha" subtitle="Informe o e-mail cadastrado pelo escritório e enviaremos um link para criar outra senha." footer={footer}>
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <Field label="E-mail" error={form.formState.errors.email?.message}>
           <Input type="email" autoComplete="email" placeholder="voce@email.com" autoFocus {...form.register('email')} />

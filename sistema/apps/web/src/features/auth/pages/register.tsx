@@ -52,11 +52,11 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Crie sua conta"
-      subtitle="Organize o financeiro da sua empresa em minutos."
+      title="Crie seu acesso ao portal"
+      subtitle="Use o e-mail em que você recebeu o convite do escritório."
       footer={
         <>
-          Já tem conta?{' '}
+          Já tem acesso?{' '}
           <Link to="/login" state={location.state} className="font-semibold text-brand-text hover:underline">
             Entrar
           </Link>
