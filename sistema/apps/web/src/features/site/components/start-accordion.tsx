@@ -11,8 +11,6 @@ const STEP_LOOK: Record<StepId, { bg: string; fg: string }> = {
   rotina: { bg: 'var(--site-blue-3)', fg: 'var(--site-ink)' },
 };
 
-const FIRST_TALK = ['O CNPJ, ou a ideia do negócio', 'O regime tributário de hoje', 'Quantas pessoas trabalham na empresa', 'Faturamento e notas emitidas por mês'];
-
 export function StartAccordion() {
   const [open, setOpen] = useState<StepId>('conversa');
 
@@ -49,18 +47,7 @@ export function StartAccordion() {
                 <div id={`etapa-${step.id}`} className="site-step__panel" hidden={!isOpen}>
                   <p className="site-step__text">{step.text}</p>
                   <div className="site-step__aside">
-                    {step.id === 'conversa' ? (
-                      <div>
-                        <p className="site-step__aside-title">Para a primeira conversa</p>
-                        <ul className="site-step__list">
-                          {FIRST_TALK.map((item) => (
-                            <li key={item}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <StepShot id={step.id} />
-                    )}
+                    <StepShot id={step.id} />
                   </div>
                 </div>
               </li>

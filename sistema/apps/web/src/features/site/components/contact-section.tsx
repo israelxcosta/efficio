@@ -38,12 +38,30 @@ export function ContactSection({ subject, onSubjectChange }: { subject: string; 
       </div>
 
       <div className="site-wrap site-contato__body">
-        <h2 id="contato-title" tabIndex={-1} data-section-heading data-reveal>
-          Fale com o escritório
-        </h2>
-        <p className="site-contato__lead" data-reveal style={{ '--d': '80ms' } as CSSProperties}>
-          Diga o seu nome e o assunto: o WhatsApp abre com a mensagem escrita. Atendimento: {OFFICE.hours.toLowerCase()}.
-        </p>
+        <div className="site-grid site-contato__head">
+          <div>
+            <h2 id="contato-title" tabIndex={-1} data-section-heading data-reveal>
+              Fale com o escritório
+            </h2>
+            <p className="site-contato__lead" data-reveal style={{ '--d': '80ms' } as CSSProperties}>
+              Diga o seu nome e o assunto: o WhatsApp abre com a mensagem escrita, e você confere antes de enviar.
+            </p>
+          </div>
+          <dl className="site-contato__ways" data-reveal style={{ '--d': '140ms' } as CSSProperties}>
+            <div>
+              <dt>WhatsApp</dt>
+              <dd>{OFFICE.whatsappLabel}</dd>
+            </div>
+            <div>
+              <dt>Atendimento</dt>
+              <dd>{OFFICE.hours}</dd>
+            </div>
+            <div>
+              <dt>Endereço</dt>
+              <dd>{OFFICE.address}</dd>
+            </div>
+          </dl>
+        </div>
 
         <form className="site-contact-bar" onSubmit={submit} data-reveal style={{ '--d': '160ms' } as CSSProperties}>
           <label className="site-sr-only" htmlFor="contato-nome">
@@ -72,9 +90,7 @@ export function ContactSection({ subject, onSubjectChange }: { subject: string; 
               {OFFICE.email}
             </ExternalLink>
           </p>
-          <p>
-            WhatsApp {OFFICE.whatsappLabel}. Nada é enviado antes de você confirmar no aplicativo.
-          </p>
+          <p>Abre o WhatsApp com a mensagem pronta. Nada é enviado antes de você confirmar no aplicativo.</p>
         </div>
       </div>
     </section>

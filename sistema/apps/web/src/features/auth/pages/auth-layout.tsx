@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import { ArrowDown, ArrowRight, Building2, ChartLine, HandCoins, Landmark, Receipt, Truck } from 'lucide-react';
 
 const NODES = [
@@ -14,7 +15,10 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
       <div className="flex flex-col px-6 py-8 sm:px-12">
-        <span className="text-lg font-extrabold tracking-tight">efficio</span>
+        {/* Back to the office's site (visitors see it at `/`; signed-in users at `/site`). */}
+        <Link to="/site" className="self-start text-lg font-extrabold tracking-tight" aria-label="Efficio Contabilidade: voltar ao site">
+          efficio
+        </Link>
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
           <h1 className="text-[28px] font-semibold tracking-tight">{title}</h1>
           <p className="mt-1.5 text-sm text-muted">{subtitle}</p>

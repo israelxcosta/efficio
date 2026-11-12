@@ -64,8 +64,8 @@ export function ExternalLink({ href, className, children, ...props }: AnchorHTML
 }
 
 /**
- * Arrivals of the sections: elements with `data-reveal` rise (or open) once, when their top passes
- * 88% of the viewport. Without IntersectionObserver or with reduced motion, everything is shown as is.
+ * Arrivals of the sections: elements with `data-reveal` rise (or open) once, when they enter the
+ * viewport. Without IntersectionObserver or with reduced motion, everything is shown as is.
  */
 export function useReveal<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -81,11 +81,34 @@ export function useReveal<T extends HTMLElement>() {
           observer.unobserve(entry.target);
         }
       },
-      { rootMargin: '0px 0px -12% 0px', threshold: 0.01 },
+      // No bottom inset: consecutive screens tile the page, so a short element is never skipped by a fast scroll.
+      { rootMargin: '0px', threshold: 0 },
     );
-    root.querySelectorAll('[data-reveal]').forEach((el) => observer.observe(el));
+    const pending = new Set(root.querySelectorAll<HTMLElement>('[data-reveal]'));
+    pending.forEach((el) => observer.observe(el));
+    // A jump (a link, the End key, a fast fling) can carry an element past the screen between two
+    // frames without it ever intersecting: whatever is already above the bottom of the screen is shown.
+    let frame = 0;
+    const sweep = () => {
+      frame = 0;
+      for (const el of pending) {
+        if (el.classList.contains('is-in')) pending.delete(el);
+        else if (el.getBoundingClientRect().top < window.innerHeight) {
+          el.classList.add('is-in');
+          observer.unobserve(el);
+          pending.delete(el);
+        }
+      }
+      if (!pending.size) window.removeEventListener('scroll', onScroll);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(sweep);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       observer.disconnect();
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
       root.classList.remove('site--motion');
     };
   }, []);

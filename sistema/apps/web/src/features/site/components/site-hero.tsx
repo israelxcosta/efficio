@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { MessageCircle } from 'lucide-react';
+import { monthAgenda, MONTHS } from '../obligations';
 import { CHAPTERS, OFFICE, whatsappHref } from '../site-content';
 import { ExternalLink, PortalLink, SectionLink } from './site-ui';
 
@@ -12,7 +13,17 @@ const FOLDER_LOOK: Record<(typeof CHAPTERS)[number]['id'], { bg: string; fg: str
   contato: { bg: 'var(--site-navy)', fg: 'var(--site-on-dark)', x: '76%', xPhone: '62%' },
 };
 
-export function SiteHero() {
+/** "Em novembro, uma empresa do Simples com funcionários tem 7 entregas; a próxima vence no dia 15." */
+export function monthLine(today: Date): string {
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+  const agenda = monthAgenda(year, month, 'simples', true);
+  const next = agenda.days.find((d) => d.day >= today.getDate());
+  const when = next ? `a próxima vence no dia ${next.day}` : 'as datas do mês já passaram';
+  return `Em ${MONTHS[month - 1]}, uma empresa do Simples com funcionários tem ${agenda.total} entregas; ${when}.`;
+}
+
+export function SiteHero({ today = new Date() }: { today?: Date }) {
   // Back to front: the last chapter is the folder at the back, "O seu mês" is the open one in front.
   const stack = [...CHAPTERS].reverse();
   return (
@@ -56,7 +67,7 @@ export function SiteHero() {
                     <MessageCircle aria-hidden />
                     Falar com o escritório
                   </ExternalLink>
-                  <p className="site-folder__note">Escolha o regime abaixo e veja o que a sua empresa entrega este mês.</p>
+                  <p className="site-folder__note">{monthLine(today)}</p>
                 </div>
               ) : null}
             </div>

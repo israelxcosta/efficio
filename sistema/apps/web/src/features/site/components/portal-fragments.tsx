@@ -204,7 +204,7 @@ export function PortalHome() {
       title={CLIENT}
       sub="Simples Nacional · obrigações de outubro de 2026"
       aside={
-        <span className="ui-cal__nav" aria-hidden>
+        <span className="ui-cal__nav ui-wide-only" aria-hidden>
           <span className="ui-btn ui-btn--outline">
             <ChevronLeft size={14} />
           </span>
@@ -239,6 +239,27 @@ export function PortalHome() {
           { status: 'doing', title: 'Balancete de setembro', meta: 'vence 26/10' },
         ]}
       />
+    </Panel>
+  );
+}
+
+function ClientCardShot() {
+  return (
+    <Panel title="Ficha do cliente" sub={`${CLIENT} · primeira conversa`} foot={<><span>Preenchida na conversa</span><span>vira a proposta</span></>}>
+      <ul className="ui-rows">
+        {[
+          ['Atividade', 'restaurante e lanchonete'],
+          ['Regime de hoje', 'Simples Nacional'],
+          ['Funcionários', '3'],
+          ['Notas por mês', 'cerca de 40'],
+          ['Faturamento', 'R$ 85 mil por mês, em média'],
+        ].map(([k, v]) => (
+          <li key={k} style={{ gridTemplateColumns: '120px minmax(0,1fr)' }}>
+            <span className="ui-row-meta">{k}</span>
+            <span className="ui-row-title">{v}</span>
+          </li>
+        ))}
+      </ul>
     </Panel>
   );
 }
@@ -322,8 +343,9 @@ function RoutineShot() {
   );
 }
 
-/** The picture of each stage of "Como começar" (the first one, the conversation, is a list in words). */
-export function StepShot({ id }: { id: Exclude<StepId, 'conversa'> }) {
+/** The picture of each stage of "Como começar". */
+export function StepShot({ id }: { id: StepId }) {
+  if (id === 'conversa') return <ClientCardShot />;
   if (id === 'proposta') return <ContractShot />;
   if (id === 'transicao') return <TransitionShot />;
   if (id === 'portal') return <InviteShot />;

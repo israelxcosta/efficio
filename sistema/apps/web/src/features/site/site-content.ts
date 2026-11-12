@@ -79,7 +79,7 @@ export const PORTAL_FEATURES = [
   { id: 'pendencias', sentence: 'O que depende de você fica separado', result: '1 pendência: extratos bancários de setembro, pedidos em 06/10.', on: false },
   { id: 'documentos', sentence: 'Cada documento guardado no seu mês', result: 'Setembro de 2026: 9 arquivos, entre guias, holerites e recibos.', on: true },
   { id: 'prazos', sentence: 'Os prazos do mês num calendário', result: 'Outubro: 7 entregas, 5 concluídas, 1 em andamento e 1 aguardando você.', on: false },
-  { id: 'seguranca', sentence: 'Entrada com verificação em duas etapas', result: 'Código de 6 dígitos do aplicativo autenticador a cada novo acesso.', on: false },
+  { id: 'seguranca', sentence: 'Senha e código em duas etapas', result: 'Código de 6 dígitos do aplicativo autenticador a cada novo acesso.', on: false },
 ] as const;
 
 export type StepId = 'conversa' | 'proposta' | 'transicao' | 'portal' | 'rotina';

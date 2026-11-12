@@ -1,30 +1,66 @@
-import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { mailtoHref, OFFICE, whatsappHref } from '../site-content';
 import { ExternalLink, PortalLink, SectionLink } from './site-ui';
 
 /** The wordmark built from blocks: each letter knocked out of its own rectangle, bottoms aligned. */
 const BLOCKS = [
-  { letter: 'e', h: '100%', bg: 'var(--site-sky)' },
-  { letter: 'f', h: '78%', bg: 'var(--site-blue-3)' },
-  { letter: 'f', h: '90%', bg: 'var(--site-white)' },
-  { letter: 'i', h: '64%', bg: 'var(--site-accent)' },
-  { letter: 'c', h: '84%', bg: 'var(--site-blue-2)' },
-  { letter: 'i', h: '70%', bg: 'var(--site-paper)' },
-  { letter: 'o', h: '96%', bg: 'var(--site-sky)' },
+  { letter: 'e', h: 1, fill: 'var(--site-sky)' },
+  { letter: 'f', h: 0.74, fill: 'var(--site-blue-3)' },
+  { letter: 'f', h: 0.9, fill: 'var(--site-white)' },
+  { letter: 'i', h: 0.82, fill: 'var(--site-accent)' },
+  { letter: 'c', h: 0.64, fill: 'var(--site-blue-2)' },
+  { letter: 'i', h: 0.78, fill: 'var(--site-paper)' },
+  { letter: 'o', h: 0.96, fill: 'var(--site-sky)' },
 ];
+
+/**
+ * The mark as one drawing: `rows` splits the seven blocks (one row on wide screens, "effi" over "cio"
+ * on a phone). Each row is `rowH` tall, blocks share the width with 8-unit gaps.
+ */
+function BlockMark({ rows, width, rowH, fontSize, className }: { rows: number[]; width: number; rowH: number; fontSize: number; className: string }) {
+  const gap = 8;
+  let index = 0;
+  const shapes = rows.flatMap((count, row) => {
+    const w = (width - gap * (count - 1)) / count;
+    const bottom = rowH * (row + 1) + gap * row;
+    return Array.from({ length: count }, (_, i) => {
+      const b = BLOCKS[index++]!;
+      const x = i * (w + gap);
+      const h = rowH * b.h;
+      const id = `site-mark-${className}-${index}`;
+      return (
+        <g key={id}>
+          <clipPath id={id}>
+            <rect x={x} y={bottom - h} width={w} height={h} />
+          </clipPath>
+          <rect x={x} y={bottom - h} width={w} height={h} style={{ fill: b.fill }} />
+          <text
+            x={x + w / 2}
+            y={bottom - fontSize * 0.06}
+            textAnchor="middle"
+            clipPath={`url(#${id})`}
+            style={{ fill: 'var(--site-navy)', fontSize, fontWeight: 800, letterSpacing: '-0.04em' }}
+          >
+            {b.letter}
+          </text>
+        </g>
+      );
+    });
+  });
+  const height = rowH * rows.length + gap * (rows.length - 1);
+  return (
+    <svg className={className} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="efficio">
+      {shapes}
+    </svg>
+  );
+}
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
   return (
     <footer className="site-footer">
-      <div className="site-mark" role="img" aria-label="efficio">
-        {BLOCKS.map((b, i) => (
-          <span key={i} className="site-mark__block" style={{ '--h': b.h, '--block-bg': b.bg } as CSSProperties}>
-            <span aria-hidden>{b.letter}</span>
-          </span>
-        ))}
-      </div>
+      <BlockMark className="site-mark site-mark--wide" rows={[7]} width={1400} rowH={330} fontSize={270} />
+      <BlockMark className="site-mark site-mark--phone" rows={[4, 3]} width={400} rowH={190} fontSize={170} />
 
       <div className="site-grid site-footer__cols">
         <nav className="site-footer__links" aria-label="Rodapé">
