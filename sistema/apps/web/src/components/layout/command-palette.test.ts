@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SearchResponse } from '@effinance/shared';
-import { contactPathFor, paletteAreaFor, paletteNavFor, SEARCH_PLACEHOLDERS, visibleSearchHits } from './command-palette';
+import { contactPathFor, filterPaletteGroups, matchesPaletteQuery, paletteAreaFor, paletteNavFor, SEARCH_PLACEHOLDERS, visibleSearchHits } from './command-palette';
 import { FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS } from './nav';
 
 // A search answer with hits of both areas, as an administrator gets it (or as it stays in the cache
@@ -139,5 +139,61 @@ describe('SEARCH_PLACEHOLDERS (⌘K)', () => {
   it('says what each area searches', () => {
     expect(SEARCH_PLACEHOLDERS.gestao).toBe('Buscar tarefas, clientes, páginas ou ações…');
     expect(SEARCH_PLACEHOLDERS.financeiro).toBe('Buscar lançamentos, contas, clientes, páginas ou ações…');
+  });
+});
+
+describe('filterPaletteGroups (⌘K actions and pages while searching)', () => {
+  const groups = [
+    {
+      heading: 'Ações do financeiro',
+      entries: [
+        { id: 'expense', label: 'Nova despesa' },
+        { id: 'income', label: 'Nova receita' },
+        { id: 'invest', label: 'Investir', keywords: 'aplicar' },
+      ],
+    },
+    {
+      heading: 'Ir para · Financeiro',
+      entries: [
+        { id: 'payables', label: 'Contas a pagar', keywords: 'despesas boletos vencimentos' },
+        { id: 'transfers', label: 'Transferências e investimentos', keywords: 'investir aplicar resgatar mover' },
+      ],
+    },
+    { heading: 'Outros', entries: [{ id: 'settings', label: 'Configurações', keywords: 'perfil senha' }] },
+  ];
+  const ids = (q: string) => filterPaletteGroups(groups, q).map((g) => [g.heading, g.entries.map((e) => e.id)]);
+
+  it('lists everything before the search starts (cmdk filters the first letter)', () => {
+    expect(filterPaletteGroups(groups, '')).toBe(groups);
+    expect(filterPaletteGroups(groups, 'd')).toBe(groups);
+  });
+
+  it('keeps only the actions and pages whose label or keywords have the text, and drops empty groups', () => {
+    expect(ids('despesa')).toEqual([
+      ['Ações do financeiro', ['expense']],
+      ['Ir para · Financeiro', ['payables']],
+    ]);
+    expect(ids('aplicar')).toEqual([
+      ['Ações do financeiro', ['invest']],
+      ['Ir para · Financeiro', ['transfers']],
+    ]);
+  });
+
+  it('ignores accents and case, and needs every word typed', () => {
+    expect(ids('CONFIGURACOES')).toEqual([['Outros', ['settings']]]);
+    expect(ids('transferencias')).toEqual([['Ir para · Financeiro', ['transfers']]]);
+    expect(ids('nova  receita')).toEqual([['Ações do financeiro', ['income']]]);
+    expect(ids('nova pagar')).toEqual([]);
+  });
+
+  it('leaves nothing when nothing matches (the palette shows its empty state)', () => {
+    expect(ids('assinatura')).toEqual([]);
+  });
+
+  it('matches the heading only through the entries (not "financeiro" for every page)', () => {
+    expect(ids('financeiro')).toEqual([]);
+    expect(matchesPaletteQuery({ label: 'Grupos por regime', keywords: 'simples presumido' }, 'Simples')).toBe(true);
+    expect(matchesPaletteQuery({ label: 'Grupos por regime' }, 'gr reg')).toBe(true);
+    expect(matchesPaletteQuery({ label: 'Grupos por regime' }, 'mei')).toBe(false);
   });
 });

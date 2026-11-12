@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Command } from 'cmdk';
 import { Dialog } from 'radix-ui';
 import { useNavigate } from 'react-router';
@@ -115,6 +115,36 @@ export function paletteNavFor(area: Area, can?: (key: PermissionKey) => boolean)
   return { heading: AREA_LABELS.gestao, items: [...navItemsFor('gestao', can), ...regimeGroups] };
 }
 
+/** An action or page of the palette: what it says and the words that also find it. */
+export interface PaletteEntry {
+  id: string;
+  label: string;
+  keywords?: string;
+  icon?: ReactNode;
+  onSelect?: () => void;
+}
+
+/** Lower case, without accents (ç → c, ã → a): "Configurações" is found by "configuracoes". */
+function fold(text: string): string {
+  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+}
+
+/** Whether every word typed is in the entry's label or keywords (accents and case ignored). */
+export function matchesPaletteQuery(entry: Pick<PaletteEntry, 'label' | 'keywords'>, query: string): boolean {
+  const haystack = fold(`${entry.label} ${entry.keywords ?? ''}`);
+  return fold(query).split(/\s+/).filter(Boolean).every((word) => haystack.includes(word));
+}
+
+/**
+ * The actions and pages while searching. From two letters on cmdk stops filtering (the server answers
+ * the search), so the palette filters them itself by label and keywords; groups left empty go away
+ * (with nothing at all, cmdk shows the empty state). Before that, cmdk filters them as usual.
+ */
+export function filterPaletteGroups<T extends Pick<PaletteEntry, 'label' | 'keywords'>>(groups: { heading: string; entries: T[] }[], query: string) {
+  if (query.trim().length < 2) return groups;
+  return groups.map((g) => ({ ...g, entries: g.entries.filter((e) => matchesPaletteQuery(e, query)) })).filter((g) => g.entries.length > 0);
+}
+
 const groupClass = '[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-subtle';
 
 const itemClass =
@@ -164,97 +194,67 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
   const nav = paletteNavFor(scope, can);
   const today = todayISO();
 
-  // Phase 3: the deadlines sheet (everyone) and a new union (`registry`, Cadastros visible).
-  const deadlineActions = (
-    <>
-      <Command.Item value="ver vencimentos documentos certidoes certificado alvara convencoes coletivas" className={itemClass} onSelect={() => run(() => taskActionsCtx.openDeadlines())}>
-        <FileClock /> Ver vencimentos
-      </Command.Item>
-      {canManage && can('page.registry') ? (
-        <Command.Item value="novo sindicato convencao coletiva data-base" className={itemClass} onSelect={() => run(() => navigate('/tarefas/cadastros?aba=sindicatos&sindicato=novo'))}>
-          <Scale /> Novo sindicato
-        </Command.Item>
-      ) : null}
-    </>
+  // The area's actions, pages and the common items, as data: filtered by the typed text while the
+  // server search runs (cmdk filters only the first letter, see `filterPaletteGroups`).
+  const go = (to: string) => () => run(() => navigate(to));
+  const taskEntries: PaletteEntry[] = [
+    ...(canWriteTasks
+      ? [
+          { id: 'task', label: 'Nova tarefa', keywords: 'criar solicitacao', icon: <ListChecks />, onSelect: () => run(() => newTask()) },
+          { id: 'appointment', label: 'Novo compromisso', keywords: 'horario agenda reuniao', icon: <CalendarClock />, onSelect: () => run(() => newTask({ appointment: true })) },
+          { id: 'template', label: 'Aplicar modelo de processo', keywords: 'fluxo etapas roteiro', icon: <Workflow />, onSelect: () => run(taskActionsCtx.openTemplatePicker) },
+        ]
+      : []),
+    { id: 'notes', label: 'Minhas anotações', keywords: 'notas lembretes', icon: <NotebookPen />, onSelect: () => run(taskActionsCtx.openNotes) },
+    ...(canWriteTasks ? [{ id: 'note', label: 'Nova anotação', keywords: 'nota lembrete', icon: <SquarePen />, onSelect: () => run(taskActionsCtx.newNote) }] : []),
+    ...(canWriteTasks && canManage && can('page.recurring')
+      ? [{ id: 'recurring', label: 'Nova tarefa recorrente', keywords: 'obrigacao das dctfweb', icon: <Repeat />, onSelect: go('/tarefas/recorrentes?recorrente=nova') }]
+      : []),
+    // Phase 3: the deadlines sheet (everyone) and a new union (`registry`, Cadastros visible).
+    { id: 'deadlines', label: 'Ver vencimentos', keywords: 'documentos certidoes certificado alvara convencoes coletivas', icon: <FileClock />, onSelect: () => run(() => taskActionsCtx.openDeadlines()) },
+    ...(canManage && can('page.registry')
+      ? [{ id: 'union', label: 'Novo sindicato', keywords: 'convencao coletiva data-base', icon: <Scale />, onSelect: go('/tarefas/cadastros?aba=sindicatos&sindicato=novo') }]
+      : []),
+  ];
+  const financeEntries: PaletteEntry[] = [
+    { id: 'expense', label: 'Nova despesa', icon: <Minus className="!text-danger" />, onSelect: () => run(() => actions.openTransaction({ type: 'expense' })) },
+    { id: 'income', label: 'Nova receita', icon: <Plus className="!text-success" />, onSelect: () => run(() => actions.openTransaction({ type: 'income' })) },
+    { id: 'transfer', label: 'Transferir entre contas', icon: <ArrowLeftRight />, onSelect: () => run(() => actions.openTransfer('transfer')) },
+    { id: 'invest', label: 'Investir', keywords: 'aplicar', icon: <TrendingUp />, onSelect: () => run(() => actions.openTransfer('investment')) },
+    { id: 'import', label: 'Importar extrato ou fatura (OFX/CSV)', keywords: 'arquivo ofx csv banco', icon: <FileUp />, onSelect: () => run(() => openImport()) },
+    ...(openFinance.enabled
+      ? [{ id: 'open-finance', label: 'Conectar banco (Open Finance)', keywords: 'integracoes sincronizar', icon: <Landmark />, onSelect: go('/configuracoes?aba=integracoes') }]
+      : []),
+  ];
+  const otherArea: Area = scope === 'financeiro' ? 'gestao' : 'financeiro';
+  const groups = filterPaletteGroups(
+    [
+      scope === 'financeiro' ? { heading: 'Ações do financeiro', entries: financeEntries } : { heading: 'Ações da gestão', entries: taskEntries },
+      {
+        heading: `Ir para · ${nav.heading}`,
+        entries: nav.items.map((item) => ({ id: item.to, label: item.label, keywords: item.keywords, icon: <item.icon />, onSelect: go(item.to) })),
+      },
+      {
+        heading: 'Outros',
+        entries: [
+          ...(canAccessFinance
+            ? [
+                {
+                  id: 'switch-area',
+                  label: otherArea === 'gestao' ? 'Ir para a gestão de tarefas' : 'Ir para o financeiro',
+                  keywords: 'area',
+                  icon: otherArea === 'gestao' ? <BriefcaseBusiness /> : <Wallet />,
+                  onSelect: go(lastPathOf(memory, otherArea)),
+                },
+              ]
+            : []),
+          { id: 'my-area', label: MY_AREA_ITEM.label, keywords: MY_AREA_ITEM.keywords, icon: <MY_AREA_ITEM.icon />, onSelect: go(MY_AREA_ITEM.to) },
+          { id: 'settings', label: SETTINGS_ITEM.label, keywords: settingsSearchKeywords(), icon: <SETTINGS_ITEM.icon />, onSelect: go(SETTINGS_ITEM.to) },
+        ],
+      },
+    ],
+    q,
   );
-
-  const taskActions = canWriteTasks ? (
-    <Command.Group heading="Ações da gestão" className={groupClass}>
-      <Command.Item value="nova tarefa criar solicitacao" className={itemClass} onSelect={() => run(() => newTask())}>
-        <ListChecks /> Nova tarefa
-      </Command.Item>
-      <Command.Item value="novo compromisso horario agenda reuniao" className={itemClass} onSelect={() => run(() => newTask({ appointment: true }))}>
-        <CalendarClock /> Novo compromisso
-      </Command.Item>
-      <Command.Item value="aplicar modelo de processo fluxo etapas roteiro" className={itemClass} onSelect={() => run(taskActionsCtx.openTemplatePicker)}>
-        <Workflow /> Aplicar modelo de processo
-      </Command.Item>
-      <Command.Item value="minhas anotacoes notas lembretes" className={itemClass} onSelect={() => run(taskActionsCtx.openNotes)}>
-        <NotebookPen /> Minhas anotações
-      </Command.Item>
-      <Command.Item value="nova anotacao nota lembrete" className={itemClass} onSelect={() => run(taskActionsCtx.newNote)}>
-        <SquarePen /> Nova anotação
-      </Command.Item>
-      {canManage && can('page.recurring') ? (
-        <Command.Item value="nova tarefa recorrente obrigacao das dctfweb" className={itemClass} onSelect={() => run(() => navigate('/tarefas/recorrentes?recorrente=nova'))}>
-          <Repeat /> Nova tarefa recorrente
-        </Command.Item>
-      ) : null}
-      {deadlineActions}
-    </Command.Group>
-  ) : (
-    <Command.Group heading="Ações da gestão" className={groupClass}>
-      <Command.Item value="minhas anotacoes notas lembretes" className={itemClass} onSelect={() => run(taskActionsCtx.openNotes)}>
-        <NotebookPen /> Minhas anotações
-      </Command.Item>
-      {deadlineActions}
-    </Command.Group>
-  );
-
-  const financeActions = scope === 'financeiro' ? (
-    <Command.Group heading="Ações do financeiro" className={groupClass}>
-      <Command.Item value="nova despesa" className={itemClass} onSelect={() => run(() => actions.openTransaction({ type: 'expense' }))}>
-        <Minus className="!text-danger" /> Nova despesa
-      </Command.Item>
-      <Command.Item value="nova receita" className={itemClass} onSelect={() => run(() => actions.openTransaction({ type: 'income' }))}>
-        <Plus className="!text-success" /> Nova receita
-      </Command.Item>
-      <Command.Item value="transferir entre contas" className={itemClass} onSelect={() => run(() => actions.openTransfer('transfer'))}>
-        <ArrowLeftRight /> Transferir entre contas
-      </Command.Item>
-      <Command.Item value="investir aplicar" className={itemClass} onSelect={() => run(() => actions.openTransfer('investment'))}>
-        <TrendingUp /> Investir
-      </Command.Item>
-      <Command.Item value="importar extrato fatura arquivo ofx csv banco" className={itemClass} onSelect={() => run(() => openImport())}>
-        <FileUp /> Importar extrato ou fatura (OFX/CSV)
-      </Command.Item>
-      {openFinance.enabled ? (
-        <Command.Item
-          value="conectar banco open finance integracoes sincronizar"
-          className={itemClass}
-          onSelect={() => run(() => navigate('/configuracoes?aba=integracoes'))}
-        >
-          <Landmark /> Conectar banco (Open Finance)
-        </Command.Item>
-      ) : null}
-    </Command.Group>
-  ) : null;
-
-  const goTo = (
-    <Command.Group heading={`Ir para · ${nav.heading}`} className={groupClass}>
-      {nav.items.map((item) => (
-        <Command.Item
-          key={item.to}
-          value={`${nav.heading} ${item.label} ${item.keywords ?? ''}`}
-          className={itemClass}
-          onSelect={() => run(() => navigate(item.to))}
-        >
-          <item.icon /> {item.label}
-        </Command.Item>
-      ))}
-    </Command.Group>
-  );
-
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -377,26 +377,15 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                 </>
               ) : null}
 
-              {scope === 'financeiro' ? financeActions : taskActions}
-              {goTo}
-              <Command.Group heading="Outros" className={groupClass}>
-                {canAccessFinance ? (
-                  <Command.Item
-                    value={scope === 'financeiro' ? 'ir para a gestao de tarefas area' : 'ir para o financeiro area'}
-                    className={itemClass}
-                    onSelect={() => run(() => navigate(lastPathOf(memory, scope === 'financeiro' ? 'gestao' : 'financeiro')))}
-                  >
-                    {scope === 'financeiro' ? <BriefcaseBusiness /> : <Wallet />}
-                    {scope === 'financeiro' ? 'Ir para a gestão de tarefas' : 'Ir para o financeiro'}
-                  </Command.Item>
-                ) : null}
-                <Command.Item value={`${MY_AREA_ITEM.label} ${MY_AREA_ITEM.keywords ?? ''}`} className={itemClass} onSelect={() => run(() => navigate(MY_AREA_ITEM.to))}>
-                  <MY_AREA_ITEM.icon /> {MY_AREA_ITEM.label}
-                </Command.Item>
-                <Command.Item value={`${SETTINGS_ITEM.label} ${settingsSearchKeywords()}`} className={itemClass} onSelect={() => run(() => navigate(SETTINGS_ITEM.to))}>
-                  <SETTINGS_ITEM.icon /> {SETTINGS_ITEM.label}
-                </Command.Item>
-              </Command.Group>
+              {groups.map((group) => (
+                <Command.Group key={group.heading} heading={group.heading} className={groupClass}>
+                  {group.entries.map((entry) => (
+                    <Command.Item key={entry.id} value={`${entry.label} ${entry.keywords ?? ''}`} className={itemClass} onSelect={entry.onSelect}>
+                      {entry.icon} {entry.label}
+                    </Command.Item>
+                  ))}
+                </Command.Group>
+              ))}
             </Command.List>
           </Command>
         </Dialog.Content>
