@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Repeat } from 'lucide-react';
 import { addMonthKey, formatDateBR, monthKey, type ISODate, type MonthKey } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/misc';
-import { SUBSCRIPTION_REASON, usePermissions } from '@/features/auth/permissions';
+import { usePermissions } from '@/features/auth/permissions';
 import { cn } from '@/lib/utils';
 import { useTaskCalendar } from '../api';
 import { itemsByDay, type CalendarItem } from '../calendar-logic';
@@ -73,7 +73,7 @@ export function MiniCalendar({
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const { openTask, newTask } = useTaskSheetLinks();
   const { openOccurrence } = useOccurrenceSheetLinks();
-  const { canWriteTasks } = usePermissions();
+  const { canWriteTasks, subscriptionReason } = usePermissions();
   const current = focus >= 0 && focus < 42 ? focus : firstOfMonth;
   const finding = `${competenceName(month).split(' ')[0]} · ${daysWithItems(byDay, month)} ${daysWithItems(byDay, month) === 1 ? 'dia' : 'dias'} com tarefas`;
   const ready = Boolean(calendar.data);
@@ -222,7 +222,7 @@ export function MiniCalendar({
                       + {open.length - 5} no calendário
                     </Link>
                   ) : null}
-                  <span className="self-start" title={canWriteTasks ? undefined : SUBSCRIPTION_REASON}>
+                  <span className="self-start" title={canWriteTasks ? undefined : (subscriptionReason ?? undefined)}>
                     <Button
                       variant="outline"
                       size="sm"

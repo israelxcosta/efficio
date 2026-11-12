@@ -1,6 +1,7 @@
 // Builds the external services from the environment (API server, migrations, seed). The browser
 // demo builds its own (src/demo/server.ts in apps/web).
 
+import { BILLING_ENABLED } from '@effinance/shared';
 import { createAwsKmsKeyProvider } from './lib/crypto/aws-kms';
 import { fromBase64, sha256Hex, type Bytes } from './lib/crypto/encoding';
 import { LocalKeyProvider, type KeyProvider } from './lib/crypto/key-provider';
@@ -85,6 +86,7 @@ export async function createPlatform(env: Env): Promise<Platform> {
     appUrl: env.APP_URL,
     relaxedRateLimits: env.NODE_ENV === 'test',
     mailer: await createMailer(env),
+    billingEnabled: BILLING_ENABLED,
     billing:
       env.BILLING_PROVIDER === 'mercadopago'
         ? new MercadoPagoProvider({ accessToken: env.MP_ACCESS_TOKEN!, webhookSecret: env.MP_WEBHOOK_SECRET! })

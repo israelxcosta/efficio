@@ -46,7 +46,8 @@ const FAKE_ID = '00000000-0000-4000-8000-000000000000';
 
 let app: App;
 beforeAll(async () => {
-  app = await createTestApp();
+  // Paid plans on (billing findings and 402 guards); billing-disabled.test.ts covers billing off.
+  app = await createTestApp({ billingEnabled: true });
 });
 afterAll(async () => {
   await app.close();

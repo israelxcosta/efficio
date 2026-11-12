@@ -1,5 +1,5 @@
 import { cloneElement, type ReactElement } from 'react';
-import { rolePermissions, type MemberRole, type PermissionKey, type PermissionMap } from '@effinance/shared';
+import { BILLING_ENABLED, rolePermissions, type MemberRole, type PermissionKey, type PermissionMap } from '@effinance/shared';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useAuth } from './auth-context';
 
@@ -17,8 +17,13 @@ export interface Permissions {
   can: (key: PermissionKey) => boolean;
   /** `can('finance')`: mirrors the API's finance guard. */
   canAccessFinance: boolean;
-  /** The subscription allows writes (trialing, active or past_due within the grace period). */
+  /**
+   * The subscription allows writes (trialing, active or past_due within the grace period). Always true
+   * while paid subscriptions are off (`BILLING_ENABLED`, a future rollout).
+   */
   subscriptionActive: boolean;
+  /** "Assinatura inativa…" when the subscription blocks writes; null otherwise (always, with billing off). */
+  subscriptionReason: string | null;
   /** Day-to-day work in the task module (any role, subscription active). */
   canWriteTasks: boolean;
   /** Registries of the task module (`registry`, subscription active). */
@@ -41,7 +46,8 @@ export function isAdminRole(role: MemberRole | null | undefined): boolean {
 /**
  * Pure form of `usePermissions` (tested): role + subscription + the effective permission map → what the
  * member may do. Without a map (an older session answer) the role's defaults apply, which is exactly the
- * behavior before per-person permissions.
+ * behavior before per-person permissions. With paid subscriptions off (`BILLING_ENABLED`) the
+ * subscription never blocks anything.
  */
 export function permissionsFor(
   role: MemberRole | null,
@@ -52,7 +58,8 @@ export function permissionsFor(
   const permissions = map ?? rolePermissions(role);
   const can = (key: PermissionKey) => hasWorkspace && permissions[key] === true;
   const finance = can('finance');
-  const readOnlyReason = !hasWorkspace ? null : !finance ? FINANCE_ONLY_REASON : !subscriptionActive ? SUBSCRIPTION_REASON : null;
+  const active = subscriptionActive || !BILLING_ENABLED;
+  const readOnlyReason = !hasWorkspace ? null : !finance ? FINANCE_ONLY_REASON : !active ? SUBSCRIPTION_REASON : null;
   return {
     role,
     isOwner: role === 'owner',
@@ -60,9 +67,10 @@ export function permissionsFor(
     permissions,
     can,
     canAccessFinance: finance,
-    subscriptionActive,
-    canWriteTasks: hasWorkspace && subscriptionActive,
-    canManage: hasWorkspace && can('registry') && subscriptionActive,
+    subscriptionActive: active,
+    subscriptionReason: active ? null : SUBSCRIPTION_REASON,
+    canWriteTasks: hasWorkspace && active,
+    canManage: hasWorkspace && can('registry') && active,
     canWrite: hasWorkspace && readOnlyReason === null,
     readOnlyReason,
   };
@@ -79,18 +87,20 @@ export type WriteScope = 'finance' | 'tasks' | 'admin';
 
 /**
  * What a gated control does: hidden (a permanent restriction by permission, said once in the page
- * description), disabled with the reason (a temporary one: inactive subscription) or enabled.
+ * description), disabled with the reason (a temporary one: inactive subscription, only with billing
+ * on) or enabled.
  */
 export function gateFor(p: Permissions, scope: WriteScope, permission?: PermissionKey): { hidden: boolean; reason: string | null } {
   const key: PermissionKey | null = permission ?? (scope === 'finance' ? 'finance' : scope === 'admin' ? 'registry' : null);
   if (key && !p.can(key)) return { hidden: true, reason: null };
-  return { hidden: false, reason: p.subscriptionActive ? null : SUBSCRIPTION_REASON };
+  return { hidden: false, reason: p.subscriptionReason };
 }
 
 /**
  * Wraps a create/edit control. `finance` (default) and `admin` (= `registry`) hide it from members
  * without that permission, as does an explicit `permission`; every scope disables it with a tooltip
- * while the subscription is inactive (the wrapper stays focusable so keyboard users get the tooltip).
+ * while the subscription is inactive (the wrapper stays focusable so keyboard users get the tooltip),
+ * which never happens while paid subscriptions are off (`BILLING_ENABLED`).
  */
 export function WriteGate({
   children,

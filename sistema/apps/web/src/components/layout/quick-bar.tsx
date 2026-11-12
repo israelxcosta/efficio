@@ -11,12 +11,17 @@ import type { Area } from './nav';
 const btn =
   'inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors hover:bg-bg-subtle disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-4';
 
-/** Floating quick-action bar (desktop), Graniq style: the actions of the current area. */
+/** Floating quick-action bar (desktop), Graniq style: the actions of the current area; the search (⌘K) is scoped to it too. */
 export function QuickBar({ area, onSearch }: { area: Area; onSearch: () => void }) {
   return (
     <div data-bottom-bar className="pointer-events-none fixed inset-x-0 bottom-5 z-20 hidden justify-center lg:flex lg:pl-[76px] print:hidden">
       <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-border bg-surface/95 p-1.5 pl-2 shadow-lg backdrop-blur">
-        <button type="button" onClick={onSearch} className="mr-1 flex h-9 items-center gap-2 rounded-full pr-3 pl-1 text-sm text-subtle hover:text-muted">
+        <button
+          type="button"
+          onClick={onSearch}
+          aria-label={area === 'financeiro' ? 'Buscar no financeiro ou executar ação (⌘K)' : 'Buscar na gestão de tarefas ou executar ação (⌘K)'}
+          className="mr-1 flex h-9 items-center gap-2 rounded-full pr-3 pl-1 text-sm text-subtle hover:text-muted"
+        >
           <span className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-fg">
             <Search className="size-4" />
           </span>

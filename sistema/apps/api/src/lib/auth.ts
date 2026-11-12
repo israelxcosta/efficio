@@ -11,6 +11,7 @@ import { env } from '../env';
 import { type IssuedSession, REFRESH_TTL_MS, setSessionWorkspace } from '../modules/auth/sessions';
 import { type Access, isMutation, loadAccess } from '../modules/workspaces/access';
 import { AppError, UnauthorizedError } from './errors';
+import { billingEnabled } from './platform';
 
 export const AUTH_COOKIE = 'effinance_token';
 export const REFRESH_COOKIE = 'effinance_refresh';
@@ -142,7 +143,7 @@ export const authPlugin = fp(async (app) => {
     ) {
       throw new AppError(409, 'workspace_mismatch', 'Você trocou de espaço em outra aba. Atualize a página para continuar.');
     }
-    const access = await loadAccess(app.db, claims.sub, claims.wid, claims.sid);
+    const access = await loadAccess(app.db, claims.sub, claims.wid, claims.sid, billingEnabled(app.platform));
     // Revoked session or membership removed: the client refreshes (which picks a valid workspace).
     if (!access) throw new UnauthorizedError();
     request.userId = claims.sub;

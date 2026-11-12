@@ -67,6 +67,12 @@ export const TRIAL_DAYS = 14;
 /** Days a `past_due` subscription keeps write access while the payment is retried. */
 export const GRACE_DAYS = 7;
 
+/**
+ * Paid subscriptions (future rollout). While false every workspace works as with an active plan (no
+ * 402, no trial expiry), checkout/webhook/cancel answer 404 and the web hides the subscription screens.
+ */
+export const BILLING_ENABLED: boolean = false;
+
 export const BILLING_INTERVALS = ['month', 'year'] as const;
 export type BillingInterval = (typeof BILLING_INTERVALS)[number];
 

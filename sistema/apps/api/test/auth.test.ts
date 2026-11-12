@@ -4,7 +4,8 @@ import { createAccount, createTestApp, firstCategory, registerUser, resetDb } fr
 
 let app: App;
 beforeAll(async () => {
-  app = await createTestApp();
+  // Paid plans on (a new company starts in trial); billing-disabled.test.ts covers billing off.
+  app = await createTestApp({ billingEnabled: true });
 });
 afterAll(async () => {
   await app.close();

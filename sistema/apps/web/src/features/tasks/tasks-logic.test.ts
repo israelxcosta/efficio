@@ -163,7 +163,7 @@ describe('settings', () => {
   it('hides the finance sections from collaborators', () => {
     expect(settingsTabsFor(false)).toEqual(['perfil', 'seguranca', 'membros', 'privacidade']);
     expect(settingsTabsFor(true)).toContain('integracoes');
-    expect(settingsTabsFor(true)).toContain('assinatura');
+    // Assinatura follows BILLING_ENABLED too: features/billing/billing-rollout.test.tsx.
   });
 });
 

@@ -129,7 +129,8 @@ describe('permissions per person (spec §13.10)', () => {
 
   it('shows the Escritório tab only with `office`', () => {
     expect(settingsTabsFor(false, false)).toEqual(['perfil', 'seguranca', 'membros', 'privacidade']);
-    expect(settingsTabsFor(true, true)).toEqual(['perfil', 'seguranca', 'membros', 'escritorio', 'assinatura', 'integracoes', 'privacidade']);
+    // Assinatura also depends on BILLING_ENABLED (features/billing/billing-rollout.test.tsx).
+    expect(settingsTabsFor(true, true).filter((t) => t !== 'assinatura')).toEqual(['perfil', 'seguranca', 'membros', 'escritorio', 'integracoes', 'privacidade']);
     expect(settingsTabsFor(true, false)).not.toContain('escritorio');
     expect(settingsTabsFor(false, true)).toContain('escritorio');
     expect(rolePermissions('editor').office).toBe(true);

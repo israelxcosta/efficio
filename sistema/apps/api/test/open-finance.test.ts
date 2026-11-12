@@ -23,7 +23,8 @@ let fake: FakeOpenFinanceProvider;
 let original: OpenFinanceSetup | null | undefined;
 
 beforeAll(async () => {
-  app = await createTestApp();
+  // Paid plans on (writes need an active subscription); billing-disabled.test.ts covers billing off.
+  app = await createTestApp({ billingEnabled: true });
   original = app.platform.openFinance;
 });
 afterAll(async () => {

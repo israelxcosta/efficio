@@ -71,7 +71,7 @@ const OFFICE_ENCRYPTED = ['responsibleDocument', 'responsibleEmail', 'responsibl
 /** History entries without `seq` (a sequence shared by every workspace). */
 const { seq: _seq, ...eventColumns } = getTableColumns(taskEvents);
 
-export async function exportWorkspace(db: DbExecutor, access: Access) {
+export async function exportWorkspace(db: DbExecutor, access: Access, billingEnabled: boolean) {
   const cipher = await getCipher(access.workspaceId);
   // The requester's own profile photo (others' photos are theirs: never in someone else's export).
   const [photo] = await db.select().from(userPhotos).where(eq(userPhotos.userId, access.userId));
@@ -245,7 +245,7 @@ export async function exportWorkspace(db: DbExecutor, access: Access) {
     format: 'effinance-export/v1',
     exportedAt: new Date().toISOString(),
     workspace,
-    subscription: summarizeSubscription(subscription),
+    subscription: summarizeSubscription(subscription, billingEnabled),
     members: members.map(({ isYou: _you, ...m }) => m),
     profilePhoto,
     ...data,

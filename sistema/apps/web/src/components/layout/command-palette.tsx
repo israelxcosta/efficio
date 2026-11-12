@@ -24,7 +24,7 @@ import {
   Wallet,
   Workflow,
 } from 'lucide-react';
-import { formatBRL, formatDateBR, RECURRENCE_PERIOD_LABELS, todayISO, type PermissionKey, type SearchResponse } from '@effinance/shared';
+import { formatBRL, formatDateBR, RECURRENCE_PERIOD_LABELS, todayISO, type Contact, type PermissionKey, type SearchResponse } from '@effinance/shared';
 import { api } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { BankLogo } from '@/components/ui/bank-logo';
@@ -37,7 +37,7 @@ import { useTaskSheetLinks } from '@/features/tasks/task-links';
 import { useTaskActions } from '@/features/tasks/task-actions';
 import { shortDate } from '@/features/tasks/due';
 import { lastPathOf, type AreaMemory } from './area-memory';
-import { FINANCE_NAV_ITEMS, MY_AREA_ITEM, navItemsFor, REGIME_GROUPS_ITEM, SETTINGS_ITEM, type Area, type NavItem } from './nav';
+import { AREA_LABELS, FINANCE_NAV_ITEMS, MY_AREA_ITEM, navItemsFor, REGIME_GROUPS_ITEM, SETTINGS_ITEM, settingsSearchKeywords, type Area, type NavItem } from './nav';
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
@@ -49,26 +49,70 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 /**
- * What the search may show: transactions, accounts and categories only with access to the finances
- * (the API omits them for collaborators, but the web does not rely on it alone: an answer cached
- * before a role change, or an API regression, must not put amounts on a collaborator's screen), and
- * suppliers only in the finance area's audience.
+ * The area the palette searches: the Financeiro only with access to the finances (a collaborator, or
+ * a stale rail after a role change, gets the Gestão).
  */
-export function visibleSearchHits(r: SearchResponse | undefined, canAccessFinance: boolean, can?: (key: PermissionKey) => boolean) {
+export function paletteAreaFor(area: Area, canAccessFinance: boolean): Area {
+  return area === 'financeiro' && canAccessFinance ? 'financeiro' : 'gestao';
+}
+
+/** Placeholder of the search field: what the palette finds in each area. */
+export const SEARCH_PLACEHOLDERS: Record<Area, string> = {
+  gestao: 'Buscar tarefas, clientes, páginas ou ações…',
+  financeiro: 'Buscar lançamentos, contas, clientes, páginas ou ações…',
+};
+
+const SEARCH_DESCRIPTIONS: Record<Area, string> = {
+  gestao: 'Busque tarefas, tarefas recorrentes, clientes e sindicatos ou navegue pela gestão de tarefas',
+  financeiro: 'Busque lançamentos, contas, categorias, clientes e fornecedores ou navegue pelo financeiro',
+};
+
+/**
+ * What the search shows: only the results of the area where the person is. Gestão: tasks, recurring
+ * tasks, unions and clients (its sheet). Financeiro: transactions, accounts, categories, clients and
+ * suppliers, and only with access to the finances (the API omits them for collaborators, but the web
+ * does not rely on it alone: an answer cached before a role change, or an API regression, must not
+ * put amounts on a collaborator's screen).
+ */
+export function visibleSearchHits(r: SearchResponse | undefined, area: Area, canAccessFinance: boolean, can?: (key: PermissionKey) => boolean) {
   // A hit that opens a page hidden for the person (`page.*`, spec §13.10) is left out too.
   const page = (key: PermissionKey) => !can || can(key);
+  if (area === 'financeiro') {
+    return {
+      transactions: canAccessFinance ? (r?.transactions ?? []) : [],
+      accounts: canAccessFinance ? (r?.accounts ?? []) : [],
+      categories: canAccessFinance ? (r?.categories ?? []) : [],
+      contacts: canAccessFinance ? (r?.contacts ?? []) : [],
+      tasks: [],
+      recurringTasks: [],
+      unions: [],
+    };
+  }
   return {
-    transactions: canAccessFinance ? (r?.transactions ?? []) : [],
-    accounts: canAccessFinance ? (r?.accounts ?? []) : [],
-    categories: canAccessFinance ? (r?.categories ?? []) : [],
-    // Clients open the Gestão sheet (or, for administrators, the finance registry).
-    contacts: (r?.contacts ?? []).filter((c) => (c.kind === 'client' ? canAccessFinance || page('page.clients') : canAccessFinance)),
+    transactions: [],
+    accounts: [],
+    categories: [],
+    // Clients open the Gestão sheet; suppliers belong to the finances.
+    contacts: page('page.clients') ? (r?.contacts ?? []).filter((c) => c.kind === 'client') : [],
     // Tasks and recurring tasks are for every member (titles only; never a client's access data).
     tasks: r?.tasks ?? [],
     recurringTasks: page('page.recurring') ? (r?.recurringTasks ?? []) : [],
     // Unions (phase 3): public data of the entity, for every member; they open Cadastros › Sindicatos.
     unions: page('page.registry') ? (r?.unions ?? []) : [],
   };
+}
+
+/** Where a client or supplier hit leads: the client in the module of the search; a supplier in the finances. */
+export function contactPathFor(area: Area, contact: Pick<Contact, 'id' | 'kind'>): string {
+  if (contact.kind !== 'client') return `/fornecedores?editar=${contact.id}`;
+  return area === 'financeiro' ? `/clientes?consultar=${contact.id}` : `/tarefas/clientes?cliente=${contact.id}`;
+}
+
+/** Pages of the area ("Ir para"): every Gestão page, the hub's included, plus Grupos por regime; or the finance rail. */
+export function paletteNavFor(area: Area, can?: (key: PermissionKey) => boolean): { heading: string; items: NavItem[] } {
+  if (area === 'financeiro') return { heading: AREA_LABELS.financeiro, items: FINANCE_NAV_ITEMS };
+  const regimeGroups = !can || can('page.recurring') ? [REGIME_GROUPS_ITEM] : [];
+  return { heading: AREA_LABELS.gestao, items: [...navItemsFor('gestao', can), ...regimeGroups] };
 }
 
 const groupClass = '[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-subtle';
@@ -84,8 +128,9 @@ interface CommandPaletteProps {
 }
 
 /**
- * ⌘K: search and actions of the current area first. Financial actions, pages and results only for
- * administrators (the API omits them for collaborators too).
+ * ⌘K: search, actions and pages of the area where the person is, and only of it (Gestão or
+ * Financeiro); Minha área, Configurações and the switch to the other area in both. The Financeiro
+ * only with access to the finances (the API omits its results for collaborators too).
  */
 export function CommandPalette({ open, onOpenChange, area, memory }: CommandPaletteProps) {
   const navigate = useNavigate();
@@ -94,7 +139,8 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
   const { canAccessFinance, canWriteTasks, canManage, can } = usePermissions();
   const { newTask, openTask } = useTaskSheetLinks();
   const taskActionsCtx = useTaskActions();
-  const openFinance = useOpenFinanceStatus(open && canAccessFinance);
+  const scope = paletteAreaFor(area, canAccessFinance);
+  const openFinance = useOpenFinanceStatus(open && scope === 'financeiro');
   const [query, setQuery] = useState('');
   const q = useDebounced(query.trim(), 200);
   const search = useQuery({
@@ -114,9 +160,8 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
   }
 
   const r = search.data;
-  const { transactions, accounts, categories, contacts, tasks, recurringTasks, unions } = visibleSearchHits(r, canAccessFinance, can);
-  // Every Gestão page, the hub's included, plus Grupos por regime (a view of Recorrentes).
-  const gestaoItems = [...navItemsFor('gestao', can), ...(can('page.recurring') ? [REGIME_GROUPS_ITEM] : [])];
+  const { transactions, accounts, categories, contacts, tasks, recurringTasks, unions } = visibleSearchHits(r, scope, canAccessFinance, can);
+  const nav = paletteNavFor(scope, can);
   const today = todayISO();
 
   // Phase 3: the deadlines sheet (everyone) and a new union (`registry`, Cadastros visible).
@@ -166,7 +211,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
     </Command.Group>
   );
 
-  const financeActions = canAccessFinance ? (
+  const financeActions = scope === 'financeiro' ? (
     <Command.Group heading="Ações do financeiro" className={groupClass}>
       <Command.Item value="nova despesa" className={itemClass} onSelect={() => run(() => actions.openTransaction({ type: 'expense' }))}>
         <Minus className="!text-danger" /> Nova despesa
@@ -195,12 +240,12 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
     </Command.Group>
   ) : null;
 
-  const goTo = (heading: string, items: NavItem[]) => (
-    <Command.Group heading={`Ir para · ${heading}`} className={groupClass}>
-      {items.map((item) => (
+  const goTo = (
+    <Command.Group heading={`Ir para · ${nav.heading}`} className={groupClass}>
+      {nav.items.map((item) => (
         <Command.Item
           key={item.to}
-          value={`${heading} ${item.label} ${item.keywords ?? ''}`}
+          value={`${nav.heading} ${item.label} ${item.keywords ?? ''}`}
           className={itemClass}
           onSelect={() => run(() => navigate(item.to))}
         >
@@ -216,18 +261,14 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] data-[state=open]:animate-fade-in" />
         <Dialog.Content className="fixed top-[12vh] left-1/2 z-50 w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-lg outline-none data-[state=open]:animate-fade-in">
           <Dialog.Title className="sr-only">Buscar</Dialog.Title>
-          <Dialog.Description className="sr-only">
-            {canAccessFinance
-              ? 'Busque tarefas, transações, contas, categorias, clientes, fornecedores ou navegue'
-              : 'Busque tarefas, tarefas recorrentes e clientes ou navegue pela gestão de tarefas'}
-          </Dialog.Description>
+          <Dialog.Description className="sr-only">{SEARCH_DESCRIPTIONS[scope]}</Dialog.Description>
           <Command shouldFilter={!q || q.length < 2} label="Busca global">
             <div className="flex items-center gap-3 border-b border-border px-4">
               <Search className="size-4 text-muted" />
               <Command.Input
                 value={query}
                 onValueChange={setQuery}
-                placeholder={canAccessFinance ? 'Buscar tarefas, transações, clientes, páginas ou ações…' : 'Buscar tarefas, clientes, páginas ou ações…'}
+                placeholder={SEARCH_PLACEHOLDERS[scope]}
                 className="h-14 flex-1 bg-transparent text-[15px] outline-none placeholder:text-subtle"
               />
               <kbd className="rounded-md border border-border bg-bg-subtle px-1.5 py-0.5 text-[11px] font-semibold text-muted">ESC</kbd>
@@ -318,23 +359,13 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                     </Command.Group>
                   ) : null}
                   {contacts.length ? (
-                    <Command.Group heading={canAccessFinance ? 'Clientes e fornecedores' : 'Clientes'} className={groupClass}>
+                    <Command.Group heading={scope === 'financeiro' ? 'Clientes e fornecedores' : 'Clientes'} className={groupClass}>
                       {contacts.map((c) => (
                         <Command.Item
                           key={c.id}
                           value={`ct-${c.id}`}
                           className={itemClass}
-                          onSelect={() =>
-                            run(() =>
-                              navigate(
-                                c.kind !== 'client'
-                                  ? `/fornecedores?editar=${c.id}`
-                                  : (area === 'financeiro' || !can('page.clients')) && canAccessFinance
-                                    ? `/clientes?consultar=${c.id}`
-                                    : `/tarefas/clientes?cliente=${c.id}`,
-                              ),
-                            )
-                          }
+                          onSelect={() => run(() => navigate(contactPathFor(scope, c)))}
                         >
                           {c.kind === 'client' ? <Building2 /> : <Truck />}
                           <span className="flex-1 truncate">{c.name}</span>
@@ -346,43 +377,23 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                 </>
               ) : null}
 
-              {area === 'financeiro' && canAccessFinance ? (
-                <>
-                  {financeActions}
-                  {taskActions}
-                </>
-              ) : (
-                <>
-                  {taskActions}
-                  {financeActions}
-                </>
-              )}
-              {area === 'financeiro' && canAccessFinance ? (
-                <>
-                  {goTo('Financeiro', FINANCE_NAV_ITEMS)}
-                  {goTo('Gestão de tarefas', gestaoItems)}
-                </>
-              ) : (
-                <>
-                  {goTo('Gestão de tarefas', gestaoItems)}
-                  {canAccessFinance ? goTo('Financeiro', FINANCE_NAV_ITEMS) : null}
-                </>
-              )}
+              {scope === 'financeiro' ? financeActions : taskActions}
+              {goTo}
               <Command.Group heading="Outros" className={groupClass}>
                 {canAccessFinance ? (
                   <Command.Item
-                    value={area === 'financeiro' ? 'ir para a gestao de tarefas area' : 'ir para o financeiro area'}
+                    value={scope === 'financeiro' ? 'ir para a gestao de tarefas area' : 'ir para o financeiro area'}
                     className={itemClass}
-                    onSelect={() => run(() => navigate(lastPathOf(memory, area === 'financeiro' ? 'gestao' : 'financeiro')))}
+                    onSelect={() => run(() => navigate(lastPathOf(memory, scope === 'financeiro' ? 'gestao' : 'financeiro')))}
                   >
-                    {area === 'financeiro' ? <BriefcaseBusiness /> : <Wallet />}
-                    {area === 'financeiro' ? 'Ir para a gestão de tarefas' : 'Ir para o financeiro'}
+                    {scope === 'financeiro' ? <BriefcaseBusiness /> : <Wallet />}
+                    {scope === 'financeiro' ? 'Ir para a gestão de tarefas' : 'Ir para o financeiro'}
                   </Command.Item>
                 ) : null}
                 <Command.Item value={`${MY_AREA_ITEM.label} ${MY_AREA_ITEM.keywords ?? ''}`} className={itemClass} onSelect={() => run(() => navigate(MY_AREA_ITEM.to))}>
                   <MY_AREA_ITEM.icon /> {MY_AREA_ITEM.label}
                 </Command.Item>
-                <Command.Item value={`${SETTINGS_ITEM.label} ${SETTINGS_ITEM.keywords ?? ''}`} className={itemClass} onSelect={() => run(() => navigate(SETTINGS_ITEM.to))}>
+                <Command.Item value={`${SETTINGS_ITEM.label} ${settingsSearchKeywords()}`} className={itemClass} onSelect={() => run(() => navigate(SETTINGS_ITEM.to))}>
                   <SETTINGS_ITEM.icon /> {SETTINGS_ITEM.label}
                 </Command.Item>
               </Command.Group>

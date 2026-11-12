@@ -54,7 +54,7 @@ export interface TasksHubViewProps {
   replaceViews: boolean;
   onViewChosen?: (view: TaskView) => void;
   creates: CreateAction[];
-  /** Why Criar is disabled (inactive subscription); null when it is enabled. */
+  /** Why Criar is disabled (inactive subscription, only with billing on); null when it is enabled. */
   blockedReason: string | null;
   onCreate: (id: 'task' | 'appointment' | 'recurring') => void;
   onApplyTemplate: () => void;

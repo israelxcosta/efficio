@@ -14,7 +14,8 @@ import { createClient, office, workspaceOf } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
-  app = await createTestApp();
+  // Paid plans on (no generation without a writable subscription); billing-disabled.test.ts covers billing off.
+  app = await createTestApp({ billingEnabled: true });
 });
 afterAll(async () => {
   delete process.env.EFFINANCE_NOW;

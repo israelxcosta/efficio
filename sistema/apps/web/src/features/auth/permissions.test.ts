@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { rolePermissions } from '@effinance/shared';
+
+// These rules include the paid subscription (an inactive one blocks writes): they run with billing on.
+// With `BILLING_ENABLED` off the subscription blocks nothing (features/billing/billing-rollout.test.tsx).
+vi.mock('@effinance/shared', async (importOriginal) => ({ ...(await importOriginal<typeof import('@effinance/shared')>()), BILLING_ENABLED: true }));
+
 import { ADMIN_ONLY_REASON, FINANCE_ONLY_REASON, gateFor, permissionsFor, SUBSCRIPTION_REASON } from './permissions';
 import { ROLE_LABELS } from './roles';
 

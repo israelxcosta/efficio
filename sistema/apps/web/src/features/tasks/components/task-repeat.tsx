@@ -5,7 +5,7 @@ import type { ISODate, TaskDetail, TaskUpdateInput } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/dialog';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { SUBSCRIPTION_REASON } from '@/features/auth/permissions';
+import { usePermissions } from '@/features/auth/permissions';
 import { toastError } from '@/lib/notify';
 import { useUpdateTask } from '../api';
 import {
@@ -58,7 +58,7 @@ export function TaskRepeatField({
 }: {
   task: TaskDetail;
   today: ISODate;
-  /** Inactive subscription (or no task permission). */
+  /** Inactive subscription (only with billing on) or no task permission. */
   readOnly: boolean;
   canRegistry: boolean;
   /** "Salvo nesta e nas próximas" after saving the rule. */
@@ -66,6 +66,7 @@ export function TaskRepeatField({
 }) {
   const mode = repeatModeOf(task);
   const update = useUpdateTask();
+  const { subscriptionReason } = usePermissions();
   const rule = mode === 'series' ? task.recurrence : null;
   const start = (task.dueDate ?? today) as ISODate;
   const [draft, setDraft] = useState<{ on: boolean; form: RepeatForm } | null>(null);
@@ -91,7 +92,7 @@ export function TaskRepeatField({
   if (mode === 'registry') return <FrozenRepeat reason="Vem da tarefa recorrente." />;
 
   const canEdit = mode === 'series' || mode === 'ended' ? (task.recurrence?.canEdit ?? true) : true;
-  const lockReason = readOnly ? SUBSCRIPTION_REASON : !canEdit ? NO_EDIT_REASON : undefined;
+  const lockReason = readOnly ? (subscriptionReason ?? 'Somente leitura.') : !canEdit ? NO_EDIT_REASON : undefined;
 
   if (mode === 'series' && rule) {
     if (draft) {

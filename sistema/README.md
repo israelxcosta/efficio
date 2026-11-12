@@ -163,9 +163,13 @@ cookie httpOnly e dados no servidor.
   e-mail com link de uso único.
 - **Proteções**: CSP restritiva e HSTS, verificação de origem e de JSON em toda escrita (CSRF),
   rate limit (Redis opcional para várias instâncias), log de auditoria sem dados pessoais.
-- **Assinaturas**: Mercado Pago (assinaturas recorrentes); webhooks com assinatura HMAC verificada
-  e status sempre reconsultado na API do Mercado Pago. Teste grátis de 14 dias; sem assinatura
-  válida o espaço fica somente leitura (`402`). Em desenvolvimento e na demo, `BILLING_PROVIDER=fake`.
+- **Assinaturas: desativadas, implantação futura.** `BILLING_ENABLED = false`
+  (`packages/shared/src/saas.ts`): todo espaço funciona como assinatura ativa (sem `402`, o teste não
+  expira), checkout, cancelamento e webhook do Mercado Pago respondem `404` e o web esconde as telas
+  de assinatura. O código de cobrança continua para quando o interruptor voltar a `true`: Mercado
+  Pago (assinaturas recorrentes), webhooks com assinatura HMAC verificada e status reconsultado na
+  API, teste grátis de 14 dias e espaço somente leitura (`402`) sem assinatura válida. Em
+  desenvolvimento e na demo, `BILLING_PROVIDER=fake`. Ver `docs/api.md` → "Cobrança desativada".
 - **LGPD**: aceite dos termos no cadastro, exportação completa dos dados (JSON) e exclusão da conta
   e dos espaços.
 

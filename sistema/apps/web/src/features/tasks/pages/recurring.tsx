@@ -34,7 +34,7 @@ import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { SkeletonRows } from '@/components/ui/skeleton';
 import { Tooltip } from '@/components/ui/tooltip';
-import { ADMIN_ONLY_REASON, SUBSCRIPTION_REASON, usePermissions, WriteGate } from '@/features/auth/permissions';
+import { ADMIN_ONLY_REASON, usePermissions, WriteGate } from '@/features/auth/permissions';
 import { ApiRequestError } from '@/lib/api';
 import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
@@ -74,7 +74,7 @@ export default function RecurringTasksPage() {
   const filters = parseRecurringFilters(params);
   const view = parseRecurringView(params);
   const list = useRecurringTasks(toRecurringQuery(filters, month));
-  const { can, canManage } = usePermissions();
+  const { can, canManage, subscriptionReason } = usePermissions();
   // Texts and the registry follow `registry`; deleting a recurring task, `deleteRegistry`.
   const isAdmin = can('registry');
   const [ending, setEnding] = useState<RecurringTask | null>(null);
@@ -222,7 +222,7 @@ export default function RecurringTasksPage() {
         loading={Boolean(openId) && !openRecurring && !duplicating}
         options={options.data}
         canEdit={canManage}
-        readOnlyReason={isAdmin ? SUBSCRIPTION_REASON : ADMIN_ONLY_REASON}
+        readOnlyReason={(isAdmin && subscriptionReason) || ADMIN_ONLY_REASON}
       />
       <EndRecurringDialog recurring={ending} current={month} onOpenChange={(o) => !o && setEnding(null)} />
       <ConfirmDialog

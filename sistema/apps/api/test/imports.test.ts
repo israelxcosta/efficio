@@ -11,7 +11,8 @@ import { admin, createAccount, createTestApp, firstCategory, registerUser, reset
 
 let app: App;
 beforeAll(async () => {
-  app = await createTestApp();
+  // Paid plans on (expired workspaces get 402); billing-disabled.test.ts covers billing off.
+  app = await createTestApp({ billingEnabled: true });
 });
 afterAll(async () => {
   await app.close();

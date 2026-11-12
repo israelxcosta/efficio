@@ -6,11 +6,14 @@ import { Check, Copy, DoorOpen, Link2, MailPlus, SlidersHorizontal, Trash2, User
 import { toast } from 'sonner';
 import type { z } from 'zod';
 import {
+  BILLING_ENABLED,
   inviteInputSchema,
   PLANS,
   WORKSPACE_KIND_LABELS,
   type Invite,
   type Member,
+  type Plan,
+  type WorkspaceKind,
 } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,6 +47,32 @@ import {
 } from '@/features/workspaces/api';
 import { WORKSPACE_KIND_ICONS } from '@/features/workspaces/kind-icon';
 import { Cell, TabGrid } from './layout';
+
+/** Subtitle of Membros: the count against the limit ("no plano atual" only with paid subscriptions on). */
+export function membersCountLine(count: number | undefined, max: number | undefined): string {
+  if (!max) return 'Pessoas com acesso a este espaço';
+  const line = `${count ?? '–'} de ${max} ${max === 1 ? 'membro' : 'membros'}`;
+  return BILLING_ENABLED ? `${line} no plano atual` : line;
+}
+
+/**
+ * The notice when the members limit is reached. The plan (and the way up to a larger one) only while
+ * paid subscriptions are on (`BILLING_ENABLED`, a future rollout).
+ */
+export function memberLimitCopy({ kind, max, upgrade }: { kind: WorkspaceKind | undefined; max: number; upgrade: Pick<Plan, 'name' | 'maxMembers'> | undefined }): {
+  title: string;
+  detail: string;
+} {
+  return {
+    title: BILLING_ENABLED ? `Limite de membros do plano atingido (${max})` : `Limite de membros atingido (${max})`,
+    detail:
+      kind === 'personal'
+        ? 'Este espaço é individual. Crie uma empresa para compartilhar com a equipe.'
+        : BILLING_ENABLED && upgrade
+          ? `Mude para o plano ${upgrade.name} para convidar até ${upgrade.maxMembers} membros.`
+          : 'Remova um membro ou um convite pendente para convidar outra pessoa.',
+  };
+}
 
 export function MembersTab() {
   // Invites, roles, removals and permissions: the `members` key (by default, the owner).
@@ -79,7 +108,7 @@ function WorkspaceCard() {
 
   return (
     <Card className="p-6">
-      <CardHeader title="Espaço" subtitle="Cada espaço tem dados, membros e assinatura próprios." />
+      <CardHeader title="Espaço" subtitle={BILLING_ENABLED ? 'Cada espaço tem dados, membros e assinatura próprios.' : 'Cada espaço tem dados e membros próprios.'} />
       <div className="mt-5 flex items-start gap-4">
         <span className={cn('flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-primary-soft text-primary-soft-fg', isOwner && 'sm:mt-[26px]')}>
           <Icon className="size-5" />
@@ -172,9 +201,7 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
     <Card className="p-6">
       <CardHeader
         title="Membros"
-        subtitle={
-          max ? `${count ?? '–'} de ${max} ${max === 1 ? 'membro' : 'membros'} no plano atual` : 'Pessoas com acesso a este espaço'
-        }
+        subtitle={membersCountLine(count, max)}
         icon={<Users />}
       />
       <div className="mt-4">
@@ -285,6 +312,7 @@ function InvitesCard() {
   const used = (subscription.data?.memberCount ?? members.data?.length ?? 0) + (invites.data?.length ?? 0);
   const full = max !== null && used >= max;
   const upgrade = workspace ? PLANS.find((p) => p.workspaceKinds.includes(workspace.kind) && p.maxMembers > (max ?? 0)) : undefined;
+  const limit = full && max !== null ? memberLimitCopy({ kind: workspace?.kind, max, upgrade }) : null;
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
@@ -300,16 +328,10 @@ function InvitesCard() {
   return (
     <Card className="p-6">
       <CardHeader title="Convidar pessoas" subtitle="O convite vale por 7 dias e precisa ser aceito com o mesmo e-mail." icon={<MailPlus />} />
-      {full ? (
+      {limit ? (
         <div className="mt-4 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-[13px]">
-          <p className="font-semibold text-fg">Limite de membros do plano atingido ({max})</p>
-          <p className="mt-0.5 text-muted">
-            {workspace?.kind === 'personal'
-              ? 'Este espaço é individual. Crie uma empresa para compartilhar com a equipe.'
-              : upgrade
-                ? `Mude para o plano ${upgrade.name} para convidar até ${upgrade.maxMembers} membros.`
-                : 'Remova um membro ou um convite pendente para convidar outra pessoa.'}
-          </p>
+          <p className="font-semibold text-fg">{limit.title}</p>
+          <p className="mt-0.5 text-muted">{limit.detail}</p>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px_auto] sm:items-start" noValidate>

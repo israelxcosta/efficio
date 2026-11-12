@@ -9,7 +9,8 @@ import { admin, createAccount, createTestApp, legacyPersonalWorkspace, registerU
 
 let app: App;
 beforeAll(async () => {
-  app = await createTestApp();
+  // Paid plans on (trial, 402 and checkout); billing-disabled.test.ts covers billing off.
+  app = await createTestApp({ billingEnabled: true });
 });
 afterAll(async () => {
   await app.close();

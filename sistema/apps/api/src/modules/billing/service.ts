@@ -7,7 +7,7 @@ import type { DbExecutor } from '../../db/client';
 import { billingEvents, subscriptions } from '../../db/schema';
 import { audit, type AuditContext } from '../../lib/audit';
 import { ValidationError } from '../../lib/errors';
-import type { Platform } from '../../lib/platform';
+import { billingEnabled, type Platform } from '../../lib/platform';
 import type { Access } from '../workspaces/access';
 import { getSubscriptionRow, memberCount } from '../workspaces/service';
 import { effectiveStatus, maxMembersFor, summarizeSubscription } from './entitlements';
@@ -17,13 +17,14 @@ export function plansFor(kind: Access['workspaceKind'] | null): Plan[] {
   return kind ? PLANS.filter((p) => p.workspaceKinds.includes(kind)) : [...PLANS];
 }
 
-export async function getSubscription(db: DbExecutor, access: Access): Promise<Subscription> {
+/** `billingOn`: the platform's switch (`billingEnabled(platform)`); off = reported as active. */
+export async function getSubscription(db: DbExecutor, access: Access, billingOn: boolean): Promise<Subscription> {
   const [row, members] = await Promise.all([
     getSubscriptionRow(db, access.workspaceId),
     memberCount(db, access.workspaceId),
   ]);
   return {
-    ...summarizeSubscription(row),
+    ...summarizeSubscription(row, billingOn),
     provider: row?.provider ?? null,
     plan: getPlan(row?.planCode) ?? null,
     memberCount: members,
@@ -178,7 +179,7 @@ export async function cancelSubscription(db: DbExecutor, platform: Platform, acc
     userId: access.userId,
     entity: 'subscription',
   });
-  return getSubscription(db, access);
+  return getSubscription(db, access, billingEnabled(platform));
 }
 
 /** Best effort: stops future charges of workspaces about to be deleted. */
@@ -240,7 +241,13 @@ export async function handleWebhook(
 }
 
 /** Fake provider only: activates a plan as if the payment had been authorized. */
-export async function devActivate(db: DbExecutor, access: Access, planCode: PlanCode, ctx: AuditContext): Promise<Subscription> {
+export async function devActivate(
+  db: DbExecutor,
+  platform: Platform,
+  access: Access,
+  planCode: PlanCode,
+  ctx: AuditContext,
+): Promise<Subscription> {
   const plan = getPlan(planCode)!;
   if (!plan.workspaceKinds.includes(access.workspaceKind)) {
     throw new ValidationError('Este plano não está disponível para este tipo de espaço');
@@ -267,5 +274,5 @@ export async function devActivate(db: DbExecutor, access: Access, planCode: Plan
     entity: 'subscription',
     metadata: { planCode, provider: 'fake' },
   });
-  return getSubscription(db, access);
+  return getSubscription(db, access, billingEnabled(platform));
 }

@@ -23,7 +23,7 @@ import {
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
-import type { PagePermissionKey, PermissionKey } from '@effinance/shared';
+import { BILLING_ENABLED, type PagePermissionKey, type PermissionKey } from '@effinance/shared';
 
 export interface NavItem {
   to: string;
@@ -136,7 +136,12 @@ export const FINANCE_NAV_ITEMS: NavItem[] = [
   { to: '/relatorios', label: 'Relatórios', icon: ChartLine, mobile: true, keywords: 'analises fluxo de caixa comparacao insights' },
 ];
 
-export const SETTINGS_ITEM: NavItem = { to: '/configuracoes', label: 'Configurações', icon: Settings, keywords: 'perfil tema senha seguranca 2fa sessoes membros convites assinatura plano integracoes open finance importacoes privacidade exportar lgpd' };
+export const SETTINGS_ITEM: NavItem = { to: '/configuracoes', label: 'Configurações', icon: Settings, keywords: 'perfil tema senha seguranca 2fa sessoes membros convites integracoes open finance importacoes privacidade exportar lgpd' };
+
+/** What finds Configurações in ⌘K: "assinatura" and "plano" only while paid subscriptions are on (`BILLING_ENABLED`). */
+export function settingsSearchKeywords(): string {
+  return BILLING_ENABLED ? `${SETTINGS_ITEM.keywords} assinatura plano` : (SETTINGS_ITEM.keywords ?? '');
+}
 
 /** Grupos por regime, a view of Recorrentes: in ⌘K (spec §2.8) and in the hub, never in the rail. */
 export const REGIME_GROUPS_ITEM: NavItem = {

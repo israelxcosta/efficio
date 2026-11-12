@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Check, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import type { z } from 'zod';
-import { PLANS, TRIAL_DAYS, workspaceInputSchema, type WorkspaceSummary } from '@effinance/shared';
+import { BILLING_ENABLED, PLANS, TRIAL_DAYS, workspaceInputSchema, type WorkspaceSummary } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Field, Input } from '@/components/ui/input';
@@ -38,6 +38,26 @@ export function useSwitchWorkspace() {
   return { switchTo, switching };
 }
 
+/** " · somente leitura" beside a workspace whose subscription lapsed; nothing while paid subscriptions are off. */
+export function workspaceAccessNote(ws: Pick<WorkspaceSummary, 'subscription'>): string {
+  return BILLING_ENABLED && !ws.subscription.canWrite ? ' · somente leitura' : '';
+}
+
+/** The trial and the plan of a new company, in its sheet; null while paid subscriptions are off (`BILLING_ENABLED`). */
+export function newWorkspaceTrialNote(): { title: string; detail: string } | null {
+  if (!BILLING_ENABLED) return null;
+  const plan = PLANS.find((p) => p.workspaceKinds.includes('business'));
+  return {
+    title: `${TRIAL_DAYS} dias grátis, sem cartão`,
+    detail: `Contas a pagar e a receber da empresa com a sua equipe.${plan ? ` Depois, plano ${plan.name} com até ${plan.maxMembers} membros.` : ''}`,
+  };
+}
+
+/** Toast after creating a company: the trial only while paid subscriptions are on. */
+export function newWorkspaceCreatedMessage(name: string): string {
+  return BILLING_ENABLED ? `${name} criada com ${TRIAL_DAYS} dias grátis. Convide quem vai participar.` : `${name} criada. Convide quem vai participar.`;
+}
+
 function WorkspaceRow({ ws, active }: { ws: WorkspaceSummary; active: boolean }) {
   const Icon = WORKSPACE_KIND_ICONS[ws.kind];
   return (
@@ -54,7 +74,7 @@ function WorkspaceRow({ ws, active }: { ws: WorkspaceSummary; active: boolean })
         <span className="block truncate text-sm font-semibold text-fg">{ws.name}</span>
         <span className="block text-[11px] font-medium text-muted">
           {ROLE_LABELS[ws.role]}
-          {ws.subscription.canWrite ? '' : ' · somente leitura'}
+          {workspaceAccessNote(ws)}
         </span>
       </span>
       {active ? <Check className="size-4 text-primary dark:text-fg" aria-label="Espaço atual" /> : null}
@@ -114,7 +134,7 @@ export function WorkspaceList({ onCreate, onSwitched }: { onCreate: () => void; 
 
 type WorkspaceForm = z.input<typeof workspaceInputSchema>;
 
-/** "Nova empresa": a business workspace with its own data, members and subscription. */
+/** "Nova empresa": a business workspace with its own data and members (and subscription, with billing on). */
 export function WorkspaceSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const create = useCreateWorkspace();
   const { switchTo } = useSwitchWorkspace();
@@ -122,7 +142,7 @@ export function WorkspaceSheet({ open, onOpenChange }: { open: boolean; onOpenCh
     resolver: zodResolver(workspaceInputSchema),
     defaultValues: { name: '', kind: 'business' },
   });
-  const plan = PLANS.find((p) => p.workspaceKinds.includes('business'));
+  const trial = newWorkspaceTrialNote();
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
@@ -130,7 +150,7 @@ export function WorkspaceSheet({ open, onOpenChange }: { open: boolean; onOpenCh
       onOpenChange(false);
       form.reset({ name: '', kind: 'business' });
       await switchTo(ws, { to: '/configuracoes?aba=membros', silent: true });
-      toast.success(`${ws.name} criada com ${TRIAL_DAYS} dias grátis. Convide quem vai participar.`);
+      toast.success(newWorkspaceCreatedMessage(ws.name));
     } catch (error) {
       toastError(error);
     }
@@ -141,7 +161,7 @@ export function WorkspaceSheet({ open, onOpenChange }: { open: boolean; onOpenCh
       open={open}
       onOpenChange={onOpenChange}
       title="Nova empresa"
-      description="Uma empresa separada, com dados, membros e assinatura próprios."
+      description={BILLING_ENABLED ? 'Uma empresa separada, com dados, membros e assinatura próprios.' : 'Uma empresa separada, com dados e membros próprios.'}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -157,13 +177,12 @@ export function WorkspaceSheet({ open, onOpenChange }: { open: boolean; onOpenCh
         <Field label="Nome da empresa" error={form.formState.errors.name?.message}>
           <Input placeholder="Ex.: Costa Contabilidade Ltda." {...form.register('name')} />
         </Field>
-        <div className="rounded-xl border border-border bg-surface-muted px-4 py-3.5 text-[13px]">
-          <p className="font-semibold text-fg">{TRIAL_DAYS} dias grátis, sem cartão</p>
-          <p className="mt-1 text-muted">
-            Contas a pagar e a receber da empresa com a sua equipe.{' '}
-            {plan ? `Depois, plano ${plan.name} com até ${plan.maxMembers} membros.` : null}
-          </p>
-        </div>
+        {trial ? (
+          <div className="rounded-xl border border-border bg-surface-muted px-4 py-3.5 text-[13px]">
+            <p className="font-semibold text-fg">{trial.title}</p>
+            <p className="mt-1 text-muted">{trial.detail}</p>
+          </div>
+        ) : null}
       </form>
     </Sheet>
   );

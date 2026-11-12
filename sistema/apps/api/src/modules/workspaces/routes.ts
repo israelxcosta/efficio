@@ -17,7 +17,7 @@ import {
 import { audit } from '../../lib/audit';
 import { ValidationError } from '../../lib/errors';
 import { oneLine } from '../../lib/mailer';
-import { rateLimited } from '../../lib/platform';
+import { billingEnabled, rateLimited } from '../../lib/platform';
 import { assertPermission } from '../../lib/permissions';
 import { requestContext } from '../../lib/request-context';
 import { assertOwner, assertSubscriptionAllowsWrite } from './access';
@@ -53,9 +53,9 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook('onRequest', app.authenticate);
 
   const summaryOf = async (userId: string, workspaceId: string) =>
-    (await listWorkspaceSummaries(app.db, userId)).find((w) => w.id === workspaceId)!;
+    (await listWorkspaceSummaries(app.db, userId, billingEnabled(app.platform))).find((w) => w.id === workspaceId)!;
 
-  app.get('/', async (req) => listWorkspaceSummaries(app.db, req.userId));
+  app.get('/', async (req) => listWorkspaceSummaries(app.db, req.userId, billingEnabled(app.platform)));
 
   app.post('/', { schema: { body: workspaceInputSchema }, config: rateLimited(app.platform, 10, '1 hour') }, async (req, reply) => {
     const id = await createSharedWorkspace(app.db, req.userId, req.body);
@@ -181,7 +181,7 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get('/current/export', { config: rateLimited(app.platform, 5, '1 minute') }, async (req, reply) => {
     assertOwner(req.access);
-    const data = await exportWorkspace(app.db, req.access);
+    const data = await exportWorkspace(app.db, req.access, billingEnabled(app.platform));
     // The export carries the clients' accesses decrypted (owner only): the audit record says so.
     await audit(app.db, { ...requestContext(req), action: 'data.exported', workspaceId: req.workspaceId, userId: req.userId, entity: 'workspace', entityId: req.workspaceId, metadata: { includesCredentials: true } });
     reply.header('content-disposition', `attachment; filename="efficio-${data.exportedAt.slice(0, 10)}.json"`);
@@ -208,7 +208,7 @@ export const inviteRoutes: FastifyPluginAsyncZod = async (app) => {
       const workspaceId = await acceptInvite(app.db, req.userId, req.params.token);
       await app.switchSession(req, reply, workspaceId);
       await audit(app.db, { ...requestContext(req), action: 'member.joined', workspaceId, userId: req.userId, entity: 'user', entityId: req.userId });
-      return getMe(app.db, req.userId, workspaceId);
+      return getMe(app.db, req.userId, workspaceId, billingEnabled(app.platform));
     },
   );
 };

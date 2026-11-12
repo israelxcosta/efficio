@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { connectTokenSchema, createConnectionSchema, fakeConnectSchema, linkAccountsSchema } from '@effinance/shared';
 import { audit } from '../../lib/audit';
 import { financeOnly } from '../../lib/finance-access';
-import { rateLimited } from '../../lib/platform';
+import { billingEnabled, rateLimited } from '../../lib/platform';
 import { requestContext } from '../../lib/request-context';
 import { tenantGuards } from '../../lib/tenant-scope';
 import { idParams } from '../common/params';
@@ -108,7 +108,12 @@ export const openFinanceWebhookRoutes: FastifyPluginAsyncZod = async (app) => {
     '/:provider/:secret',
     { bodyLimit: 64 * 1024, schema: { params: webhookParams }, config: rateLimited(app.platform, 300, '1 minute') },
     async (req) => {
-      const context: OpenFinanceContext = { db: app.db, of: app.platform.openFinance, log: req.log ?? quietLog };
+      const context: OpenFinanceContext = {
+        db: app.db,
+        of: app.platform.openFinance,
+        log: req.log ?? quietLog,
+        billingEnabled: billingEnabled(app.platform),
+      };
       const { duplicate, job } = await receiveWebhook(context, req.params.provider, req.params.secret, req.body);
       // Answer now (the aggregator expects a 2xx within seconds); the sync runs afterwards.
       if (job) runInBackground(job);

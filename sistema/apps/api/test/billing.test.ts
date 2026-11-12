@@ -48,7 +48,11 @@ beforeAll(async () => {
   mp = fakeMercadoPago();
   app = await buildApp({
     logger: false,
-    platform: { billing: new MercadoPagoProvider({ accessToken: 'TEST-token', webhookSecret: SECRET, fetch: mp.fetchImpl }) },
+    // Billing switched on (the shared default may be off: billing-disabled.test.ts covers that path).
+    platform: {
+      billingEnabled: true,
+      billing: new MercadoPagoProvider({ accessToken: 'TEST-token', webhookSecret: SECRET, fetch: mp.fetchImpl }),
+    },
   });
   await app.ready();
 });

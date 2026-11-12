@@ -465,6 +465,8 @@ Contrato em `packages/shared/src/saas.ts`.
   - Mudança de papel vale na próxima requisição (o papel é relido a cada requisição).
 - Gravações exigem assinatura válida: `trialing` (14 dias, sem cartão), `active` ou `past_due` dentro
   da carência de 7 dias. Fora disso → `402 subscription_required` (leitura e exportação continuam).
+  **Com a cobrança desativada (`BILLING_ENABLED = false`, o padrão atual) não há `402`**: veja
+  "Cobrança desativada (implantação futura)".
 - Limite de membros por plano ao convidar.
 
 ## Endpoints novos
@@ -506,10 +508,10 @@ Contrato em `packages/shared/src/saas.ts`.
 | GET | `/api/workspaces/current/audit` | `auditQuerySchema` | `Paginated<AuditLogEntry>` (owner) |
 | GET | `/api/billing/plans` | — | `Plan[]` |
 | GET | `/api/billing/subscription` | — | `Subscription` |
-| POST | `/api/billing/checkout` | `checkoutSchema` | `CheckoutResponse` (owner) |
-| POST | `/api/billing/cancel` | — | `Subscription` (owner; cancela ao fim do período) |
-| POST | `/api/billing/webhooks/mercadopago` | notificação MP | 200 (assinatura `x-signature` verificada, idempotente) |
-| POST | `/api/billing/dev/activate` | `checkoutSchema` | `Subscription` — só com `BILLING_PROVIDER=fake` (dev/demo) |
+| POST | `/api/billing/checkout` | `checkoutSchema` | `CheckoutResponse` (owner) — `404` com a cobrança desativada |
+| POST | `/api/billing/cancel` | — | `Subscription` (owner; cancela ao fim do período) — `404` com a cobrança desativada |
+| POST | `/api/billing/webhooks/mercadopago` | notificação MP | 200 (assinatura `x-signature` verificada, idempotente) — `404` com a cobrança desativada |
+| POST | `/api/billing/dev/activate` | `checkoutSchema` | `Subscription` — só com `BILLING_PROVIDER=fake` (dev/demo); `404` com a cobrança desativada |
 
 ## Detalhes de implementação
 
@@ -543,6 +545,28 @@ Contrato em `packages/shared/src/saas.ts`.
   todos os espaços de novo (0013: descrição e comentários de tarefas).
 - **Demo (PGlite)**: mesmas rotas e serviços, inclusive RLS e criptografia (chave mestra fixa e
   pública da demo), sessão no `localStorage` e provedor de pagamento fake.
+
+## Cobrança desativada (implantação futura)
+
+`BILLING_ENABLED` (`packages/shared/src/saas.ts`) está `false`: os planos pagos ficam para uma
+implantação futura, sem apagar o código de cobrança. A API lê o valor de `platform.billingEnabled`
+(padrão: a constante; `lib/platform.ts` → `billingEnabled()`). Enquanto desligado:
+
+- `SubscriptionSummary` (`GET /auth/me`, `GET /workspaces`, `GET /billing/subscription`, exportação)
+  informa `status: 'active'`, `canWrite: true`, `trialEndsAt` e `currentPeriodEnd` `null` e
+  `cancelAtPeriodEnd: false` (`planCode` é o gravado, em geral `null`). Nenhuma rota responde
+  `402 subscription_required`, o teste não expira e os webhooks do Open Finance sincronizam. A linha
+  de `subscriptions` continua nascendo `trialing`: só o resumo é reescrito
+  (`modules/billing/entitlements.ts` → `summarizeSubscription`).
+- `POST /billing/checkout`, `/billing/cancel`, `/billing/dev/activate` e
+  `/billing/webhooks/mercadopago` respondem `404 not_found` (nada vai para `billing_events`).
+  `GET /billing/plans` e `GET /billing/subscription` continuam (a tela de membros lê `memberCount` e
+  `maxMembers`; o limite de membros segue o do teste por tipo de espaço). Excluir conta ou espaço
+  ainda cancela no provedor uma assinatura paga que exista.
+- Religar: `BILLING_ENABLED = true` (API e web leem a mesma constante). Espaços criados com a
+  cobrança desligada têm `trial_ends_at` vencido: renove-o antes, senão ficam somente leitura na hora.
+- Testes: `test/billing-disabled.test.ts` injeta `billingEnabled: false`; as suítes do caminho ligado
+  (cobrança, `402`, teste expirado) usam `createTestApp({ billingEnabled: true })`.
 
 ## Mercado Pago (assinaturas)
 

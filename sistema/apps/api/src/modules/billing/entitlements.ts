@@ -1,5 +1,6 @@
 // What a subscription allows right now. Trial expiry and the past-due grace period are computed on
-// read, so no scheduled job is needed.
+// read, so no scheduled job is needed. With billing switched off (`BILLING_ENABLED`, see
+// lib/platform.ts) only the summary changes: every workspace reads as an active subscription.
 
 import {
   GRACE_DAYS,
@@ -50,7 +51,25 @@ export function canWrite(row: SubscriptionRow | null | undefined, now: Date = ne
   }
 }
 
-export function summarizeSubscription(row: SubscriptionRow | null | undefined, now: Date = new Date()): SubscriptionSummary {
+/**
+ * The subscription as the API reports it (`req.access`, `/auth/me`, export…): `canWrite` is what every
+ * 402 check reads. Billing off: active and writable, with no trial/period dates (nothing to warn about).
+ */
+export function summarizeSubscription(
+  row: SubscriptionRow | null | undefined,
+  billingEnabled: boolean,
+  now: Date = new Date(),
+): SubscriptionSummary {
+  if (!billingEnabled) {
+    return {
+      planCode: (row?.planCode as PlanCode | null) ?? null,
+      status: 'active',
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      canWrite: true,
+    };
+  }
   return {
     planCode: (row?.planCode as PlanCode | null) ?? null,
     status: effectiveStatus(row, now),

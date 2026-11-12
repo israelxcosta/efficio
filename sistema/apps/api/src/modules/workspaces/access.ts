@@ -3,6 +3,7 @@
 
 import { and, eq, exists, gt, isNull, sql } from 'drizzle-orm';
 import {
+  BILLING_ENABLED,
   effectivePermissions,
   sanitizePermissionOverrides,
   type MemberRole,
@@ -36,11 +37,13 @@ export interface Access {
   subscription: SubscriptionSummary;
 }
 
+/** `billingEnabled`: the platform's switch (lib/platform.ts → `billingEnabled()`); off = never 402. */
 export async function loadAccess(
   db: DbExecutor,
   userId: string,
   workspaceId: string,
   sessionId: string | null,
+  billingEnabled: boolean = BILLING_ENABLED,
 ): Promise<Access | null> {
   const now = new Date();
   const conditions = [eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)];
@@ -87,7 +90,7 @@ export async function loadAccess(
     userName: row.userName,
     workspaceName: row.workspace.name,
     workspaceKind: row.workspace.kind,
-    subscription: summarizeSubscription(row.subscription, now),
+    subscription: summarizeSubscription(row.subscription, billingEnabled, now),
   };
 }
 

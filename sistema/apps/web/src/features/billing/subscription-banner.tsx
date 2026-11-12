@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { CircleAlert, Clock, Lock, X } from 'lucide-react';
-import { formatDateBR } from '@effinance/shared';
+import { BILLING_ENABLED, formatDateBR } from '@effinance/shared';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
 
@@ -22,14 +22,28 @@ function readDismissed(key: string): boolean {
 }
 
 /**
+ * The toast of a 402 (`subscription_required`): what to say and, for the owner, the way to subscribe.
+ * Null while paid subscriptions are off (`BILLING_ENABLED`): the error is told like any other.
+ */
+export function subscriptionRequiredToast(isOwner: boolean): { title: string; description: string; action?: { label: string; to: string } } | null {
+  if (!BILLING_ENABLED) return null;
+  return {
+    title: 'Assinatura necessária',
+    description: 'O espaço está em modo somente leitura. Assine um plano para voltar a criar e editar.',
+    action: isOwner ? { label: 'Assinar', to: '/configuracoes?aba=assinatura' } : undefined,
+  };
+}
+
+/**
  * Subscription state of the active workspace, above every page. Collaborators (viewer) work on the
- * tasks like everyone: their only restriction, the finances, is told by the restricted pages.
+ * tasks like everyone: their only restriction, the finances, is told by the restricted pages. Nothing
+ * while paid subscriptions are off (`BILLING_ENABLED`, a future rollout): no trial, no read-only mode.
  */
 export function SubscriptionBanner() {
   const { workspace } = useAuth();
   const trialKey = `effinance:trial-banner:${workspace?.id ?? ''}`;
   const [dismissed, setDismissed] = useState(() => readDismissed(trialKey));
-  if (!workspace) return null;
+  if (!BILLING_ENABLED || !workspace) return null;
 
   const sub = workspace.subscription;
   const isOwner = workspace.role === 'owner';

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ChevronLeft, ChevronRight, Download, History, Trash2, UserX } from 'lucide-react';
 import { toast } from 'sonner';
-import { todayISO, type AuditLogEntry } from '@effinance/shared';
+import { BILLING_ENABLED, todayISO, type AuditLogEntry } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Modal } from '@/components/ui/dialog';
@@ -150,7 +150,7 @@ function AuditCard() {
 
   return (
     <Card className="p-6">
-      <CardHeader title="Registro de auditoria" subtitle="Ações sensíveis neste espaço: acessos, membros, assinatura e exportações." icon={<History />} />
+      <CardHeader title="Registro de auditoria" subtitle={BILLING_ENABLED ? 'Ações sensíveis neste espaço: acessos, membros, assinatura e exportações.' : 'Ações sensíveis neste espaço: acessos, membros e exportações.'} icon={<History />} />
       <div className="mt-4">
         {audit.isPending ? (
           <SkeletonRows rows={3} />
@@ -224,7 +224,11 @@ function DeleteWorkspaceCard() {
 
   return (
     <Card className="border-danger/30 p-6">
-      <CardHeader title="Excluir este espaço" subtitle="Apaga todos os dados, cancela a assinatura e destrói a chave de criptografia. Não pode ser desfeito." icon={<Trash2 />} />
+      <CardHeader title="Excluir este espaço" subtitle={
+          BILLING_ENABLED
+            ? 'Apaga todos os dados, cancela a assinatura e destrói a chave de criptografia. Não pode ser desfeito.'
+            : 'Apaga todos os dados e destrói a chave de criptografia. Não pode ser desfeito.'
+        } icon={<Trash2 />} />
       <div className="mt-5">
         <Button variant="danger-soft" onClick={() => setOpen(true)}>
           <Trash2 /> Excluir {workspace.name}

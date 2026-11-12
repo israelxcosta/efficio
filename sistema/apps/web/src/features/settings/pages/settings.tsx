@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { CreditCard, Plug, ShieldCheck, ShieldEllipsis, Stamp, UserRound, Users } from 'lucide-react';
-import { WORKSPACE_KIND_LABELS } from '@effinance/shared';
+import { BILLING_ENABLED, WORKSPACE_KIND_LABELS } from '@effinance/shared';
 import { PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { useAuth } from '@/features/auth/auth-context';
@@ -19,9 +19,24 @@ type Tab = (typeof TABS)[number];
 /** Collaborators (no finance access) see Perfil, Segurança, Membros and Privacidade (spec §2.6). */
 const ADMIN_TABS: readonly Tab[] = ['assinatura', 'integracoes'];
 
-/** Escritório (phase 3) only for whoever has `office`; Assinatura and Integrações with the finances. */
+/**
+ * Escritório (phase 3) only for whoever has `office`; Assinatura and Integrações with the finances.
+ * Assinatura only while paid subscriptions are on (`BILLING_ENABLED`, a future rollout).
+ */
 export function settingsTabsFor(canAccessFinance: boolean, canOffice = false): readonly Tab[] {
-  return TABS.filter((t) => (t === 'escritorio' ? canOffice : canAccessFinance || !ADMIN_TABS.includes(t)));
+  return TABS.filter((t) => {
+    if (t === 'assinatura' && !BILLING_ENABLED) return false;
+    return t === 'escritorio' ? canOffice : canAccessFinance || !ADMIN_TABS.includes(t);
+  });
+}
+
+/**
+ * The tab of `?aba=`: one the person sees, else Perfil. A tab that does not exist for the person (the
+ * Assinatura with billing off, a finance tab for a collaborator, a typo) also cleans the address.
+ */
+export function resolveSettingsTab(raw: string | null, tabs: readonly Tab[]): { tab: Tab; redirect: boolean } {
+  if ((tabs as readonly string[]).includes(raw ?? '')) return { tab: raw as Tab, redirect: false };
+  return { tab: 'perfil', redirect: Boolean(raw) };
 }
 
 export default function SettingsPage() {
@@ -29,8 +44,10 @@ export default function SettingsPage() {
   const { canAccessFinance, can } = usePermissions();
   const tabs = settingsTabsFor(canAccessFinance, can('office'));
   const [params, setParams] = useSearchParams();
-  const raw = params.get('aba');
-  const tab: Tab = (tabs as readonly string[]).includes(raw ?? '') ? (raw as Tab) : 'perfil';
+  const { tab, redirect } = resolveSettingsTab(params.get('aba'), tabs);
+  useEffect(() => {
+    if (redirect) setParams({}, { replace: true });
+  }, [redirect, setParams]);
 
   // Narrow screens scroll the tab bar: keep the active tab (e.g. from a link) in view.
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -58,7 +75,7 @@ export default function SettingsPage() {
               Conta, segurança e o espaço <span className="font-semibold text-fg">{workspace.name}</span> ({WORKSPACE_KIND_LABELS[workspace.kind]}).
             </>
           ) : (
-            'Conta, segurança e assinatura.'
+            BILLING_ENABLED ? 'Conta, segurança e assinatura.' : 'Conta e segurança.'
           )
         }
       />

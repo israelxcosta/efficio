@@ -3,6 +3,7 @@ import type { LightMyRequestResponse } from 'fastify';
 import { afterAll } from 'vitest';
 import { buildApp, type App } from '../src/app';
 import { createDb, type Database } from '../src/db/client';
+import type { Platform } from '../src/lib/platform';
 import { createWorkspace } from '../src/modules/workspaces/service';
 
 let adminConnection: ReturnType<typeof createDb> | null = null;
@@ -18,8 +19,12 @@ afterAll(async () => {
   adminConnection = null;
 });
 
-export async function createTestApp(): Promise<App> {
-  const app = await buildApp({ logger: false });
+/**
+ * App with the services built from env, plus overrides. Billing follows `BILLING_ENABLED` unless the
+ * suite says otherwise: `createTestApp({ billingEnabled: true })` covers the paid-plans path (402, trial).
+ */
+export async function createTestApp(platform: Partial<Platform> = {}): Promise<App> {
+  const app = await buildApp({ logger: false, platform });
   await app.ready();
   return app;
 }

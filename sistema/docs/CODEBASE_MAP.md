@@ -181,7 +181,7 @@ sequenceDiagram
 | `common` | — | `get*OrThrow` (sempre por id + workspace), `validateTransactionRefs` |
 | `auth` | `/auth/*` | registro, login, refresh rotativo (reuso revoga a família), TOTP, recuperação, troca de espaço |
 | `workspaces` | `/workspaces`, `/invites` | membros e papéis, convites (hash do token), exportação LGPD, exclusão com crypto-shredding |
-| `billing` | `/billing/*` | planos, checkout Mercado Pago, webhooks assinados e idempotentes, status calculado na leitura |
+| `billing` | `/billing/*` | planos, checkout Mercado Pago, webhooks assinados e idempotentes, status calculado na leitura. **Desativado** (`BILLING_ENABLED = false`, `lib/platform.ts` → `billingEnabled()`): resumo sempre `active`, sem 402, checkout/cancel/webhook 404 (`docs/api.md` → "Cobrança desativada") |
 | `categories` | `/categories` | árvore de 2 níveis; padrões pessoal e empresarial (`defaults.ts`) |
 | `accounts` | `/accounts` | saldo = inicial + realizado; projetado até o fim do mês |
 | `credit-cards` | `/credit-cards` | faturas, limite usado, pagamento integral (`card_payment`), `listInvoicesToPay` |

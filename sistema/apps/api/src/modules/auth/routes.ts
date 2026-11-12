@@ -30,6 +30,7 @@ import {
 } from '../../lib/auth';
 import { sha256Hex } from '../../lib/crypto/encoding';
 import { UnauthorizedError } from '../../lib/errors';
+import { billingEnabled } from '../../lib/platform';
 import { requestContext } from '../../lib/request-context';
 import { prepareWorkspaceDeletion } from '../workspaces/deletion';
 import { getMe, getUserRow, resolveWorkspaceFor, switchWorkspace } from '../workspaces/service';
@@ -184,7 +185,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   const authenticated: FastifyPluginAsyncZod = async (authed) => {
     authed.addHook('onRequest', app.authenticate);
 
-    authed.get('/me', async (req) => getMe(app.db, req.userId, req.workspaceId));
+    authed.get('/me', async (req) => getMe(app.db, req.userId, req.workspaceId, billingEnabled(app.platform)));
 
     authed.put('/me', { schema: { body: updateProfileSchema } }, async (req) => updateProfile(app.db, req.userId, req.body));
 
@@ -244,7 +245,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
     authed.post('/switch-workspace', { schema: { body: switchWorkspaceSchema } }, async (req, reply) => {
       await switchWorkspace(app.db, req.userId, req.body.workspaceId);
       await app.switchSession(req, reply, req.body.workspaceId);
-      return getMe(app.db, req.userId, req.body.workspaceId);
+      return getMe(app.db, req.userId, req.body.workspaceId, billingEnabled(app.platform));
     });
   };
   await app.register(authenticated);

@@ -3,7 +3,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions } from '@/features/auth/permissions';
-import { SubscriptionBanner } from '@/features/billing/subscription-banner';
+import { SubscriptionBanner, subscriptionRequiredToast } from '@/features/billing/subscription-banner';
 import { onAccessError } from '@/lib/api';
 import { TransactionActionsProvider } from '@/features/transactions/transaction-actions';
 import { ImportActionsProvider } from '@/features/imports/import-actions';
@@ -44,7 +44,8 @@ export function AppShell() {
   }, [memoryKey, pathWithSearch, location.pathname, canAccessFinance]);
 
   // 402/403 from any request: explain once (deduplicated toast) and refresh the session state,
-  // since the subscription or the member's role may have changed since it was loaded.
+  // since the subscription or the member's role may have changed since it was loaded. With paid
+  // subscriptions off (`BILLING_ENABLED`) there is no plan to offer: a 402 is told like a 403.
   useEffect(() => {
     onAccessError((kind, error) => {
       if (kind === 'workspace_mismatch') {
@@ -54,11 +55,13 @@ export function AppShell() {
         return;
       }
       void refreshMe();
-      if (kind === 'subscription_required') {
-        toast.error('Assinatura necessária', {
+      const subscription = kind === 'subscription_required' ? subscriptionRequiredToast(role === 'owner') : null;
+      if (subscription) {
+        const { action } = subscription;
+        toast.error(subscription.title, {
           id: 'subscription-required',
-          description: 'O espaço está em modo somente leitura. Assine um plano para voltar a criar e editar.',
-          action: role === 'owner' ? { label: 'Assinar', onClick: () => navigate('/configuracoes?aba=assinatura') } : undefined,
+          description: subscription.description,
+          action: action ? { label: action.label, onClick: () => navigate(action.to) } : undefined,
         });
       } else {
         toast.error(error.message, { id: 'forbidden' });

@@ -12,7 +12,8 @@ import { admin, createTestApp, registerUser, resetDb, type Client } from './help
 
 let app: App;
 beforeAll(async () => {
-  app = await createTestApp();
+  // Paid plans on (writes need a writable subscription); billing-disabled.test.ts covers billing off.
+  app = await createTestApp({ billingEnabled: true });
 });
 afterAll(async () => {
   await app.close();

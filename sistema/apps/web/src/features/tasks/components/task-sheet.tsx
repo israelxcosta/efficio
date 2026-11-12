@@ -41,7 +41,7 @@ import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip } from '@/components/ui/tooltip';
-import { SUBSCRIPTION_REASON, usePermissions, WriteGate } from '@/features/auth/permissions';
+import { usePermissions, WriteGate } from '@/features/auth/permissions';
 import { ApiRequestError, errorMessage } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { toastError } from '@/lib/notify';
@@ -950,7 +950,8 @@ function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptio
 function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; stamp: Stamp; readOnly: boolean; onClose: () => void }) {
   const status = useTaskStatusChange();
   const remove = useDeleteTask();
-  const isAdmin = usePermissions().can('deleteTasks');
+  const { can, subscriptionReason } = usePermissions();
+  const isAdmin = can('deleteTasks');
   const [confirming, setConfirming] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [params, setParams] = useSearchParams();
@@ -961,9 +962,8 @@ function DetailFooter({ task, stamp, readOnly, onClose }: { task: TaskDetail; st
   const primary = primaryAction(task);
 
   if (readOnly) {
-    return (
-      <p className="mr-auto text-caption text-muted">{SUBSCRIPTION_REASON}</p>
-    );
+    // Only an inactive subscription (billing on) makes a task read-only for a member.
+    return subscriptionReason ? <p className="mr-auto text-caption text-muted">{subscriptionReason}</p> : null;
   }
   return (
     <>

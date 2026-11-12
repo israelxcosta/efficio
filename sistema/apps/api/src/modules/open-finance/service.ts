@@ -70,6 +70,8 @@ export interface OpenFinanceContext {
   db: DbExecutor;
   of: OpenFinanceSetup | null | undefined;
   log?: LogLike;
+  /** Paid subscriptions on (`app.platform`)? Off: webhook syncs never stop for the subscription. */
+  billingEnabled?: boolean;
 }
 
 type LinkInput = z.output<typeof linkAccountsSchema>;

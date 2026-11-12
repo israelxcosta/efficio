@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MemberAvatar } from '@/components/ui/member-avatar';
-import { usePermissions, SUBSCRIPTION_REASON } from '@/features/auth/permissions';
+import { usePermissions } from '@/features/auth/permissions';
 import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { useDeleteTask, useTaskOptions, useUpdateTask } from '../api';
@@ -50,7 +50,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
   const compact = density === 'compact';
   const options = useTaskOptions();
   const today = todayProp ?? options.data?.today ?? todayISO();
-  const { canWriteTasks } = usePermissions();
+  const { canWriteTasks, subscriptionReason } = usePermissions();
   const status = useTaskStatusChange();
   const { openTask } = useTaskSheetLinks();
   const closed = task.status === 'done' || task.status === 'canceled';
@@ -74,7 +74,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
           size={compact ? 'sm' : 'md'}
           loading={status.savingId === task.id}
           disabled={!canWriteTasks}
-          disabledReason={canWriteTasks ? null : SUBSCRIPTION_REASON}
+          disabledReason={canWriteTasks ? null : subscriptionReason}
           onToggle={(action) => void status.toggle(task, action)}
         />
         <button type="button" onClick={() => openTask(task.id)} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left">

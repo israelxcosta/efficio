@@ -3,7 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { registerSchema, TRIAL_DAYS } from '@effinance/shared';
+import { BILLING_ENABLED, registerSchema, TRIAL_DAYS } from '@effinance/shared';
 import type { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/input';
@@ -16,6 +16,13 @@ import { FullPageLoader } from '@/components/layout/app-shell';
 import { safeInternalPath } from '@/lib/safe-url';
 
 type RegisterForm = z.input<typeof registerSchema>;
+
+/** Toast after signing up: the trial days only while paid subscriptions are on (`BILLING_ENABLED`). */
+export function accountCreatedMessage(): string {
+  return BILLING_ENABLED
+    ? `Conta criada! Você tem ${TRIAL_DAYS} dias grátis, com o plano de contas da empresa e um caixa prontos.`
+    : 'Conta criada! O plano de contas da empresa e um caixa já estão prontos.';
+}
 
 export default function RegisterPage() {
   const { user, loading, register: signUp } = useAuth();
@@ -36,7 +43,7 @@ export default function RegisterPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     try {
       await signUp(values);
-      toast.success(`Conta criada! Você tem ${TRIAL_DAYS} dias grátis, com o plano de contas da empresa e um caixa prontos.`);
+      toast.success(accountCreatedMessage());
       navigate(from, { replace: true });
     } catch (error) {
       toast.error(errorMessage(error));

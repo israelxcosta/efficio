@@ -1,6 +1,6 @@
 // Runs the in-browser API (PGlite + real route plugins) in Node to guard the demo build.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { addMonthKey, addMonths, daysInMonth, discountAmount, monthKey, todayISO } from '@effinance/shared';
+import { addMonthKey, addMonths, BILLING_ENABLED, daysInMonth, discountAmount, monthKey, todayISO } from '@effinance/shared';
 import { demoFetch } from './fetch';
 import { DEMO_EMAIL, DEMO_PASSWORD, getDemoServer } from './server';
 
@@ -253,7 +253,8 @@ describe('demo api (PGlite)', () => {
 
     // A second company: business by default, its own categories, nothing of the office.
     const created = await call('POST', '/workspaces', { name: BRANCH });
-    expect(created).toMatchObject({ status: 201, body: { name: BRANCH, kind: 'business', role: 'owner', subscription: { status: 'trialing' } } });
+    // A trial only while paid subscriptions are on (`BILLING_ENABLED`); otherwise every workspace reads as active.
+    expect(created).toMatchObject({ status: 201, body: { name: BRANCH, kind: 'business', role: 'owner', subscription: { status: BILLING_ENABLED ? 'trialing' : 'active' } } });
     const switched = await switchTo(BRANCH);
     expect(switched.workspace).toMatchObject({ id: created.body.id, name: BRANCH });
     expect((await call('GET', '/accounts')).body).toEqual([]);
@@ -283,15 +284,23 @@ describe('demo api (PGlite)', () => {
     expect(plain.email).toContain('@');
   });
 
-  it('runs the fake checkout and activates a plan', async () => {
-    // The office already subscribes to the Empresa plan; the new company is in trial.
-    expect((await call('POST', '/billing/checkout', { planCode: 'business_monthly' })).status).toBe(422);
-    await switchTo(BRANCH);
-    expect((await call('POST', '/billing/checkout', { planCode: 'individual_monthly' })).status).toBe(422);
-    const checkout = await call('POST', '/billing/checkout', { planCode: 'business_monthly' });
-    expect(checkout.body.checkoutUrl).toContain('#/configuracoes?aba=assinatura&simular=business_monthly');
-    const active = await call('POST', '/billing/dev/activate', { planCode: 'business_monthly' });
-    expect(active.body).toMatchObject({ status: 'active', canWrite: true, plan: { code: 'business_monthly' } });
+  it('runs the fake checkout and activates a plan (only with billing on)', async () => {
+    if (BILLING_ENABLED) {
+      // The office already subscribes to the Empresa plan; the new company is in trial.
+      expect((await call('POST', '/billing/checkout', { planCode: 'business_monthly' })).status).toBe(422);
+      await switchTo(BRANCH);
+      expect((await call('POST', '/billing/checkout', { planCode: 'individual_monthly' })).status).toBe(422);
+      const checkout = await call('POST', '/billing/checkout', { planCode: 'business_monthly' });
+      expect(checkout.body.checkoutUrl).toContain('#/configuracoes?aba=assinatura&simular=business_monthly');
+      const active = await call('POST', '/billing/dev/activate', { planCode: 'business_monthly' });
+      expect(active.body).toMatchObject({ status: 'active', canWrite: true, plan: { code: 'business_monthly' } });
+    } else {
+      // Billing off (future rollout): the charging routes do not exist; the workspace writes anyway.
+      await switchTo(BRANCH);
+      expect((await call('POST', '/billing/checkout', { planCode: 'business_monthly' })).status).toBe(404);
+      expect((await call('POST', '/billing/dev/activate', { planCode: 'business_monthly' })).status).toBe(404);
+      expect((await call('GET', '/auth/me')).body.workspace.subscription).toMatchObject({ status: 'active', canWrite: true });
+    }
     expect((await call('GET', '/billing/plans')).body).toHaveLength(4);
 
     // Deleting the extra company is allowed; the last one is not.
@@ -383,7 +392,7 @@ describe('demo api (PGlite)', () => {
     });
     expect(reg.status).toBe(201);
     const me = (await call('GET', '/auth/me')).body;
-    expect(me.workspace).toMatchObject({ name: 'Teste Contábil Ltda', kind: 'business', role: 'owner', subscription: { status: 'trialing' } });
+    expect(me.workspace).toMatchObject({ name: 'Teste Contábil Ltda', kind: 'business', role: 'owner', subscription: { status: BILLING_ENABLED ? 'trialing' : 'active' } });
     expect(me.workspaces).toHaveLength(1);
     expect((await call('GET', '/accounts')).body.map((a: { name: string }) => a.name)).toEqual(['Caixa']);
     const cats = await call('GET', '/categories');

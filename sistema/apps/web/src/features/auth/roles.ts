@@ -1,4 +1,4 @@
-import type { MemberRole } from '@effinance/shared';
+import { BILLING_ENABLED, type MemberRole } from '@effinance/shared';
 
 // Names of the roles on screen (spec §2.6). The roles stay `owner`, `editor` and `viewer` in the API;
 // `packages/shared` still carries the older labels (Editor, Leitor), so the web uses these until the
@@ -11,7 +11,10 @@ export const ROLE_LABELS: Record<MemberRole, string> = {
 };
 
 export const ROLE_HINTS: Record<MemberRole, string> = {
-  owner: 'Administrador com controle da assinatura, dos membros e do espaço',
+  // The subscription only while paid subscriptions are on (`BILLING_ENABLED`, a future rollout).
+  get owner() {
+    return BILLING_ENABLED ? 'Administrador com controle da assinatura, dos membros e do espaço' : 'Administrador com controle dos membros e do espaço';
+  },
   editor: 'Acessa o financeiro e mantém clientes e cadastros da gestão',
   viewer: 'Usa toda a gestão de tarefas; não vê o financeiro nem honorários',
 };

@@ -3,6 +3,7 @@
 
 import { and, asc, count, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import {
+  BILLING_ENABLED,
   effectivePermissions,
   grantedPermissions,
   normalizePermissionOverrides,
@@ -80,7 +81,8 @@ export async function createWorkspace(
   return id;
 }
 
-export async function listWorkspaceSummaries(db: DbExecutor, userId: string): Promise<WorkspaceSummary[]> {
+/** `billingEnabled`: the platform's switch (lib/platform.ts → `billingEnabled()`). */
+export async function listWorkspaceSummaries(db: DbExecutor, userId: string, billingEnabled: boolean): Promise<WorkspaceSummary[]> {
   const rows = await db
     .select({ role: workspaceMembers.role, permissions: workspaceMembers.permissions, workspace: workspaces, subscription: subscriptions })
     .from(workspaceMembers)
@@ -95,7 +97,7 @@ export async function listWorkspaceSummaries(db: DbExecutor, userId: string): Pr
     kind: r.workspace.kind,
     role: r.role,
     permissions: effectivePermissions(r.role, r.role === 'owner' ? {} : r.permissions),
-    subscription: summarizeSubscription(r.subscription, now),
+    subscription: summarizeSubscription(r.subscription, billingEnabled, now),
   }));
 }
 
@@ -122,10 +124,15 @@ export async function getUserRow(db: DbExecutor, userId: string): Promise<UserRo
   return row;
 }
 
-export async function getMe(db: DbExecutor, userId: string, workspaceId: string): Promise<MeResponse> {
+export async function getMe(
+  db: DbExecutor,
+  userId: string,
+  workspaceId: string,
+  billingEnabled: boolean = BILLING_ENABLED,
+): Promise<MeResponse> {
   const [user, list, photo] = await Promise.all([
     getUserRow(db, userId),
-    listWorkspaceSummaries(db, userId),
+    listWorkspaceSummaries(db, userId, billingEnabled),
     photoUpdatedAtOf(db, userId),
   ]);
   const workspace = list.find((w) => w.id === workspaceId);
