@@ -18,6 +18,7 @@ import { IS_DEMO } from '@/lib/demo';
 import { DemoBanner } from './demo-banner';
 import { areaMemoryKey, forgetStaleAreaMemories, railAreaFor, readAreaMemory, rememberAreaPath } from './area-memory';
 import { areaOf } from './nav';
+import { shellEntry, SitePage } from '@/features/site/site-entry';
 
 export function AppShell() {
   const { user, workspace, loading, refreshMe, resyncSession } = useAuth();
@@ -85,8 +86,17 @@ export function AppShell() {
     window.scrollTo({ top: 0 });
   }, [location.pathname]);
 
-  if (loading) return <FullPageLoader />;
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+  const entry = shellEntry({ loading, signedIn: Boolean(user), pathname: location.pathname });
+  if (entry === 'loading') return <FullPageLoader />;
+  // Visitors see the office's site at `/`; any other app address asks for the login first.
+  if (entry === 'site') {
+    return (
+      <Suspense fallback={<FullPageLoader />}>
+        <SitePage />
+      </Suspense>
+    );
+  }
+  if (entry === 'login') return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
 
   return (
     <TransactionActionsProvider>

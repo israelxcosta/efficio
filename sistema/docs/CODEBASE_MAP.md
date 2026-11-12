@@ -70,7 +70,8 @@ sistema/
 │   ├── src/app.ts, server.ts   montagem do Fastify, hooks globais, árvore de rotas
 │   ├── src/routes.ts           domainRoutes (tenantRoutes) e scopedRoutes (inTenant)
 │   ├── src/setup.ts, env.ts    providers (e-mail, cobrança, Open Finance, CNPJ) e env validado
-│   ├── src/db/                 schema.ts, client, migrate, retention, backfill, seed, demo-seed
+│   ├── src/db/                 schema.ts, client, migrate, retention, backfill, seed, demo-seed,
+│   │                           bootstrap-owner (primeiro acesso: proprietário + link de senha)
 │   ├── src/lib/                auth, tenant, crypto (cifra por campo, keyring), errors, sql, clock,
 │   │                           permissions (chaves), scoped-context (módulos da fase 3), images
 │   ├── src/modules/<domínio>/  routes.ts + service.ts por domínio (ver "Módulos da API")
@@ -251,7 +252,7 @@ sequenceDiagram
   e, no demo, troca o `fetch` por `demo/fetch.ts`.
 - **Demo:** `demo/server.ts` abre PGlite em `idb://effinance-demo`, aplica `apps/api/drizzle/*.sql`
   (via `import.meta.glob`), configura uma chave mestre pública, roda `seedDemo` (marcador
-  `SEED_VERSION`, hoje `seed:office-v6-tasks-phase2`; o seed da fase 3 está em `db/demo-seed-phase3.ts`
+  `SEED_VERSION`, hoje `seed:office-v9-owner-israel`; dono do escritório: Israel, `israel@efficio.com.br`; o seed da fase 3 está em `db/demo-seed-phase3.ts`
   e só entra num banco novo até o marcador subir) e registra os módulos reais da API num roteador
   falso (`fake-fastify.ts`; respostas JSON, ou bytes/texto quando a rota define o `content-type` —
   download de anexo e CSV —, repassados por `fetch.ts`). `demo.test.ts` roda tudo isso no Node,

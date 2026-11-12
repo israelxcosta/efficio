@@ -4,6 +4,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { FinanceGate } from '@/components/layout/finance-gate';
 import { Button } from '@/components/ui/button';
 import { IS_DEMO } from '@/lib/demo';
+import { SITE_PATH, SitePage } from '@/features/site/site-entry';
 
 const LoginPage = lazy(() => import('@/features/auth/pages/login'));
 const RegisterPage = lazy(() => import('@/features/auth/pages/register'));
@@ -71,6 +72,8 @@ export const routes: RouteObject[] = [
   { path: '/convite', element: <InvitePage /> },
   { path: '/termos', element: <TermsPage /> },
   { path: '/privacidade', element: <PrivacyPage /> },
+  // The office's public site, signed in or not (visitors also get it at `/`, see AppShell).
+  { path: SITE_PATH, element: <SitePage /> },
   {
     path: '/',
     element: <AppShell />,

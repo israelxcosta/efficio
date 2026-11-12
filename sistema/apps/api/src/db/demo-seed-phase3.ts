@@ -193,7 +193,7 @@ export async function seedPhase3(db: DbExecutor, workspaceId: string, ownerId: s
       db: tx,
       workspaceId,
       userId: ownerId,
-      userName: owner?.name ?? 'Marina Costa',
+      userName: owner?.name ?? 'Israel',
       permissions: rolePermissions('owner'),
       cipher,
       today,

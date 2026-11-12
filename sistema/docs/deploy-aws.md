@@ -513,6 +513,33 @@ próprio (43+ caracteres), `MAILER=ses`, `APP_URL`/`CORS_ORIGIN` https e valores
 `MP_ACCESS_TOKEN`/`MP_WEBHOOK_SECRET` (ela não fala com o Mercado Pago nem envia e-mails) e
 `OPEN_FINANCE_PROVIDER=disabled` (ela não fala com a Pluggy) — **nunca** os segredos reais da API.
 
+**Primeiro acesso** (só no primeiro deploy, depois da migração e com o serviço da API no ar): o banco
+novo não tem contas. Crie a do proprietário com uma tarefa avulsa da **task definition da API**
+(`effinance-api`: o login da API basta, são as mesmas gravações do cadastro, e a task role tem a
+chave KMS para gerar a chave de dados do espaço), na rede e no `sg` da API:
+
+```bash
+aws ecs run-task --cluster effinance --task-definition effinance-api \
+  --network-configuration 'awsvpcConfiguration={subnets=[<privadas>],securityGroups=[<sg-api>],assignPublicIp=DISABLED}' \
+  --overrides '{"containerOverrides":[{"name":"api","command":["node","dist/bootstrap-owner.js","--email","israel@efficio.com.br","--name","Israel","--workspace","Efficio Contabilidade"]}]}'
+
+# a saída (com o link) vai para o log da tarefa:
+aws logs tail /effinance/api --log-stream-names api/api/<id-da-tarefa> --since 15m
+```
+
+- Cria o usuário e o espaço empresarial "Efficio Contabilidade" com ele como proprietário e imprime
+  **apenas** um link `${APP_URL}/redefinir-senha#token=…` de uso único, válido por 30 min (o
+  fluxo de redefinição de senha). Nenhuma senha passa pelo comando, pelo log ou pelo repositório.
+- Idempotente: rodar de novo só informa que a conta existe e não muda nada. Link expirado ou perdido:
+  repita com `"--reset-link"` no fim do `command` (gera outro e invalida o anterior; até 5 por hora).
+- O link fica no CloudWatch (log group cifrado, acesso restrito, 90 dias): **abra-o logo** e defina
+  a senha. Depois de usado ou vencido ele não vale mais nada; se alguém puder tê-lo visto antes de
+  você usá-lo, gere outro com `--reset-link`. (Rodar fora do ECS não funciona por padrão: a política
+  da `effinance-data` só deixa as roles da aplicação usarem a chave, §2.)
+- Ao entrar pela primeira vez, ative o 2FA (Configurações → Segurança).
+- Nunca rode `db:seed` em produção: o seed de demonstração recria `israel@efficio.com.br` com a senha
+  pública `demo12345` (ele se recusa com `NODE_ENV=production` e não vai na imagem).
+
 ### 7. Web (S3 + CloudFront)
 
 1. Build: `pnpm --filter @effinance/web build`. O Vite não gera sourcemaps (o CI falha se houver
@@ -738,6 +765,8 @@ classificação de segredo) ou filtre o caminho no envio.
 - [ ] Origem (ALB) inacessível fora do CloudFront; `TRUST_PROXY=2` conferido com um IP forjado.
 - [ ] Política da `effinance-data` com contexto obrigatório; nenhuma outra role decifra.
 - [ ] Execution role ≠ task role; migração com roles e segredo próprios.
+- [ ] Acesso inicial criado com `bootstrap-owner.js` (§6), link usado dentro do prazo e 2FA ativo
+      na conta do proprietário.
 - [ ] Imagem implantada por digest; ECR imutável com Inspector; CI verde em `main`.
 - [ ] CSP de `apps/web/src/lib/csp.ts` aplicada no CloudFront (hash conferido); `dist-demo` fora do domínio de produção.
 - [ ] WAF fora do modo Count após o período de observação.

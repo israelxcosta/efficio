@@ -1,12 +1,12 @@
-// Task module demo data, part of the demo seed: the office team (four colleagues of Marina who cannot
-// sign in — only Marina can), the departments Fiscal, Contábil, Pessoal/DP and Societário, task
+// Task module demo data, part of the demo seed: the office team (four colleagues of Israel, the owner,
+// who cannot sign in — only he can), the departments Fiscal, Contábil, Pessoal/DP and Societário, task
 // categories (one of them, "Retrabalho", flagged as rework with six corrections for Rota Sul, Pão Quente
 // and Ju Prado opened on past days), ~25 tasks of an accounting office (some
 // overdue, some concluded on time or late, appointments, subtasks and comments) and, from phase 2,
 // the office's recurring obligations (DAS, DCTFWeb, EFD-Reinf, folha, FGTS Digital, eSocial, SPED,
 // DEFIS, DASN-SIMEI, ECD, ECF, a weekly check…) with occurrences of the previous and the current
 // competence in several situations, two process templates (abertura de empresa, admissão de
-// funcionário) with one process in progress, Marina's notes and a small attachment. Written through
+// funcionário) with one process in progress, Israel's notes and a small attachment. Written through
 // the task services, so free text and files are encrypted like the API's. Keep it free of Node-only
 // imports.
 
@@ -49,7 +49,7 @@ import {
   updateTask,
 } from '../modules/tasks/service';
 
-/** Colleagues of Marina in the office. They exist to be assigned; their login is disabled. */
+/** Colleagues of Israel (the owner) in the office. They exist to be assigned; their login is disabled. */
 export const DEMO_TEAM = [
   { name: 'Ana Paula Ribeiro', email: 'ana.ribeiro@efficio.app', role: 'editor' },
   { name: 'Bruno Carvalho', email: 'bruno.carvalho@efficio.app', role: 'viewer' },
@@ -60,14 +60,14 @@ export const DEMO_TEAM = [
 /** Not a password hash: both password verifiers (API and demo) refuse it, so nobody signs in with it. */
 const LOGIN_DISABLED = 'login-disabled';
 
-type Who = 'marina' | 'ana' | 'bruno' | 'juliana' | 'rafael';
+type Who = 'owner' | 'ana' | 'bruno' | 'juliana' | 'rafael';
 
 export async function seedTasks(
   db: DbExecutor,
   workspaceId: string,
   ownerId: string,
 ): Promise<void> {
-  const ids: Record<Who, string> = { marina: ownerId, ana: '', bruno: '', juliana: '', rafael: '' };
+  const ids: Record<Who, string> = { owner: ownerId, ana: '', bruno: '', juliana: '', rafael: '' };
   for (const person of DEMO_TEAM) {
     const [user] = await db
       .insert(users)
@@ -79,7 +79,7 @@ export async function seedTasks(
       })
       .returning({ id: users.id });
     await db.insert(workspaceMembers).values({ workspaceId, userId: user!.id, role: person.role });
-    ids[person.email.split('.')[0] as Exclude<Who, 'marina'>] = user!.id;
+    ids[person.email.split('.')[0] as Exclude<Who, 'owner'>] = user!.id;
   }
   // Members and the workspace key are read on the system connection, before the tenant transaction
   // (as in a request; the demo's PGlite has a single connection).
@@ -105,12 +105,12 @@ export async function seedTasks(
       today,
       cipher,
     });
-    const admin = as('marina');
+    const admin = as('owner');
 
     // --- departments and categories ----------------------------------------------------------------
     const fiscal = await createDepartment(admin, {
       name: 'Fiscal',
-      memberIds: [ids.marina, ids.ana],
+      memberIds: [ids.owner, ids.ana],
     });
     const contabil = await createDepartment(admin, { name: 'Contábil', memberIds: [ids.bruno] });
     const pessoal = await createDepartment(admin, { name: 'Pessoal/DP', memberIds: [ids.juliana] });
@@ -142,13 +142,13 @@ export async function seedTasks(
     const task = async (who: Who, input: TaskInput & { by?: Who }) => {
       const { by, ...rest } = input;
       return createTask(
-        as(by ?? 'marina'),
+        as(by ?? 'owner'),
         taskInputSchema.parse({ ...rest, assigneeId: rest.assigneeId ?? ids[who] }),
       );
     };
     const unassigned = (input: TaskInput) => createTask(admin, taskInputSchema.parse(input));
 
-    // Fiscal (Marina and Ana).
+    // Fiscal (Israel and Ana).
     const icms = await task('ana', {
       title: `Apuração do ICMS de ${previous}`,
       clientId: client('Pão Quente'),
@@ -160,7 +160,7 @@ export async function seedTasks(
     await addComment(as('ana'), icms.id, {
       text: 'Faltam as notas de devolução de dois fornecedores; já pedi ao cliente.',
     });
-    const dctf = await task('marina', {
+    const dctf = await task('owner', {
       title: 'Retificar DCTFWeb de setembro',
       clientId: client('Tecnova'),
       categoryId: cat.obrigacoes,
@@ -178,7 +178,7 @@ export async function seedTasks(
       status: 'in_progress',
       dueDate: today,
     });
-    const parcelamento = await task('marina', {
+    const parcelamento = await task('owner', {
       title: 'Parcelamento de débitos do Simples',
       clientId: client('Ju Prado Design'),
       status: 'waiting_client',
@@ -188,7 +188,7 @@ export async function seedTasks(
     await addComment(as('juliana'), parcelamento.id, {
       text: 'A Juliana Prado ligou: prefere 24 parcelas.',
     });
-    await task('marina', {
+    await task('owner', {
       title: 'Certidão negativa de débitos federais',
       clientId: client('Alicerce'),
       categoryId: cat.certidoes,
@@ -200,7 +200,7 @@ export async function seedTasks(
       dueDate: day(12),
       priority: 'low',
     });
-    await task('marina', {
+    await task('owner', {
       title: 'Reunião de planejamento tributário',
       clientId: client('Tecnova'),
       categoryId: cat.atendimento,
@@ -231,7 +231,7 @@ export async function seedTasks(
       dueDate: day(-5),
       priority: 'high',
     });
-    await addComment(as('marina'), balancete.id, {
+    await addComment(as('owner'), balancete.id, {
       text: 'O banco ainda não mandou o extrato da conta garantida.',
     });
     const conciliacao = await task('bruno', {
@@ -346,11 +346,11 @@ export async function seedTasks(
       dueDate: day(15),
       categoryId: cat.certidoes,
     });
-    await task('marina', { title: 'Treinamento da equipe: novo leiaute do eSocial' });
+    await task('owner', { title: 'Treinamento da equipe: novo leiaute do eSocial' });
     await unassigned({ title: 'Organizar o arquivo físico de 2024', priority: 'low' });
 
-    // Concluded by someone other than the assignee: Ana closes one of Marina's.
-    const nota = await task('marina', {
+    // Concluded by someone other than the assignee: Ana closes one of Israel's.
+    const nota = await task('owner', {
       title: 'Enviar notas fiscais de serviço ao cliente',
       clientId: client('Ju Prado Design'),
       dueDate: day(-1),
@@ -381,7 +381,7 @@ export async function seedTasks(
     await rework('ana', { title: 'Retificar SPED Fiscal com CFOP errado', clientId: client('Rota Sul'), dueDate: day(-18), priority: 'high' }, 20, 2);
     await rework('juliana', { title: 'Refazer folha dos motoristas: horas extras a menor', clientId: client('Rota Sul'), dueDate: day(-50) }, 55, 3);
     await rework('ana', { title: 'Reenviar EFD-Reinf rejeitada', clientId: client('Rota Sul'), dueDate: day(-148) }, 150, 1);
-    await rework('marina', {
+    await rework('owner', {
       title: 'Corrigir apuração do Simples: receita no anexo errado',
       clientId: client('Pão Quente'),
       status: 'in_progress',
@@ -389,7 +389,7 @@ export async function seedTasks(
       priority: 'urgent',
     }, 8);
     await rework('ana', { title: 'Reemitir guia do DAS de março', clientId: client('Pão Quente'), dueDate: day(-208) }, 210, 1);
-    await rework('marina', { title: 'Refazer a declaração de faturamento', clientId: client('Ju Prado Design'), dueDate: day(-43) }, 45, 2);
+    await rework('owner', { title: 'Refazer a declaração de faturamento', clientId: client('Ju Prado Design'), dueDate: day(-43) }, 45, 2);
 
     // --- phase 2: recurring obligations, processes, notes, an attachment ---------------------------
     const staff = [...withStaff].map(client).filter((v): v is string => v !== null);
@@ -459,7 +459,7 @@ export async function seedTasks(
       .from(tasks)
       .where(and(eq(tasks.workspaceId, workspaceId), isNotNull(tasks.recurringTaskId), inArray(tasks.competence, [previousMonth, month])))
       .orderBy(asc(tasks.dueDate), asc(tasks.id));
-    const byWho = (assigneeId: string | null) => (Object.entries(ids).find(([, v]) => v === assigneeId)?.[0] ?? 'marina') as Who;
+    const byWho = (assigneeId: string | null) => (Object.entries(ids).find(([, v]) => v === assigneeId)?.[0] ?? 'owner') as Who;
     /** Concludes as the responsible, then moves the conclusion to 15:00 (São Paulo) of `date` (seed only). */
     const conclude = async (o: (typeof occurrences)[number], date: string) => {
       await changeTaskStatus(as(byWho(o.assigneeId)), o.id, 'done');
@@ -495,10 +495,10 @@ export async function seedTasks(
     }
     const current = occurrences.filter((o) => o.competence === month && o.dueDate! >= today);
     if (current[1]) {
-      await updateTask(as('marina'), current[1].id, { assigneeId: ids.rafael });
+      await updateTask(as('owner'), current[1].id, { assigneeId: ids.rafael });
       await addComment(as('rafael'), current[1].id, { text: 'Assumo este mês: a Ana está de férias.' });
     }
-    if (current[3]) await changeTaskStatus(as('marina'), current[3].id, 'canceled', 'Cliente sem movimento neste mês');
+    if (current[3]) await changeTaskStatus(as('owner'), current[3].id, 'canceled', 'Cliente sem movimento neste mês');
     const reopenable = occurrences.find((o) => o.competence === previousMonth && o.assigneeId === ids.ana);
     if (reopenable) {
       await changeTaskStatus(admin, reopenable.id, 'in_progress', 'Guia emitida com o valor errado; recalcular');
@@ -542,7 +542,7 @@ export async function seedTasks(
     );
     await changeTaskStatus(as('juliana'), process.task.id, 'done');
 
-    // Notes of Marina (private) and a small attachment.
+    // Notes of Israel (private) and a small attachment.
     await createNote(admin, taskNoteInputSchema.parse({ title: 'Portais das prefeituras', content: 'NFS-e de Campinas: nfse.campinas.sp.gov.br\nNFS-e de Sumaré: sumare.sp.gov.br/nfse' }));
     await createNote(admin, taskNoteInputSchema.parse({ title: 'Pendências da semana', content: 'Cobrar extratos da Tecnova.\nConfirmar férias da Ana.' }));
     const pdf = new TextEncoder().encode('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');

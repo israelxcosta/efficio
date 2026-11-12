@@ -59,6 +59,6 @@ describe('demo seed, phase 3', () => {
 
     const members = await marina.get('/workspaces/current/members');
     const adjustments = Object.fromEntries(members.body.map((m: { name: string; permissionOverrides: object }) => [m.name, m.permissionOverrides]));
-    expect(adjustments).toMatchObject({ 'Ana Paula Ribeiro': { office: false }, 'Rafael Lima': { 'page.reports': false }, 'Marina Costa': {} });
+    expect(adjustments).toMatchObject({ 'Ana Paula Ribeiro': { office: false }, 'Rafael Lima': { 'page.reports': false }, Israel: {} });
   });
 });

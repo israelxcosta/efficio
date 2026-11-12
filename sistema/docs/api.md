@@ -411,6 +411,11 @@ Contrato em `packages/shared/src/saas.ts`.
   em `/auth/mfa/enable`, salvo login feito há menos de 15 min (`422` pede a senha).
 - Recuperação de senha por e-mail: link `${APP_URL}/redefinir-senha#token=…` (o token fica no
   fragmento, fora de logs e do `Referer`), uso único, 30 min, guardado como hash.
+- Primeiro acesso (sem rota HTTP): `bootstrap:owner` (`src/db/bootstrap-owner.ts` →
+  `modules/auth/bootstrap.ts`) cria, se não existirem, o usuário (sem senha utilizável) e o espaço
+  empresarial com ele como proprietário, e imprime um link desse mesmo fluxo de redefinição para
+  definir a senha. Conta existente: nada muda (`--reset-link` gera outro link). Auditoria
+  `auth.owner_bootstrapped`. Ver README → "Primeiro acesso".
 - Senhas: scrypt; novas senhas com 10+ caracteres, letras e números.
 - Limites (429): por IP em login/2FA/recuperação/convites/exportação/checkout/webhook (Redis
   opcional via `REDIS_URL` para múltiplas instâncias); por conta, 10 falhas de código 2FA a cada

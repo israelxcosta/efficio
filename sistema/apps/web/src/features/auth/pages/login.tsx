@@ -13,7 +13,7 @@ import { ApiRequestError, errorMessage } from '@/lib/api';
 import { useAuth } from '../auth-context';
 import { AuthLayout } from './auth-layout';
 import { FullPageLoader } from '@/components/layout/app-shell';
-import { IS_DEMO } from '@/lib/demo';
+import { DEMO_LOGIN, IS_DEMO } from '@/lib/demo';
 import { safeInternalPath } from '@/lib/safe-url';
 import { landingPath } from '@/components/layout/area-memory';
 
@@ -28,7 +28,7 @@ export default function LoginPage() {
   const form = useForm<LoginForm, unknown, z.output<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     // The demo build ships a sample user; prefill it so testers can sign in with one click.
-    defaultValues: IS_DEMO ? { email: 'demo@efficio.app', password: 'demo12345' } : { email: '', password: '' },
+    defaultValues: IS_DEMO && DEMO_LOGIN ? { ...DEMO_LOGIN } : { email: '', password: '' },
   });
   // Only in-app paths: `from` comes from the URL the visitor first opened (e.g. `//evil.example`).
   const from = safeInternalPath((location.state as { from?: unknown } | null)?.from);

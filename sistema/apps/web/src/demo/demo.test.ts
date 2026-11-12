@@ -2,6 +2,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { addMonthKey, addMonths, BILLING_ENABLED, daysInMonth, discountAmount, monthKey, todayISO } from '@effinance/shared';
 import { demoFetch } from './fetch';
+import { DEMO_LOGIN } from '@/lib/demo';
 import { DEMO_EMAIL, DEMO_PASSWORD, getDemoServer } from './server';
 
 async function call(method: string, path: string, body?: unknown) {
@@ -38,6 +39,10 @@ describe('demo api (PGlite)', () => {
     expect((await call('GET', '/health')).body).toMatchObject({ status: 'ok', mode: 'demo' });
   }, 120_000);
 
+  it('prefills the login screen with the seeded owner', () => {
+    expect(DEMO_LOGIN).toEqual({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+  });
+
   it('requires a session and logs in the seeded demo user', async () => {
     expect((await call('GET', '/auth/me')).status).toBe(401);
     const bad = await call('POST', '/auth/login', { email: DEMO_EMAIL, password: 'errada' });
@@ -45,6 +50,7 @@ describe('demo api (PGlite)', () => {
     const ok = await call('POST', '/auth/login', { email: DEMO_EMAIL, password: DEMO_PASSWORD });
     expect(ok.status).toBe(200);
     const me = (await call('GET', '/auth/me')).body;
+    expect(me.user).toMatchObject({ name: 'Israel', email: 'israel@efficio.com.br' });
     expect(me.user.email).toBe(DEMO_EMAIL);
     // Business only: the office, created with the account, is her only workspace.
     expect(me.workspace).toMatchObject({ name: OFFICE, kind: 'business', role: 'owner' });

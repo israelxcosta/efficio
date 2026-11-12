@@ -51,8 +51,9 @@ cp apps/api/.env.example apps/api/.env
 
 # migrações + dados de demonstração
 pnpm db:migrate
-pnpm db:seed          # demo@efficio.app / demo12345 — a empresa "Efficio Contabilidade"
-                      # (único espaço da conta demo, plano Empresa ativo)
+pnpm db:seed          # israel@efficio.com.br / demo12345 — a empresa "Efficio Contabilidade"
+                      # (único espaço da conta demo, plano Empresa ativo). O seed APAGA e recria
+                      # essa conta com a senha pública: só em banco local/descartável.
 
 # API (3333) + Web (5173)
 pnpm dev
@@ -60,12 +61,39 @@ pnpm dev
 
 Acesse http://localhost:5173.
 
+## Primeiro acesso (produção)
+
+Num banco novo não há nenhuma conta. Depois das migrações, crie o acesso do proprietário com um
+comando idempotente — **sem senha** em argumento, código, log ou repositório:
+
+```bash
+pnpm --filter @effinance/api bootstrap:owner -- \
+  --email israel@efficio.com.br --name "Israel" --workspace "Efficio Contabilidade"
+# imagem de produção (sem pnpm): node dist/bootstrap-owner.js --email ... --name ... --workspace ...
+```
+
+- Cria, se não existirem, o usuário e o espaço empresarial com ele como **proprietário** (as mesmas
+  categorias e a carteira "Caixa" do cadastro) e imprime **só um link de uso único** para definir a
+  senha (`${APP_URL}/redefinir-senha#token=…`, o fluxo de redefinição de senha, válido por 30 min).
+  Até o link ser usado, nenhuma senha entra na conta.
+- Se a conta já existir, apenas informa (e lista os espaços dela) e **não altera nada**. Link
+  expirou ou se perdeu? `--reset-link` gera um novo e invalida o anterior (limite de 5 por hora por
+  conta, o mesmo do "Esqueci minha senha").
+- E-mail inválido, opção desconhecida ou falta de `--name` (para criar) encerram com código 1, sem
+  criar nada.
+- Depois de definir a senha e entrar, ative o 2FA em Configurações → Segurança.
+
+No primeiro deploy na AWS, rode-o como tarefa avulsa do ECS: veja
+[`docs/deploy-aws.md`](docs/deploy-aws.md) → "Primeiro acesso".
+
 ## Ambiente de testes (sem servidor)
 
 `pnpm --filter @effinance/web build:demo` gera em `apps/web/dist-demo` uma versão estática e completa
 do sistema: as mesmas rotas e regras da API rodam no navegador sobre o PGlite (PostgreSQL em
 WebAssembly). Cada navegador ganha sua própria base, salva no IndexedDB e já preenchida com os dados
-de demonstração; o login vem preenchido com a conta demo e um aviso permite restaurar os dados.
+de demonstração; o login vem preenchido com a conta do proprietário do demo (Israel,
+`israel@efficio.com.br` / `demo12345`, dados fictícios só no navegador) e um aviso permite restaurar
+os dados.
 
 O escritório "Efficio Contabilidade" (a empresa criada com a conta demo, seu único espaço) traz
 honorários gerados para os 10 meses anteriores, cada cliente com seu dia de vencimento (5, 10, 15 ou
@@ -91,7 +119,8 @@ cookie httpOnly e dados no servidor.
 | `pnpm build`      | build de produção (API em `apps/api/dist`, Web em `apps/web/dist`) |
 | `pnpm --filter @effinance/web build:demo` | build estático de testes, sem servidor (`apps/web/dist-demo`) |
 | `pnpm db:migrate` | aplica as migrações do Drizzle |
-| `pnpm db:seed`    | cria/recria o usuário de demonstração com dados realistas |
+| `pnpm db:seed`    | cria/recria o usuário de demonstração com dados realistas (nunca em produção) |
+| `pnpm --filter @effinance/api bootstrap:owner -- --email … --name … --workspace …` | primeiro acesso: cria o proprietário e o espaço e imprime o link para definir a senha (ver "Primeiro acesso") |
 
 ## Funcionalidades
 

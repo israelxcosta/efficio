@@ -33,6 +33,14 @@ export const PASSWORD_RESET_TTL_MS = 30 * 60_000;
 export const PASSWORD_RESET_MAX_PER_HOUR = 5;
 export const PASSWORD_RESET_REQUESTED_ACTION = 'auth.password_reset_requested';
 
+/**
+ * Link of the reset screen. The token goes in the fragment: never sent to the server/CDN (no access
+ * logs) nor leaked in Referer headers.
+ */
+export function passwordResetLink(appUrl: string, token: string): string {
+  return `${appUrl}/redefinir-senha#token=${token}`;
+}
+
 export function toUser(row: UserRow): User {
   return { id: row.id, name: row.name, email: row.email, createdAt: row.createdAt.toISOString() };
 }
@@ -44,9 +52,28 @@ function timingGuardHash() {
   return dummyHash;
 }
 
-function isUniqueViolation(error: unknown): boolean {
+export function isUniqueViolation(error: unknown): boolean {
   const e = error as { code?: string; cause?: { code?: string } } | null;
   return e?.code === '23505' || e?.cause?.code === '23505';
+}
+
+/**
+ * The data of a company created with an account: the business categories and a "Caixa" wallet.
+ * Financial rows go through the tenant role (RLS), which lasts until commit: call it as the LAST step
+ * of the transaction.
+ */
+export async function seedCompanyDefaults(tx: DbExecutor, workspaceId: string): Promise<void> {
+  await withTenant(tx, workspaceId, async (t) => {
+    await seedDefaultCategories(t, workspaceId, 'business');
+    await t.insert(accounts).values({
+      workspaceId,
+      name: 'Caixa',
+      type: 'wallet',
+      color: '#12A150',
+      icon: 'wallet',
+      initialBalance: 0,
+    });
+  });
 }
 
 /**
@@ -68,18 +95,7 @@ export async function register(db: DbExecutor, input: RegisterInput): Promise<{ 
       const name = input.companyName?.trim() || DEFAULT_COMPANY_NAME;
       const workspaceId = await createWorkspace(tx, { name, kind: 'business', ownerId: user!.id });
       const [updated] = await tx.update(users).set({ lastWorkspaceId: workspaceId }).where(eq(users.id, user!.id)).returning();
-      // Financial rows go through the tenant role (RLS). Last step: the role lasts until commit.
-      await withTenant(tx, workspaceId, async (t) => {
-        await seedDefaultCategories(t, workspaceId, 'business');
-        await t.insert(accounts).values({
-          workspaceId,
-          name: 'Caixa',
-          type: 'wallet',
-          color: '#12A150',
-          icon: 'wallet',
-          initialBalance: 0,
-        });
-      });
+      await seedCompanyDefaults(tx, workspaceId);
       return { user: updated!, workspaceId };
     });
   } catch (error) {

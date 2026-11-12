@@ -84,6 +84,46 @@
   --shadow-sm: 0 1px 3px rgb(16 24 40 / 0.06), 0 1px 2px rgb(16 24 40 / 0.03);
   --shadow-lg: 0 12px 32px -8px rgb(16 24 40 / 0.18);
 
+  /*
+   * Public site (features/site): the office's chapter colours, taken from the navy ramp and kept the
+   * same in the light and dark themes of the app (no override under [data-theme='dark']). One field
+   * per chapter; the accent (the green of a concluded task) marks the action.
+   */
+  --site-night: #0f1f47;
+  --site-navy: #152b61;
+  --site-navy-2: #1e3a80;
+  --site-blue: #2a4c9f;
+  --site-blue-2: #3f64be;
+  --site-blue-3: #9ab2e6;
+  --site-sky: #c6d4f1;
+  --site-paper: #f2f4f7;
+  --site-white: #ffffff;
+  /* Ink on the light fields, and its quieter step (both 4.5:1 or more on paper, white and sky). */
+  --site-ink: #0a1530;
+  --site-ink-soft: #3b4a6b;
+  /* Text on the dark fields. */
+  --site-on-dark: #ffffff;
+  --site-on-dark-soft: #c6d4f1;
+  --site-accent: #34c77b;
+  --site-accent-hover: #4fd68e;
+  --site-accent-ink: #0a1530;
+  /* The portal's interface as the site shows it ([data-ui] fragments): the app's light theme. */
+  --site-ui-surface: #ffffff;
+  --site-ui-muted-surface: #f6f7f9;
+  --site-ui-border: #e4e7ec;
+  --site-ui-fg: #14171f;
+  --site-ui-muted: #5b616b;
+  --site-ui-data: #2f5fbf;
+  --site-ui-data-soft: #dbe5f7;
+  --site-ui-success: #18794a;
+  --site-ui-success-soft: #e6f4ec;
+  --site-ui-warning: #95600f;
+  --site-ui-warning-soft: #fdf3dc;
+  --site-ui-danger: #c4242a;
+  /* Page margin and gutter of the site's 12-column grid. */
+  --site-margin: clamp(20px, 2.5vw, 36px);
+  --site-gutter: clamp(16px, 1.7vw, 24px);
+
   color-scheme: light;
 }
 
@@ -235,6 +275,23 @@
   --color-aging-1: var(--app-aging-1);
   --color-aging-2: var(--app-aging-2);
   --color-aging-3: var(--app-aging-3);
+
+  --color-site-night: var(--site-night);
+  --color-site-navy: var(--site-navy);
+  --color-site-navy-2: var(--site-navy-2);
+  --color-site-blue: var(--site-blue);
+  --color-site-blue-2: var(--site-blue-2);
+  --color-site-blue-3: var(--site-blue-3);
+  --color-site-sky: var(--site-sky);
+  --color-site-paper: var(--site-paper);
+  --color-site-white: var(--site-white);
+  --color-site-ink: var(--site-ink);
+  --color-site-ink-soft: var(--site-ink-soft);
+  --color-site-on-dark: var(--site-on-dark);
+  --color-site-on-dark-soft: var(--site-on-dark-soft);
+  --color-site-accent: var(--site-accent);
+  --color-site-accent-hover: var(--site-accent-hover);
+  --color-site-accent-ink: var(--site-accent-ink);
 
   --radius-sm: 8px;
   --radius-md: 12px;

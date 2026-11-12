@@ -1,7 +1,12 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: { server: 'src/server.ts', migrate: 'src/db/migrate.ts', seed: 'src/db/seed.ts' },
+  entry: {
+    server: 'src/server.ts',
+    migrate: 'src/db/migrate.ts',
+    seed: 'src/db/seed.ts',
+    'bootstrap-owner': 'src/db/bootstrap-owner.ts',
+  },
   format: ['esm'],
   platform: 'node',
   target: 'node22',

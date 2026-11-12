@@ -1,6 +1,6 @@
 // Demo data shared by the CLI seed (`pnpm --filter @effinance/api db:seed`) and the in-browser
-// demo build. Idempotent — the demo user and her workspaces are removed and recreated: Marina signs up
-// with her company, the accounting office "Efficio Contabilidade" (business plan, active), its only
+// demo build. Idempotent — the demo user and his workspaces are removed and recreated: Israel, the owner,
+// signs up with his company, the accounting office "Efficio Contabilidade" (business plan, active), its only
 // workspace: clients with fee periods, generated fees paid on time (some with the punctuality
 // discount), late (some with juros e multa) or still open, suppliers and the office's fixed costs,
 // plus the task module (team, departments, client responsibles and tasks: demo-seed-tasks.ts).
@@ -38,9 +38,11 @@ import { createConnection, linkAccounts, syncConnection } from '../modules/open-
 import { seedPhase3 } from './demo-seed-phase3';
 import { DEMO_TEAM, seedTasks } from './demo-seed-tasks';
 
-export const DEMO_EMAIL = 'demo@efficio.app';
+/** The office's owner. Demo data only: the seed recreates this account with the published password. */
+export const DEMO_EMAIL = 'israel@efficio.com.br';
 export const DEMO_PASSWORD = 'demo12345';
-/** Marina's company (business workspace), created with her account: the accounting office. */
+const DEMO_OWNER_NAME = 'Israel';
+/** Israel's company (business workspace), created with his account: the accounting office. */
 export const COMPANY_WORKSPACE_NAME = 'Efficio Contabilidade';
 /** The office's main bank account (fees are received there). */
 const OFFICE_ACCOUNT = 'Conta PJ Inter';
@@ -306,7 +308,7 @@ const PAYMENT_HABITS: Record<string, (k: number) => Payment> = {
 };
 
 /**
- * The accounting office (business plan, created with Marina's account): clients with yearly fee
+ * The accounting office (business plan, created with Israel's account): clients with yearly fee
  * periods (one awaiting its readjustment, two inactive), each with its due day and some with a
  * discount for paying on time, suppliers, fees receivable generated per competence month (some with
  * the employee charge) and the office's fixed costs. Fees follow each client's payment habit.
@@ -518,10 +520,10 @@ async function seedCompany(db: DbExecutor, workspaceId: string): Promise<void> {
 }
 
 /**
- * Earlier demo addresses (Effinance base; Rafael, of the former "Família Costa" workspace): removed
- * too, so a reseed leaves no stale demo users.
+ * Earlier demo addresses (Marina, the former owner; Effinance base; Rafael, of the former "Família
+ * Costa" workspace): removed too, so a reseed leaves no stale demo users.
  */
-const LEGACY_DEMO_EMAILS = ['rafael@efficio.app', 'demo@effinance.app', 'rafael@effinance.app'];
+const LEGACY_DEMO_EMAILS = ['demo@efficio.app', 'rafael@efficio.app', 'demo@effinance.app', 'rafael@effinance.app'];
 
 /** Removes the demo users and every workspace they own (data cascades). */
 async function removeDemoUsers(db: DbExecutor) {
@@ -584,13 +586,13 @@ async function seedIntegrations(db: DbExecutor, workspaceId: string, userId: str
 }
 
 /**
- * Marina signs up with her company (the same path as the sign-up form): the office is her only
+ * Israel signs up with his company (the same path as the sign-up form): the office is his only
  * workspace and the one every session opens.
  */
 export async function seedDemo(db: DbExecutor) {
   await removeDemoUsers(db);
   const { user, workspaceId } = await register(db, {
-    name: 'Marina Costa',
+    name: DEMO_OWNER_NAME,
     email: DEMO_EMAIL,
     password: DEMO_PASSWORD,
     companyName: COMPANY_WORKSPACE_NAME,
