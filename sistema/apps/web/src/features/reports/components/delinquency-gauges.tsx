@@ -7,12 +7,12 @@ import { bandNames, formatChance, reworkSummary, riskBands } from '../delinquenc
 
 /**
  * Colours of each risk band (tokens only, spec §5.3): low risk is neutral (colour only on the clients
- * at risk), Atenção amber, Risco alto dark amber, Crítico red. No green: it is not a change.
+ * at risk), Atenção yellow, Risco alto orange, Crítico red. No green: it is not a change.
  */
 export const RISK_TONE: Record<DelinquencyRisk, { text: string; bg: string; soft: string; color: string }> = {
   baixo: { text: 'text-fg', bg: 'bg-[var(--app-chart-neutral)]', soft: 'bg-bg-subtle text-muted', color: 'var(--app-chart-neutral)' },
-  moderado: { text: 'text-warning', bg: 'bg-warning', soft: 'bg-warning-soft text-warning', color: 'var(--app-warning)' },
-  alto: { text: 'text-aging-3', bg: 'bg-aging-3', soft: 'bg-aging-2/15 text-aging-3', color: 'var(--app-aging-3)' },
+  moderado: { text: 'text-warning', bg: 'bg-[var(--app-chart-yellow)]', soft: 'bg-warning-soft text-warning', color: 'var(--app-chart-yellow)' },
+  alto: { text: 'text-aging-3', bg: 'bg-[var(--app-chart-orange)]', soft: 'bg-aging-2/15 text-aging-3', color: 'var(--app-chart-orange)' },
   critico: { text: 'text-danger', bg: 'bg-danger', soft: 'bg-danger-soft text-danger', color: 'var(--app-danger)' },
 };
 

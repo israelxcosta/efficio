@@ -12,7 +12,7 @@ import { formatDays, lateFinding, lateTrend, monthBars, type BarMode, type Month
 import { MonthTick } from './month-tick';
 
 const ON_TIME = 'var(--app-data)';
-const PAID_LATE = 'var(--app-warning)';
+const PAID_LATE = 'var(--app-chart-orange)';
 const OPEN_LATE = CHART_COLORS.danger;
 
 const CHART_HELP =

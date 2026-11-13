@@ -60,6 +60,9 @@
   --app-chart-expense-strong: #7a818c;
   /* Despesas no fluxo de caixa e resultado negativo do mês. */
   --app-chart-negative: #cc3333;
+  /* Pago com atraso e risco alto (laranja) · atenção (amarelo). */
+  --app-chart-orange: #ff9933;
+  --app-chart-yellow: #ffdb4d;
   /* Neutral series (e.g. the earlier period in comparisons). */
   --app-chart-neutral: #d0d5dd;
   --app-chart-grid: #e9ecf1;
@@ -140,6 +143,8 @@
   --app-chart-expense: #5d5d5b;
   --app-chart-expense-strong: #96958f;
   --app-chart-negative: #e66464;
+  --app-chart-orange: #ffa652;
+  --app-chart-yellow: #f5cf4a;
   --app-chart-neutral: #5d5d5b;
   --app-chart-grid: #3b3b3b;
   --app-chart-1: #c3d4f6;
