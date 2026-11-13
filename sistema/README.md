@@ -213,8 +213,8 @@ cookie httpOnly e dados no servidor.
 - **Cadeia de suprimentos**: pnpm fixado por versão + hash, `--frozen-lockfile`, só o `esbuild`
   pode rodar script de instalação (`strictDepBuilds`), versões novas só depois de 24 h
   (`minimumReleaseAge`), bloqueio de perda de proveniência (`trustPolicy`) e de dependências
-  transitivas de git/tarball (`pnpm-workspace.yaml`). O CI (`.github/workflows/ci.yml`) roda
-  typecheck, testes, builds, `pnpm audit`, gitleaks no histórico inteiro e o build da imagem, com
+  transitivas de git/tarball (`pnpm-workspace.yaml`). O CI (`.github/workflows/ci.yml` na raiz do
+  repositório, rodando dentro de `sistema/`; push em `main` e `claude/**`, PRs) roda typecheck, testes, builds, `pnpm audit`, gitleaks no histórico inteiro e o build da imagem, com
   actions fixadas por SHA e token somente leitura.
 - **Segredos**: nada versionado (`.env` ignorado; `apps/api/.env.example` só com valores de
   desenvolvimento e instruções para gerar segredos fortes). Em produção, `src/env.ts` recusa o

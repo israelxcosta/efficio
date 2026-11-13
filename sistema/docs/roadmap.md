@@ -34,13 +34,19 @@ no padrão `NOME EMPRESA/DEPARTAMENTO/ANO/MÊS`, e ter a opção de enviar o doc
      não oficiais (risco de bloqueio do número).
 - **Demo no navegador:** a gravação no OneDrive é simulada (PGlite não fala com a Microsoft).
 
+**Respostas do dono (13/11/2026)**
+- Microsoft 365 na **versão pessoal**, administrada por israel@efficio.com.br. Isso muda o desenho:
+  conta pessoal não tem SharePoint nem permissão de aplicativo (`Sites.Selected`). A integração terá de
+  ser por **login delegado** da conta Microsoft (OAuth com `Files.ReadWrite` + `offline_access`, token de
+  renovação cifrado no banco), gravando no OneDrive pessoal do escritório.
+- Documentos (inclusive holerite e rescisão) vão **por e-mail e WhatsApp com link que expira em 30 dias**.
+- Ordem combinada (ver `analise-sistema-2026-11.md`): primeiro o envio com link próprio do Efficio e
+  registro de download; o OneDrive vem depois.
+
 **Decisões pendentes**
-1. OneDrive empresarial (Microsoft 365 / SharePoint) ou pessoal? (recomendado: empresarial)
-2. Quem registra o aplicativo no Microsoft 365 (precisa de administrador)?
-3. ANO/MÊS da pasta pela competência da tarefa ou pelo vencimento?
-4. DEPARTAMENTO = departamentos já cadastrados no sistema?
-5. WhatsApp: nível 1 primeiro ou já o nível 2?
-6. Arquivo só no OneDrive ou também uma cópia no sistema?
+1. ANO/MÊS da pasta: pela competência da tarefa ou pelo vencimento? (tarefas avulsas não têm competência)
+2. DEPARTAMENTO = departamentos já cadastrados no sistema?
+3. Arquivo só no OneDrive ou também uma cópia no sistema?
 
 **Antes de implementar:** protótipo das telas (anexar, escolher envio, histórico) para aprovação.
 
@@ -74,8 +80,48 @@ admissão, solicitações e celular).
   limites de tamanho e tipo de arquivo; registro de quem enviou e quando; nada do escritório (outros
   clientes, financeiro, honorários de terceiros) aparece no painel.
 
+**Respostas do dono (13/11/2026):** o escritório não usa nenhum portal hoje; o único sistema externo é o
+contábil **IOB**. O portal fica para depois do envio de documentos (item 1).
+
 **Decisões pendentes**
 1. O cliente pode ver todos os documentos da empresa ou só os marcados como visíveis? (recomendado: só os marcados)
 2. Quantos usuários por empresa cliente e se cada um vê tudo ou só alguns tipos (ex.: só o sócio vê folha).
 3. Prazos mínimos por tipo de pedido (ex.: rescisão com X dias úteis) e avisos automáticos.
 4. Notificações ao cliente: e-mail, WhatsApp (item 1) ou ambos.
+
+---
+
+## 3. Cobrança dos honorários por boleto/Pix
+
+**Pedido (13/11/2026):** gerar a cobrança (boleto ou Pix) pelo sistema com o valor dos honorários, usando a
+chave aleatória da conta Bradesco. **Decisão do dono: fica para o futuro** (o Bradesco não cobra pelo Pix
+recebido).
+
+**Já decidido para quando entrar**
+- Juros (1% a.m. pro rata) e multa (2%) contam **desde o primeiro dia após o vencimento**, sem carência.
+- Juros e multa ficam em **categoria própria** ("Receitas financeiras › Juros e multas recebidos"; nas contas a
+  pagar, "Despesas financeiras › Juros e multas"), fora da receita de honorários — em implantação (13/11/2026).
+- Proposta guardada: QR Code estático (BR Code) gerado pelo sistema; na baixa com atraso, opção de cobrar os
+  juros e a multa na próxima mensalidade ("Juros e multa por atraso – competência MM/AAAA"), receber junto ou
+  isentar (com registro de quem isentou). Depois: Pix com vencimento (cobv) ou Pix Automático com baixa automática.
+
+---
+
+## 4. Outras funções adiadas pelo dono (13/11/2026)
+
+- **NFS-e dos honorários** pelo sistema: não por enquanto.
+- **Caixas postais e-CAC/DTE-SN (Integra Contador/Serpro)** e procurações: não por enquanto.
+
+---
+
+## 5. Hospedagem (quando for subir)
+
+- O dono tem plano na **Hostinger** e o domínio **efficio.com.br** no registro.br; a subida para produção ainda
+  não foi marcada.
+- O sistema precisa de Node.js e PostgreSQL 16. Na Hostinger isso só roda num **VPS (KVM)**; a hospedagem de sites
+  compartilhada não oferece PostgreSQL. No VPS: Docker Compose com PostgreSQL, API e o web atrás de um proxy com
+  TLS (Caddy ou Nginx), DNS do registro.br apontando para o VPS.
+- Ajustes necessários antes: hoje a produção exige chaves no AWS KMS (`KEY_PROVIDER=aws`, `apps/api/src/env.ts`).
+  Opções: manter só o KMS na AWS (custo baixo, chave fora do servidor) ou permitir chave local com guarda
+  cuidadosa — decidir na hora da subida. O e-mail transacional hoje só sai por webhook; para usar o e-mail da
+  Hostinger é preciso suporte a SMTP. Backups diários do PostgreSQL para fora do VPS, com teste de restauração.

@@ -15,21 +15,21 @@ updates:
 
   - package-ecosystem: docker
     directories:
-      - /apps/api
+      - /sistema/apps/api
     schedule:
       interval: weekly
     cooldown:
       default-days: 3
 
   - package-ecosystem: docker-compose
-    directory: /
+    directory: /sistema
     schedule:
       interval: monthly
     cooldown:
       default-days: 3
 
   - package-ecosystem: npm
-    directory: /
+    directory: /sistema
     schedule:
       interval: weekly
     cooldown:

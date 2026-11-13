@@ -734,7 +734,7 @@ classificação de segredo) ou filtre o caminho no envio.
 
 ### 13. CI/CD
 
-- CI (`.github/workflows/ci.yml`, em todo PR e push na `main`): token só `contents: read`, actions
+- CI (`.github/workflows/ci.yml` na raiz do repositório, rodando dentro de `sistema/`; em todo PR e push na `main` e em `claude/**`): token só `contents: read`, actions
   fixadas por SHA, `pnpm install --frozen-lockfile`, typecheck, testes com Postgres, builds (falha
   se houver sourcemap no web), `pnpm audit`, gitleaks no histórico inteiro (`.gitleaks.toml`) e
   build da imagem com checagens (UID 10001, FS somente leitura, sem npm, sem seed, CA presente).
