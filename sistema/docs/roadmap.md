@@ -3,6 +3,8 @@
 Pedidos já combinados que ainda não entraram no sistema. Cada item lista o que foi pedido, a solução
 proposta e as decisões que faltam antes de começar.
 
+Ordem recomendada e análise completa (13/11/2026): [analise-sistema-2026-11.md](analise-sistema-2026-11.md).
+
 ---
 
 ## 1. Anexos no OneDrive + envio por e-mail e WhatsApp
@@ -27,7 +29,8 @@ no padrão `NOME EMPRESA/DEPARTAMENTO/ANO/MÊS`, e ter a opção de enviar o doc
   1. Simples: abre o WhatsApp com a mensagem e o link já escritos (`wa.me`); a pessoa confirma o envio.
      Sem custo e sem aprovação. Não anexa o arquivo, só o link.
   2. Oficial (WhatsApp Business Platform da Meta): envia o arquivo automaticamente. Exige verificação
-     da empresa, número dedicado, modelos de mensagem aprovados e tem custo por conversa. Não usar APIs
+     da empresa, número dedicado, modelos de mensagem aprovados e tem custo por mensagem (cobrança
+     por mensagem desde 07/2025). Não usar APIs
      não oficiais (risco de bloqueio do número).
 - **Demo no navegador:** a gravação no OneDrive é simulada (PGlite não fala com a Microsoft).
 
