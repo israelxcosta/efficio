@@ -6,11 +6,15 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { routes } from '@/app/routes';
 import { AppShell } from '@/components/layout/app-shell';
+import { FaqSection } from './components/faq-section';
+import { monthFigures } from './components/month-showcase';
+import { ServicesOrbit } from './components/services-orbit';
+import { AnnouncementBar } from './components/site-header';
 import { SiteFooter } from './components/site-footer';
 import { SiteHero } from './components/site-hero';
 import { PORTAL_PATH } from './components/site-ui';
 import { calendarCells, easter, lastBusinessDay, monthAgenda, nationalHolidays } from './obligations';
-import { contactMessage, OFFICE, whatsappHref } from './site-content';
+import { contactMessage, FAQ, FAQ_TOPICS, OFFICE, SERVICES, whatsappHref } from './site-content';
 import { shellEntry, SITE_PATH, SitePage } from './site-entry';
 
 const elementType = (el: unknown) => (isValidElement(el) ? (el as ReactElement).type : null);
@@ -65,6 +69,43 @@ describe('portal button', () => {
     const html = render(<SiteHero />);
     expect(html).toContain(`href="https://wa.me/${OFFICE.whatsapp.replace(/\D/g, '')}?text=`);
     expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  it('is offered by the bar on top of the page, which can be closed', () => {
+    const html = render(<AnnouncementBar />);
+    // "Entrar no portal" (the "no portal" part hides on phones, where the bar has one line).
+    expect(html).toMatch(/<a[^>]*href="\/login"[^>]*><span>Entrar<span[^>]*> no portal<\/span><\/span>/);
+    expect(html).toContain('aria-label="Fechar aviso"');
+  });
+});
+
+describe('the services', () => {
+  it('turns every service into a button that leads to the contact', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <ServicesOrbit onPick={() => {}} />
+      </MemoryRouter>,
+    );
+    const buttons = html.match(/<button type="button" class="site-service"/g) ?? [];
+    expect(buttons).toHaveLength(SERVICES.length);
+    for (const s of SERVICES) expect(html).toContain(`Falar sobre ${s.name.toLowerCase()}.`);
+  });
+});
+
+describe('the questions', () => {
+  it('files every question under a topic, and no topic is empty', () => {
+    const topics = new Set(FAQ_TOPICS.map((t) => t.id));
+    for (const item of FAQ) expect(topics.has(item.topic)).toBe(true);
+    for (const t of FAQ_TOPICS) expect(FAQ.some((item) => item.topic === t.id)).toBe(true);
+  });
+
+  it('shows all topics first, with the answers closed and tied to their questions', () => {
+    const html = renderToStaticMarkup(<FaqSection />);
+    expect(html).toMatch(/<button type="button" class="site-chip" aria-pressed="true">Todas<\/button>/);
+    for (const t of FAQ_TOPICS) expect(html).toContain(`aria-pressed="false">${t.label}</button>`);
+    const questions = [...html.matchAll(/aria-expanded="false" aria-controls="([^"]+)"/g)].map((m) => m[1]);
+    expect(questions).toHaveLength(FAQ.length);
+    for (const id of questions) expect(html).toMatch(new RegExp(`id="${id}"[^>]*hidden`));
   });
 });
 
@@ -124,6 +165,18 @@ describe('the month of a company', () => {
     expect(easter(2026)).toEqual([4, 5]);
     expect(nationalHolidays(2026).get('04-03')).toBe('Sexta-feira Santa');
     expect(nationalHolidays(2026).get('11-20')).toBe('Consciência Negra');
+  });
+
+  it('counts the figures beside the calendar from the agenda on screen', () => {
+    const agenda = monthAgenda(2026, 11, 'simples', true);
+    const today = new Date(2026, 10, 13);
+    const figures = monthFigures(agenda, today);
+    expect(agenda.total).toBe(7);
+    expect(figures).toMatchObject({ isCurrent: true, dated: 6, floating: 1, offDays: [15, 20] });
+    expect(figures.next?.day).toBe(15);
+    // Another month: its first due day; after the last due day of this month: none.
+    expect(monthFigures(monthAgenda(2026, 12, 'simples', true), today).next?.day).toBe(15);
+    expect(monthFigures(agenda, new Date(2026, 10, 27)).next).toBeNull();
   });
 
   it('lays the month out in whole weeks, Monday first', () => {

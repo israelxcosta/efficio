@@ -1,12 +1,11 @@
 import { useLayoutEffect, useRef, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { LockKeyhole } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /** Address of the portal: the app's login (signed-in users are sent on to their start page). */
 export const PORTAL_PATH = '/login';
 
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 }
 
@@ -44,11 +43,19 @@ export function SectionLink({
   );
 }
 
+/**
+ * The label of a button, repeated in `data-label` for the hover "label wipe" (site.css): the label
+ * slides up and out while its copy rises from below. Text-only buttons get it; the copy is drawn by
+ * CSS and hidden from assistive technology.
+ */
+export function wipe(label: ReactNode): { 'data-label'?: string } {
+  return typeof label === 'string' ? { 'data-label': label } : {};
+}
+
 /** "Portal do cliente": the login of the office's system. */
 export function PortalLink({ className, children = 'Portal do cliente' }: { className?: string; children?: ReactNode }) {
   return (
-    <Link to={PORTAL_PATH} className={cn('site-button', className)}>
-      <LockKeyhole aria-hidden />
+    <Link to={PORTAL_PATH} className={cn('site-btn', className)} {...wipe(children)}>
       {children}
     </Link>
   );

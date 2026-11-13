@@ -3,7 +3,7 @@
 // footer of the site says the screens carry sample data.
 import type { ReactNode } from 'react';
 import { Check, ChevronLeft, ChevronRight, Paperclip } from 'lucide-react';
-import type { ServiceId, StepId } from '../site-content';
+import type { StepId } from '../site-content';
 
 type Status = 'done' | 'doing' | 'wait' | 'open';
 
@@ -73,129 +73,6 @@ function Panel({ title, sub, aside, foot, children, className }: { title: string
 }
 
 const CLIENT = 'Sua Empresa Ltda.';
-
-const PREVIEWS: Record<ServiceId, { title: string; sub: string; rows: Row[]; foot: ReactNode }> = {
-  contabil: {
-    title: 'Contabilidade',
-    sub: `${CLIENT} · outubro de 2026`,
-    rows: [
-      { status: 'done', title: 'Conferência de extratos de setembro', meta: 'concluída em 08/10' },
-      { status: 'doing', title: 'Balancete de setembro', meta: 'vence 26/10 · departamento contábil' },
-      { status: 'open', title: 'Balanço e DRE de 2026', meta: 'fechamento anual · ECD em junho' },
-    ],
-    foot: (
-      <>
-        <span>1 concluída · 1 em andamento</span>
-        <span>3 tarefas</span>
-      </>
-    ),
-  },
-  fiscal: {
-    title: 'Fiscal',
-    sub: `${CLIENT} · outubro de 2026`,
-    rows: [
-      { status: 'done', title: 'DCTFWeb', meta: 'vence 15/10 · transmitida em 14/10', right: <Attach>recibo.pdf</Attach> },
-      { status: 'done', title: 'DAS do Simples Nacional', meta: 'vence 20/10 · R$ 1.248,31', right: <Attach>guia.pdf</Attach> },
-      { status: 'done', title: 'INSS da DCTFWeb', meta: 'vence 20/10 · R$ 612,40', right: <Attach>darf.pdf</Attach> },
-    ],
-    foot: (
-      <>
-        <span>3 de 3 concluídas</span>
-        <span>guias anexadas</span>
-      </>
-    ),
-  },
-  folha: {
-    title: 'Departamento pessoal',
-    sub: `${CLIENT} · outubro de 2026`,
-    rows: [
-      { status: 'done', title: 'Folha de setembro', meta: 'até o 5º dia útil', right: <Attach>3 holerites</Attach> },
-      { status: 'done', title: 'eSocial: eventos do mês', meta: 'vence 15/10' },
-      { status: 'doing', title: 'FGTS Digital', meta: 'vence 20/10' },
-      { status: 'wait', title: 'Admissão de auxiliar de cozinha', meta: 'documentos do funcionário' },
-    ],
-    foot: (
-      <>
-        <span>2 concluídas · 1 aguardando você</span>
-        <span>4 tarefas</span>
-      </>
-    ),
-  },
-  abertura: {
-    title: 'Abertura de empresa',
-    sub: 'Processo · Sua Nova Empresa Ltda.',
-    rows: [
-      { status: 'done', title: 'Consulta de viabilidade', meta: 'prefeitura · aprovada' },
-      { status: 'done', title: 'Registro na Junta Comercial', meta: 'contrato social registrado' },
-      { status: 'done', title: 'CNPJ', meta: 'inscrição ativa' },
-      { status: 'doing', title: 'Inscrição municipal', meta: 'em análise na prefeitura' },
-      { status: 'open', title: 'Alvará de funcionamento', meta: 'depois da inscrição' },
-    ],
-    foot: (
-      <>
-        <span>3 de 5 etapas</span>
-        <span>próxima: inscrição municipal</span>
-      </>
-    ),
-  },
-  planejamento: {
-    title: 'Planejamento tributário',
-    sub: `${CLIENT} · ano de 2027`,
-    rows: [
-      { status: 'doing', title: 'Simulação: Simples × Presumido', meta: 'faturamento previsto para 2027' },
-      { status: 'done', title: 'Pró-labore e distribuição de lucros', meta: 'revisado em setembro' },
-      { status: 'open', title: 'Opção pelo Simples Nacional', meta: 'até 29/01/2027' },
-    ],
-    foot: (
-      <>
-        <span>A opção vale para o ano inteiro</span>
-        <span>3 tarefas</span>
-      </>
-    ),
-  },
-  financeiro: {
-    title: 'Contas a pagar',
-    sub: `${CLIENT} · semana de 19/10`,
-    rows: [
-      { status: 'done', title: 'Aluguel do ponto', meta: 'pago em 19/10', right: <span className="ui-num">R$ 4.800,00</span> },
-      { status: 'done', title: 'DAS do Simples Nacional', meta: 'pago em 20/10', right: <span className="ui-num">R$ 1.248,31</span> },
-      { status: 'doing', title: 'Fornecedor de embalagens', meta: 'vence 21/10 · agendado', right: <span className="ui-num">R$ 1.932,40</span> },
-      { status: 'open', title: 'Energia elétrica', meta: 'vence 22/10', right: <span className="ui-num">R$ 687,15</span> },
-    ],
-    foot: (
-      <>
-        <span>2 pagas · 1 agendada</span>
-        <span className="ui-num">Semana: R$ 8.667,86</span>
-      </>
-    ),
-  },
-  certidoes: {
-    title: 'Certidões',
-    sub: `${CLIENT} · validade de cada uma`,
-    rows: [
-      { status: 'done', title: 'CND federal', meta: 'válida até 06/04/2027', right: <Badge status="done">Válida</Badge> },
-      { status: 'wait', title: 'CRF do FGTS', meta: 'válida até 11/11/2026', right: <Badge status="wait">Renovar</Badge> },
-      { status: 'done', title: 'Certidão estadual', meta: 'válida até 18/01/2027', right: <Badge status="done">Válida</Badge> },
-      { status: 'done', title: 'Certidão municipal', meta: 'válida até 02/02/2027', right: <Badge status="done">Válida</Badge> },
-    ],
-    foot: (
-      <>
-        <span>3 válidas · 1 para renovar</span>
-        <span>4 certidões</span>
-      </>
-    ),
-  },
-};
-
-/** What a service looks like in the portal: its tasks of the month. */
-export function ServicePreview({ id }: { id: ServiceId }) {
-  const p = PREVIEWS[id];
-  return (
-    <Panel title={p.title} sub={p.sub} foot={p.foot}>
-      <Rows rows={p.rows} />
-    </Panel>
-  );
-}
 
 /** The client's start screen in the portal. */
 export function PortalHome() {

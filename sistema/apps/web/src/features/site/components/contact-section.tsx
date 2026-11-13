@@ -1,26 +1,13 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 import { contactMessage, mailtoHref, OFFICE, whatsappHref } from '../site-content';
-import { DOCUMENTS, DocThumb } from './portal-fragments';
-import { ExternalLink } from './site-ui';
+import { ExternalLink, PortalLink } from './site-ui';
 
 /**
- * "Fale com o escritório": the papers of a client's month drift across the top; the bar writes the
- * WhatsApp message (name + subject) and opens it, so nothing is sent without the visitor confirming.
+ * "Fale com o escritório" on the lime card: the form writes the WhatsApp message (name + subject) and
+ * opens it, so nothing is sent without the visitor confirming. The office's details on the white panel.
  */
 export function ContactSection({ subject, onSubjectChange }: { subject: string; onSubjectChange: (subject: string) => void }) {
   const [name, setName] = useState('');
-  const stripRef = useRef<HTMLDivElement>(null);
-  const [paused, setPaused] = useState(false);
-
-  // The drifting strip stops while it is off screen.
-  useEffect(() => {
-    const strip = stripRef.current;
-    if (!strip || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(([entry]) => setPaused(!entry?.isIntersecting));
-    observer.observe(strip);
-    return () => observer.disconnect();
-  }, []);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -28,29 +15,62 @@ export function ContactSection({ subject, onSubjectChange }: { subject: string; 
   }
 
   return (
-    <section id="contato" className="site-chapter site-contato" aria-labelledby="contato-title">
-      <div ref={stripRef} className="site-strip" data-paused={paused} aria-hidden>
-        <div className="site-strip__track">
-          {[...DOCUMENTS, ...DOCUMENTS].map((doc, i) => (
-            <DocThumb key={i} doc={doc} />
-          ))}
-        </div>
-      </div>
+    <section id="contato" className="site-contact" aria-labelledby="contato-title">
+      <div className="site-contact__card" data-reveal>
+        <div className="site-contact__copy">
+          <p className="site-contact__label">Contato</p>
+          <h2 id="contato-title" className="site-h2 site-contact__title" tabIndex={-1} data-section-heading>
+            Fale com o escritório
+          </h2>
+          <p className="site-contact__lead">
+            Diga o seu nome e o assunto: o WhatsApp abre com a mensagem escrita, e você confere antes de enviar.
+          </p>
 
-      <div className="site-wrap site-contato__body">
-        <div className="site-grid site-contato__head">
-          <div>
-            <h2 id="contato-title" tabIndex={-1} data-section-heading data-reveal>
-              Fale com o escritório
-            </h2>
-            <p className="site-contato__lead" data-reveal style={{ '--d': '80ms' } as CSSProperties}>
-              Diga o seu nome e o assunto: o WhatsApp abre com a mensagem escrita, e você confere antes de enviar.
-            </p>
-          </div>
-          <dl className="site-contato__ways" data-reveal style={{ '--d': '140ms' } as CSSProperties}>
+          <form className="site-form" onSubmit={submit}>
+            <div className="site-field">
+              <label htmlFor="contato-nome">Seu nome</label>
+              <input id="contato-nome" name="nome" autoComplete="name" placeholder="Como podemos chamar você" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="site-field">
+              <label htmlFor="contato-assunto">Assunto</label>
+              <input
+                id="contato-assunto"
+                name="assunto"
+                placeholder="Abrir empresa, folha, troca de contador…"
+                value={subject}
+                onChange={(e) => onSubjectChange(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="site-btn site-form__submit" data-label="Enviar pelo WhatsApp">
+              Enviar pelo WhatsApp
+            </button>
+          </form>
+          <p className="site-contact__note">
+            Prefere e-mail?{' '}
+            <ExternalLink href={mailtoHref(subject || 'Contato pelo site')} className="site-inline-link">
+              {OFFICE.email}
+            </ExternalLink>
+            . Nada é enviado antes de você confirmar no aplicativo.
+          </p>
+        </div>
+
+        <aside className="site-contact__aside" aria-label="Dados do escritório">
+          <dl className="site-contact__list">
             <div>
               <dt>WhatsApp</dt>
-              <dd>{OFFICE.whatsappLabel}</dd>
+              <dd>
+                <ExternalLink href={whatsappHref('Olá! Vim pelo site do escritório.')} className="site-inline-link">
+                  {OFFICE.whatsappLabel}
+                </ExternalLink>
+              </dd>
+            </div>
+            <div>
+              <dt>E-mail</dt>
+              <dd>
+                <ExternalLink href={mailtoHref('Contato pelo site')} className="site-inline-link">
+                  {OFFICE.email}
+                </ExternalLink>
+              </dd>
             </div>
             <div>
               <dt>Atendimento</dt>
@@ -61,37 +81,13 @@ export function ContactSection({ subject, onSubjectChange }: { subject: string; 
               <dd>{OFFICE.address}</dd>
             </div>
           </dl>
-        </div>
-
-        <form className="site-contact-bar" onSubmit={submit} data-reveal style={{ '--d': '160ms' } as CSSProperties}>
-          <label className="site-sr-only" htmlFor="contato-nome">
-            Seu nome
-          </label>
-          <input id="contato-nome" name="nome" autoComplete="name" placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} />
-          <label className="site-sr-only" htmlFor="contato-assunto">
-            Assunto
-          </label>
-          <input
-            id="contato-assunto"
-            name="assunto"
-            placeholder="Assunto: abrir empresa, folha…"
-            value={subject}
-            onChange={(e) => onSubjectChange(e.target.value)}
-          />
-          <button type="submit">
-            <MessageCircle size={20} aria-hidden />
-            Enviar pelo WhatsApp
-          </button>
-        </form>
-        <div className="site-contact-bar__notes site-small">
-          <p>
-            Prefere e-mail?{' '}
-            <ExternalLink href={mailtoHref(subject || 'Contato pelo site')} className="site-link font-semibold text-site-on-dark">
-              {OFFICE.email}
-            </ExternalLink>
-          </p>
-          <p>Abre o WhatsApp com a mensagem pronta. Nada é enviado antes de você confirmar no aplicativo.</p>
-        </div>
+          <div className="site-contact__portal">
+            <p>
+              <strong>Já é cliente?</strong> Guias, documentos e pendências do mês estão no portal.
+            </p>
+            <PortalLink className="site-btn--sm">Entrar no portal</PortalLink>
+          </div>
+        </aside>
       </div>
     </section>
   );

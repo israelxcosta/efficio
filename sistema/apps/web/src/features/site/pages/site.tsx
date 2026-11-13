@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
+import '@fontsource-variable/geist';
+import { AudienceCards } from '../components/audience-cards';
+import { CompareTable } from '../components/compare-table';
 import { ContactSection } from '../components/contact-section';
-import { FaqBands } from '../components/faq-bands';
+import { DueNumbers } from '../components/due-numbers';
+import { FaqSection } from '../components/faq-section';
 import { MonthShowcase } from '../components/month-showcase';
-import { PortalSection } from '../components/portal-section';
-import { ServicesIndex } from '../components/services-index';
+import { ServicesOrbit } from '../components/services-orbit';
+import { AnnouncementBar, SiteHeader } from '../components/site-header';
 import { SiteFooter } from '../components/site-footer';
 import { SiteHero } from '../components/site-hero';
-import { StartAccordion } from '../components/start-accordion';
 import { goToSection, SectionLink, useReveal } from '../components/site-ui';
+import { StartJourney } from '../components/start-journey';
+import { WhyBento } from '../components/why-bento';
 import { OFFICE } from '../site-content';
 import '../site.css';
 
@@ -25,22 +30,27 @@ export default function SitePage() {
   }, []);
 
   return (
-    <div ref={root} className="site">
-      <SectionLink to="mes" className="site-skip">
+    <div ref={root} className="site" id="topo">
+      <SectionLink to="conteudo" className="site-skip">
         Pular para o conteúdo
       </SectionLink>
-      <SiteHero />
-      <main>
+      <AnnouncementBar />
+      <SiteHeader />
+      <main id="conteudo">
+        <SiteHero />
+        <DueNumbers />
+        <StartJourney />
         <MonthShowcase />
-        <ServicesIndex
+        <ServicesOrbit
           onPick={(service) => {
             setSubject(service.name);
             goToSection('contato');
           }}
         />
-        <PortalSection />
-        <StartAccordion />
-        <FaqBands />
+        <WhyBento />
+        <CompareTable />
+        <AudienceCards />
+        <FaqSection />
         <ContactSection subject={subject} onSubjectChange={setSubject} />
       </main>
       <SiteFooter />
