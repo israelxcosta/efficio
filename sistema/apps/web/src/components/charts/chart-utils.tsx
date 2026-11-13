@@ -8,6 +8,8 @@ export const CHART_COLORS = {
   incomeStrong: 'var(--app-chart-income-strong)',
   expense: 'var(--app-chart-expense)',
   expenseStrong: 'var(--app-chart-expense-strong)',
+  /** Despesas do fluxo de caixa e resultado negativo do mês. */
+  negative: 'var(--app-chart-negative)',
   neutral: 'var(--app-chart-neutral)',
   grid: 'var(--app-chart-grid)',
   axis: 'var(--app-subtle)',

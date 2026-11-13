@@ -422,7 +422,7 @@ export function MonthlyResultWidget({ d, alert }: WidgetProps) {
               <ReferenceLine y={0} stroke="var(--app-border-strong)" />
               <Bar dataKey="net" name="net" radius={[3, 3, 3, 3]} maxBarSize={44} isAnimationActive={!resizing}>
                 {rows.map((r) => (
-                  <Cell key={r.month} fill={r.net < 0 ? CHART_COLORS.danger : CHART_COLORS.income} />
+                  <Cell key={r.month} fill={r.net < 0 ? CHART_COLORS.negative : CHART_COLORS.income} />
                 ))}
                 <LabelList dataKey="net" content={(p) => <PeakLabel {...p} peak={peak} />} />
               </Bar>

@@ -58,6 +58,8 @@
   --app-chart-income-strong: #1e3f8a;
   --app-chart-expense: #c3c8d1;
   --app-chart-expense-strong: #7a818c;
+  /* Despesas no fluxo de caixa e resultado negativo do mês. */
+  --app-chart-negative: #cc3333;
   /* Neutral series (e.g. the earlier period in comparisons). */
   --app-chart-neutral: #d0d5dd;
   --app-chart-grid: #e9ecf1;
@@ -137,6 +139,7 @@
   --app-chart-income-strong: #c3d4f6;
   --app-chart-expense: #5d5d5b;
   --app-chart-expense-strong: #96958f;
+  --app-chart-negative: #e66464;
   --app-chart-neutral: #5d5d5b;
   --app-chart-grid: #3b3b3b;
   --app-chart-1: #c3d4f6;

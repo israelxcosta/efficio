@@ -65,7 +65,7 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
         <CardHeader title="Fluxo de caixa" subtitle="Entradas e saídas por período" icon={<Waves />} />
         <div className="mt-3 flex flex-wrap gap-4">
           <LegendDot color={CHART_COLORS.income} label="Entradas" />
-          <LegendDot color={CHART_COLORS.expense} label="Saídas" />
+          <LegendDot color={CHART_COLORS.negative} label="Saídas" />
         </div>
         <div className="mt-2 h-72">
           {report.isPending ? (
@@ -81,7 +81,7 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
                 {projected.length ? <ProjectionArea from={projected[0]!.label} to={projected[projected.length - 1]!.label} /> : null}
                 <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ entradas: 'Entradas', saidas: 'Saídas' }} />} />
                 <Bar dataKey="entradas" name="entradas" stackId="flow" fill={CHART_COLORS.income} radius={[3, 3, 0, 0]} maxBarSize={34} />
-                <Bar dataKey="saidas" name="saidas" stackId="flow" fill={CHART_COLORS.expense} radius={[3, 3, 0, 0]} maxBarSize={34} />
+                <Bar dataKey="saidas" name="saidas" stackId="flow" fill={CHART_COLORS.negative} radius={[3, 3, 0, 0]} maxBarSize={34} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
