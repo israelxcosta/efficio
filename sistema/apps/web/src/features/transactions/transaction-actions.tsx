@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -23,12 +23,42 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { Select } from '@/components/ui/select';
 import { useAccounts } from '@/features/accounts/api';
 import { useDeleteTransfer } from '@/features/transfers/api';
-import { TransferSheet, type TransferMode, type TransferSheetState } from '@/features/transfers/transfer-sheet';
+import type { TransferMode, TransferSheetState } from '@/features/transfers/transfer-sheet';
 import { useAnticipateInstallments, useDeleteTransaction, useSetPaid } from './api';
 import { ScopeDialog } from './scope-dialog';
-import { TransactionSheet, type TransactionSheetState, type TxKind } from './transaction-sheet';
+import type { TransactionSheetState, TxKind } from './transaction-sheet';
 import { toastError } from '@/lib/notify';
 import { usePermissions } from '@/features/auth/permissions';
+
+/**
+ * Stands in for a sheet whose chunk did not load (offline, or a new deploy removed the old file):
+ * each opening explains it and closes, instead of breaking the page.
+ */
+function SheetLoadFailed({ state, onOpenChange }: { state: { open: boolean }; onOpenChange: (open: boolean) => void }) {
+  useEffect(() => {
+    if (!state.open) return;
+    toast.error('Não foi possível abrir o formulário.', { id: 'sheet-load-failed', description: 'Verifique a conexão e recarregue a página.' });
+    onOpenChange(false);
+  }, [state.open, onOpenChange]);
+  return null;
+}
+
+type SheetProps<S> = { state: S; onOpenChange: (open: boolean) => void };
+
+// The sheets (forms, pickers, splits, recurrence) are chunks of their own, loaded on first use:
+// they stay out of the first load of every page (docs/analise-sistema-2026-11.md §2.4).
+const TransactionSheet = lazy<ComponentType<SheetProps<TransactionSheetState>>>(() =>
+  import('./transaction-sheet').then(
+    (m) => ({ default: m.TransactionSheet }),
+    () => ({ default: SheetLoadFailed }),
+  ),
+);
+const TransferSheet = lazy<ComponentType<SheetProps<TransferSheetState>>>(() =>
+  import('@/features/transfers/transfer-sheet').then(
+    (m) => ({ default: m.TransferSheet }),
+    () => ({ default: SheetLoadFailed }),
+  ),
+);
 
 interface OpenTransactionOptions {
   type: TxKind;
@@ -68,6 +98,8 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
   const [savingPaidId, setSavingPaidId] = useState<string | null>(null);
   const txSheetUsed = useStickyTrue(txSheet.open);
   const transferSheetUsed = useStickyTrue(transferSheet.open);
+  const onTxSheetChange = useCallback((open: boolean) => setTxSheet((s) => (open ? s : { ...s, open: false })), []);
+  const onTransferSheetChange = useCallback((open: boolean) => setTransferSheet((s) => (open ? s : { ...s, open: false })), []);
 
   const deleteTx = useDeleteTransaction();
   const deleteTransfer = useDeleteTransfer();
@@ -218,15 +250,18 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
       {/* Collaborators never reach the finances: none of these (nor their queries) mount for them. */}
       {canAccessFinance ? (
         <>
-          {/* Mounted on first use so their option queries don't run on every page load. */}
+          {/* Mounted (and their chunks loaded) on first use, so neither the code nor the option queries
+              run on every page load. One boundary each, with nothing as fallback: while a chunk loads
+              the page stays as it is, and the other sheet is never hidden. */}
           {txSheetUsed ? (
-            <TransactionSheet state={txSheet} onOpenChange={(open) => setTxSheet((s) => (open ? s : { ...s, open: false }))} />
+            <Suspense fallback={null}>
+              <TransactionSheet state={txSheet} onOpenChange={onTxSheetChange} />
+            </Suspense>
           ) : null}
           {transferSheetUsed ? (
-            <TransferSheet
-              state={transferSheet}
-              onOpenChange={(open) => setTransferSheet((s) => (open ? s : { ...s, open: false }))}
-            />
+            <Suspense fallback={null}>
+              <TransferSheet state={transferSheet} onOpenChange={onTransferSheetChange} />
+            </Suspense>
           ) : null}
           <ScopeDialog
             open={Boolean(toDelete) && isSeries}

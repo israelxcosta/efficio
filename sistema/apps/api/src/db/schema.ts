@@ -29,6 +29,7 @@ import type {
   ClientStatus,
   ContactKind,
   ContractBlock,
+  FeeAdjustmentIndex,
   FeeEntryKind,
   Frequency,
   IconName,
@@ -581,6 +582,84 @@ export const clientFees = pgTable(
       name: 'client_fees_client_fk',
       columns: [t.workspaceId, t.clientId],
       foreignColumns: [contacts.workspaceId, contacts.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+/**
+ * A yearly fee adjustment applied in batch (reajuste em lote, migration 0021): the month whose fee
+ * periods it registered, the indices informed (basis points, null = not informed), the percentage
+ * applied and who applied it (name recorded; "Usuário excluído" when the account goes).
+ */
+export const feeAdjustments = pgTable(
+  'fee_adjustments',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    month: text().$type<MonthKey>().notNull(),
+    igpmBps: integer(),
+    ipcaBps: integer(),
+    inpcBps: integer(),
+    cctBps: integer(),
+    appliedBps: integer().notNull(),
+    /** Index whose value was applied; null = typed by hand or no positive index. */
+    chosenIndex: text().$type<FeeAdjustmentIndex>(),
+    adjustEmployeeFee: boolean().notNull(),
+    appliedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    appliedByName: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    tenantUnique('fee_adjustments', t),
+    index('fee_adjustments_month_idx').on(t.workspaceId, t.month),
+    index('fee_adjustments_applied_by_idx').on(t.appliedBy).where(sql`${t.appliedBy} is not null`),
+    check('fee_adjustments_month_chk', sql`${t.month} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+    check(
+      'fee_adjustments_indices_chk',
+      sql`${t.igpmBps} between -10000 and 10000 and ${t.ipcaBps} between -10000 and 10000 and ${t.inpcBps} between -10000 and 10000 and ${t.cctBps} between -10000 and 10000`,
+    ),
+    check('fee_adjustments_applied_chk', sql`${t.appliedBps} between 0 and 10000`),
+    check('fee_adjustments_chosen_index_chk', sql`${t.chosenIndex} in ('igpm', 'ipca', 'inpc', 'cct')`),
+    check('fee_adjustments_applied_by_name_chk', sql`length(${t.appliedByName}) between 1 and 120`),
+  ],
+);
+
+/**
+ * One fee period registered by a batch, with the values it started from and the ones applied (the
+ * letter's calculation, kept even if the period is edited later). Goes away with the period.
+ */
+export const feeAdjustmentItems = pgTable(
+  'fee_adjustment_items',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    adjustmentId: uuid().notNull(),
+    clientFeeId: uuid().notNull(),
+    previousAmount: money().notNull(),
+    previousEmployeeFee: money().notNull(),
+    amount: money().notNull(),
+    employeeFee: money().notNull(),
+    discountBps: integer().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    tenantUnique('fee_adjustment_items', t),
+    uniqueIndex('fee_adjustment_items_fee_uq').on(t.clientFeeId),
+    index('fee_adjustment_items_adjustment_idx').on(t.workspaceId, t.adjustmentId),
+    check(
+      'fee_adjustment_items_values_chk',
+      sql`${t.previousAmount} > 0 and ${t.amount} > 0 and ${t.previousEmployeeFee} >= 0 and ${t.employeeFee} >= 0`,
+    ),
+    check('fee_adjustment_items_discount_chk', sql`${t.discountBps} between 0 and 9999`),
+    foreignKey({
+      name: 'fee_adjustment_items_adjustment_fk',
+      columns: [t.workspaceId, t.adjustmentId],
+      foreignColumns: [feeAdjustments.workspaceId, feeAdjustments.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'fee_adjustment_items_fee_fk',
+      columns: [t.workspaceId, t.clientFeeId],
+      foreignColumns: [clientFees.workspaceId, clientFees.id],
     }).onDelete('cascade'),
   ],
 );
@@ -1902,7 +1981,7 @@ export const clientDocuments = pgTable(
     index('client_documents_updated_by_idx').on(t.updatedBy).where(sql`${t.updatedBy} is not null`),
     check(
       'client_documents_kind_chk',
-      sql`${t.kind} in ('digital_certificate', 'cnd_federal', 'cnd_state', 'cnd_municipal', 'crf_fgts', 'cndt', 'operating_license', 'sanitary_license', 'fire_certificate', 'environmental_license', 'pcmso', 'pgr', 'ltcat', 'professional_registration', 'other')`,
+      sql`${t.kind} in ('digital_certificate', 'ecac_power_of_attorney', 'cnd_federal', 'cnd_state', 'cnd_municipal', 'crf_fgts', 'cndt', 'operating_license', 'sanitary_license', 'fire_certificate', 'environmental_license', 'pcmso', 'pgr', 'ltcat', 'professional_registration', 'other')`,
     ),
     check(
       'client_documents_name_chk',
@@ -2150,6 +2229,8 @@ export type GoalRow = typeof goals.$inferSelect;
 export type GoalContributionRow = typeof goalContributions.$inferSelect;
 export type ContactRow = typeof contacts.$inferSelect;
 export type ClientFeeRow = typeof clientFees.$inferSelect;
+export type FeeAdjustmentRow = typeof feeAdjustments.$inferSelect;
+export type FeeAdjustmentItemRow = typeof feeAdjustmentItems.$inferSelect;
 export type RecurrenceRow = typeof recurrences.$inferSelect;
 export type TransactionRow = typeof transactions.$inferSelect;
 export type NewTransactionRow = typeof transactions.$inferInsert;

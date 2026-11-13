@@ -8,6 +8,7 @@ export * from './utils/documents';
 export * from './utils/invoice';
 export * from './utils/recurrence';
 export * from './utils/fees';
+export * from './utils/fee-adjustments';
 export * from './integrations';
 export * from './utils/late-fees';
 export * from './utils/delinquency';

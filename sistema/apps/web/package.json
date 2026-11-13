@@ -10,6 +10,7 @@
     "build:demo": "tsc -p tsconfig.json && vite build --mode demo",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
+    "check:entry": "node scripts/check-entry-chunks.mjs",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {

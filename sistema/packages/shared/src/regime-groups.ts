@@ -110,12 +110,16 @@ export const REGIME_GROUP_ITEMS: readonly RegimeGroupItem[] = [
   {
     key: 'dctfweb',
     name: 'DCTFWeb',
-    description: 'Transmitir a DCTFWeb e emitir o DARF. Prazo de referência: dia 15 do mês seguinte; confira a regra vigente.',
+    // Legal deadline: last business day of the following month (IN RFB 2.248/2025) — day 31 anticipated to
+    // a business day. Internal target 16 days before it (between the 9th and the 15th): the DARF it issues
+    // is due on the 20th.
+    description:
+      'Transmitir a DCTFWeb e emitir o DARF. Prazo legal: último dia útil do mês seguinte (IN RFB 2.248/2025); meta interna até o dia 15, antes do vencimento do DARF (dia 20).',
     department: 'fiscal',
     period: 'monthly',
-    dueDay: 15,
+    dueDay: 31,
     dueMonth: null,
-    targetDaysBefore: 3,
+    targetDaysBefore: 16,
     nonBusinessDayRule: 'anticipate',
     referenceOffset: 1,
     regimes: EMPLOYERS,

@@ -90,12 +90,21 @@ export default defineConfig(({ mode }) => {
       // Fonts stay files: inlined as data: URLs they would need `font-src data:` in the CSP.
       assetsInlineLimit: (file: string) => (/\.(woff2?|ttf|otf)$/i.test(file) ? false : undefined),
       chunkSizeWarningLimit: 900,
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          manualChunks(id: string) {
-            if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'charts';
-            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) return 'react';
-            return undefined;
+          // Explicit groups, highest priority first. A group also takes the dependencies of what it
+          // captures, so the libraries of the first load are claimed before `charts`: otherwise
+          // recharts drags React and clsx into the charts chunk and every page (login, site, Início)
+          // preloads it. `pnpm check:entry` (scripts/check-entry-chunks.mjs) fails if that comes back.
+          codeSplitting: {
+            groups: [
+              { name: 'react', test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 40 },
+              { name: 'router', test: /[\\/]node_modules[\\/]react-router[\\/]/, priority: 30 },
+              // Every other library imported statically from main.tsx (the first load), in one chunk.
+              { name: 'vendor', test: /[\\/]node_modules[\\/]/, tags: ['$initial'], priority: 20 },
+              // Only the pages with charts load it (Financeiro, Relatórios, client report, card detail).
+              { name: 'charts', test: /[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/, priority: 10 },
+            ],
           },
         },
       },

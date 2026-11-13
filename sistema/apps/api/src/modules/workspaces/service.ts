@@ -560,28 +560,55 @@ export async function previewInvite(db: DbExecutor, token: string): Promise<Invi
   };
 }
 
-/** Adds the signed-in user (whose e-mail must match the invite) to the workspace. */
-export async function acceptInvite(db: DbExecutor, userId: string, token: string): Promise<string> {
+type InviteRow = Awaited<ReturnType<typeof findInvite>>;
+
+/**
+ * The pending invite of `token`, usable by whoever has `email`: not expired and sent to that e-mail.
+ * `hint` ends the mismatch message (signing in to accept, or signing up).
+ */
+export async function usableInvite(
+  db: DbExecutor,
+  token: string,
+  email: string,
+  hint = 'Entre com esse e-mail para aceitar.',
+): Promise<InviteRow> {
   const row = await findInvite(db, token);
   if (row.invite.expiresAt <= new Date()) throw new ValidationError('Este convite expirou. Peça um novo convite.');
-  const user = await getUserRow(db, userId);
-  if (user.email.toLowerCase() !== row.invite.email.toLowerCase()) {
-    throw new ForbiddenError(`Este convite foi enviado para ${row.invite.email}. Entre com esse e-mail para aceitar.`);
+  if (email.toLowerCase() !== row.invite.email.toLowerCase()) {
+    throw new ForbiddenError(`Este convite foi enviado para ${row.invite.email}. ${hint}`);
   }
+  return row;
+}
+
+/**
+ * Adds `userId` to the invite's workspace with the invited role (unless already a member) and uses the
+ * invite up — inside the caller's transaction. A concurrent use of the same invite fails (404).
+ */
+export async function joinByInvite(tx: DbExecutor, row: InviteRow, userId: string): Promise<string> {
   const workspaceId = row.workspace.id;
-  await db.transaction(async (tx) => {
-    const [member] = await tx
-      .select({ role: workspaceMembers.role })
-      .from(workspaceMembers)
-      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)));
-    if (!member) {
-      await assertMemberSlot(tx, workspaceId, row.workspace.kind, 1);
-      await tx.insert(workspaceMembers).values({ workspaceId, userId, role: row.invite.role });
-    }
-    await tx.update(workspaceInvites).set({ acceptedAt: new Date() }).where(eq(workspaceInvites.id, row.invite.id));
-    await tx.update(users).set({ lastWorkspaceId: workspaceId }).where(eq(users.id, userId));
-  });
+  const [member] = await tx
+    .select({ role: workspaceMembers.role })
+    .from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)));
+  if (!member) {
+    await assertMemberSlot(tx, workspaceId, row.workspace.kind, 1);
+    await tx.insert(workspaceMembers).values({ workspaceId, userId, role: row.invite.role });
+  }
+  const used = await tx
+    .update(workspaceInvites)
+    .set({ acceptedAt: new Date() })
+    .where(and(eq(workspaceInvites.id, row.invite.id), isNull(workspaceInvites.acceptedAt)))
+    .returning({ id: workspaceInvites.id });
+  if (used.length === 0) throw new NotFoundError('Convite inválido ou já utilizado');
+  await tx.update(users).set({ lastWorkspaceId: workspaceId }).where(eq(users.id, userId));
   return workspaceId;
+}
+
+/** Adds the signed-in user (whose e-mail must match the invite) to the workspace. */
+export async function acceptInvite(db: DbExecutor, userId: string, token: string): Promise<string> {
+  const user = await getUserRow(db, userId);
+  const row = await usableInvite(db, token, user.email);
+  return db.transaction((tx) => joinByInvite(tx, row, userId));
 }
 
 // ---------------------------------------------------------------------------

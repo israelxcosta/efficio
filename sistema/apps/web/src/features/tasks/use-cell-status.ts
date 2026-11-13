@@ -15,6 +15,7 @@ import { api } from '@/lib/api';
 import { toastError } from '@/lib/notify';
 import { qk } from '@/lib/query-keys';
 import { invalidateTasks } from './api';
+import { staleAfterTaskChange } from './task-cache';
 
 /** Toast after a cell concludes (spec §17), with the month closed when it was the last pending one. */
 export function cellDoneMessage(taskName: string, clientName: string, monthName: string | null): string {
@@ -68,7 +69,7 @@ export function useCellStatus() {
       if (cell.status === status) return true;
       const from = cell.status;
       const me = qc.getQueryData<TaskOptionsResponse>(qk.taskOptions)?.me ?? null;
-      const snapshots = qc.getQueriesData<unknown>({ queryKey: ['tasks'] });
+      const snapshots = qc.getQueriesData<unknown>({ predicate: (q) => staleAfterTaskChange(q.queryKey, 'status') });
       patchCells(qc, cell.taskId, (c) => optimisticCell(c, status, me, new Date().toISOString()));
       setBusy((b) => new Set(b).add(cell.taskId));
       try {
@@ -84,7 +85,7 @@ export function useCellStatus() {
             action: { label: 'Desfazer', onClick: () => void change({ ...cell, status: 'done' }, from, { ...ctx, monthCloses: null }, { undo: true }) },
           });
         }
-        void invalidateTasks(qc);
+        void invalidateTasks(qc, { change: 'status' });
         return true;
       } catch (error) {
         for (const [key, data] of snapshots) qc.setQueryData(key, data);

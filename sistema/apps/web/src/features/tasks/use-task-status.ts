@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useQueryClient, type Query, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   daysOverdue,
@@ -19,6 +19,7 @@ import { api } from '@/lib/api';
 import { toastError } from '@/lib/notify';
 import { qk } from '@/lib/query-keys';
 import { invalidateTasks } from './api';
+import { staleAfterTaskChange } from './task-cache';
 import { firstName, shortDate } from './due';
 import { useTaskSheetLinks } from './task-links';
 
@@ -59,6 +60,8 @@ export function optimisticTask<T extends Task>(task: T, status: TaskStatus, toda
   };
 }
 
+const isStatusView = (q: Query) => staleAfterTaskChange(q.queryKey, 'status');
+
 function patchCaches(qc: QueryClient, id: string, fn: <T extends Task>(t: T) => T) {
   qc.setQueriesData<unknown>({ queryKey: ['tasks'] }, (old: unknown) => {
     if (!old || typeof old !== 'object') return old;
@@ -92,8 +95,9 @@ export function useTaskStatusChange() {
       const from = task.status;
       const options = qc.getQueryData<TaskOptionsResponse>(qk.taskOptions);
       const today = options?.today ?? todayISO();
-      await qc.cancelQueries({ queryKey: ['tasks'] });
-      const snapshots = qc.getQueriesData<unknown>({ queryKey: ['tasks'] });
+      // Only the views a status changes: an in-flight fetch of the pickers is left to finish.
+      await qc.cancelQueries({ predicate: isStatusView });
+      const snapshots = qc.getQueriesData<unknown>({ predicate: isStatusView });
       patchCaches(qc, task.id, (t) => optimisticTask(t, status, today, options?.me ?? null, new Date().toISOString()));
       setSavingId(task.id);
       try {
@@ -106,26 +110,27 @@ export function useTaskStatusChange() {
         // A concluded process step started the next one: no undo (§18, item 8), a link to the new step.
         if (res.activated && kind !== 'undo') {
           const next = res.activated;
-          void invalidateTasks(qc, { keepDetail: task.id });
+          // A new task (the next step): the counts per category change too.
+          void invalidateTasks(qc, { keepDetail: task.id, change: 'task' });
           toast(nextStepMessage(next, today), { duration: 8000, action: { label: 'Ver etapa', onClick: () => openTask(next.id) } });
           return true;
         }
         // Reopening with a reason is a recorded decision: no undo (§11.6).
         const message = reason ? 'Tarefa reaberta.' : statusMessage(from, status, kind);
         if (reason && message) {
-          void invalidateTasks(qc, { keepDetail: task.id });
+          void invalidateTasks(qc, { keepDetail: task.id, change: 'status' });
           toast(message);
           return true;
         }
         if (!message) {
-          void invalidateTasks(qc, { keepDetail: task.id });
+          void invalidateTasks(qc, { keepDetail: task.id, change: 'status' });
           return true;
         }
         let settled = false;
         const refresh = () => {
           if (settled) return;
           settled = true;
-          void invalidateTasks(qc, { keepDetail: task.id });
+          void invalidateTasks(qc, { keepDetail: task.id, change: 'status' });
         };
         toast(message, {
           duration: 6000,

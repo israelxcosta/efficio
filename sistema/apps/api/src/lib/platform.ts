@@ -24,11 +24,21 @@ export interface Platform {
   cnpj?: CnpjProvider | null;
   /** Tests only: per-IP route limits become 1000/window so suites can hammer an endpoint. */
   relaxedRateLimits?: boolean;
+  /**
+   * Public sign-up (`POST /auth/register` without an invite token)? From `SIGNUP_ENABLED` (env.ts: on in
+   * development and tests, off in production). Absent = off: an account then only comes from an invite.
+   */
+  signupEnabled?: boolean;
 }
 
 /** Whether paid subscriptions are on: the platform's setting, else `BILLING_ENABLED`. */
 export function billingEnabled(platform: Pick<Platform, 'billingEnabled'> | null | undefined): boolean {
   return platform?.billingEnabled ?? BILLING_ENABLED;
+}
+
+/** Whether anyone may sign up without an invite (fails closed when the platform does not say). */
+export function signupEnabled(platform: Pick<Platform, 'signupEnabled'> | null | undefined): boolean {
+  return platform?.signupEnabled ?? false;
 }
 
 /**

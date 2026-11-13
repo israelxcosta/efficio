@@ -23,8 +23,10 @@ import {
   createWorkspace,
   deleteWorkspaceRow,
   getUserRow,
+  joinByInvite,
   photoUpdatedAtOf,
   toMeUser,
+  usableInvite,
 } from '../workspaces/service';
 import { revokeUserSessions } from './sessions';
 
@@ -78,11 +80,19 @@ export async function seedCompanyDefaults(tx: DbExecutor, workspaceId: string): 
 
 /**
  * Creates the user and their company: a business workspace (in trial) named `companyName` ("Minha
- * empresa" when blank), with the business categories and a "Caixa" wallet.
+ * empresa" when blank), with the business categories and a "Caixa" wallet. With `inviteToken` the user
+ * joins the inviting workspace instead (the e-mail must be the invited one; no company is created) and
+ * the invite is used up — checked before anything is written, all in one transaction.
  */
-export async function register(db: DbExecutor, input: RegisterInput): Promise<{ user: UserRow; workspaceId: string }> {
+export async function register(
+  db: DbExecutor,
+  input: RegisterInput,
+): Promise<{ user: UserRow; workspaceId: string; viaInvite: boolean }> {
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email));
   if (existing) throw new ConflictError('Já existe uma conta com este e-mail');
+  const invite = input.inviteToken
+    ? await usableInvite(db, input.inviteToken, input.email, 'Crie a conta com esse e-mail.')
+    : null;
 
   const passwordHash = await hashPassword(input.password);
   try {
@@ -92,11 +102,15 @@ export async function register(db: DbExecutor, input: RegisterInput): Promise<{ 
         .insert(users)
         .values({ name: input.name, email: input.email, passwordHash, acceptedTermsAt: now, passwordChangedAt: now })
         .returning();
+      if (invite) {
+        const workspaceId = await joinByInvite(tx, invite, user!.id);
+        return { user: { ...user!, lastWorkspaceId: workspaceId }, workspaceId, viaInvite: true };
+      }
       const name = input.companyName?.trim() || DEFAULT_COMPANY_NAME;
       const workspaceId = await createWorkspace(tx, { name, kind: 'business', ownerId: user!.id });
       const [updated] = await tx.update(users).set({ lastWorkspaceId: workspaceId }).where(eq(users.id, user!.id)).returning();
       await seedCompanyDefaults(tx, workspaceId);
-      return { user: updated!, workspaceId };
+      return { user: updated!, workspaceId, viaInvite: false };
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError('Já existe uma conta com este e-mail');

@@ -9,6 +9,7 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
+import { sql } from 'drizzle-orm';
 import type { ApiError } from '@effinance/shared';
 import { env } from './env';
 import { createDb, type Database } from './db/client';
@@ -31,6 +32,30 @@ declare module 'fastify' {
   interface FastifyInstance {
     /** System connection (owner role). Financial data is only touched through `req.db` (RLS). */
     db: Database;
+  }
+}
+
+/** Readiness answers 503 when the database does not answer `select 1` within this time. */
+export const READINESS_TIMEOUT_MS = 2_000;
+
+/** Whether the database answers (`select 1`), giving up after `timeoutMs`. Never throws. */
+export async function databaseReady(db: Database, timeoutMs = READINESS_TIMEOUT_MS): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), timeoutMs);
+  });
+  try {
+    // The failure is handled on the query itself: one that rejects after the timeout must not surface
+    // as an unhandled rejection.
+    const query = Promise.resolve()
+      .then(() => db.execute(sql`select 1`))
+      .then(
+        () => true,
+        () => false,
+      );
+    return await Promise.race([query, timeout]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -158,7 +183,14 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
   await app.register(
     async (api) => {
+      // Liveness: the process answers (no dependency checked, so a database hiccup never restarts it).
       api.get('/health', async () => ({ status: 'ok' }));
+      // Readiness (load balancer / deploy): the database answers. No detail leaves on failure.
+      api.get('/health/ready', async (req, reply) => {
+        if (await databaseReady(app.db)) return { status: 'ok' };
+        req.log.warn('readiness check failed: database unavailable');
+        return reply.code(503).send({ status: 'unavailable' });
+      });
       await api.register(authRoutes, { prefix: '/auth' });
       await api.register(workspaceRoutes, { prefix: '/workspaces' });
       await api.register(inviteRoutes, { prefix: '/invites' });

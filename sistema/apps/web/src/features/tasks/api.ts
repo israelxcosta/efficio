@@ -54,17 +54,27 @@ import { api, apiDownload, saveBlob } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { isUuid } from '@/lib/safe-url';
 import { isOccurrenceRef } from './occurrence';
+import { staleAfterContentChange, staleAfterTaskChange, type TaskChange, type TaskContentChange } from './task-cache';
 
 // Hooks of the task module (Gestão de tarefas, phases 1 and 2). Every member reads and writes tasks; the
 // registries are written by administrators (the API answers 403 otherwise, and the screens hide those
-// controls). Keys live under the `tasks` domain so one invalidation refreshes lists, summaries,
-// the home page and the pickers.
+// controls). Keys live under the `tasks` domain; each change refreshes only what is built from it
+// (task-cache.ts): a status or an edit never refetches the pickers (`/tasks/options`), the members,
+// the templates or the regime groups, which only the registry changes refresh.
 
-export function invalidateTasks(qc: QueryClient, { keepDetail }: { keepDetail?: string } = {}) {
-  return qc.invalidateQueries({
-    queryKey: ['tasks'],
-    predicate: keepDetail ? (q) => !(q.queryKey[1] === 'detail' && q.queryKey[2] === keepDetail) : undefined,
-  });
+/** After a status (`status`) or a created, edited or deleted task or process (`task`, the default). */
+export function invalidateTasks(qc: QueryClient, { keepDetail, change = 'task' }: { keepDetail?: string; change?: TaskChange } = {}) {
+  return qc.invalidateQueries({ predicate: (q) => staleAfterTaskChange(q.queryKey, change, keepDetail) });
+}
+
+/** After a comment, an attachment or a subtask of `taskId`: the lists' counters, its history, the feed. */
+export function invalidateTaskContent(qc: QueryClient, taskId: string, change: TaskContentChange = {}) {
+  return qc.invalidateQueries({ predicate: (q) => staleAfterContentChange(q.queryKey, taskId, change) });
+}
+
+/** After a registry change (departments, categories, members, recurring tasks, templates): the whole module. */
+export function invalidateTaskRegistries(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: ['tasks'] });
 }
 
 /** Pickers, today, who I am and whether I am an administrator: one request for the whole module. */
@@ -225,7 +235,7 @@ export function useAddSubtask(taskId: string) {
         const subtasks = [...t.subtasks, sub];
         return { ...t, subtasks, subtaskCount: subtaskCount(subtasks) };
       });
-      void invalidateTasks(qc, { keepDetail: taskId });
+      void invalidateTaskContent(qc, taskId);
     },
   });
 }
@@ -247,7 +257,7 @@ export function useUpdateSubtask(taskId: string) {
     onError: (_e, _v, ctx) => {
       if (ctx?.before) qc.setQueryData(qk.task(taskId), ctx.before);
     },
-    onSettled: () => void invalidateTasks(qc, { keepDetail: taskId }),
+    onSettled: () => void invalidateTaskContent(qc, taskId),
   });
 }
 
@@ -266,7 +276,7 @@ export function useDeleteSubtask(taskId: string) {
     onError: (_e, _v, ctx) => {
       if (ctx?.before) qc.setQueryData(qk.task(taskId), ctx.before);
     },
-    onSettled: () => void invalidateTasks(qc, { keepDetail: taskId }),
+    onSettled: () => void invalidateTaskContent(qc, taskId),
   });
 }
 
@@ -276,7 +286,7 @@ export function useAddComment(taskId: string) {
     mutationFn: (text: string) => api<TaskComment>(`/tasks/${taskId}/comments`, { method: 'POST', body: { text } }),
     onSuccess: (comment) => {
       patchDetail(qc, taskId, (t) => ({ ...t, comments: [...t.comments, comment], commentCount: t.commentCount + 1 }));
-      void invalidateTasks(qc, { keepDetail: taskId });
+      void invalidateTaskContent(qc, taskId, { history: true });
     },
   });
 }
@@ -292,7 +302,7 @@ export function useSaveDepartment() {
       id
         ? api<TaskDepartment>(`/tasks/departments/${id}`, { method: 'PUT', body: input })
         : api<TaskDepartment>('/tasks/departments', { method: 'POST', body: input }),
-    onSuccess: () => void invalidateTasks(qc),
+    onSuccess: () => void invalidateTaskRegistries(qc),
   });
 }
 
@@ -300,7 +310,7 @@ export function useDeleteDepartment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<void>(`/tasks/departments/${id}`, { method: 'DELETE' }),
-    onSuccess: () => void invalidateTasks(qc),
+    onSuccess: () => void invalidateTaskRegistries(qc),
   });
 }
 
@@ -313,7 +323,7 @@ export function useSaveTaskCategory() {
         : api<TaskCategory>('/tasks/categories', { method: 'POST', body: input }),
     // "Conta como retrabalho" changes the clients' scores in the financial reports.
     onSuccess: () => {
-      void invalidateTasks(qc);
+      void invalidateTaskRegistries(qc);
       void qc.invalidateQueries({ queryKey: ['reports'] });
     },
   });
@@ -324,7 +334,7 @@ export function useDeleteTaskCategory() {
   return useMutation({
     mutationFn: (id: string) => api<void>(`/tasks/categories/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      void invalidateTasks(qc);
+      void invalidateTaskRegistries(qc);
       void qc.invalidateQueries({ queryKey: ['reports'] });
     },
   });
@@ -335,7 +345,7 @@ export function useSetMemberDepartment() {
   return useMutation({
     mutationFn: ({ userId, departmentId }: { userId: string; departmentId: string | null }) =>
       api<TaskMember>(`/tasks/members/${userId}/department`, { method: 'PUT', body: { departmentId } }),
-    onSuccess: () => void invalidateTasks(qc),
+    onSuccess: () => void invalidateTaskRegistries(qc),
   });
 }
 
@@ -363,7 +373,7 @@ export function useDeleteComment(taskId: string) {
     onError: (_e, _v, ctx) => {
       if (ctx?.before) qc.setQueryData(qk.task(taskId), ctx.before);
     },
-    onSettled: () => void invalidateTasks(qc, { keepDetail: taskId }),
+    onSettled: () => void invalidateTaskContent(qc, taskId, { history: true, activity: true }),
   });
 }
 
@@ -374,7 +384,7 @@ export function useUploadAttachment(taskId: string) {
       api<TaskAttachment>(`/tasks/${taskId}/attachments`, { method: 'POST', body: input, signal }),
     onSuccess: (attachment) => {
       patchDetail(qc, taskId, (t) => ({ ...t, attachments: [...t.attachments, attachment], attachmentCount: t.attachmentCount + 1 }));
-      void invalidateTasks(qc, { keepDetail: taskId });
+      void invalidateTaskContent(qc, taskId, { history: true });
     },
   });
 }
@@ -389,7 +399,7 @@ export function useDeleteAttachment(taskId: string) {
         attachments: t.attachments.filter((a) => a.id !== attachmentId),
         attachmentCount: Math.max(0, t.attachmentCount - 1),
       }));
-      void invalidateTasks(qc, { keepDetail: taskId });
+      void invalidateTaskContent(qc, taskId, { history: true });
     },
   });
 }
@@ -466,7 +476,7 @@ export function useSaveRecurring() {
       id
         ? api<RecurringTask>(`/tasks/recurring/${id}`, { method: 'PUT', body: input })
         : api<RecurringTask>('/tasks/recurring', { method: 'POST', body: input }),
-    onSuccess: () => void invalidateTasks(qc),
+    onSuccess: () => void invalidateTaskRegistries(qc),
   });
 }
 
@@ -485,7 +495,7 @@ export function useApplyRegimeGroup() {
   return useMutation({
     mutationFn: ({ regime, input }: { regime: RegimeGroupRegime; input?: RegimeGroupApplyInput }) =>
       api<RegimeGroupApplyResponse>(`/tasks/regime-groups/${regime}/apply`, { method: 'POST', body: input ?? {} }),
-    onSuccess: () => void invalidateTasks(qc),
+    onSuccess: () => void invalidateTaskRegistries(qc),
   });
 }
 
@@ -493,7 +503,7 @@ export function useDeleteRecurring() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<void>(`/tasks/recurring/${id}`, { method: 'DELETE' }),
-    onSuccess: () => void invalidateTasks(qc),
+    onSuccess: () => void invalidateTaskRegistries(qc),
   });
 }
 
@@ -559,7 +569,11 @@ export function useDeleteFlow() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<void>(`/tasks/flows/${id}`, { method: 'DELETE' }),
-    onSuccess: () => void invalidateTasks(qc),
+    // The templates count the processes made from them ("Aplicado 7 vezes").
+    onSuccess: () => {
+      void invalidateTasks(qc);
+      void qc.invalidateQueries({ queryKey: qk.flowTemplates });
+    },
   });
 }
 
@@ -578,7 +592,7 @@ export function useSaveFlowTemplate() {
       id
         ? api<FlowTemplate>(`/tasks/flow-templates/${id}`, { method: 'PUT', body: input })
         : api<FlowTemplate>('/tasks/flow-templates', { method: 'POST', body: input }),
-    onSuccess: () => void invalidateTasks(qc),
+    onSuccess: () => void invalidateTaskRegistries(qc),
   });
 }
 
@@ -586,7 +600,7 @@ export function useDeleteFlowTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<void>(`/tasks/flow-templates/${id}`, { method: 'DELETE' }),
-    onSuccess: () => void invalidateTasks(qc),
+    onSuccess: () => void invalidateTaskRegistries(qc),
   });
 }
 
@@ -595,7 +609,11 @@ export function useApplyFlowTemplate() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: ApplyFlowTemplateInput }) =>
       api<TaskFlowCreatedResponse>(`/tasks/flow-templates/${id}/apply`, { method: 'POST', body: input }),
-    onSuccess: () => void invalidateTasks(qc),
+    // The templates count the processes made from them ("Aplicado 7 vezes").
+    onSuccess: () => {
+      void invalidateTasks(qc);
+      void qc.invalidateQueries({ queryKey: qk.flowTemplates });
+    },
   });
 }
 

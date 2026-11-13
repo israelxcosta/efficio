@@ -50,6 +50,64 @@ export const FEE_CATEGORY = { name: 'Serviços Prestados', fee: 'Honorários con
 /** Expense category of the discounts granted for paying by the due date (found by name, created when missing). */
 export const DISCOUNT_CATEGORY = { name: 'Despesas financeiras', discount: 'Descontos concedidos' } as const;
 
+/**
+ * Categories of the interest and fine (juros e multa) charged on a late payment, by the type of the
+ * original (found by name, created when missing). Never the original's category: interest and fines
+ * received are financial income, not service revenue (in the Simples Nacional they are not part of the
+ * gross revenue — Res. CGSN 140/2018, art. 2º, §5º, II), and those paid are financial expenses.
+ */
+export const LATE_FEE_CATEGORY = {
+  income: { name: 'Receitas financeiras', lateFee: 'Juros e multas recebidos' },
+  expense: { name: 'Despesas financeiras', lateFee: 'Juros e multas' },
+} as const;
+
+// ---------------------------------------------------------------------------
+// Yearly fee adjustment in batch (reajuste anual dos honorários, contract clause 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Indices of the yearly adjustment (contract clause 3.3): the largest positive variation accumulated in
+ * the 12 months before the base date applies. Values travel in basis points (427 = 4,27%).
+ */
+export const FEE_ADJUSTMENT_INDEXES = ['igpm', 'ipca', 'inpc', 'cct'] as const;
+export type FeeAdjustmentIndex = (typeof FEE_ADJUSTMENT_INDEXES)[number];
+
+export const FEE_ADJUSTMENT_INDEX_LABELS: Record<FeeAdjustmentIndex, string> = {
+  igpm: 'IGP-M (FGV)',
+  ipca: 'IPCA (IBGE)',
+  inpc: 'INPC (IBGE)',
+  cct: 'Reajuste da CCT',
+};
+
+/** Formal notice before the adjusted fee takes effect, with the calculation (contract clause 3.5). */
+export const FEE_ADJUSTMENT_NOTICE_DAYS = 30;
+/** Bounds of an index (± 100%) and of the applied percentage (0 to 100%), in basis points. */
+export const MAX_FEE_ADJUSTMENT_BPS = 10_000;
+/** Clients in one batch. */
+export const MAX_FEE_ADJUSTMENT_CLIENTS = 1_000;
+
+/** Situation of a client in the preview of a month. */
+export const FEE_ADJUSTMENT_STATUSES = ['ready', 'already_adjusted', 'no_previous_fee'] as const;
+export type FeeAdjustmentStatus = (typeof FEE_ADJUSTMENT_STATUSES)[number];
+
+export const FEE_ADJUSTMENT_STATUS_LABELS: Record<FeeAdjustmentStatus, string> = {
+  ready: 'Pronto para reajustar',
+  already_adjusted: 'Já reajustado',
+  no_previous_fee: 'Sem vigência anterior',
+};
+
+/** Why applying the batch left a client out. */
+export const FEE_ADJUSTMENT_SKIP_REASONS = ['already_adjusted', 'no_previous_fee', 'not_due', 'inactive', 'not_found'] as const;
+export type FeeAdjustmentSkipReason = (typeof FEE_ADJUSTMENT_SKIP_REASONS)[number];
+
+export const FEE_ADJUSTMENT_SKIP_LABELS: Record<FeeAdjustmentSkipReason, string> = {
+  already_adjusted: 'Já reajustado: a vigência deste mês já está cadastrada',
+  no_previous_fee: 'Sem vigência anterior cadastrada',
+  not_due: 'A vigência do cliente não renova neste mês',
+  inactive: 'Cliente inativo',
+  not_found: 'Cliente não encontrado',
+};
+
 /** Payment risk of a client, from the delinquency score (see utils/delinquency.ts). */
 export const DELINQUENCY_RISKS = ['baixo', 'moderado', 'alto', 'critico'] as const;
 export type DelinquencyRisk = (typeof DELINQUENCY_RISKS)[number];
@@ -761,6 +819,7 @@ export const MIN_DEPARTMENT_COMPARISON_MEMBERS = 3;
  */
 export const CLIENT_DOCUMENT_KINDS = [
   'digital_certificate',
+  'ecac_power_of_attorney',
   'cnd_federal',
   'cnd_state',
   'cnd_municipal',
@@ -780,6 +839,7 @@ export type ClientDocumentKind = (typeof CLIENT_DOCUMENT_KINDS)[number];
 
 export const CLIENT_DOCUMENT_KIND_LABELS: Record<ClientDocumentKind, string> = {
   digital_certificate: 'Certificado digital (e-CNPJ A1/A3)',
+  ecac_power_of_attorney: 'Procuração eletrônica e-CAC',
   cnd_federal: 'CND federal (Receita e PGFN)',
   cnd_state: 'CND estadual',
   cnd_municipal: 'CND municipal',
@@ -810,6 +870,7 @@ export const CLIENT_DOCUMENT_GROUP_LABELS: Record<ClientDocumentGroup, string> =
 
 export const CLIENT_DOCUMENT_KIND_GROUP: Record<ClientDocumentKind, ClientDocumentGroup> = {
   digital_certificate: 'certificates',
+  ecac_power_of_attorney: 'certificates',
   cnd_federal: 'certificates_of_debt',
   cnd_state: 'certificates_of_debt',
   cnd_municipal: 'certificates_of_debt',
@@ -825,6 +886,9 @@ export const CLIENT_DOCUMENT_KIND_GROUP: Record<ClientDocumentKind, ClientDocume
   professional_registration: 'others',
   other: 'others',
 };
+
+/** An electronic power of attorney in the e-CAC (Receita Federal) is valid for up to 5 years. */
+export const ECAC_POWER_OF_ATTORNEY_MAX_YEARS = 5;
 
 /** Up to 50 documents per client; the note up to 200 characters. */
 export const MAX_CLIENT_DOCUMENTS = 50;

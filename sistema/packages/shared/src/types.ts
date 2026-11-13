@@ -17,6 +17,9 @@ import type {
   ContactKind,
   DelinquencyRisk,
   EvolutionMetric,
+  FeeAdjustmentIndex,
+  FeeAdjustmentSkipReason,
+  FeeAdjustmentStatus,
   FeeEntryKind,
   GenerateFeesSkipReason,
   Frequency,
@@ -730,6 +733,173 @@ export interface GenerateFeesResponse {
   skipped: { clientId: string; name: string; reason: GenerateFeesSkipReason }[];
   /** Sum of `created`. */
   total: number;
+}
+
+// ---------------------------------------------------------------------------
+// Yearly fee adjustment in batch (reajuste anual, contract clause 3). Percentages in basis points.
+// ---------------------------------------------------------------------------
+
+/** Accumulated 12-month variation of each index (basis points; null = not informed). */
+export interface FeeAdjustmentIndices {
+  igpmBps: number | null;
+  ipcaBps: number | null;
+  inpcBps: number | null;
+  cctBps: number | null;
+}
+
+/** Monthly fee and fee per employee of a period (cents). */
+export interface FeeAdjustmentValues {
+  amount: number;
+  employeeFee: number;
+}
+
+/** A client whose next fee period starts in the month of the preview. */
+export interface FeeAdjustmentPreviewItem {
+  clientId: string;
+  /** Trade name, else the legal name. */
+  name: string;
+  /** Razão social. */
+  legalName: string;
+  status: FeeAdjustmentStatus;
+  /** The period that starts in the month: the one the batch registers. */
+  period: FeePeriod;
+  /** Last day of the formal notice (start − 30 days, clause 3.5). */
+  noticeDeadline: ISODate;
+  /** The notice deadline has passed (today > `noticeDeadline`). */
+  noticeLate: boolean;
+  /** Period in force before it (index − 1): what the adjustment starts from; null when not registered. */
+  current: (FeeAdjustmentValues & { feeId: string; discountBps: number }) | null;
+  /** `current` with the percentage applied (rounded to the cent); null without a previous period. */
+  proposed: FeeAdjustmentValues | null;
+  /**
+   * The period of the month when already registered (`already_adjusted`), and the batch that registered
+   * it (null = registered by hand).
+   */
+  registered: (FeeAdjustmentValues & { feeId: string; adjustmentId: string | null }) | null;
+}
+
+/** GET /fee-adjustments/preview. */
+export interface FeeAdjustmentPreviewResponse {
+  month: MonthKey;
+  /** Today in the office time zone (notice deadlines). */
+  today: ISODate;
+  indices: FeeAdjustmentIndices;
+  /** Largest positive index (clause 3.3); `bps` 0 and `index` null when none is positive. */
+  suggested: { bps: number; index: FeeAdjustmentIndex | null };
+  /** Percentage used for `proposed`: the one sent, else the suggested. */
+  appliedBps: number;
+  adjustEmployeeFee: boolean;
+  /** Active clients whose next period starts in the month, by name. */
+  items: FeeAdjustmentPreviewItem[];
+  totals: {
+    clients: number;
+    ready: number;
+    alreadyAdjusted: number;
+    noPreviousFee: number;
+    /** Ready clients whose notice deadline has passed. */
+    noticeLate: number;
+    /** Monthly fees of the ready clients, now and adjusted (cents). */
+    currentMonthly: number;
+    proposedMonthly: number;
+  };
+}
+
+/** A batch already applied ("lote"). */
+export interface FeeAdjustment {
+  id: string;
+  month: MonthKey;
+  indices: FeeAdjustmentIndices;
+  appliedBps: number;
+  /** Index whose value was applied; null = percentage typed by hand or no positive index. */
+  chosenIndex: FeeAdjustmentIndex | null;
+  adjustEmployeeFee: boolean;
+  /** Clients whose period registered by the batch is still there (removing the period drops it). */
+  clientCount: number;
+  appliedBy: TaskPersonRef;
+  createdAt: string;
+}
+
+/** One client adjusted by a batch. */
+export interface FeeAdjustmentCreated {
+  clientId: string;
+  name: string;
+  feeId: string;
+  period: FeePeriod;
+  previous: FeeAdjustmentValues;
+  adjusted: FeeAdjustmentValues;
+  /** Punctuality discount, kept from the previous period (basis points). */
+  discountBps: number;
+}
+
+/** POST /fee-adjustments (201 when something was registered, else 200 with `adjustment: null`). */
+export interface FeeAdjustmentApplyResponse {
+  adjustment: FeeAdjustment | null;
+  created: FeeAdjustmentCreated[];
+  /** `name` is null for ids that are not clients of the workspace. */
+  skipped: { clientId: string; name: string | null; reason: FeeAdjustmentSkipReason }[];
+}
+
+/** The office in the letterhead (registry already filled in Configurações › Escritório). */
+export interface FeeAdjustmentLetterOffice {
+  /** Trade name, else the legal name. */
+  name: string | null;
+  legalName: string | null;
+  /** CNPJ, digits only. */
+  document: string | null;
+  zipCode: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  district: string | null;
+  city: string | null;
+  state: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  responsibleName: string | null;
+  /** `data:image/...;base64,…` or null. */
+  logo: string | null;
+  registered: boolean;
+}
+
+/** Data of one adjustment letter (comunicação formal com memória de cálculo). */
+export interface FeeAdjustmentLetter {
+  clientId: string;
+  feeId: string;
+  client: {
+    /** Razão social. */
+    name: string;
+    tradeName: string | null;
+    /** CNPJ, digits only. */
+    document: string;
+    responsibleName: string | null;
+    email: string | null;
+    zipCode: string | null;
+    street: string | null;
+    number: string | null;
+    complement: string | null;
+    district: string | null;
+    city: string | null;
+    state: string | null;
+  };
+  period: FeePeriod;
+  noticeDeadline: ISODate;
+  /** Values of the previous period and the adjusted ones, as applied by the batch. */
+  previous: FeeAdjustmentValues;
+  adjusted: FeeAdjustmentValues;
+  discountBps: number;
+  /** The period was edited after the batch (the letter keeps the batch's values). */
+  edited: boolean;
+}
+
+/** GET /fee-adjustments/:id/letters: everything to (re)print the letters of a batch. */
+export interface FeeAdjustmentLettersResponse {
+  adjustment: FeeAdjustment;
+  office: FeeAdjustmentLetterOffice;
+  /** Office fields the letterhead needs and are blank ("Cadastro do escritório", "CNPJ"…). */
+  missingOffice: string[];
+  /** By client name. */
+  letters: FeeAdjustmentLetter[];
 }
 
 export interface FeeEmployeesResponse {

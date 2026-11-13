@@ -16,7 +16,7 @@ import { MercadoPagoProvider } from './modules/billing/providers/mercadopago';
 import { FakeOpenFinanceProvider } from './modules/open-finance/providers/fake';
 import { PluggyProvider } from './modules/open-finance/providers/pluggy';
 import type { OpenFinanceSetup } from './modules/open-finance/providers/types';
-import { openFinanceProviderOf, type Env } from './env';
+import { openFinanceProviderOf, signupEnabledOf, type Env } from './env';
 
 /** Development/test only: a fixed, public key. Never used when NODE_ENV=production. */
 async function insecureDevMasterKey(): Promise<Bytes> {
@@ -87,6 +87,7 @@ export async function createPlatform(env: Env): Promise<Platform> {
     relaxedRateLimits: env.NODE_ENV === 'test',
     mailer: await createMailer(env),
     billingEnabled: BILLING_ENABLED,
+    signupEnabled: signupEnabledOf(env),
     billing:
       env.BILLING_PROVIDER === 'mercadopago'
         ? new MercadoPagoProvider({ accessToken: env.MP_ACCESS_TOKEN!, webhookSecret: env.MP_WEBHOOK_SECRET! })

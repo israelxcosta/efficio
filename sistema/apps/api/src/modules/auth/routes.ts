@@ -12,6 +12,8 @@ import {
   mfaVerifySchema,
   registerSchema,
   resetPasswordSchema,
+  SIGNUP_DISABLED_ERROR,
+  SIGNUP_DISABLED_MESSAGE,
   switchWorkspaceSchema,
   updateProfileSchema,
   type AuthResponse,
@@ -29,8 +31,8 @@ import {
   type MfaClaims,
 } from '../../lib/auth';
 import { sha256Hex } from '../../lib/crypto/encoding';
-import { UnauthorizedError } from '../../lib/errors';
-import { billingEnabled } from '../../lib/platform';
+import { AppError, UnauthorizedError } from '../../lib/errors';
+import { billingEnabled, signupEnabled } from '../../lib/platform';
 import { requestContext } from '../../lib/request-context';
 import { prepareWorkspaceDeletion } from '../workspaces/deletion';
 import { getMe, getUserRow, resolveWorkspaceFor, switchWorkspace } from '../workspaces/service';
@@ -70,10 +72,17 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   }
 
   app.post('/register', { schema: { body: registerSchema }, config: limit(5) }, async (req, reply) => {
-    const { user, workspaceId } = await register(app.db, req.body);
+    // Sign-up by invite only when public sign-up is off (production default): refused before anything
+    // is read or written. The invite link still creates the account (into the inviting workspace).
+    if (!req.body.inviteToken && !signupEnabled(app.platform)) {
+      throw new AppError(403, SIGNUP_DISABLED_ERROR, SIGNUP_DISABLED_MESSAGE);
+    }
+    const { user, workspaceId, viaInvite } = await register(app.db, req.body);
     const session = await createSession(app.db, { userId: user.id, workspaceId, ...requestContext(req) });
     const token = await issueSessionCookies(reply, session, workspaceId);
-    await audit(app.db, { ...requestContext(req), action: 'auth.register', userId: user.id, workspaceId });
+    const context = { ...requestContext(req), userId: user.id, workspaceId };
+    await audit(app.db, { ...context, action: 'auth.register', metadata: { invite: viaInvite } });
+    if (viaInvite) await audit(app.db, { ...context, action: 'member.joined', entity: 'user', entityId: user.id });
     return reply.code(201).send({ user: toUser(user), token } satisfies AuthResponse);
   });
 

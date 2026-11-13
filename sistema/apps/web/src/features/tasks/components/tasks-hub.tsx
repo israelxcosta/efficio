@@ -61,9 +61,26 @@ export interface TasksHubViewProps {
   onAdHocProcess: () => void;
 }
 
-const itemClass =
-  'flex size-9 shrink-0 items-center justify-center rounded-[10px] transition-colors duration-150 pointer-coarse:size-10 max-sm:h-10 max-sm:w-auto max-sm:flex-1';
-const createClass = 'size-9 pointer-coarse:size-10';
+// On the computer each item is a 36px icon named by its tooltip (the owner's choice). A tap opens no
+// tooltip, so touch screens (`sm:pointer-coarse`) and narrow ones (`max-sm`, two rows: views, then
+// pages) show the name under the icon. The two variants never apply together.
+const itemClass = cn(
+  'flex size-9 shrink-0 items-center justify-center rounded-[10px] transition-colors duration-150',
+  'max-sm:h-12 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1 max-sm:flex-col max-sm:gap-0.5 max-sm:px-1',
+  'sm:pointer-coarse:h-12 sm:pointer-coarse:w-auto sm:pointer-coarse:min-w-14 sm:pointer-coarse:flex-col sm:pointer-coarse:gap-0.5 sm:pointer-coarse:px-2',
+);
+const createClass =
+  'size-9 sm:pointer-coarse:h-12 sm:pointer-coarse:w-auto sm:pointer-coarse:min-w-14 sm:pointer-coarse:flex-col sm:pointer-coarse:gap-0.5 sm:pointer-coarse:px-2.5';
+/** The visible name: hidden on the computer, where the tooltip and the `aria-label` carry it. */
+const captionClass = 'hidden max-w-full truncate text-[11px] leading-tight font-semibold max-sm:block sm:pointer-coarse:block';
+
+function Caption({ children }: { children: ReactNode }) {
+  return (
+    <span data-hub-caption aria-hidden className={captionClass}>
+      {children}
+    </span>
+  );
+}
 
 /**
  * The disabled state of a Criar button (the button gets `disabled` itself), with the reason in a

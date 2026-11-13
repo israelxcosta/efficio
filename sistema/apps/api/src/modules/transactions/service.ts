@@ -3,11 +3,13 @@ import {
   buildOccurrenceDates,
   DISCOUNT_CATEGORY,
   earnsDiscount,
+  LATE_FEE_CATEGORY,
   LATE_FEE_KIND_LABELS,
   LATE_FEE_KINDS,
   minISO,
   splitInstallments,
   type AnticipateInstallmentsInput,
+  type LateFeeKind,
   type SeriesScope,
   type SetPaidInput,
   type Transaction,
@@ -471,14 +473,14 @@ export async function setPaid(
   }
 
   const discount = discountAmountOf(row, patch, input);
-  const fees = lateFeeRows(row, patch, input);
+  const fees = lateFeeAmounts(row, patch, input);
 
   await db.transaction(async (tx) => {
     await tx.update(transactions).set(patch).where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, row.id)));
     if (fees) {
       // Sent with the payment: they replace the previous ones.
       await tx.delete(transactions).where(lateFeesOf(workspaceId, row.id));
-      if (fees.length) await tx.insert(transactions).values(fees);
+      if (fees.length) await tx.insert(transactions).values(await lateFeeRows(tx, row, patch, fees));
     } else if (row.paid) {
       // Not sent: reopening removes them; confirming again moves them to the new payment.
       await syncLateFees(tx, workspaceId, { ...row, ...patch });
@@ -501,15 +503,13 @@ function lateFeesOf(workspaceId: string, id: string): SQL {
 
 /**
  * Keeps the interest and fine of a transaction in step with its payment: removed when it is reopened,
- * paid on time or moved to a card; otherwise dated on the payment, in its account, contact and category.
+ * paid on time or moved to a card; otherwise dated on the payment, in its account and contact. Their
+ * category stays their own ("Juros e multas", `LATE_FEE_CATEGORY`), never the original's.
  */
 async function syncLateFees(
   tx: DbExecutor,
   workspaceId: string,
-  original: Pick<
-    NewTransactionRow,
-    'id' | 'date' | 'paid' | 'paidAt' | 'accountId' | 'creditCardId' | 'contactId' | 'categoryId' | 'subcategoryId'
-  >,
+  original: Pick<NewTransactionRow, 'id' | 'date' | 'paid' | 'paidAt' | 'accountId' | 'creditCardId' | 'contactId'>,
 ) {
   const where = lateFeesOf(workspaceId, original.id!);
   const { paid, paidAt, date } = original;
@@ -524,21 +524,19 @@ async function syncLateFees(
       paidAt,
       accountId: original.accountId,
       contactId: original.contactId,
-      categoryId: original.categoryId,
-      subcategoryId: original.subcategoryId,
     })
     .where(where);
 }
 
 /**
- * Interest and fine of a late payment as their own paid rows, linked to the original (same type,
- * account, contact and category; dated on the payment). Undefined when the request sends none.
+ * Interest and fine sent with a payment, validated: undefined when the request sends none, empty when
+ * both are 0 (removes the previous ones).
  */
-function lateFeeRows(
+function lateFeeAmounts(
   row: TransactionRow,
   patch: Partial<NewTransactionRow>,
   input: SetPaidInput,
-): NewTransactionRow[] | undefined {
+): { kind: LateFeeKind; amount: number }[] | undefined {
   if (input.interest === undefined && input.fine === undefined) return undefined;
   const amounts = { interest: input.interest ?? 0, fine: input.fine ?? 0 };
   if (amounts.interest === 0 && amounts.fine === 0) return [];
@@ -548,20 +546,37 @@ function lateFeeRows(
   }
   if (row.lateFeeOf) throw new ValidationError('Este lançamento já é de juros ou multa');
   if (row.discountOf) throw new ValidationError('Este lançamento é de desconto concedido');
-  const paidAt = patch.paidAt!;
-  if (paidAt <= row.date) throw new ValidationError('Juros e multa só valem para pagamento depois do vencimento');
+  if (patch.paidAt! <= row.date) throw new ValidationError('Juros e multa só valem para pagamento depois do vencimento');
+  return LATE_FEE_KINDS.filter((kind) => amounts[kind] > 0).map((kind) => ({ kind, amount: amounts[kind] }));
+}
 
-  return LATE_FEE_KINDS.filter((kind) => amounts[kind] > 0).map((kind) => ({
+/**
+ * Interest and fine of a late payment as their own paid rows, linked to the original (same type,
+ * account and contact; dated on the payment), in the late-fee category of the type: "Receitas
+ * financeiras › Juros e multas recebidos" or "Despesas financeiras › Juros e multas" (found by name,
+ * created when renamed or removed). Interest on a fee thus never inflates the service revenue.
+ */
+async function lateFeeRows(
+  tx: DbExecutor,
+  row: TransactionRow,
+  patch: Partial<NewTransactionRow>,
+  fees: { kind: LateFeeKind; amount: number }[],
+): Promise<NewTransactionRow[]> {
+  const type = row.type === 'income' ? 'income' : 'expense';
+  const target = LATE_FEE_CATEGORY[type];
+  const { categoryId, subcategories } = await ensureCategoryPath(tx, row.workspaceId, type, target.name, [target.lateFee]);
+  const paidAt = patch.paidAt!;
+  return fees.map(({ kind, amount }) => ({
     workspaceId: row.workspaceId,
     type: row.type,
     description: `${LATE_FEE_KIND_LABELS[kind]} — ${row.description}`,
-    amount: amounts[kind],
+    amount,
     date: paidAt,
     paid: true,
     paidAt,
     accountId: patch.accountId ?? row.accountId,
-    categoryId: row.categoryId,
-    subcategoryId: row.subcategoryId,
+    categoryId,
+    subcategoryId: subcategories[target.lateFee],
     contactId: row.contactId,
     paymentMethod: row.paymentMethod,
     lateFeeOf: row.id,

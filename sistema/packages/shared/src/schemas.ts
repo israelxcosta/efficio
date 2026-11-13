@@ -24,6 +24,8 @@ import {
   MAX_CONTRACT_BLOCK_CHARS,
   MAX_CONTRACT_BLOCKS,
   MAX_CONTRACT_TOTAL_CHARS,
+  MAX_FEE_ADJUSTMENT_BPS,
+  MAX_FEE_ADJUSTMENT_CLIENTS,
   MAX_OFFICE_IMAGE_BYTES,
   MAX_RECURRENCE_COUNT,
   MAX_RECURRENCE_INTERVAL,
@@ -143,6 +145,12 @@ export const registerSchema = z.object({
   companyName: optionalText(60),
   /** LGPD: explicit acceptance of the terms of use and privacy policy. */
   acceptTerms: z.literal(true, { message: 'Aceite os termos de uso e a política de privacidade' }),
+  /**
+   * Token of the invite link (`/convite/<token>`). With it the account joins the inviting workspace
+   * (the e-mail must be the invited one) and no company is created; it is the only way to sign up while
+   * public sign-up is off (`SIGNUP_DISABLED_ERROR`).
+   */
+  inviteToken: z.string().trim().min(20, { message: 'Convite inválido' }).max(200, { message: 'Convite inválido' }).optional(),
 });
 export type RegisterInput = z.input<typeof registerSchema>;
 
@@ -654,6 +662,82 @@ export const feeEmployeesSchema = z.object({
   dryRun: z.boolean().default(false),
 });
 export type FeeEmployeesInput = z.input<typeof feeEmployeesSchema>;
+
+// ---------------------------------------------------------------------------
+// Yearly fee adjustment in batch (reajuste anual, contract clause 3). Percentages in basis points
+// (427 = 4,27%); see utils/fee-adjustments.ts.
+// ---------------------------------------------------------------------------
+
+const INDEX_RANGE_MESSAGE = 'Use um percentual entre -100% e 100%';
+const APPLIED_RANGE_MESSAGE = 'Use um percentual entre 0% e 100%';
+/** The contract only adjusts upwards (clause 3.3, "maior variação positiva"). */
+const NEGATIVE_ADJUSTMENT_MESSAGE = 'O reajuste não pode ser negativo: o contrato só reajusta para cima';
+
+/** Accumulated 12-month variation of an index: negative allowed. */
+const indexBpsValueSchema = z
+  .int({ message: 'Percentual inválido' })
+  .min(-MAX_FEE_ADJUSTMENT_BPS, { message: INDEX_RANGE_MESSAGE })
+  .max(MAX_FEE_ADJUSTMENT_BPS, { message: INDEX_RANGE_MESSAGE });
+/** null/absent = not informed. */
+const indexBpsSchema = indexBpsValueSchema.nullish().transform((v) => v ?? null);
+
+const appliedBpsSchema = z
+  .int({ message: 'Percentual inválido' })
+  .min(0, { message: NEGATIVE_ADJUSTMENT_MESSAGE })
+  .max(MAX_FEE_ADJUSTMENT_BPS, { message: APPLIED_RANGE_MESSAGE });
+
+/** The same in a query string: '' or absent = not informed. */
+const indexBpsQuerySchema = z
+  .union([z.literal(''), z.coerce.number().pipe(indexBpsValueSchema)])
+  .optional()
+  .transform((v) => (v === '' || v === undefined ? null : v));
+
+/**
+ * GET /fee-adjustments/preview: the clients whose next fee period starts in `month`. With the indices
+ * (and optionally the percentage) the new values come computed; without them the percentage is 0.
+ */
+export const feeAdjustmentPreviewQuerySchema = z.object({
+  month: monthKeySchema,
+  igpmBps: indexBpsQuerySchema,
+  ipcaBps: indexBpsQuerySchema,
+  inpcBps: indexBpsQuerySchema,
+  cctBps: indexBpsQuerySchema,
+  /** Percentage applied; absent = the largest positive index (0 when none). */
+  appliedBps: z
+    .union([z.literal(''), z.coerce.number().pipe(appliedBpsSchema)])
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  /** Adjust the fee per employee too (default yes). */
+  adjustEmployeeFee: z.stringbool().default(true),
+});
+export type FeeAdjustmentPreviewQuery = z.input<typeof feeAdjustmentPreviewQuerySchema>;
+
+/**
+ * POST /fee-adjustments: registers the period of `month` for the selected clients with the values of
+ * the previous period adjusted by the percentage (rounded to the cent; the punctuality discount is kept).
+ * Clients that cannot be adjusted (already registered, no previous period…) are skipped.
+ */
+export const applyFeeAdjustmentSchema = z.object({
+  month: monthKeySchema,
+  igpmBps: indexBpsSchema,
+  ipcaBps: indexBpsSchema,
+  inpcBps: indexBpsSchema,
+  cctBps: indexBpsSchema,
+  /** Percentage applied; absent = the largest positive index (0 when none). */
+  appliedBps: appliedBpsSchema.optional(),
+  adjustEmployeeFee: z.boolean().default(true),
+  clientIds: z
+    .array(idSchema)
+    .min(1, { message: 'Selecione ao menos um cliente' })
+    .max(MAX_FEE_ADJUSTMENT_CLIENTS, { message: `Selecione até ${MAX_FEE_ADJUSTMENT_CLIENTS} clientes por vez` }),
+});
+export type ApplyFeeAdjustmentInput = z.input<typeof applyFeeAdjustmentSchema>;
+
+export const feeAdjustmentListQuerySchema = paginationQuerySchema.extend({
+  /** Only the batches of this month. */
+  month: monthKeySchema.optional(),
+});
+export type FeeAdjustmentListQuery = z.input<typeof feeAdjustmentListQuerySchema>;
 
 /** Late-payment extra in cents (0 = none). */
 const lateFeeAmountSchema = z.int({ message: 'Valor inválido' }).min(0, { message: 'Valor inválido' }).max(100_000_000_000);

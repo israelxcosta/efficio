@@ -73,6 +73,14 @@ export const GRACE_DAYS = 7;
  */
 export const BILLING_ENABLED: boolean = false;
 
+/**
+ * Public sign-up switched off (`SIGNUP_ENABLED=false`, the production default): `POST /auth/register`
+ * without an invite answers 403 with this code and message, and creates nothing. An invite link still
+ * creates the account (`registerSchema.inviteToken`), straight into the inviting workspace.
+ */
+export const SIGNUP_DISABLED_ERROR = 'signup_disabled';
+export const SIGNUP_DISABLED_MESSAGE = 'O cadastro é feito por convite do escritório.';
+
 export const BILLING_INTERVALS = ['month', 'year'] as const;
 export type BillingInterval = (typeof BILLING_INTERVALS)[number];
 

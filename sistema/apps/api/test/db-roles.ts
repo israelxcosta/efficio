@@ -74,4 +74,7 @@ export const TENANT_TABLES = [
   // Generation marker of the recurring occurrences (migration 0018).
   'task_generation_state',
   'task_generation_marks',
+  // Yearly fee adjustment in batch (migration 0021).
+  'fee_adjustments',
+  'fee_adjustment_items',
 ] as const;

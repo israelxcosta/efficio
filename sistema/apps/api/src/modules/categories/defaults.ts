@@ -1,4 +1,4 @@
-import { DISCOUNT_CATEGORY, FEE_CATEGORY, type CategoryType, type IconName } from '@effinance/shared';
+import { DISCOUNT_CATEGORY, FEE_CATEGORY, LATE_FEE_CATEGORY, type CategoryType, type IconName } from '@effinance/shared';
 
 export interface DefaultCategory {
   name: string;
@@ -202,6 +202,15 @@ export const BUSINESS_CATEGORIES: DefaultCategory[] = [
     ],
   },
   {
+    // LATE_FEE_CATEGORY.income: interest and fines received on late receivables are booked here, never in
+    // the fee's category (they are not service revenue); created in a workspace that renamed or removed it.
+    name: LATE_FEE_CATEGORY.income.name,
+    type: 'income',
+    icon: 'landmark',
+    color: '#0F766E',
+    subcategories: [{ name: LATE_FEE_CATEGORY.income.lateFee, icon: 'receipt' }],
+  },
+  {
     name: 'Pessoal',
     type: 'expense',
     icon: 'briefcase',
@@ -286,13 +295,14 @@ export const BUSINESS_CATEGORIES: DefaultCategory[] = [
   },
   {
     // DISCOUNT_CATEGORY: discounts granted for paying by the due date are booked into "Descontos
-    // concedidos" (created in a workspace that renamed or removed it).
+    // concedidos"; LATE_FEE_CATEGORY.expense: interest and fines paid late into "Juros e multas" (both
+    // created in a workspace that renamed or removed them).
     name: DISCOUNT_CATEGORY.name,
     type: 'expense',
     icon: 'landmark',
     color: '#E5484D',
     subcategories: [
-      { name: 'Juros e multas', icon: 'receipt' },
+      { name: LATE_FEE_CATEGORY.expense.lateFee, icon: 'receipt' },
       { name: 'Empréstimos', icon: 'landmark' },
       { name: DISCOUNT_CATEGORY.discount, icon: 'tag' },
     ],

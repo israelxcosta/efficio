@@ -9,20 +9,25 @@ export type HubViewId = 'list' | 'board' | 'calendar' | 'audit' | 'recurring' | 
 
 export interface HubViewItem {
   id: HubViewId;
-  /** The tooltip and the `aria-label` (the hub has no visible text). */
+  /** The tooltip and the `aria-label` (on the computer the hub has no visible text). */
   label: string;
+  /**
+   * The name under the icon on touch or narrow screens, where a tap opens no tooltip. Always a part
+   * of `label`, so the visible name is in the accessible one (WCAG 2.5.3).
+   */
+  short: string;
   /** `views` are the views of Tarefas; `pages` the other pages (a divider separates them). */
   group: 'views' | 'pages';
 }
 
 const HUB_VIEWS: (HubViewItem & { permission?: PermissionKey })[] = [
-  { id: 'list', label: 'Lista', group: 'views' },
-  { id: 'board', label: 'Quadro', group: 'views' },
-  { id: 'calendar', label: 'Calendário', group: 'views' },
-  { id: 'audit', label: 'Auditoria mensal', group: 'pages', permission: 'page.audit' },
-  { id: 'recurring', label: 'Tarefas recorrentes', group: 'pages', permission: 'page.recurring' },
-  { id: 'regimes', label: 'Grupos por regime', group: 'pages', permission: 'page.recurring' },
-  { id: 'processes', label: 'Processos', group: 'pages', permission: 'page.processes' },
+  { id: 'list', label: 'Lista', short: 'Lista', group: 'views' },
+  { id: 'board', label: 'Quadro', short: 'Quadro', group: 'views' },
+  { id: 'calendar', label: 'Calendário', short: 'Calendário', group: 'views' },
+  { id: 'audit', label: 'Auditoria mensal', short: 'Auditoria', group: 'pages', permission: 'page.audit' },
+  { id: 'recurring', label: 'Tarefas recorrentes', short: 'Recorrentes', group: 'pages', permission: 'page.recurring' },
+  { id: 'regimes', label: 'Grupos por regime', short: 'Por regime', group: 'pages', permission: 'page.recurring' },
+  { id: 'processes', label: 'Processos', short: 'Processos', group: 'pages', permission: 'page.processes' },
 ];
 
 /** Items of Ver, in order; the pages turned off for the person (spec §13.10) are not there. */
@@ -75,6 +80,8 @@ export interface CreateAction {
   id: CreateActionId;
   /** The tooltip and the `aria-label`. */
   label: string;
+  /** The name under the icon on touch screens (a part of `label`, like `HubViewItem.short`). */
+  short: string;
   /** One line about what it creates (menus). */
   description: string;
   /** Pages that create it (the others open a sheet or a menu over the page). */
@@ -90,16 +97,17 @@ export interface CreateAction {
 export function createActions(can: (key: PermissionKey) => boolean): CreateAction[] {
   const registry = can('registry') && can('page.recurring');
   const all: (CreateAction & { show: boolean })[] = [
-    { id: 'task', label: 'Nova tarefa', description: 'Uma tarefa avulsa ou que se repete, com prazo e responsável.', show: true },
-    { id: 'appointment', label: 'Novo compromisso', description: 'Com horário na agenda (reunião, visita).', show: true },
+    { id: 'task', label: 'Nova tarefa', short: 'Tarefa', description: 'Uma tarefa avulsa ou que se repete, com prazo e responsável.', show: true },
+    { id: 'appointment', label: 'Novo compromisso', short: 'Compromisso', description: 'Com horário na agenda (reunião, visita).', show: true },
     {
       id: 'recurring',
       label: 'Nova tarefa recorrente',
+      short: 'Recorrente',
       description: 'Uma obrigação que se repete para os clientes a cada período.',
       href: '/tarefas/recorrentes?recorrente=nova',
       show: registry,
     },
-    { id: 'process', label: 'Novo processo', description: 'Etapas em sequência: a partir de um modelo ou avulso.', show: true },
+    { id: 'process', label: 'Novo processo', short: 'Processo', description: 'Etapas em sequência: a partir de um modelo ou avulso.', show: true },
   ];
   return all.filter((a) => a.show).map(({ show: _show, ...a }) => a);
 }
