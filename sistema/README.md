@@ -30,7 +30,8 @@ packages/
   shared/      contrato compartilhado
 docs/
   api.md             endpoints e regras de negócio
-  deploy-aws.md      produção na AWS (RDS, KMS, ECS, CloudFront, WAF, SES, Mercado Pago)
+  deploy-hostinger.md  produção do escritório: VPS Hostinger KVM 1 (kit em deploy/)
+  deploy-aws.md      alternativa não usada: SaaS na AWS (RDS, KMS, ECS, CloudFront, WAF, SES)
   design-system.md   tokens, componentes e padrões de tela
 .claude/agents/      agentes por função (backend, frontend, UI designer)
 ```
@@ -83,8 +84,8 @@ pnpm --filter @effinance/api bootstrap:owner -- \
   criar nada.
 - Depois de definir a senha e entrar, ative o 2FA em Configurações → Segurança.
 
-No primeiro deploy na AWS, rode-o como tarefa avulsa do ECS: veja
-[`docs/deploy-aws.md`](docs/deploy-aws.md) → "Primeiro acesso".
+No VPS de produção: [`docs/deploy-hostinger.md`](docs/deploy-hostinger.md) → passo 8. Na alternativa AWS,
+rode-o como tarefa avulsa do ECS: [`docs/deploy-aws.md`](docs/deploy-aws.md) → "Primeiro acesso".
 
 ## Ambiente de testes (sem servidor)
 

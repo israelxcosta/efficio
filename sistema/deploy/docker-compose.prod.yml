@@ -1,0 +1,209 @@
+# Efficio em produção num VPS único (Hostinger KVM 1: 1 vCPU, 4 GB RAM). Guia: docs/deploy-hostinger.md.
+#
+#   cd /opt/efficio/app/sistema/deploy
+#   docker compose -f docker-compose.prod.yml up -d --build      (ou ./scripts/atualizar.sh)
+#
+# Os valores vêm do arquivo .env desta pasta (criado por scripts/gerar-segredos.sh, chmod 600, fora do
+# git). Cada serviço recebe só as variáveis que usa; `${VAR:?}` faz o compose recusar subir sem ela.
+#
+# Rede: só o Caddy publica portas (80/443). O banco fica numa rede interna sem saída para a internet;
+# a API está nas duas (precisa sair para SMTP e BrasilAPI). Docker publica portas por fora do ufw:
+# nunca acrescente `ports:` ao db ou à api.
+#
+# Memória (4 GB + 2 GB de swap): db 1 GB, api 512 MB, caddy 256 MB; sobra para o SO e para o build.
+
+name: efficio
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: '5'
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  logging: *logging
+
+# Variáveis da API (validadas por apps/api/src/env.ts ao iniciar). Nova variável: acrescente aqui e no
+# deploy/.env.example.
+x-api-env: &api-env
+  NODE_ENV: production
+  DATABASE_URL: postgres://efficio:${EFFICIO_DB_PASSWORD:?}@db:5432/efficio
+  # Sem TLS só porque o banco está na rede interna do Docker (host "db"); a API recusa em outro host.
+  DATABASE_SSL: disable
+  JWT_SECRET: ${JWT_SECRET:?}
+  KEY_PROVIDER: local
+  ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY:?}
+  APP_URL: https://${DOMAIN:?}
+  CORS_ORIGIN: https://${DOMAIN:?}
+  # Um proxy à frente (Caddy): o IP real do cliente vem do X-Forwarded-For que ele grava.
+  TRUST_PROXY: '1'
+  MAILER: smtp
+  SMTP_HOST: ${SMTP_HOST:-smtp.hostinger.com}
+  SMTP_PORT: ${SMTP_PORT:-465}
+  SMTP_SECURE: ${SMTP_SECURE:-true}
+  SMTP_USER: ${SMTP_USER:?preencha SMTP_USER no .env}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:?preencha SMTP_PASSWORD no .env}
+  MAIL_FROM: ${MAIL_FROM:?preencha MAIL_FROM no .env}
+  SIGNUP_ENABLED: 'false'
+  REQUIRE_MFA: 'true'
+  JOBS_ENABLED: 'true'
+  CNPJ_PROVIDER: brasilapi
+  OPEN_FINANCE_PROVIDER: disabled
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  db:
+    # Mesma versão do desenvolvimento e do CI. Tag + digest: atualize os dois juntos.
+    image: postgres:16.15-alpine3.24@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    restart: unless-stopped
+    <<: *hardening
+    # A entrypoint oficial começa como root e troca para o usuário postgres.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    environment:
+      # Superusuário de manutenção (backup/restauração pelo socket local). A API não o usa.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      # Lida só por db-init/10-efficio.sh na primeira inicialização (banco vazio).
+      EFFICIO_DB_PASSWORD: ${EFFICIO_DB_PASSWORD:?}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      TZ: America/Sao_Paulo
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=40
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - log_min_duration_statement=2000
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Somente leitura: o script que cria os papéis/banco (não expõe nada do host).
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
+    shm_size: 128m
+    networks: [interna]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U efficio -d efficio -h 127.0.0.1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          pids: 200
+
+  # Roda as migrações (node dist/migrate.js) e termina; a API só sobe se ela terminar com sucesso.
+  migrate:
+    # Mesma imagem da api (construída pelo serviço api; nunca baixada de um registro).
+    image: efficio-api:local
+    pull_policy: never
+    <<: *hardening
+    command: ['node', 'dist/migrate.js']
+    restart: 'no'
+    environment: *api-env
+    tmpfs:
+      - /tmp:size=16m
+    networks: [interna]
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          pids: 100
+
+  api:
+    # Imagem endurecida de apps/api/Dockerfile (não root, só dependências de produção).
+    image: efficio-api:local
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    <<: *hardening
+    restart: unless-stopped
+    environment: *api-env
+    tmpfs:
+      - /tmp:size=16m
+    networks: [interna, borda]
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # /ready testa também o banco (o /api/health da imagem só testa o processo).
+      test: ['CMD', 'wget', '-q', '-T', '3', '-O', '/dev/null', 'http://127.0.0.1:3333/api/health/ready']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          pids: 200
+
+  caddy:
+    # Caddy + build de produção do web embutido (deploy/web.Dockerfile).
+    image: efficio-web:local
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    <<: *hardening
+    environment:
+      DOMAIN: ${DOMAIN:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+    ports:
+      - '80:80'
+      - '443:443'
+    # Usuário sem privilégio abrindo 80/443 dentro do próprio namespace de rede (sem capabilities).
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    volumes:
+      # Certificados TLS (Let's Encrypt) e estado do Caddy. Volumes nomeados, sem pasta do host.
+      - caddy-data:/data
+      - caddy-config:/config
+    tmpfs:
+      - /tmp:size=16m
+    networks: [borda]
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-T', '3', '-O', '/dev/null', 'http://127.0.0.1:8081/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          pids: 100
+
+networks:
+  # Sem rota para fora: só db, migrate e api.
+  interna:
+    internal: true
+  borda: {}
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

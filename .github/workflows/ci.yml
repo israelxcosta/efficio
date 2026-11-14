@@ -153,3 +153,33 @@ jobs:
             if command -v npm || command -v corepack; then echo "package manager in runtime image"; exit 1; fi
             if touch dist/probe 2>/dev/null; then echo "application files are writable"; exit 1; fi
           '
+
+  deploy-kit:
+    name: VPS kit (compose, scripts, web image)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: docker compose config (placeholder env)
+        run: docker compose --env-file deploy/.env.example -f deploy/docker-compose.prod.yml config --quiet
+      - name: shellcheck (preinstalled on the runner)
+        run: shellcheck -S style deploy/scripts/*.sh deploy/db-init/*.sh
+      - name: docker build (Caddy + production web build)
+        run: docker build -f deploy/web.Dockerfile -t efficio-web:ci .
+      - name: Image policy checks
+        run: |
+          test "$(docker image inspect -f '{{.Config.User}}' efficio-web:ci)" = "10002:10002"
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+            -e DOMAIN=efficio.com.br -e ACME_EMAIL=ci@example.com efficio-web:ci sh -c '
+              set -e
+              test "$(id -u)" = 10002
+              test -s /srv/index.html
+              if find /srv -name "*.map" | grep -q .; then echo "source maps in the web image"; exit 1; fi
+              if touch /srv/probe 2>/dev/null; then echo "site files are writable"; exit 1; fi
+              grep -q "frame-ancestors" /etc/caddy/csp.caddy
+              caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+            '

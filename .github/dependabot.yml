@@ -16,13 +16,16 @@ updates:
   - package-ecosystem: docker
     directories:
       - /sistema/apps/api
+      - /sistema/deploy # web.Dockerfile (Node + Caddy)
     schedule:
       interval: weekly
     cooldown:
       default-days: 3
 
   - package-ecosystem: docker-compose
-    directory: /sistema
+    directories:
+      - /sistema
+      - /sistema/deploy # docker-compose.prod.yml (PostgreSQL do VPS)
     schedule:
       interval: monthly
     cooldown:

@@ -1,0 +1,12 @@
+# Agenda o backup todo dia às 02:30 (horário de Brasília). Persistent: se o servidor estava
+# desligado nesse horário, roda assim que ligar.
+[Unit]
+Description=Backup diário do Efficio às 02:30
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 America/Sao_Paulo
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

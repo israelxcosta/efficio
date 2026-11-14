@@ -1,4 +1,8 @@
-# Deploy na AWS (produção)
+# Deploy na AWS (alternativa não usada)
+
+> **Não é o deploy em uso.** O Efficio roda num VPS Hostinger: veja [deploy-hostinger.md](deploy-hostinger.md)
+> (decisão de 14/11/2026, `docs/roadmap.md` §5). Este guia fica como referência de segurança para uma
+> eventual versão SaaS multi-assinante.
 
 Guia para colocar o Effinance no ar como SaaS na AWS com isolamento por assinante (RLS),
 criptografia de envelope (KMS), TLS ponta a ponta e o mínimo de privilégio em cada peça.

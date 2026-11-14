@@ -116,21 +116,19 @@ recebido).
 
 ## 5. Hospedagem (quando for subir)
 
-- O dono tem plano na **Hostinger** e o domínio **efficio.com.br** no registro.br; a subida para produção ainda
-  não foi marcada.
+- **Guia de instalação: [deploy-hostinger.md](deploy-hostinger.md)** (passo a passo para leigo, kit em
+  `sistema/deploy/`: compose de produção, Caddy com HTTPS e cabeçalhos de segurança, scripts de instalação,
+  segredos, atualização, backup cifrado com rotação e restauração guiada, timer do backup às 02:30).
 - **Decisão (14/11/2026):** o sistema é **só do escritório** (não será vendido), com **5 usuários** (sócios e
-  empregados), e deve rodar **somente no VPS KVM 1 da Hostinger** (1 vCPU, 4 GB de RAM, 50 GB NVMe, 4 TB de
-  tráfego). Cabe com folga: PostgreSQL + API + proxy com TLS num Docker Compose, uma instância só, sem Redis
-  (limite de requisições em memória). O build do web e da imagem da API sai do CI (o VPS só baixa e roda).
-  Com um único servidor e sem AWS, a chave de criptografia passa a ser local (arquivo com permissão restrita +
-  cópia offline guardada pelo dono) — exige liberar `KEY_PROVIDER=local` em produção no `env.ts`.
-- O sistema precisa de Node.js e PostgreSQL 16. Na Hostinger isso só roda num **VPS (KVM)**; a hospedagem de sites
-  compartilhada não oferece PostgreSQL. No VPS: Docker Compose com PostgreSQL, API e o web atrás de um proxy com
-  TLS (Caddy ou Nginx), DNS do registro.br apontando para o VPS.
-- Ajustes necessários antes: hoje a produção exige chaves no AWS KMS (`KEY_PROVIDER=aws`, `apps/api/src/env.ts`).
-  Opções: manter só o KMS na AWS (custo baixo, chave fora do servidor) ou permitir chave local com guarda
-  cuidadosa — decidir na hora da subida. O e-mail transacional hoje só sai por webhook; para usar o e-mail da
-  Hostinger é preciso suporte a SMTP. Backups diários do PostgreSQL para fora do VPS, com teste de restauração.
-- Já pronto no código (14/11): cadastro só por convite em produção (`SIGNUP_ENABLED`, desligado por padrão),
-  produção sem exigir Mercado Pago com a cobrança desligada e `GET /api/health/ready` (testa o banco) para o
-  monitor do servidor.
+  empregados), e roda **somente no VPS KVM 1 da Hostinger** (1 vCPU, 4 GB de RAM, 50 GB NVMe, Ubuntu 24.04),
+  domínio **efficio.com.br** no registro.br, e-mail do escritório na Hostinger (SMTP). PostgreSQL 16 + API +
+  Caddy num Docker Compose, uma instância, sem Redis (limite de requisições em memória) e sem AWS.
+- As imagens são construídas no próprio VPS (`deploy/scripts/atualizar.sh`, uma por vez, cabe em 4 GB + 2 GB de
+  swap); o CI valida o compose e os scripts e constrói a imagem do site a cada push (job `deploy-kit`).
+- Chave de criptografia local (`KEY_PROVIDER=local`, no `.env` com chmod 600) com cópia offline obrigatória
+  guardada pelo dono, junto com a senha dos backups. E-mail por SMTP (`MAILER=smtp`), MFA obrigatório
+  (`REQUIRE_MFA=true`), cadastro só por convite, agendador interno (`JOBS_ENABLED=true`).
+- Backups: diário cifrado no VPS (14 diários + 8 semanais), cópia opcional para Google Drive/OneDrive (rclone),
+  backups semanais do painel Hostinger como camada extra e teste de restauração mensal (`restaurar.sh --teste`).
+- [deploy-aws.md](deploy-aws.md) fica como **alternativa não usada** (SaaS multi-assinante na AWS), mantida como
+  referência de segurança.

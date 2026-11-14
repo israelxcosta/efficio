@@ -1,0 +1,28 @@
+# Contexto de deploy/web.Dockerfile (substitui o .dockerignore da raiz só para este build).
+# Entra apenas o necessário para o build do web; segredos, git, testes e artefatos ficam fora.
+**
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!package.json
+!tsconfig.base.json
+!packages/shared/**
+!apps/api/package.json
+!apps/web/**
+!deploy/Caddyfile
+!deploy/csp-header.mjs
+
+**/node_modules
+**/dist
+**/dist-demo
+**/coverage
+**/*.tsbuildinfo
+**/.vite
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/.npmrc
+**/*.test.ts
+**/*.test.tsx
+**/*.test.mjs
+**/*.md

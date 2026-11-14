@@ -43,6 +43,9 @@ playwright-report
 test-results
 **/*.log
 
+# VPS deploy kit (the API image never needs it; deploy/web.Dockerfile has its own ignore file)
+deploy
+
 # Docs and the web app sources (the API image only needs apps/web/package.json for the lockfile)
 docs
 **/*.md
