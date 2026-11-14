@@ -329,7 +329,7 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuItem icon={<Building2 />} asChild>
-            <Link to={`/tarefas/clientes?cliente=${cell.client.id}`}>Ver cliente</Link>
+            <Link to={`/tarefas/clientes/${cell.client.id}`}>Ver cliente</Link>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

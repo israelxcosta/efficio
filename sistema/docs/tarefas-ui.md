@@ -2645,6 +2645,14 @@ cliente em cada departamento.
 
 ### 13.2 Ficha do cliente (`TaskClientSheet`, `width="lg"`)
 
+> **Atualização (14/11/2026):** a ficha só leitura da Gestão (`TaskClientSheet`) e o "Consultar" do financeiro
+> (`ClientDetailsDialog`) foram substituídos pela **ficha única do cliente**, uma página em
+> `/tarefas/clientes/:id` (Gestão) e `/clientes/:id` (Financeiro), com abas Dados, Documentos, Acessos
+> (`clientCredentials`), Tarefas e Financeiro (`finance`). Dados cadastrais e documentos são editados com a
+> permissão **Cadastro dos clientes** (`clients`); links antigos `?cliente=` e `?consultar=` redirecionam.
+> Código: `apps/web/src/features/clients/pages/client-page.tsx` e `client-page-logic.ts`.
+
+
 Abre pela linha, pela auditoria, pelo `RecurringOccurrenceSheet` e pela busca (⌘K). Título: o nome.
 Descrição: "Lucro Presumido · 45.723.174/0001-10 · Ativo" (ou "Inativo desde 12/08/2026").
 

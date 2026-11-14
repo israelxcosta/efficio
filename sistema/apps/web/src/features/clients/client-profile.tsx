@@ -12,7 +12,7 @@ import {
 
 export function ProfileItem({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
   return (
-    <div className={wide ? 'sm:col-span-2' : undefined}>
+    <div className={wide ? 'sm:col-span-2 xl:col-span-3' : undefined}>
       <dt className="text-xs font-medium text-muted">{label}</dt>
       <dd className="mt-0.5 text-sm break-words text-fg">{children || <span className="text-subtle">—</span>}</dd>
     </div>
@@ -23,7 +23,7 @@ export function ProfileSection({ title, children }: { title: string; children: R
   return (
     <section className="flex flex-col gap-3">
       <p className="eyebrow text-brand-text">{title}</p>
-      <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">{children}</dl>
+      <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">{children}</dl>
     </section>
   );
 }

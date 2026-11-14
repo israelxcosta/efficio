@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import {
   BadgePercent,
   Building2,
@@ -44,7 +44,7 @@ import { toastError } from '@/lib/notify';
 import { isUuid } from '@/lib/safe-url';
 import { cn, initials } from '@/lib/utils';
 import { useClient, useClients, useDeleteClient, useReactivateClient } from '../api';
-import { ClientDetailsDialog } from '../client-details-dialog';
+import { clientPagePath } from '../client-page-logic';
 import { ClientSheet } from '../client-sheet';
 import { ClientsSummary } from '../clients-summary';
 import { FeesDialog } from '../fees-dialog';
@@ -129,6 +129,7 @@ function FeeCell({ client, today, onOpen }: { client: Client; today: string; onO
 
 export default function ClientsPage() {
   const { readOnlyReason } = usePermissions();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -136,7 +137,6 @@ export default function ClientsPage() {
   const [regime, setRegime] = useState<TaxRegime | ''>('');
   const [page, setPage] = useState(1);
   const [sheet, setSheet] = useState<{ open: boolean; client?: Client | null }>({ open: false });
-  const [viewingId, setViewingId] = useState<string | null>(null);
   const [feesFor, setFeesFor] = useState<Client | null>(null);
   const [toInactivate, setToInactivate] = useState<Client | null>(null);
   const [toReactivate, setToReactivate] = useState<Client | null>(null);
@@ -162,18 +162,10 @@ export default function ClientsPage() {
     page,
     pageSize: PAGE_SIZE,
   });
-  // Always fresh (refetched after edits, inactivation, new fees) while the "Consultar" view is open.
-  const viewing = useClient(viewingId);
-
-  // Deep link from the command palette: /clientes?consultar=<id>
+  // Old deep link of the "Consultar" dialog (/clientes?consultar=<id>): the client page now.
   const viewParam = params.get('consultar');
   useEffect(() => {
-    if (isUuid(viewParam)) {
-      setViewingId(viewParam);
-      const next = new URLSearchParams(params);
-      next.delete('consultar');
-      setParams(next, { replace: true });
-    }
+    if (isUuid(viewParam)) navigate(clientPagePath('financeiro', viewParam), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewParam]);
 
@@ -195,7 +187,7 @@ export default function ClientsPage() {
   // Same buttons in the table (desktop) and in the cards (mobile).
   const actions = (c: Client) => (
     <div className="flex items-center justify-end gap-0.5">
-      <RowAction label="Consultar cadastro" icon={<Eye />} onClick={() => setViewingId(c.id)} />
+      <RowAction label="Abrir ficha do cliente" icon={<Eye />} onClick={() => navigate(clientPagePath('financeiro', c.id))} />
       <RowAction
         label="Editar cadastro"
         icon={<Pencil />}
@@ -376,11 +368,7 @@ export default function ClientsPage() {
                     <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg">
                       {initials(c.tradeName || c.name)}
                     </span>
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 text-left"
-                      onClick={() => setViewingId(c.id)}
-                    >
+                    <Link to={clientPagePath('financeiro', c.id)} className="min-w-0 flex-1 text-left">
                       <span
                         className={cn(
                           'block truncate font-semibold',
@@ -397,7 +385,7 @@ export default function ClientsPage() {
                         {c.simplesAnnex ? ` · Anexo ${c.simplesAnnex}` : ''} · desde{' '}
                         {formatDateBR(c.contractStartDate)}
                       </span>
-                    </button>
+                    </Link>
                     {statusBadge(c)}
                   </div>
                   <div className="flex items-center justify-between gap-2 pl-12">
@@ -431,11 +419,7 @@ export default function ClientsPage() {
                         )}
                       >
                         <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            className="flex items-center gap-3 text-left"
-                            onClick={() => setViewingId(c.id)}
-                          >
+                          <Link to={clientPagePath('financeiro', c.id)} className="flex items-center gap-3 text-left">
                             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg">
                               {initials(c.tradeName || c.name)}
                             </span>
@@ -454,7 +438,7 @@ export default function ClientsPage() {
                                 </span>
                               ) : null}
                             </span>
-                          </button>
+                          </Link>
                         </td>
                         <td className="tabular px-4 py-3 whitespace-nowrap text-muted">
                           {formatCNPJ(c.document)}
@@ -516,22 +500,6 @@ export default function ClientsPage() {
         open={sheet.open}
         client={sheet.client}
         onOpenChange={(o) => setSheet((s) => ({ ...s, open: o }))}
-      />
-      <ClientDetailsDialog
-        client={viewingId ? (viewing.data ?? null) : null}
-        onClose={() => setViewingId(null)}
-        onEdit={(c) => {
-          setViewingId(null);
-          setSheet({ open: true, client: c });
-        }}
-        onFees={(c) => {
-          setViewingId(null);
-          setFeesFor(c);
-        }}
-        onContract={(c) => {
-          setViewingId(null);
-          void contract.start(c);
-        }}
       />
       {contract.dialog}
       <FeesDialog client={feesFor} onClose={() => setFeesFor(null)} />

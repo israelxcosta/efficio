@@ -1,18 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Building2, ChevronLeft, ChevronRight, ClipboardCheck, Ellipsis, ExternalLink, ListChecks, Search, Wallet } from 'lucide-react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Building2, ChevronLeft, ChevronRight, ClipboardCheck, Ellipsis, ExternalLink, ListChecks, Search } from 'lucide-react';
 import { formatCNPJ, formatDateBR, TAX_REGIME_LABELS, TAX_REGIMES, type Client, type ClientDocumentAlert, type TaxRegime } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePermissions } from '@/features/auth/permissions';
 import { Card } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
@@ -22,11 +16,12 @@ import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { cn, initials, pluralize } from '@/lib/utils';
 import { useAllClients, useTaskOptions } from '../api';
 import { SummaryLabel, toggleClass } from '../components/tasks-summary';
-import { TaskClientSheet } from '../components/task-client-sheet';
 import { tasksHref } from '../url-state';
 import { activeByRegime, filterClients, type ClientFilters, type ClientSituation } from '../client-filters';
 import { useClientDocumentAlerts } from '@/features/deadlines/api';
 import { mostUrgentText } from '@/features/deadlines/deadline-logic';
+import { clientPagePath } from '@/features/clients/client-page-logic';
+import { isUuid } from '@/lib/safe-url';
 
 const PAGE_SIZE = 50;
 type Situation = ClientSituation;
@@ -36,7 +31,7 @@ export default function TaskClientsPage() {
   const [params, setParams] = useSearchParams();
   const options = useTaskOptions();
   const clients = useAllClients();
-  // The client registry lives in the finances (`finance`); here it is read-only.
+  // Creating clients stays in the finances (`finance`); editing their data is on the client page (`clients`).
   const canFinance = usePermissions().can('finance');
 
   const situationRaw = params.get('situacao');
@@ -90,7 +85,8 @@ export default function TaskClientsPage() {
   const regimes = activeByRegime(all);
   const maxRegime = Math.max(1, ...regimes.map((r) => r.count));
 
-  const opened = openId ? all.find((c) => c.id === openId) ?? null : null;
+  // Old address of the client sheet (`?cliente=<id>`, `&secao=documentos`): the client page now.
+  if (isUuid(openId)) return <Navigate to={clientPagePath('gestao', openId, params.get('secao') === 'documentos' ? 'documentos' : undefined)} replace />;
 
   return (
     <div className="flex flex-col gap-5">
@@ -98,17 +94,8 @@ export default function TaskClientsPage() {
         title="Clientes"
         description={
           ready
-            ? `${pluralize(active.length, 'cliente ativo', 'clientes ativos')} · cadastro mantido pelos administradores no financeiro`
-            : 'Cadastro mantido pelos administradores no financeiro'
-        }
-        actions={
-          canFinance ? (
-            <Button variant="outline" asChild>
-              <Link to="/clientes">
-                <Wallet /> Editar no financeiro
-              </Link>
-            </Button>
-          ) : null
+            ? `${pluralize(active.length, 'cliente ativo', 'clientes ativos')} · abra um cliente para ver a ficha completa`
+            : 'Abra um cliente para ver a ficha completa'
         }
       />
 
@@ -284,12 +271,7 @@ export default function TaskClientsPage() {
             />
           ) : (
             shown.map((c) => (
-              <ClientRow
-                key={c.id}
-                client={c}
-                onOpen={() => update({ cliente: c.id, pagina: params.get('pagina') })}
-                docAlert={docsFilter ? alertsById.get(c.id) : undefined}
-              />
+              <ClientRow key={c.id} client={c} docAlert={docsFilter ? alertsById.get(c.id) : undefined} />
             ))
           )}
         </div>
@@ -310,35 +292,26 @@ export default function TaskClientsPage() {
         ) : null}
       </Card>
 
-      <TaskClientSheet
-        client={opened}
-        loading={Boolean(openId) && clients.isPending}
-        notFound={Boolean(openId) && Boolean(clients.data) && !opened}
-        error={openId ? clients.error : null}
-        onClose={() => update({ cliente: null, pagina: params.get('pagina') })}
-        options={options.data}
-      />
     </div>
   );
 }
 
 interface ClientRowProps {
   client: Client;
-  onOpen: () => void;
   /** Under the "Documentos" filter: the most urgent document goes in the subtitle. */
   docAlert?: ClientDocumentAlert;
 }
 
 /** Client row in the pattern of the task row (spec §13.1): identification, CNPJ, regime, menu. */
-function ClientRow({ client: c, onOpen, docAlert }: ClientRowProps) {
+function ClientRow({ client: c, docAlert }: ClientRowProps) {
   const navigate = useNavigate();
-  const canFinance = usePermissions().can('finance');
   const name = c.tradeName || c.name;
+  const href = clientPagePath('gestao', c.id);
   const inactive = c.status === 'inactive';
 
   return (
     <div className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-surface-muted @lg:px-4">
-      <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left">
+      <Link to={href} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg" aria-hidden>
           {initials(name)}
         </span>
@@ -361,7 +334,7 @@ function ClientRow({ client: c, onOpen, docAlert }: ClientRowProps) {
             <span className="@2xl:hidden"> · {TAX_REGIME_LABELS[c.taxRegime]}</span>
           </span>
         </span>
-      </button>
+      </Link>
       <span className="tabular hidden w-40 text-body-sm text-muted @3xl:block">{formatCNPJ(c.document)}</span>
       <span className="hidden w-36 min-w-0 @2xl:block">
         <span className="block truncate text-body-sm text-fg">{TAX_REGIME_LABELS[c.taxRegime]}</span>
@@ -378,8 +351,8 @@ function ClientRow({ client: c, onOpen, docAlert }: ClientRowProps) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem icon={<ExternalLink />} onSelect={onOpen}>
-            Ver ficha
+          <DropdownMenuItem icon={<ExternalLink />} onSelect={() => navigate(href)}>
+            Abrir ficha
           </DropdownMenuItem>
           <DropdownMenuItem icon={<ListChecks />} onSelect={() => navigate(tasksHref({ scope: 'all', client: c.id }))}>
             Ver tarefas do cliente
@@ -387,14 +360,6 @@ function ClientRow({ client: c, onOpen, docAlert }: ClientRowProps) {
           <DropdownMenuItem icon={<ClipboardCheck />} onSelect={() => navigate(`/tarefas/auditoria?busca=${encodeURIComponent(name)}`)}>
             Ver na auditoria
           </DropdownMenuItem>
-          {canFinance ? (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem icon={<Wallet />} onSelect={() => navigate(`/clientes?editar=${c.id}`)}>
-                Editar no financeiro
-              </DropdownMenuItem>
-            </>
-          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

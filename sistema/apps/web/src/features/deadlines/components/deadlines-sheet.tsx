@@ -276,7 +276,7 @@ export function DocumentDeadlineRow({ doc, today }: { doc: DocumentDeadline; tod
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem icon={<Building2 />} onSelect={() => navigate(`/tarefas/clientes?cliente=${doc.client.id}&secao=documentos`)}>
+          <DropdownMenuItem icon={<Building2 />} onSelect={() => navigate(`/tarefas/clientes/${doc.client.id}?aba=documentos`)}>
             Ver cliente
           </DropdownMenuItem>
           <DropdownMenuItem

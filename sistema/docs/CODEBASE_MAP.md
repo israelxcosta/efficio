@@ -385,3 +385,6 @@ sequenceDiagram
   `features/dashboard/widgets/` usando `WidgetCard` → entrada em `layout/catalog.tsx`.
 - **Mexer em autenticação/sessão:** `apps/api/src/lib/auth.ts`, `modules/auth/`, e no web
   `features/auth/auth-context.tsx` e `lib/api.ts`.
+
+<!-- 14/11/2026 -->
+**Ficha única do cliente** (14/11/2026): `features/clients/pages/client-page.tsx` serve `/tarefas/clientes/:id` e `/clientes/:id` (mesmo componente em cada casca); seções e ações por permissão em `client-page-logic.ts` (`clients` edita dados cadastrais via `PATCH /api/clients/:id/registration` e documentos via `PUT /api/clients/:id/documents`; `finance` vê honorários, contrato e observações; `clientCredentials` revela acessos). Abas com `SegmentedControl` em `?aba=`; `ClientSheet mode="registration"` para quem não tem `finance`.

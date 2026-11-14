@@ -25,6 +25,8 @@ const CategoriesPage = lazy(() => import('@/features/categories/pages/categories
 const GoalsPage = lazy(() => import('@/features/goals/pages/goals'));
 const ContactsPage = lazy(() => import('@/features/contacts/pages/contacts'));
 const ClientsPage = lazy(() => import('@/features/clients/pages/clients'));
+// The client page (UX 2.3): the same component in both areas, each in its shell.
+const ClientPage = lazy(() => import('@/features/clients/pages/client-page'));
 const ReportsPage = lazy(() => import('@/features/reports/pages/reports'));
 const ClientReportPage = lazy(() => import('@/features/reports/pages/client-report'));
 const SettingsPage = lazy(() => import('@/features/settings/pages/settings'));
@@ -91,6 +93,7 @@ export const routes: RouteObject[] = [
           { path: 'tarefas/recorrentes', element: <RecurringTasksPage /> },
           { path: 'tarefas/processos', element: <ProcessesPage /> },
           { path: 'tarefas/clientes', element: <TaskClientsPage /> },
+          { path: 'tarefas/clientes/:id', element: <ClientPage /> },
           { path: 'tarefas/relatorios', element: <TaskReportsPage /> },
           { path: 'tarefas/cadastros', element: <TaskRegistryPage /> },
           // Common route (the rail stays the current area's), in this layout for the task sheets.
@@ -113,6 +116,7 @@ export const routes: RouteObject[] = [
           { path: 'categorias', element: <CategoriesPage /> },
           { path: 'metas', element: <GoalsPage /> },
           { path: 'clientes', element: <ClientsPage /> },
+          { path: 'clientes/:id', element: <ClientPage /> },
           { path: 'clientes/:id/contrato', element: <ClientContractPage /> },
           { path: 'clientes/reajuste', element: <FeeAdjustmentPage /> },
           { path: 'clientes/reajuste/:id/cartas', element: <FeeAdjustmentLettersPage /> },

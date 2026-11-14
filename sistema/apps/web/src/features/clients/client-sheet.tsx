@@ -29,6 +29,7 @@ import {
   isValidCNPJ,
   onlyDigits,
   type Client,
+  type ClientRegistrationInput,
   type CnpjLookupResult,
   type TaxRegime,
 } from '@effinance/shared';
@@ -176,7 +177,7 @@ export function ClientSheet({
           formState.dirtyFields as Record<string, unknown>,
         );
         if (Object.keys(patch).length)
-          await saveRegistration.mutateAsync({ id: client.id, input: patch });
+          await saveRegistration.mutateAsync({ id: client.id, input: patch as ClientRegistrationInput });
         toast.success(
           Object.keys(patch).length ? 'Dados do cliente atualizados' : 'Nada foi alterado',
         );

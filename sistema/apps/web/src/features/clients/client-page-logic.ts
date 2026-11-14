@@ -10,7 +10,7 @@ export type ClientSection = (typeof CLIENT_SECTIONS)[number];
 
 export const CLIENT_SECTION_LABELS: Record<ClientSection, string> = {
   dados: 'Dados',
-  documentos: 'Documentos e certidões',
+  documentos: 'Documentos',
   acessos: 'Acessos',
   tarefas: 'Tarefas',
   financeiro: 'Financeiro',

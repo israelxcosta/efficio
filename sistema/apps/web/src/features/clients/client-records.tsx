@@ -190,7 +190,20 @@ export function ClientAccesses({ client: c, footer }: { client: Client; footer?:
 }
 
 /** "Documentos" of a client (spec §13.8.3): most urgent first, with "Criar tarefa de renovação". */
-export function ClientDocumentsList({ client: c, today, id, onAdd }: { client: Client; today: string; id?: string; onAdd?: () => void }) {
+export function ClientDocumentsList({
+  client: c,
+  today,
+  id,
+  onAdd,
+  action,
+}: {
+  client: Client;
+  today: string;
+  id?: string;
+  onAdd?: () => void;
+  /** Button at the end of the heading row ("Editar documentos"). */
+  action?: ReactNode;
+}) {
   const { newTask } = useTaskSheetLinks();
   const docs = sortByDeadline(c.documents);
   const summary = documentsSummary(docs);
@@ -210,6 +223,7 @@ export function ClientDocumentsList({ client: c, today, id, onAdd }: { client: C
             ))}
           </p>
         ) : null}
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
       {docs.length === 0 ? (
         <p className="text-body-sm text-subtle">

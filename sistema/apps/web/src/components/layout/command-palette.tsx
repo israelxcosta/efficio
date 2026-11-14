@@ -93,7 +93,7 @@ export function visibleSearchHits(r: SearchResponse | undefined, area: Area, can
     transactions: [],
     accounts: [],
     categories: [],
-    // Clients open the Gestão sheet; suppliers belong to the finances.
+    // Clients open their page; suppliers belong to the finances.
     contacts: page('page.clients') ? (r?.contacts ?? []).filter((c) => c.kind === 'client') : [],
     // Tasks and recurring tasks are for every member (titles only; never a client's access data).
     tasks: r?.tasks ?? [],
@@ -103,10 +103,10 @@ export function visibleSearchHits(r: SearchResponse | undefined, area: Area, can
   };
 }
 
-/** Where a client or supplier hit leads: the client in the module of the search; a supplier in the finances. */
+/** Where a client or supplier hit leads: the client's page in the module of the search; a supplier in the finances. */
 export function contactPathFor(area: Area, contact: Pick<Contact, 'id' | 'kind'>): string {
   if (contact.kind !== 'client') return `/fornecedores?editar=${contact.id}`;
-  return area === 'financeiro' ? `/clientes?consultar=${contact.id}` : `/tarefas/clientes?cliente=${contact.id}`;
+  return area === 'financeiro' ? `/clientes/${contact.id}` : `/tarefas/clientes/${contact.id}`;
 }
 
 /** Pages of the area ("Ir para"): every Gestão page, the hub's included, plus Grupos por regime; or the finance rail. */

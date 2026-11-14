@@ -36,6 +36,14 @@ describe('app routes', () => {
     expect(paths(gestao.children)).toContain('minha-area');
   });
 
+  it('mounts the client page in both shells: Gestão (page.clients) and Financeiro (behind the gate)', () => {
+    const gestao = children.find((r) => paths(r.children).includes(''))!;
+    expect(paths(gestao.children)).toContain('tarefas/clientes/:id');
+    expect(paths(gate!.children)).toContain('clientes/:id');
+    const element = (list: RouteObject[] | undefined, path: string) => (list ?? []).find((r) => r.path === path)?.element as ReactElement;
+    expect(element(gestao.children, 'tarefas/clientes/:id').type).toBe(element(gate!.children, 'clientes/:id').type);
+  });
+
   it('keeps settings and the 404 for everyone', () => {
     expect(paths(children)).toEqual(expect.arrayContaining(['configuracoes', '*']));
   });

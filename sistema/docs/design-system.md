@@ -338,3 +338,6 @@ Painel financeiro e o Início da Gestão.
   de card nem na horizontal em 375/1024/1440.
 - **Layouts salvos:** o formato continua `v: 2`; cards que passaram a ficar ocultos por padrão perdem a
   célula só se o usuário não os ligou, e o vão que sobra é fechado por "Organizar" no modo Personalizar.
+
+<!-- 14/11/2026 -->
+**Ficha única do cliente** (14/11/2026): `features/clients/pages/client-page.tsx` serve `/tarefas/clientes/:id` e `/clientes/:id` (mesmo componente em cada casca); seções e ações por permissão em `client-page-logic.ts` (`clients` edita dados cadastrais via `PATCH /api/clients/:id/registration` e documentos via `PUT /api/clients/:id/documents`; `finance` vê honorários, contrato e observações; `clientCredentials` revela acessos). Abas com `SegmentedControl` em `?aba=`; `ClientSheet mode="registration"` para quem não tem `finance`.

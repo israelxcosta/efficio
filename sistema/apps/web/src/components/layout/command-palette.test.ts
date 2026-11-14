@@ -102,9 +102,9 @@ describe('contactPathFor (⌘K)', () => {
   const client = { id: 'k1', kind: 'client' as const };
   const supplier = { id: 'k2', kind: 'supplier' as const };
 
-  it('opens a client in the module where the search is', () => {
-    expect(contactPathFor('gestao', client)).toBe('/tarefas/clientes?cliente=k1');
-    expect(contactPathFor('financeiro', client)).toBe('/clientes?consultar=k1');
+  it("opens the client's page in the module where the search is", () => {
+    expect(contactPathFor('gestao', client)).toBe('/tarefas/clientes/k1');
+    expect(contactPathFor('financeiro', client)).toBe('/clientes/k1');
   });
 
   it('opens a supplier in the finance registry', () => {

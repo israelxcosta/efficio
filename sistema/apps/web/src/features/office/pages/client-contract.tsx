@@ -99,7 +99,7 @@ export default function ClientContractPage() {
           description={[...data.missing.client, ...data.missing.fee, ...data.missing.office].join(', ')}
           action={
             <Button variant="outline" asChild>
-              <Link to={`/clientes?consultar=${data.client.id}`}>Abrir o cadastro</Link>
+              <Link to={`/clientes/${data.client.id}`}>Abrir o cadastro</Link>
             </Button>
           }
         />
