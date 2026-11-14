@@ -15,8 +15,9 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 
 | Método | Rota | Entrada | Resposta |
 | --- | --- | --- | --- |
-| GET | `/api/health` | — | `{ status: 'ok' }` |
-| POST | `/api/auth/register` | `registerSchema` (`companyName` opcional) | `AuthResponse` (201) — cria a empresa (`business`, "Minha empresa" se em branco) com categorias empresariais e a conta "Caixa" |
+| GET | `/api/health` | — | `{ status: 'ok' }` — vivacidade (não consulta o banco) |
+| GET | `/api/health/ready` | — | `{ status: 'ok' }`, ou 503 `{ status: 'unavailable' }` se o banco não responder a `select 1` em 2 s (sem detalhes) |
+| POST | `/api/auth/register` | `registerSchema` (`companyName` e `inviteToken` opcionais) | `AuthResponse` (201) — cria a empresa (`business`, "Minha empresa" se em branco) com categorias empresariais e a conta "Caixa"; com `inviteToken` a conta entra no espaço do convite (e-mail igual ao convidado; sem empresa própria) e o convite é usado. Com `SIGNUP_ENABLED=false` (padrão em produção) e sem convite: 403 `signup_disabled` "O cadastro é feito por convite do escritório." e nada é criado |
 | POST | `/api/auth/login` | `loginSchema` | `AuthResponse` |
 | POST | `/api/auth/logout` | — | 204 |
 | GET | `/api/auth/me` | — | `MeResponse` (usuário com `photoUpdatedAt` + workspace ativo com `permissions` efetivas + lista) |
@@ -130,15 +131,19 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 
 - Confirmar um lançamento depois do vencimento (`PATCH /transactions/:id/paid` com `paid: true` e
   `paidAt > date`) aceita `interest` (juros) e `fine` (multa) em centavos. Cada valor > 0 vira um
-  lançamento **pago** próprio, do mesmo tipo, conta (a do pagamento), contato e categoria, datado no
-  pagamento, com `lateFeeOf` = o original e `lateFeeKind` = `interest` | `fine`, descrição
+  lançamento **pago** próprio, do mesmo tipo, conta (a do pagamento) e contato, datado no pagamento,
+  na categoria própria de juros e multa (`LATE_FEE_CATEGORY`: receita → **Receitas financeiras › Juros
+  e multas recebidos**; despesa → **Despesas financeiras › Juros e multas**; procuradas pelo nome e
+  criadas quando faltam — no Simples, juros e multa não são receita bruta, Res. CGSN 140/2018, art. 2º,
+  §5º, II), com `lateFeeOf` = o original e `lateFeeKind` = `interest` | `fine`, descrição
   "Juros — …" / "Multa — …". Saldos, extratos e relatórios não precisam de regra nova: são receitas
   (ou despesas) comuns. O original expõe a soma em `lateFees: { interest, fine }` (`null` sem nenhum).
   Sugestão da interface (`suggestLateFees` no contrato): multa de 2% + juros de 1% a.m. pro rata.
 - Enviar `interest` ou `fine` de novo **substitui** o par (o ausente vale 0; os dois 0 removem).
   Confirmar de novo **sem** enviar move os vinculados para a nova data/conta; se a nova data não é
   depois do vencimento, eles são removidos. O mesmo vale para a edição (`PUT`): reabrir, pagar em dia
-  ou mover para o cartão remove; mudar data de pagamento, conta, contato ou categoria acompanha.
+  ou mover para o cartão remove; mudar data de pagamento, conta ou contato acompanha (a categoria
+  continua a de juros e multa). A migração 0021 reclassificou as linhas antigas.
 - 422: juros/multa com `paid: false`, pagamento até o vencimento, transferência, compra no cartão ou
   lançamento que já é de juros/multa. Um lançamento de juros/multa não é reaberto sozinho (422 —
   reabra o original ou exclua-o). Excluir o original (qualquer escopo de série) leva os vinculados
@@ -168,6 +173,36 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
   valor maior que o lançamento; junto com juros/multa > 0. A linha de desconto não é reaberta
   sozinha nem recebe juros/multa/desconto (422 — reabra o original ou exclua-a). Excluir o recebível
   leva o desconto (FK em cascata).
+
+## Reajuste em lote (`/api/fee-adjustments`, permissão `finance`)
+
+Contrato, cláusula 3: reajuste a cada 12 meses pelo **maior índice positivo** acumulado em 12 meses
+entre IGP-M, IPCA, INPC e a CCT, com aviso formal **30 dias antes** e memória de cálculo. Percentuais
+em pontos-base (427 = 4,27%); utilitários em `packages/shared/src/utils/fee-adjustments.ts`
+(`suggestedAdjustment`, `adjustByBps` — meio centavo para cima —, `renewalPeriodIn`,
+`adjustmentNoticeDeadline`, `chosenAdjustmentIndex`, `adjustmentFactorText`).
+
+| Método | Rota | Entrada | Saída |
+|---|---|---|---|
+| GET | `/preview` | `feeAdjustmentPreviewQuerySchema` (`month`, `igpmBps`, `ipcaBps`, `inpcBps`, `cctBps` — vazio = não informado, negativo aceito —, `appliedBps` ≥ 0 opcional, `adjustEmployeeFee` padrão `true`) | `FeeAdjustmentPreviewResponse` |
+| POST | `/` | `applyFeeAdjustmentSchema` (mesmos campos no corpo + `clientIds`, até 1000) | `FeeAdjustmentApplyResponse` — 201 com o lote; 200 com `adjustment: null` se ninguém pôde ser reajustado |
+| GET | `/` | `feeAdjustmentListQuerySchema` (paginação + `month` opcional) | `Paginated<FeeAdjustment>`, mais recentes primeiro |
+| GET | `/:id/letters` | — | `FeeAdjustmentLettersResponse` (escritório + uma carta por cliente; 404 fora do espaço) |
+
+- **Quem entra no mês**: clientes ativos cujo contrato começou nesse mês de um ano anterior (a vigência
+  de índice k ≥ 1 começa no mês). `status`: `ready`, `already_adjusted` (a vigência k já existe;
+  `registered.adjustmentId` diz o lote, `null` = cadastrada à mão) ou `no_previous_fee` (sem a k − 1).
+  `noticeDeadline` = início − 30 dias; `noticeLate` = hoje (fuso do escritório) depois dele.
+- **Aplicar**: percentual = `appliedBps` ou o sugerido (0 se nenhum índice positivo). Para cada cliente
+  apto cria a vigência k com os valores da k − 1 × (1 + percentual), arredondados ao centavo (taxa por
+  empregado só com `adjustEmployeeFee`), mantendo o desconto por pontualidade; pula com motivo
+  (`already_adjusted`, `no_previous_fee`, `not_due`, `inactive`, `not_found` — id de outro espaço ou
+  inexistente, `name: null`). Uma transação; `ON CONFLICT` na vigência evita duplicar em corrida.
+  Auditoria `fee_adjustment.applied` (mês, percentual, índice escolhido, contagens).
+- **Lote** (`fee_adjustments` + `fee_adjustment_items`): índices, percentual, `chosenIndex` (índice cujo
+  valor foi aplicado; `null` = digitado à mão), quem aplicou e, por vigência criada, os valores de origem
+  e os aplicados (a carta reimprime esses números; `edited: true` se a vigência mudou depois). Excluir a
+  vigência criada desfaz o item (cascata); `clientCount` conta os itens restantes.
 
 ## Relatório de inadimplência
 
@@ -1466,6 +1501,17 @@ departamento, só os seus itens) e `month` (competência dos cards de tarefas, p
   só presença, nunca os valores cifrados (`CLIENT_COMPLETENESS_FIELDS`, `completenessFieldsOf`).
 
 Testes: `test/tasks-dashboard.test.ts`.
+
+## Banco (migração 0021)
+
+- Juros e multa (`late_fee_of is not null`) reclassificados, espaço a espaço (`set_config` por causa
+  do RLS forçado), para "Receitas financeiras › Juros e multas recebidos" / "Despesas financeiras ›
+  Juros e multas", criando as categorias que faltam (nome sem diferenciar maiúsculas, ativa primeiro).
+- `fee_adjustments` e `fee_adjustment_items` (tenant: RLS `ENABLE`+`FORCE`, `UNIQUE (workspace_id, id)`,
+  FKs compostas — item → lote e item → vigência, `ON DELETE CASCADE` —, CHECKs de mês, faixas de
+  pontos-base, índice escolhido e valores; nome de quem aplicou vira "Usuário excluído" com a conta).
+- `client_documents_kind_chk` aceita `ecac_power_of_attorney` (procuração eletrônica e-CAC).
+- Reexecutável e compatível com o PGlite.
 
 ## Banco (migração 0020)
 

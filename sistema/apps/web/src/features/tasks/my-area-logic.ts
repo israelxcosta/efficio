@@ -124,7 +124,6 @@ export function insightHref(link: TaskInsight['link']): string | null {
   return tasksHref({ scope: 'mine' });
 }
 
-/** "2 pedem atenção", "1 pede atenção" or "Tudo em dia" (danger and warning ask attention). */
 /** Insights the strip on top already shows ("Atrasadas", "Hoje"): Para você leaves them out (spec §3, Q2). */
 const IN_THE_STRIP: ReadonlySet<TaskInsight['key']> = new Set(['overdue', 'dueToday']);
 
@@ -133,10 +132,15 @@ export function forYouInsights(insights: readonly TaskInsight[]): { shown: TaskI
   return { shown, hidden: insights.length - shown.length };
 }
 
-export function insightsFinding(insights: TaskInsight[]): string {
+/**
+ * Finding of "Para você": "2 pedem atenção", "1 pede atenção" (danger and warning ask attention).
+ * The insights left for the strip (`hidden`: overdue, due today) always ask attention, so with any of
+ * them it is "Sem outros avisos", never "Tudo em dia" beside an overdue task.
+ */
+export function insightsFinding(insights: readonly TaskInsight[], hidden = 0): string {
   const n = insights.filter((i) => i.tone === 'danger' || i.tone === 'warning').length;
-  if (n === 0) return 'Tudo em dia';
-  return n === 1 ? '1 pede atenção' : `${n} pedem atenção`;
+  if (n > 0) return n === 1 ? '1 pede atenção' : `${n} pedem atenção`;
+  return hidden > 0 ? 'Sem outros avisos' : 'Tudo em dia';
 }
 
 /** "novembro: 12 concluídas, 92% no prazo · +4 p.p. sobre outubro". */

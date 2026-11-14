@@ -96,7 +96,7 @@ function FixedWidget({ type, d, loading, month, size, alert }: WidgetProps & { t
         <FitList
           items={items}
           getKey={(t) => t.id}
-          moreLabel="lançamento(s)"
+          moreLabel={['lançamento', 'lançamentos']}
           moreHref={href}
           className="flex flex-col"
           renderItem={(tx) => <TransactionRow tx={tx} density="line" />}

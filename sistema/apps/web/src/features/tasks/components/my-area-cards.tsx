@@ -128,7 +128,7 @@ export function MyTasksCardView({ data, loading, error, onRetry, today, onNewTas
         <FitList
           items={rows}
           getKey={(r) => r.key}
-          moreLabel="tarefas"
+          moreLabel={['tarefa', 'tarefas']}
           showMore={false}
           contentKey={by}
           renderItem={(r) =>
@@ -158,7 +158,7 @@ const INSIGHT_TONE_CLASS: Record<TaskInsight['tone'], string> = { danger: 'text-
 /** The API's insights (up to 6, in its order), each one a link to "Minhas" with its filter when it has one. */
 export function ForYouCardView({ insights, hidden = 0 }: { insights: TaskInsight[]; hidden?: number }) {
   return (
-    <WidgetCard title="Para você" subtitle={insights.length === 0 && hidden > 0 ? 'Sem outros avisos' : insightsFinding(insights)}>
+    <WidgetCard title="Para você" subtitle={insightsFinding(insights, hidden)}>
       {insights.length === 0 ? (
         hidden > 0 ? (
           <BodyEmpty title="Sem outros avisos" description="As atrasadas e as de hoje estão na faixa acima." />
@@ -375,7 +375,7 @@ export function NotesCardView({
         <FitList
           items={sorted}
           getKey={(n) => n.id}
-          moreLabel="anotações"
+          moreLabel={['anotação', 'anotações']}
           showMore={false}
           renderItem={(n) => (
             <button type="button" onClick={() => onOpen(n)} className="flex h-11 w-full items-center gap-3 rounded-lg px-2 text-left transition-colors duration-150 hover:bg-surface-muted">
@@ -417,7 +417,7 @@ export function ClientsPendingCardView({ rows, department, loading }: { rows: Pa
         <FitList
           items={ranking.rows}
           getKey={(r) => r.id}
-          moreLabel="clientes"
+          moreLabel={['cliente', 'clientes']}
           total={ranking.totals.clients}
           renderItem={(r) => (
             <Link
@@ -456,7 +456,7 @@ export function RecentCommentsCardView({ items, onOpen, now }: { items: TaskActi
         <FitList
           items={items}
           getKey={(i) => i.id}
-          moreLabel="comentários"
+          moreLabel={['comentário', 'comentários']}
           renderItem={(i) => (
             <button type="button" onClick={() => onOpen(i.taskId)} className="flex w-full items-start gap-3 rounded-lg px-2 py-1.5 text-left transition-colors duration-150 hover:bg-surface-muted">
               <MemberAvatar size="sm" name={i.author?.name} userId={i.author?.id} />

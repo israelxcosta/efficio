@@ -84,13 +84,15 @@ describe('deadlines of a recurring occurrence (target and legal deadline)', () =
   });
 
   it('carries the dates inline and the distance beside the date', () => {
-    expect(d('2026-11-02', '2026-11-05', true)).toEqual({ text: 'Meta em 5 dias · legal 05/11', tone: 'warning' });
-    expect(d('2026-11-02', '2026-11-05')).toEqual({ text: 'Meta 02/11 · legal 05/11', tone: 'warning' });
+    expect(d('2026-10-29', '2026-11-05', true)).toEqual({ text: 'Meta amanhã · legal 05/11', tone: 'warning' });
+    expect(d('2026-11-02', '2026-11-05', true)).toEqual({ text: 'Meta em 5 dias · legal 05/11', tone: 'muted' });
+    expect(d('2026-11-02', '2026-11-05')).toEqual({ text: 'Meta 02/11 · legal 05/11', tone: 'muted' });
     expect(d('2026-11-20', '2026-11-25')).toEqual({ text: 'Meta 20/11 · legal 25/11', tone: 'muted' });
   });
 
   it('speaks like a standalone task when the target is the legal deadline', () => {
     expect(d('2026-10-29', '2026-10-29')).toEqual({ text: 'Prazo legal amanhã', tone: 'warning' });
+    expect(d('2026-10-31', '2026-10-31')).toEqual({ text: 'Prazo legal em 3 dias', tone: 'muted' });
     expect(d('2026-11-15', '2026-11-15', true)).toEqual({ text: 'Prazo legal em 18 dias', tone: 'muted' });
     expect(d('2026-11-15', '2026-11-15')).toEqual({ text: 'Prazo legal 15/11', tone: 'muted' });
   });

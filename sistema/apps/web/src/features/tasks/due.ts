@@ -55,8 +55,10 @@ export function taskDueInfo(
     const time = timeRange(task);
     return { text: time ? `Hoje, ${time}` : 'Vence hoje', tone: 'warning-strong' };
   }
+  // Amber only for today and tomorrow: a wider window weakens the alert (the rest is neutral; up to
+  // 5 days the text still counts the days).
   if (days === 1) return { text: 'Vence amanhã', tone: 'warning' };
-  if (days <= 5) return { text: `Vence em ${daysText(days)}`, tone: 'warning' };
+  if (days <= 5) return { text: `Vence em ${daysText(days)}`, tone: 'muted' };
   return { text: beside ? `Vence em ${daysText(days)}` : `Vence ${shortDate(task.dueDate, today)}`, tone: 'muted' };
 }
 

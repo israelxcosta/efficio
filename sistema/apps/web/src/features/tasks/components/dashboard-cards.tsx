@@ -217,7 +217,7 @@ export function ProcessesCard(p: CardProps) {
               <FitList
                 items={rows}
                 getKey={(r) => r.department?.id ?? 'none'}
-                moreLabel="departamentos"
+                moreLabel={['departamento', 'departamentos']}
                 className="flex flex-col gap-0.5"
                 renderItem={(r) => {
                   const live = r.done + r.pending + r.overdue;
@@ -289,7 +289,7 @@ export function AgendaCard(p: CardProps) {
             <FitList
               items={items}
               getKey={(o) => `${o.recurringTaskId}:${o.periodKey}`}
-              moreLabel="prazos"
+              moreLabel={['prazo', 'prazos']}
               className="flex flex-col gap-0.5"
               renderItem={(o) => {
                 const live = o.total - o.canceled;
@@ -366,7 +366,7 @@ export function FiscalCard(p: CardProps) {
                 <FitList
                   items={d.fiscal.items}
                   getKey={(o) => `${o.recurringTaskId}:${o.periodKey}`}
-                  moreLabel="obrigações"
+                  moreLabel={['obrigação', 'obrigações']}
                   moreHref="/tarefas/auditoria?visao=tarefa"
                   className="flex flex-col gap-0.5"
                   renderItem={(o) => {
@@ -544,7 +544,7 @@ export function IncompleteCard(p: CardProps & { onList: (l: DashboardList) => vo
               total={inc.count}
               showMore={false}
               getKey={(c) => c.client.id}
-              moreLabel="clientes"
+              moreLabel={['cliente', 'clientes']}
               className="flex flex-col gap-0.5"
               renderItem={(c) => (
                 <Link

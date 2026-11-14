@@ -14,7 +14,7 @@ import { Link } from 'react-router';
 import { EyeOff, GripVertical, Info } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useElementSize } from '@/lib/use-element-size';
-import { cn } from '@/lib/utils';
+import { cn, pluralize } from '@/lib/utils';
 import { fitCount } from './layout';
 import type { WidgetAlert, WidgetId } from './types';
 
@@ -156,8 +156,8 @@ interface FitListProps<T> {
   renderItem: (item: T, index: number) => ReactNode;
   /** Real number of rows when `items` is only part of them (server-capped lists). */
   total?: number;
-  /** "+ N {moreLabel}" (e.g. "vencimento(s)"). */
-  moreLabel: string;
+  /** "+ N …" by the number of rows cut, never "(s)": [singular, plural] (e.g. ['vencimento', 'vencimentos']). */
+  moreLabel: readonly [one: string, many: string];
   moreHref?: string;
   /** Classes of the list itself (`flex flex-col gap-1`, `divide-y`…); rows are its direct children. */
   className?: string;
@@ -202,6 +202,7 @@ export function FitList<T>({ items, getKey, renderItem, total, moreLabel, moreHr
 
   const shown = items.slice(0, count);
   const hidden = realTotal - shown.length;
+  const more = `+ ${pluralize(hidden, moreLabel[0], moreLabel[1])}`;
   return (
     <div ref={box.ref} className="relative min-h-0 flex-1 overflow-hidden">
       <div ref={listRef} className={className}>
@@ -215,10 +216,10 @@ export function FitList<T>({ items, getKey, renderItem, total, moreLabel, moreHr
         <p className="absolute inset-x-0 bottom-0 flex h-5 items-end px-1 text-caption text-muted">
           {moreHref ? (
             <Link to={moreHref} className="font-medium text-brand-text hover:underline">
-              {`+ ${hidden} ${moreLabel}`}
+              {more}
             </Link>
           ) : (
-            `+ ${hidden} ${moreLabel}`
+            more
           )}
         </p>
       ) : null}

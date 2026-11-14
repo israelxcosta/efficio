@@ -195,7 +195,7 @@ export function DebtorsWidget({ alert }: WidgetProps) {
       <FitList
         items={debtors}
         getKey={(d) => d.contactId ?? '__none__'}
-        moreLabel="cliente(s) devedor(es)"
+        moreLabel={['cliente devedor', 'clientes devedores']}
         moreHref={OVERDUE_RECEIVABLES_HREF}
         className="flex flex-col gap-1"
         renderItem={(debtor, i) => (
@@ -288,7 +288,7 @@ export function UpcomingWidget({ d, loading, prefs, setPref, alert }: WidgetProp
         items={items}
         total={total}
         getKey={(t) => t.id}
-        moreLabel="vencimento(s)"
+        moreLabel={['vencimento', 'vencimentos']}
         moreHref={moreHref}
         className="flex flex-col"
         contentKey={filter}
@@ -375,7 +375,7 @@ export function CardsWidget({ d, loading, size, alert }: WidgetProps) {
       <FitList
         items={cards}
         getKey={(c) => c.id}
-        moreLabel="cartão(ões)"
+        moreLabel={['cartão', 'cartões']}
         moreHref="/cartoes"
         className="flex flex-col gap-1"
         contentKey={String(showUsage)}

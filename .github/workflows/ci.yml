@@ -75,6 +75,8 @@ jobs:
         run: |
           pnpm --filter @effinance/web exec vite build
           pnpm --filter @effinance/web exec vite build --mode demo
+      - name: Charts stay out of the initial load
+        run: pnpm --filter @effinance/web check:entry dist dist-demo
       - name: No source maps in the public web bundles
         run: |
           if find apps/web/dist apps/web/dist-demo -name '*.map' | grep -q .; then

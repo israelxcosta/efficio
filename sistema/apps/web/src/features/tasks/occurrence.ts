@@ -60,7 +60,7 @@ export function openDeadlineInfo({ legalDueDate: legal, targetDate: target }: De
   if (target >= legal) {
     // Target = legal deadline (0 days): like a standalone task, with "Prazo legal" instead of "Vence".
     if (toLegal === 1) return { text: 'Prazo legal amanhã', tone: 'warning' };
-    if (toLegal <= 5) return { text: `Prazo legal em ${daysText(toLegal)}`, tone: 'warning' };
+    if (toLegal <= 5) return { text: `Prazo legal em ${daysText(toLegal)}`, tone: 'muted' };
     return { text: beside ? `Prazo legal em ${daysText(toLegal)}` : `Prazo legal ${legalShort}`, tone: 'muted' };
   }
   const toTarget = diffInDays(target, today);
@@ -69,7 +69,8 @@ export function openDeadlineInfo({ legalDueDate: legal, targetDate: target }: De
     return { text: `Meta venceu há ${daysText(-toTarget)} · ${legalPart}`, tone: 'warning-strong' };
   }
   if (toTarget === 0) return { text: `Meta hoje · legal ${legalShort}`, tone: 'warning-strong' };
-  const tone = toTarget <= 5 ? 'warning' : 'muted';
+  // Amber only for a target tomorrow (today and missed are above), like a standalone task.
+  const tone = toTarget === 1 ? 'warning' : 'muted';
   if (!beside) return { text: `Meta ${shortDate(target, today)} · legal ${legalShort}`, tone };
   return { text: `${toTarget === 1 ? 'Meta amanhã' : `Meta em ${daysText(toTarget)}`} · legal ${legalShort}`, tone };
 }

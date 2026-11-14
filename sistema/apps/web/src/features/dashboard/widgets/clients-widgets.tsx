@@ -134,7 +134,7 @@ function RegimeShares({ slices, total }: { slices: CategoryAmount[]; total: numb
       <FitList
         items={slices}
         getKey={(s) => s.categoryId ?? s.name}
-        moreLabel="regime(s)"
+        moreLabel={['regime', 'regimes']}
         moreHref="/clientes"
         className="flex flex-col"
         renderItem={(s) => (
@@ -255,7 +255,7 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
               <FitList
                 items={stats}
                 getKey={(s) => s.regime}
-                moreLabel="regime(s)"
+                moreLabel={['regime', 'regimes']}
                 moreHref="/clientes"
                 className="flex flex-col gap-1"
                 renderItem={(s) => (
@@ -379,7 +379,7 @@ export function FeePeriodsWidget({ alert }: WidgetProps) {
       <FitList
         items={rows}
         getKey={(a) => a.client.id}
-        moreLabel="cliente(s)"
+        moreLabel={['cliente', 'clientes']}
         moreHref="/clientes"
         className="flex flex-col gap-0.5"
         renderItem={(a) => {
@@ -698,7 +698,7 @@ export function IncompleteClientsWidget({ alert }: WidgetProps) {
       <FitList
         items={items}
         getKey={(x) => x.client.id}
-        moreLabel="cliente(s)"
+        moreLabel={['cliente', 'clientes']}
         moreHref="/clientes"
         className="flex flex-col gap-0.5"
         renderItem={({ client, missing }) => (

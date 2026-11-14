@@ -13,6 +13,7 @@ import {
   BANK_CONNECTION_STATUSES,
   CARD_BRANDS,
   CATEGORY_TYPES,
+  FEE_ADJUSTMENT_INDEXES,
   FEE_ENTRY_KINDS,
   FREQUENCIES,
   IMPORT_FORMATS,
@@ -368,6 +369,8 @@ describe('catalog: row level security and privileges', () => {
     // Migrations 0008 and 0009.
     expect(values('transactions_late_fee_kind_chk')).toEqual(sorted(LATE_FEE_KINDS));
     expect(values('transactions_fee_kind_chk')).toEqual(sorted(FEE_ENTRY_KINDS));
+    // Migration 0021.
+    expect(values('fee_adjustments_chosen_index_chk')).toEqual(sorted(FEE_ADJUSTMENT_INDEXES));
   });
 
   it('late fees and generated fee rows keep their shape (CHECKs of 0008/0009)', async () => {

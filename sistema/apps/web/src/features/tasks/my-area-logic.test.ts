@@ -94,6 +94,18 @@ describe('Para você', () => {
     expect(insightsFinding([i('danger')])).toBe('1 pede atenção');
     expect(insightsFinding([i('success')])).toBe('Tudo em dia');
   });
+
+  it('never says "Tudo em dia" while the strip shows overdue or due-today tasks', () => {
+    const insights: TaskInsight[] = [
+      { key: 'overdue', tone: 'danger', text: 'Você tem 1 tarefa atrasada, vencida há 3 dias.', link: { situation: 'overdue' } },
+      { key: 'busiestWeekday', tone: 'info', text: 'Segunda é seu dia mais cheio.', link: null },
+    ];
+    const { shown, hidden } = forYouInsights(insights);
+    expect(insightsFinding(shown, hidden)).toBe('Sem outros avisos');
+    expect(insightsFinding([], 2)).toBe('Sem outros avisos');
+    const warn: TaskInsight = { key: 'targetMissed', tone: 'warning', text: '', link: null };
+    expect(insightsFinding([warn], 1)).toBe('1 pede atenção');
+  });
 });
 
 describe('Seu ritmo', () => {

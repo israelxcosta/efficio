@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface SegmentOption<T extends string> {
@@ -22,6 +22,20 @@ interface SegmentedControlProps<T extends string> {
   ariaLabel?: string;
 }
 
+/**
+ * Index of the option a key moves to, like a radio group: Right/Down the next, Left/Up the previous
+ * (wrapping), Home/End the ends; null for any other key.
+ */
+export function segmentTarget(key: string, index: number, count: number): number | null {
+  if (count === 0) return null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  const step = key === 'ArrowRight' || key === 'ArrowDown' ? 1 : key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 0;
+  if (step === 0) return null;
+  if (index < 0) return step > 0 ? 0 : count - 1;
+  return (index + step + count) % count;
+}
+
 export function SegmentedControl<T extends string>({
   value,
   onChange,
@@ -32,6 +46,8 @@ export function SegmentedControl<T extends string>({
   fullWidth,
   ariaLabel,
 }: SegmentedControlProps<T>) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const activeIndex = options.findIndex((o) => o.value === value);
   return (
     <div
       role="radiogroup"
@@ -45,14 +61,16 @@ export function SegmentedControl<T extends string>({
         className,
       )}
       onKeyDown={(e) => {
-        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        const target = segmentTarget(e.key, activeIndex, options.length);
+        if (target === null) return;
         e.preventDefault();
-        const idx = options.findIndex((o) => o.value === value);
-        const next = options[(idx + (e.key === 'ArrowRight' ? 1 : -1) + options.length) % options.length];
-        if (next) onChange(next.value);
+        // The focus goes with the chosen option (the tab stop moves to it on the next render).
+        buttons.current[target]?.focus();
+        const next = options[target];
+        if (next && next.value !== value) onChange(next.value);
       }}
     >
-      {options.map((opt) => {
+      {options.map((opt, i) => {
         const active = opt.value === value;
         return (
           <button
@@ -60,7 +78,11 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
-            tabIndex={active ? 0 : -1}
+            ref={(el) => {
+              buttons.current[i] = el;
+            }}
+            // One tab stop: the chosen option, or the first while none is.
+            tabIndex={active || (activeIndex < 0 && i === 0) ? 0 : -1}
             title={opt.title}
             onClick={() => onChange(opt.value)}
             className={cn(

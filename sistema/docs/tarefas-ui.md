@@ -28,8 +28,8 @@
 - **Revisão 4 (05/11/2026): hub de tarefas, recorrência em toda tarefa, Minha área e Auditoria
   enxuta**, a pedido do usuário.
   - **Trilho com 5 itens**: Início, Tarefas, Clientes, Relatórios e Cadastros. Auditoria,
-    Recorrentes (com Grupos por regime) e Processos saem do trilho e do "Mais" do celular e passam ao
-    **hub de tarefas**; o item Tarefas fica ativo nessas páginas e o ⌘K continua com todas (§2.2,
+    Recorrentes (com Grupos por regime) e Processos saem do trilho e passam ao
+    **hub de tarefas** (no "Mais" do celular voltam a aparecer logo após Tarefas, desde 14/11); o item Tarefas fica ativo nessas páginas e o ⌘K continua com todas (§2.2,
     §2.4, §2.8).
   - **Hub de tarefas** (`TasksHub`, §2.9): no cabeçalho de Tarefas, Auditoria, Recorrentes e
     Processos, só ícones com tooltip, em dois grupos, **Ver** (Lista, Quadro, Calendário, Auditoria,
@@ -354,8 +354,9 @@ cada um tem.
 O mesmo `Sidebar`: 76px, ícones de 20px em botões de 44px a cada 50px, tooltip à direita,
 `splitRail` e o botão "mais" com chevron quando a altura não basta. **Revisão 4: o trilho tem 5
 itens**, nesta ordem. Auditoria, Recorrentes e Processos (fase 2) continuam páginas da Gestão, com as
-mesmas rotas e chaves de página, mas saem do trilho e do "Mais" do celular: ficam no **hub de
-tarefas** (§2.9), e o item Tarefas fica ativo nelas.
+mesmas rotas e chaves de página, mas saem do trilho: ficam no **hub de tarefas** (§2.9), e o item
+Tarefas fica ativo nelas. No "Mais" do celular elas aparecem logo após Tarefas (14/11), porque o tooltip
+do hub não abre ao toque; só o item mais específico fica como página atual.
 
 | # | Rótulo (tooltip, "mais" e ⌘K) | `short` | Rota | Ícone (lucide) | Barra do celular | Ativo também em | `keywords` |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -366,7 +367,7 @@ tarefas** (§2.9), e o item Tarefas fica ativo nelas.
 | 5 | Cadastros | Cadastros | `/tarefas/cadastros` | `FolderCog` | — | — | `departamentos categorias equipe usuarios membros sindicatos convencoes data-base permissoes` |
 
 **Páginas do hub** (continuam em `GESTAO_NAV_ITEMS`, com `place: 'hub'`, porque o ⌘K, o teste de
-rotas e `pagePermissionOf` precisam delas; `railItemsFor` as tira do trilho e do "Mais"):
+rotas e `pagePermissionOf` precisam delas; `railItemsFor` as tira do trilho; o "Mais" do celular as lista após Tarefas):
 
 | Rótulo | Rota | Ícone | Chave de página | `keywords` |
 | --- | --- | --- | --- | --- |
@@ -859,7 +860,7 @@ data**. Em linha estreita (`inline`) ele carrega a data curta (`05/10` no ano co
 | Aberta, vencida | Venceu há N dias | Venceu há N dias | `text-xs font-semibold text-danger` |
 | Aberta, vence hoje | Vence hoje (ou "Hoje, 14:00–15:00") | o mesmo | `text-xs font-semibold text-warning` |
 | Aberta, amanhã | Vence amanhã | Vence amanhã | `text-xs font-medium text-warning` |
-| Aberta, em 2 a 5 dias | Vence em N dias | Vence em N dias | `text-xs font-medium text-warning` |
+| Aberta, em 2 a 5 dias | Vence em N dias | Vence em N dias | `text-xs text-muted` (desde 14/11 o âmbar fica só para hoje e amanhã) |
 | Aberta, depois | Vence em N dias | Vence 12/11 | `text-xs text-muted` |
 | Sem vencimento | (a data mostra `—`) Sem vencimento | Sem vencimento | `text-xs text-subtle` |
 | Concluída no dia do vencimento | Concluída no vencimento | Concluída em 12/10 | `text-xs text-muted` |
@@ -874,7 +875,7 @@ O texto fala dos dois prazos e a cor segue o mais grave:
 
 | Situação (aberta) | `beside` (ao lado da data da meta) | `inline` (linha estreita) | Classe |
 | --- | --- | --- | --- |
-| Antes da meta | Meta em N dias · legal 20/10 | Meta 15/10 · legal 20/10 | `text-xs text-muted` (`font-medium text-warning` de 1 a 5 dias, como na avulsa) |
+| Antes da meta | Meta em N dias · legal 20/10 | Meta 15/10 · legal 20/10 | `text-xs text-muted` (`font-medium text-warning` só para hoje e amanhã, como na avulsa) |
 | Meta hoje | Meta hoje · legal 20/10 | o mesmo | `text-xs font-semibold text-warning` |
 | Fora da meta | Meta venceu há 2 dias · legal em 3 dias | o mesmo | `text-xs font-semibold text-warning` |
 | Prazo legal hoje | Prazo legal hoje | o mesmo | `text-xs font-semibold text-warning` |

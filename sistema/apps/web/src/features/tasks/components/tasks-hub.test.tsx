@@ -55,11 +55,23 @@ describe('TasksHubView', () => {
     for (const name of ['Nova tarefa', 'Novo compromisso', 'Nova tarefa recorrente', 'Novo processo']) expect(count(html, `aria-label="${name}"`)).toBe(1);
   });
 
-  it('shows no visible label (names only in attributes)', () => {
-    const text = render().replace(/="[^"]*"/g, '');
-    expect(text).not.toContain('Auditoria mensal');
-    expect(text).not.toContain('Nova tarefa');
-    expect(text).not.toContain('Lista');
+  it('names each item only in attributes on the computer, and under the icon on touch or narrow screens', () => {
+    const html = render();
+    const captions = [...html.matchAll(/<span data-hub-caption="true" aria-hidden="true" class="([^"]*)">([^<]*)<\/span>/g)];
+    expect(captions.map((c) => c[2])).toEqual(['Lista', 'Quadro', 'Calendário', 'Auditoria', 'Recorrentes', 'Por regime', 'Processos', 'Tarefa', 'Compromisso', 'Recorrente', 'Processo']);
+    for (const [, cls = ""] of captions) {
+      expect(cls.split(' ')).toContain('hidden');
+      expect(cls).toContain('max-sm:block');
+      expect(cls).toContain('sm:pointer-coarse:block');
+    }
+    // Outside the captions there is no text: the full names stay in the tooltip and the aria-label.
+    const text = html.replace(/<span data-hub-caption[^>]*>[^<]*<\/span>/g, '').replace(/="[^"]*"/g, '');
+    expect(text).not.toMatch(/>[^<\s]+</);
+  });
+
+  it('keeps each visible name inside its accessible name (WCAG 2.5.3)', () => {
+    for (const v of hubViewItems(can)) expect(v.label.toLowerCase()).toContain(v.short.toLowerCase());
+    for (const a of createActions(can)) expect(a.label.toLowerCase()).toContain(a.short.toLowerCase());
   });
 
   it('draws the divider only when there are pages after the views', () => {

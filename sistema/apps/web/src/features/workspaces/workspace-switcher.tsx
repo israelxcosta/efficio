@@ -107,24 +107,28 @@ export function WorkspaceMenuItems({ onCreate }: { onCreate: () => void }) {
 export function WorkspaceList({ onCreate, onSwitched }: { onCreate: () => void; onSwitched?: () => void }) {
   const { workspace, workspaces } = useAuth();
   const { switchTo, switching } = useSwitchWorkspace();
+  // A list of buttons (each `li` holds a real button, so screen readers keep it a button); "Nova
+  // empresa" is an action after the list, not one of its items.
   return (
-    <div className="flex flex-col gap-1" role="list" aria-label="Empresas">
-      {workspaces.map((ws) => (
-        <button
-          key={ws.id}
-          type="button"
-          role="listitem"
-          aria-current={ws.id === workspace?.id ? 'true' : undefined}
-          disabled={switching !== null}
-          className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-bg-subtle disabled:opacity-60"
-          onClick={async () => {
-            await switchTo(ws);
-            onSwitched?.();
-          }}
-        >
-          <WorkspaceRow ws={ws} active={ws.id === workspace?.id} />
-        </button>
-      ))}
+    <div className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-1" aria-label="Empresas">
+        {workspaces.map((ws) => (
+          <li key={ws.id}>
+            <button
+              type="button"
+              aria-current={ws.id === workspace?.id ? 'true' : undefined}
+              disabled={switching !== null}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 hover:bg-bg-subtle disabled:opacity-60"
+              onClick={async () => {
+                await switchTo(ws);
+                onSwitched?.();
+              }}
+            >
+              <WorkspaceRow ws={ws} active={ws.id === workspace?.id} />
+            </button>
+          </li>
+        ))}
+      </ul>
       <button type="button" onClick={onCreate} className="flex items-center gap-3 rounded-md px-3 py-3 text-sm font-semibold text-brand-text hover:bg-bg-subtle">
         <Plus className="size-5" /> Nova empresa
       </button>

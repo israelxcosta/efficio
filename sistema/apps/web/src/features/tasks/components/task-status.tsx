@@ -39,7 +39,9 @@ const BUTTON_TONE: Record<TaskStatus, string> = {
   in_progress: 'bg-primary-soft text-primary-soft-fg',
   waiting_client: 'bg-bg-subtle text-muted',
   done: 'bg-success-soft text-success',
-  canceled: 'bg-bg-subtle text-subtle',
+  // Only the text changes (the background stays): text-subtle on bg-subtle was 4.20:1, text-muted is
+  // 5.27:1 (light) and 9.24:1 (dark).
+  canceled: 'bg-bg-subtle text-muted',
 };
 
 interface TaskStatusButtonProps {

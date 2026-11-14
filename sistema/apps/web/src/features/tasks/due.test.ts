@@ -11,11 +11,12 @@ describe('taskDueInfo', () => {
     expect(taskDueInfo(task({ dueDate: '2026-10-27' }), TODAY)).toEqual({ text: 'Venceu há 1 dia', tone: 'danger' });
   });
 
-  it('warns about today, tomorrow and the next five days', () => {
+  it('warns only about today and tomorrow (the rest is neutral)', () => {
     expect(taskDueInfo(task({ dueDate: TODAY }), TODAY)).toEqual({ text: 'Vence hoje', tone: 'warning-strong' });
     expect(taskDueInfo(task({ dueDate: TODAY, startTime: '14:00', endTime: '15:00' }), TODAY).text).toBe('Hoje, 14:00–15:00');
     expect(taskDueInfo(task({ dueDate: '2026-10-29' }), TODAY)).toEqual({ text: 'Vence amanhã', tone: 'warning' });
-    expect(taskDueInfo(task({ dueDate: '2026-11-02' }), TODAY)).toEqual({ text: 'Vence em 5 dias', tone: 'warning' });
+    expect(taskDueInfo(task({ dueDate: '2026-10-30' }), TODAY)).toEqual({ text: 'Vence em 2 dias', tone: 'muted' });
+    expect(taskDueInfo(task({ dueDate: '2026-11-02' }), TODAY)).toEqual({ text: 'Vence em 5 dias', tone: 'muted' });
   });
 
   it('carries the date inline and not beside the date column', () => {

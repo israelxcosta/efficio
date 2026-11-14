@@ -202,7 +202,7 @@ export function BalancesWidget({ d, loading, size, alert }: WidgetProps) {
           <FitList
             items={accounts}
             getKey={(a) => a.id}
-            moreLabel="conta(s)"
+            moreLabel={['conta', 'contas']}
             moreHref="/contas"
             className="flex flex-col"
             contentKey={String(roomy)}
@@ -319,7 +319,7 @@ export function InsightsWidget({ d, loading, size, alert }: WidgetProps) {
       <FitList
         items={insights}
         getKey={(ins) => `${ins.kind}:${ins.title}`}
-        moreLabel="insight(s)"
+        moreLabel={['insight', 'insights']}
         moreHref="/financeiro?aba=insights"
         className="flex flex-col divide-y divide-border"
         renderItem={(ins) => (

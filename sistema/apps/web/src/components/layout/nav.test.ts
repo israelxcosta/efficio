@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { areaOf, FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS, hostsTaskSheets, isActivePath, MY_AREA_ITEM, navItemsFor, RAIL_GAP_PX, RAIL_ITEM_PX, railItemsFor, splitRail } from './nav';
+import { areaOf, currentItemOf, FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS, hostsTaskSheets, isActivePath, moreMenuItemsFor, MY_AREA_ITEM, navItemsFor, RAIL_GAP_PX, RAIL_ITEM_PX, railItemsFor, SETTINGS_ITEM, splitRail } from './nav';
 
 const items = Array.from({ length: 12 }, (_, i) => i);
 const heightFor = (slots: number) => slots * RAIL_ITEM_PX + (slots - 1) * RAIL_GAP_PX;
@@ -120,5 +120,38 @@ describe('Minha área (spec §15.4)', () => {
   it('has its item for ⌘K and the "Mais"', () => {
     expect(MY_AREA_ITEM).toMatchObject({ to: '/minha-area', label: 'Minha área' });
     expect(MY_AREA_ITEM.keywords).toContain('perfil');
+  });
+});
+
+describe('the phone\'s "Mais"', () => {
+  it('lists the hub pages right after Tarefas (a tap opens no tooltip on the hub)', () => {
+    expect(moreMenuItemsFor('gestao').map((i) => i.label)).toEqual([
+      'Início',
+      'Tarefas',
+      'Auditoria mensal',
+      'Tarefas recorrentes',
+      'Processos',
+      'Clientes',
+      'Relatórios de tarefas',
+      'Cadastros',
+    ]);
+    expect(moreMenuItemsFor('financeiro')).toEqual(FINANCE_NAV_ITEMS);
+  });
+
+  it('leaves out the pages turned off for the person', () => {
+    const labels = moreMenuItemsFor('gestao', (key) => key !== 'page.audit' && key !== 'page.processes').map((i) => i.label);
+    expect(labels).toContain('Tarefas recorrentes');
+    expect(labels).not.toContain('Auditoria mensal');
+    expect(labels).not.toContain('Processos');
+  });
+
+  it('marks only the most specific item as the current page', () => {
+    const items = [...moreMenuItemsFor('gestao'), SETTINGS_ITEM];
+    expect(currentItemOf('/tarefas/auditoria', items)?.label).toBe('Auditoria mensal');
+    expect(currentItemOf('/tarefas/processos/x', items)?.label).toBe('Processos');
+    expect(currentItemOf('/tarefas', items)?.label).toBe('Tarefas');
+    expect(currentItemOf('/', items)?.label).toBe('Início');
+    expect(currentItemOf('/configuracoes', items)?.label).toBe('Configurações');
+    expect(currentItemOf('/minha-area', items)).toBeNull();
   });
 });

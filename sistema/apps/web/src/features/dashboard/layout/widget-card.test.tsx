@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { BodyEmpty } from '../widgets/shared';
-import { WidgetCard, WidgetChromeContext, type WidgetChrome } from './widget-card';
+import { FitList, WidgetCard, WidgetChromeContext, type WidgetChrome } from './widget-card';
 
 const html = (node: ReactNode) => renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>);
 
@@ -63,5 +63,16 @@ describe('"Personalizar" mode', () => {
     expect(out).toContain('aria-label="Ocultar Fluxo de caixa"');
     expect(out).toContain('aria-label="Mover Fluxo de caixa"');
     expect(out).toContain('border-border-strong');
+  });
+});
+
+describe('"+ N" line of a cut list', () => {
+  const list = (total: number) =>
+    html(<FitList items={['a']} total={total} getKey={(i) => i} renderItem={(i) => <span>{i}</span>} moreLabel={['tarefa', 'tarefas']} />);
+
+  it('agrees with the number of rows cut, never "+ 1 tarefas" nor "(s)"', () => {
+    expect(list(2)).toContain('+ 1 tarefa<');
+    expect(list(3)).toContain('+ 2 tarefas<');
+    expect(list(1)).not.toContain('+ ');
   });
 });

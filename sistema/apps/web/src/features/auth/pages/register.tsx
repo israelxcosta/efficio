@@ -3,11 +3,11 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { BILLING_ENABLED, registerSchema, TRIAL_DAYS } from '@effinance/shared';
+import { BILLING_ENABLED, registerSchema, SIGNUP_DISABLED_ERROR, SIGNUP_DISABLED_MESSAGE, TRIAL_DAYS } from '@effinance/shared';
 import type { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/input';
-import { errorMessage } from '@/lib/api';
+import { ApiRequestError, errorMessage } from '@/lib/api';
 import { useAuth } from '../auth-context';
 import { AuthLayout } from './auth-layout';
 import { PasswordInput } from './login';
@@ -24,6 +24,22 @@ export function accountCreatedMessage(): string {
     : 'Conta criada! O plano de contas da empresa e um caixa já estão prontos.';
 }
 
+/** Token of the invite page the visitor came from (`/convite/<token>`), sent with the sign-up. */
+export function inviteTokenFrom(from: string): string | undefined {
+  const match = /^\/convite\/([^/?#]+)$/.exec(from);
+  if (!match) return undefined;
+  try {
+    return decodeURIComponent(match[1]!);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The API refused because public sign-up is off (only invites create accounts). */
+export function isSignupClosed(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.code === SIGNUP_DISABLED_ERROR;
+}
+
 export default function RegisterPage() {
   const { user, loading, register: signUp } = useAuth();
   const navigate = useNavigate();
@@ -31,7 +47,10 @@ export default function RegisterPage() {
   // Coming from an invite: return there afterwards, with the invited e-mail prefilled.
   const state = location.state as { from?: unknown; email?: unknown } | null;
   const from = safeInternalPath(state?.from);
+  // From an invite: the account joins the office's workspace (no company is created).
+  const inviteToken = inviteTokenFrom(from);
   const [show, setShow] = useState(false);
+  const [closed, setClosed] = useState(false);
   const form = useForm<RegisterForm, unknown, z.output<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
     defaultValues: { name: '', companyName: '', email: typeof state?.email === 'string' ? state.email : '', password: '', acceptTerms: false as unknown as true },
@@ -42,11 +61,13 @@ export default function RegisterPage() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      await signUp(values);
-      toast.success(accountCreatedMessage());
-      navigate(from, { replace: true });
+      await signUp(inviteToken ? { ...values, companyName: null, inviteToken } : values);
+      toast.success(inviteToken ? 'Conta criada! Você já faz parte do espaço do escritório.' : accountCreatedMessage());
+      // The invite was accepted with the sign-up: its page would no longer find it.
+      navigate(inviteToken ? '/' : from, { replace: true });
     } catch (error) {
-      toast.error(errorMessage(error));
+      if (isSignupClosed(error)) setClosed(true);
+      else toast.error(errorMessage(error));
     }
   });
 
@@ -63,13 +84,21 @@ export default function RegisterPage() {
         </>
       }
     >
+      {closed ? (
+        <div role="alert" className="mb-4 flex flex-col gap-1 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3.5 text-sm">
+          <p className="font-semibold text-warning">{SIGNUP_DISABLED_MESSAGE}</p>
+          <p className="text-muted">Abra o link do convite que você recebeu por e-mail ou peça um convite ao escritório.</p>
+        </div>
+      ) : null}
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <Field label="Nome" error={form.formState.errors.name?.message}>
           <Input autoComplete="name" placeholder="Seu nome" autoFocus {...form.register('name')} />
         </Field>
-        <Field label="Nome da empresa" hint="Você pode alterar depois em Configurações" error={form.formState.errors.companyName?.message}>
-          <Input autoComplete="organization" placeholder="Ex.: Costa Contabilidade Ltda." {...form.register('companyName')} />
-        </Field>
+        {inviteToken ? null : (
+          <Field label="Nome da empresa" hint="Você pode alterar depois em Configurações" error={form.formState.errors.companyName?.message}>
+            <Input autoComplete="organization" placeholder="Ex.: Costa Contabilidade Ltda." {...form.register('companyName')} />
+          </Field>
+        )}
         <Field label="E-mail" error={form.formState.errors.email?.message}>
           <Input type="email" autoComplete="email" placeholder="voce@email.com" {...form.register('email')} />
         </Field>
@@ -98,7 +127,7 @@ export default function RegisterPage() {
             <p className="text-xs text-danger">{form.formState.errors.acceptTerms.message}</p>
           ) : null}
         </div>
-        <Button type="submit" size="lg" className="mt-2 w-full" loading={form.formState.isSubmitting}>
+        <Button type="submit" size="lg" className="mt-2 w-full" loading={form.formState.isSubmitting} disabled={closed}>
           Criar conta
         </Button>
       </form>

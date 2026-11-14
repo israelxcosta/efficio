@@ -29,6 +29,13 @@ describe('Para você', () => {
     expect(clear).not.toContain('<a ');
     expect(html).toContain('1 pede atenção');
   });
+
+  it('says "Sem outros avisos", not "Tudo em dia", when the overdue went to the strip', () => {
+    const info: TaskInsight = { key: 'busiestWeekday', tone: 'info', text: 'Segunda é seu dia mais cheio.', link: null };
+    const html = wrap(<ForYouCardView insights={[info]} hidden={1} />);
+    expect(html).toContain('Sem outros avisos');
+    expect(html).not.toContain('Tudo em dia');
+  });
 });
 
 describe('Meu departamento', () => {

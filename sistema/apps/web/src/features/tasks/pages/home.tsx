@@ -462,7 +462,7 @@ function MyTasks({ home, loading, error, today, onRetry }: { home: TaskHomeRespo
             <FitList
               items={recent}
               getKey={(t) => t.id}
-              moreLabel="concluídas"
+              moreLabel={['concluída', 'concluídas']}
               renderItem={(t) => <TaskRow task={t} today={today} density="compact" hideAssignee muted />}
             />
           </div>
@@ -486,7 +486,7 @@ function MyTasks({ home, loading, error, today, onRetry }: { home: TaskHomeRespo
           items={items}
           total={total}
           getKey={(i) => i.key}
-          moreLabel={total - items.length === 1 ? 'tarefa' : 'tarefas'}
+          moreLabel={['tarefa', 'tarefas']}
           moreHref={tasksHref({ scope: 'mine', ...(tab === 'overdue' ? { situation: 'overdue' } : {}), ...(tab === 'today' ? { dueDate: today as never } : {}) })}
           contentKey={tab}
           renderItem={(i) =>
@@ -549,7 +549,7 @@ function ByAssignee({ home, people, where, loading }: { home: TaskHomeResponse |
       ) : rows.length === 0 ? (
         <BodyEmpty title="Ninguém com tarefas em aberto" />
       ) : (
-        <FitList items={rows} getKey={(r) => r.key} moreLabel="pessoas" renderItem={(r) => <BreakdownItem row={r} max={max} />} />
+        <FitList items={rows} getKey={(r) => r.key} moreLabel={['pessoa', 'pessoas']} renderItem={(r) => <BreakdownItem row={r} max={max} />} />
       )}
     </WidgetCard>
   );

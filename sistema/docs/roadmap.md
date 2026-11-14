@@ -100,7 +100,7 @@ recebido).
 **Já decidido para quando entrar**
 - Juros (1% a.m. pro rata) e multa (2%) contam **desde o primeiro dia após o vencimento**, sem carência.
 - Juros e multa ficam em **categoria própria** ("Receitas financeiras › Juros e multas recebidos"; nas contas a
-  pagar, "Despesas financeiras › Juros e multas"), fora da receita de honorários — em implantação (13/11/2026).
+  pagar, "Despesas financeiras › Juros e multas"), fora da receita de honorários — implantado em 14/11/2026 (migração 0021 reclassificou os lançamentos antigos).
 - Proposta guardada: QR Code estático (BR Code) gerado pelo sistema; na baixa com atraso, opção de cobrar os
   juros e a multa na próxima mensalidade ("Juros e multa por atraso – competência MM/AAAA"), receber junto ou
   isentar (com registro de quem isentou). Depois: Pix com vencimento (cobv) ou Pix Automático com baixa automática.
@@ -125,3 +125,6 @@ recebido).
   Opções: manter só o KMS na AWS (custo baixo, chave fora do servidor) ou permitir chave local com guarda
   cuidadosa — decidir na hora da subida. O e-mail transacional hoje só sai por webhook; para usar o e-mail da
   Hostinger é preciso suporte a SMTP. Backups diários do PostgreSQL para fora do VPS, com teste de restauração.
+- Já pronto no código (14/11): cadastro só por convite em produção (`SIGNUP_ENABLED`, desligado por padrão),
+  produção sem exigir Mercado Pago com a cobrança desligada e `GET /api/health/ready` (testa o banco) para o
+  monitor do servidor.
