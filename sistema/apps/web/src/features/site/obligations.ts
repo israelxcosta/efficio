@@ -1,6 +1,8 @@
 // The month of a company's obligations, for the public site's calendar ("O mês da sua empresa").
 // Reference days of the federal rules, the same ones the office's recurring tasks use (DAS on the
-// 20th, DCTFWeb on the 15th, payroll by the 5th business day...). National holidays are marked so
+// 20th, DCTFWeb on the last business day of the month after the period (IN RFB 2.248/2025; the office
+// transmits it earlier, by the 15th, for the DARF of the 20th), payroll by the 5th business day...).
+// National holidays are marked so
 // the visitor sees which due days are not business days; how each obligation moves (earlier or
 // later) is not computed here: the page says the office checks it every month.
 
@@ -44,7 +46,7 @@ const PROFIT: Regime[] = ['presumido', 'real'];
 export const OBLIGATIONS: Obligation[] = [
   { id: 'das-mei', name: 'DAS-MEI', short: 'DAS', detail: 'guia mensal do MEI', regimes: ['mei'], due: { kind: 'day', day: 20 } },
   { id: 'das', name: 'DAS do Simples Nacional', short: 'DAS', detail: 'apuração no PGDAS-D e guia', regimes: ['simples'], due: { kind: 'day', day: 20 } },
-  { id: 'dctfweb', name: 'DCTFWeb', short: 'DCTFWeb', detail: 'débitos do eSocial e da EFD-Reinf', regimes: COMPANIES, due: { kind: 'day', day: 15 } },
+  { id: 'dctfweb', name: 'DCTFWeb', short: 'DCTFWeb', detail: 'débitos do eSocial e da EFD-Reinf', regimes: COMPANIES, due: { kind: 'last-business-day' } },
   { id: 'inss', name: 'INSS da DCTFWeb', short: 'INSS', detail: 'DARF do pró-labore e da folha', regimes: COMPANIES, due: { kind: 'day', day: 20 } },
   { id: 'reinf', name: 'EFD-Reinf', short: 'Reinf', detail: 'retenções e serviços tomados', regimes: PROFIT, due: { kind: 'day', day: 15 } },
   { id: 'pis-cofins', name: 'PIS e COFINS', short: 'PIS/COFINS', detail: 'DARF sobre o faturamento', regimes: PROFIT, due: { kind: 'day', day: 25 } },

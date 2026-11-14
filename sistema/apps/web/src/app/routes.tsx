@@ -42,6 +42,9 @@ const TaskRegistryPage = lazy(() => import('@/features/tasks/pages/registry'));
 // Phase 3: the contract template editor (`office`) and the contract of a client (finance).
 const ContractEditorPage = lazy(() => import('@/features/office/pages/contract-editor'));
 const ClientContractPage = lazy(() => import('@/features/office/pages/client-contract'));
+// Yearly fee adjustment in batch (contract clause 3) and its letters.
+const FeeAdjustmentPage = lazy(() => import('@/features/fee-adjustments/pages/fee-adjustment'));
+const FeeAdjustmentLettersPage = lazy(() => import('@/features/fee-adjustments/pages/letters'));
 
 function NotFound() {
   return (
@@ -111,6 +114,8 @@ export const routes: RouteObject[] = [
           { path: 'metas', element: <GoalsPage /> },
           { path: 'clientes', element: <ClientsPage /> },
           { path: 'clientes/:id/contrato', element: <ClientContractPage /> },
+          { path: 'clientes/reajuste', element: <FeeAdjustmentPage /> },
+          { path: 'clientes/reajuste/:id/cartas', element: <FeeAdjustmentLettersPage /> },
           { path: 'fornecedores', element: <ContactsPage /> },
           // Old address of the suppliers page (bookmarks, links in e-mails).
           { path: 'contatos', element: <LegacyContactsRedirect /> },

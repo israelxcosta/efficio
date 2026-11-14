@@ -141,6 +141,7 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 | SplitEditor        | "Dividir" no campo Categoria: linhas categoria + valor (2–10), "Dividir igualmente", "+ Adicionar categoria" (já com o valor que falta) e faixa de conferência (Falta / Excede / Valores conferem) |
 | Select (lista)     | nunca o menu nativo: lista própria (Radix) com raio xl, borda, sombra lg, padding 6px; itens com raio lg, destaque `bg-subtle` no hover/teclado, item escolhido em negrito com ✓; grupos com rótulo overline e divisor |
 | MoneyInput         | prefixo "R$" muted, digitação da direita para a esquerda (centavos), tabular-nums |
+| PercentInput       | campo de percentual com sufixo "%" muted, texto à direita, tabular-nums; id/aria chegam ao input (funciona dentro de `Field`); `inputMode="text"` quando aceita negativo (o teclado decimal do iPhone não tem sinal de menos) |
 | Sheet (lateral)    | 440px, raio 2xl à esquerda, header (título H2 + subtítulo muted + X), corpo rolável, rodapé fixo com `Cancelar` (ghost) e `Salvar` (primary) |
 | PaidToggle         | botão 👍/👎: pendente (padrão) = `ThumbsDown` em `danger-soft`/`danger`; pago = `ThumbsUp` em `success-soft`/`success`; animação de "pop" ao alternar |
 | Badge              | pílula 11–12px: `brand`, `success`, `danger`, `warning`, `neutral` (soft) |
@@ -251,6 +252,15 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
     recebido por mês" (3/5) com o em aberto empilhado sobre o recebido, hachurado (vencido `danger`,
     a vencer cinza, rótulo "vencido"/"a vencer") + Vigências (2/5); "Em aberto" (3/5) + Retrabalho
     (2/5).
+
+- **Reajuste em lote** (`/clientes/reajuste`): abas `Novo reajuste · Histórico`; passo 1 num card (mês ‹ › com o
+  mês sugerido, os quatro índices em 4 colunas — 2 no celular —, selo "Maior" no escolhido, percentual aplicado
+  com "Usar o maior índice", taxa por empregado e a memória de cálculo `aria-live`); passo 2 com tabela (lista
+  abaixo de 768px de card), caixas de seleção só nos prontos, "Prazo do aviso já passou" em `danger`, totais e
+  "Aplicar reajuste" no rodapé do card, confirmação com o percentual e quantos clientes; depois, card de
+  resultado com "Imprimir cartas". Cartas: folha A4 na tela (como o contrato), uma por página na impressão
+  (`@page` A4 15/20 mm, sem o zoom de impressão do app), marcas só de tela para vigência alterada e aviso fora
+  do prazo.
 
 ## 5. Revisão "livro-razão" (out/2026)
 

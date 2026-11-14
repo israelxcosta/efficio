@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import {
+  BadgePercent,
   Building2,
   ChevronLeft,
   ChevronRight,
@@ -263,11 +264,18 @@ export default function ClientsPage() {
         title="Clientes"
         description="Empresas atendidas pelo escritório: contrato, regime tributário e honorários."
         actions={
-          <WriteGate>
-            <Button onClick={openNew}>
-              <Plus /> Novo cliente
+          <>
+            <Button variant="outline" asChild>
+              <Link to="/clientes/reajuste">
+                <BadgePercent /> Reajuste em lote
+              </Link>
             </Button>
-          </WriteGate>
+            <WriteGate>
+              <Button onClick={openNew}>
+                <Plus /> Novo cliente
+              </Button>
+            </WriteGate>
+          </>
         }
       />
 

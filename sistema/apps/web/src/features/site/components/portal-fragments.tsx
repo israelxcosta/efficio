@@ -110,7 +110,7 @@ export function PortalHome() {
         rows={[
           { status: 'done', title: 'Folha de setembro', meta: 'até o 5º dia útil', right: <Attach>3 holerites</Attach> },
           { status: 'done', title: 'eSocial: eventos do mês', meta: 'vence 15/10', right: <Attach>recibo</Attach> },
-          { status: 'done', title: 'DCTFWeb', meta: 'vence 15/10', right: <Attach>recibo</Attach> },
+          { status: 'done', title: 'DCTFWeb', meta: 'vence 30/10', right: <Attach>recibo</Attach> },
           { status: 'done', title: 'DAS do Simples Nacional', meta: 'vence 20/10 · R$ 1.248,31', right: <Attach>guia</Attach> },
           { status: 'done', title: 'FGTS Digital', meta: 'vence 20/10', right: <Attach>guia</Attach> },
           { status: 'doing', title: 'Balancete de setembro', meta: 'vence 26/10' },
@@ -207,11 +207,12 @@ function InviteShot() {
 
 function RoutineShot() {
   return (
-    <Panel title="Novembro" sub={`${CLIENT} · o mês do escritório`} foot={<><span>2 de 4 concluídas</span><span>atualizado agora</span></>}>
+    <Panel title="Novembro" sub={`${CLIENT} · o mês do escritório`} foot={<><span>3 de 5 concluídas</span><span>atualizado agora</span></>}>
       <Rows
         rows={[
           { status: 'done', title: 'Folha e holerites', meta: 'até o 5º dia útil' },
-          { status: 'done', title: 'DCTFWeb e eSocial', meta: 'dia 15' },
+          { status: 'done', title: 'eSocial: eventos do mês', meta: 'dia 15' },
+          { status: 'done', title: 'DCTFWeb', meta: 'transmitida até o dia 15 · prazo dia 30' },
           { status: 'doing', title: 'DAS, INSS e FGTS Digital', meta: 'dia 20' },
           { status: 'open', title: 'Balancete de outubro', meta: 'dia 25' },
         ]}

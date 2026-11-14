@@ -6,6 +6,7 @@ import {
   addMonthKey,
   diffInDays,
   endOfMonth,
+  monthKey,
   TAX_REGIMES,
   type Client,
   type ClientFee,
@@ -87,6 +88,15 @@ export type FeePeriodAlert =
       date: ISODate | null;
     }
   | { kind: 'ending'; client: Client; date: ISODate; days: number };
+
+/**
+ * "Reajuste em lote →" of the card: the month the soonest ending period renews (its notice may be late:
+ * the page says so per client); without one, the page's suggested month.
+ */
+export function adjustmentHref(alerts: readonly FeePeriodAlert[]): string {
+  const soonest = alerts.find((a) => a.kind === 'ending');
+  return soonest ? `/clientes/reajuste?mes=${monthKey(addDays(soonest.date, 1))}` : '/clientes/reajuste';
+}
 
 /** The client already registered the period that follows the current one. */
 function renewed(current: ClientFee, latest: ClientFee | null): boolean {

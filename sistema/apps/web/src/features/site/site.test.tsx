@@ -130,12 +130,23 @@ describe('the month of a company', () => {
     };
   };
 
-  it('puts the DAS and the FGTS on the 20th and the DCTFWeb on the 15th (Simples, with employees)', () => {
+  it('puts the DAS and the FGTS on the 20th, the eSocial on the 15th and the DCTFWeb on the last business day (Simples, with employees)', () => {
     const { byDay, floating } = ids(2026, 11, 'simples', true);
     expect(byDay[20]).toEqual(expect.arrayContaining(['das', 'inss', 'fgts']));
-    expect(byDay[15]).toEqual(expect.arrayContaining(['dctfweb', 'esocial']));
+    expect(byDay[15]).toEqual(['esocial']);
     expect(byDay[25]).toEqual(['balancete']);
+    // 30/11/2026 is a Monday: the last business day of November.
+    expect(byDay[30]).toEqual(['dctfweb']);
     expect(floating).toEqual(['salarios']);
+  });
+
+  it('moves the DCTFWeb with the last business day of each month (IN RFB 2.248/2025)', () => {
+    expect(lastBusinessDay(2026, 12)).toBe(31);
+    expect(ids(2026, 12, 'presumido', false).byDay[31]).toContain('dctfweb');
+    // 28/02/2027 is a Sunday: Friday the 26th.
+    expect(lastBusinessDay(2027, 2)).toBe(26);
+    expect(ids(2027, 2, 'simples', false).byDay[26]).toEqual(['dctfweb']);
+    expect(ids(2027, 2, 'simples', false).agenda.days.find((d) => d.items.some((o) => o.id === 'dctfweb'))).toMatchObject({ businessDay: true });
   });
 
   it('marks due days that are not business days (15 and 20 of November 2026)', () => {
@@ -158,7 +169,7 @@ describe('the month of a company', () => {
     expect(ids(2027, 5, 'mei', false).byDay[31]).toContain('dasn-simei');
     expect(lastBusinessDay(2027, 1)).toBe(29);
     expect(ids(2027, 1, 'presumido', false).byDay[29]).toContain('irpj-tri');
-    expect(ids(2027, 2, 'presumido', false).byDay[26]).toBeUndefined();
+    expect(ids(2027, 2, 'presumido', false).byDay[26]).toEqual(['dctfweb']);
   });
 
   it('knows the national holidays, Good Friday included', () => {
@@ -174,9 +185,10 @@ describe('the month of a company', () => {
     expect(agenda.total).toBe(7);
     expect(figures).toMatchObject({ isCurrent: true, dated: 6, floating: 1, offDays: [15, 20] });
     expect(figures.next?.day).toBe(15);
-    // Another month: its first due day; after the last due day of this month: none.
+    // Another month: its first due day; after the 25th, the DCTFWeb on the 30th; after the last due day: none.
     expect(monthFigures(monthAgenda(2026, 12, 'simples', true), today).next?.day).toBe(15);
-    expect(monthFigures(agenda, new Date(2026, 10, 27)).next).toBeNull();
+    expect(monthFigures(agenda, new Date(2026, 10, 27)).next?.day).toBe(30);
+    expect(monthFigures(monthAgenda(2026, 11, 'mei', false), new Date(2026, 10, 27)).next).toBeNull();
   });
 
   it('lays the month out in whole weeks, Monday first', () => {

@@ -75,6 +75,10 @@ export const qk = {
   contractTemplate: ['office', 'contract-template'] as const,
   /** Under `clients`: a client or fee change makes it stale. */
   clientContract: (id: string) => ['clients', 'contract', id] as const,
+  /** Yearly fee adjustment in batch: under `clients` too (a fee period change moves the preview and the letters). */
+  feeAdjustmentPreview: (month: string) => ['clients', 'fee-adjustments', 'preview', month] as const,
+  feeAdjustments: (params?: Params) => ['clients', 'fee-adjustments', 'list', params ?? {}] as const,
+  feeAdjustmentLetters: (id: string) => ['clients', 'fee-adjustments', 'letters', id] as const,
   memberPermissions: (userId: string) => ['workspace', 'member-permissions', userId] as const,
 };
 

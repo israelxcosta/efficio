@@ -33,6 +33,7 @@ import { FitList, WidgetCard } from '../layout/widget-card';
 import { feesMonthInsight, portfolioInsight } from './insight-lines';
 import { StackBar } from '@/components/charts/stack-bar';
 import {
+  adjustmentHref,
   billableClients,
   clientIncome,
   feeCompetence,
@@ -49,6 +50,7 @@ import { useOfficeClients } from './data';
 import { BodyEmpty, ListSkeleton } from './shared';
 
 const clientHref = (id: string) => `/clientes?consultar=${id}`;
+const headerLink = 'text-caption font-medium whitespace-nowrap text-brand-text hover:underline';
 
 /** "Nenhum cliente cadastrado" with the way to the clients page. */
 function NoClients() {
@@ -444,6 +446,13 @@ export function FeePeriodsWidget({ alert }: WidgetProps) {
     <WidgetCard
       subtitle={parts.length ? <span className={cn(missing > 0 && 'text-danger')}>{parts.join(' · ')}</span> : `Sem vigência e vencendo em até ${FEE_ENDING_DAYS} dias`}
       alert={alert}
+      action={
+        data && data.items.length ? (
+          <Link to={adjustmentHref(alerts)} className={headerLink}>
+            Reajuste em lote →
+          </Link>
+        ) : undefined
+      }
     >
       {body}
     </WidgetCard>

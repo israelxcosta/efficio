@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
+  BadgePercent,
   BriefcaseBusiness,
   Building2,
   CalendarClock,
@@ -222,6 +223,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
     { id: 'transfer', label: 'Transferir entre contas', icon: <ArrowLeftRight />, onSelect: () => run(() => actions.openTransfer('transfer')) },
     { id: 'invest', label: 'Investir', keywords: 'aplicar', icon: <TrendingUp />, onSelect: () => run(() => actions.openTransfer('investment')) },
     { id: 'import', label: 'Importar extrato ou fatura (OFX/CSV)', keywords: 'arquivo ofx csv banco', icon: <FileUp />, onSelect: () => run(() => openImport()) },
+    { id: 'fee-adjustment', label: 'Reajuste em lote dos honorários', keywords: 'reajuste anual indice ipca igpm inpc cct cartas vigencias clientes', icon: <BadgePercent />, onSelect: go('/clientes/reajuste') },
     ...(openFinance.enabled
       ? [{ id: 'open-finance', label: 'Conectar banco (Open Finance)', keywords: 'integracoes sincronizar', icon: <Landmark />, onSelect: go('/configuracoes?aba=integracoes') }]
       : []),

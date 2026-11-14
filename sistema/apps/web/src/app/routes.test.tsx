@@ -15,7 +15,7 @@ describe('app routes', () => {
     expect(gate).toBeDefined();
     const inside = paths(gate!.children);
     for (const item of FINANCE_NAV_ITEMS) expect(inside).toContain(item.to.slice(1));
-    for (const extra of ['cartoes/:id', 'relatorios/cliente/:id', 'contatos']) expect(inside).toContain(extra);
+    for (const extra of ['cartoes/:id', 'relatorios/cliente/:id', 'contatos', 'clientes/reajuste', 'clientes/reajuste/:id/cartas']) expect(inside).toContain(extra);
   });
 
   it('leaves no finance page outside the gate', () => {

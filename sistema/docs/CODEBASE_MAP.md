@@ -273,6 +273,7 @@ sequenceDiagram
 | `imports`, `open-finance` | (sheets) | importação OFX/CSV e conexões bancárias |
 | `settings`, `auth`, `workspaces`, `billing`, `legal` | `/configuracoes`, `/login`… | perfil, segurança/MFA, membros, assinatura, privacidade |
 | `fee-charges` | (em Contas a receber) | (em andamento) gerar honorários e "+ Empregados" |
+| `fee-adjustments` | `/clientes/reajuste`, `/clientes/reajuste/:id/cartas` | reajuste anual em lote (cláusula 3): mês sugerido pelo aviso de 30 dias (`?mes=`), índices e percentual calculados na tela com os utilitários do shared (`logic.ts`), lista com seleção e totais, aplicar com confirmação, histórico (`?aba=historico`) e cartas com memória de cálculo, uma por página (`letter-text.ts`). Chaves sob `clients` (mudar uma vigência atualiza a prévia e as cartas) |
 
 ### Sistema de widgets do dashboard (`features/dashboard/layout`)
 

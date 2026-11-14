@@ -192,7 +192,7 @@ export const STEPS: { id: StepId; name: string; text: string; note?: string }[] 
   {
     id: 'rotina',
     name: 'Rotina',
-    text: 'Todo mês: folha até o 5º dia útil, declarações no dia 15, guias no dia 20 e o balancete até o dia 25.',
+    text: 'Todo mês: folha até o 5º dia útil, eSocial e EFD-Reinf no dia 15, guias no dia 20, balancete até o dia 25 e DCTFWeb até o último dia útil.',
   },
 ];
 

@@ -410,9 +410,11 @@ export async function seedTasks(
     await recurring({
       ...fiscalOrders,
       name: 'DCTFWeb',
-      description: 'Transmitir a DCTFWeb com os débitos do eSocial e da EFD-Reinf.',
-      dueDay: 15,
-      targetDaysBefore: 2,
+      description: 'Transmitir a DCTFWeb com os débitos do eSocial e da EFD-Reinf. Prazo legal: último dia útil do mês seguinte; meta interna até o dia 15.',
+      // Same rule as the catalog (regime-groups.ts): last business day of the following month, target 16 days before.
+      dueDay: 31,
+      targetDaysBefore: 16,
+      nonBusinessDayRule: 'anticipate',
       regimes: ['simples_nacional', 'presumed_profit', 'real_profit'],
       excludedClientIds: [client('Vida Saudável')].filter((v): v is string => v !== null),
     });
