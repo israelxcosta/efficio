@@ -29,6 +29,11 @@ export interface Platform {
    * development and tests, off in production). Absent = off: an account then only comes from an invite.
    */
   signupEnabled?: boolean;
+  /**
+   * Two-step verification required (`REQUIRE_MFA`; env.ts: on in production)? A session of someone
+   * without it only reaches the routes marked `config.mfaEnrollment` (lib/auth.ts). Absent = off (demo).
+   */
+  requireMfa?: boolean;
 }
 
 /** Whether paid subscriptions are on: the platform's setting, else `BILLING_ENABLED`. */
@@ -39,6 +44,11 @@ export function billingEnabled(platform: Pick<Platform, 'billingEnabled'> | null
 /** Whether anyone may sign up without an invite (fails closed when the platform does not say). */
 export function signupEnabled(platform: Pick<Platform, 'signupEnabled'> | null | undefined): boolean {
   return platform?.signupEnabled ?? false;
+}
+
+/** Whether every member must have two-step verification before using the system. */
+export function requireMfa(platform: Pick<Platform, 'requireMfa'> | null | undefined): boolean {
+  return platform?.requireMfa ?? false;
 }
 
 /**

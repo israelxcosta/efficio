@@ -3,6 +3,7 @@
 // the session is alive and the user is still a member of the workspace in the token.
 
 import fp from 'fastify-plugin';
+import { MFA_ENROLLMENT_REQUIRED_ERROR, MFA_ENROLLMENT_REQUIRED_MESSAGE } from '@effinance/shared';
 import fastifyCookie from '@fastify/cookie';
 import fastifyJwt from '@fastify/jwt';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -11,7 +12,7 @@ import { env } from '../env';
 import { type IssuedSession, REFRESH_TTL_MS, setSessionWorkspace } from '../modules/auth/sessions';
 import { type Access, isMutation, loadAccess } from '../modules/workspaces/access';
 import { AppError, UnauthorizedError } from './errors';
-import { billingEnabled } from './platform';
+import { billingEnabled, requireMfa } from './platform';
 
 export const AUTH_COOKIE = 'effinance_token';
 export const REFRESH_COOKIE = 'effinance_refresh';
@@ -43,6 +44,13 @@ declare module '@fastify/jwt' {
 }
 
 declare module 'fastify' {
+  interface FastifyContextConfig {
+    /**
+     * Route reachable by a session still owing the two-step verification enrollment (`REQUIRE_MFA`):
+     * only `GET /auth/me`, `POST /auth/mfa/setup` and `POST /auth/mfa/enable`.
+     */
+    mfaEnrollment?: boolean;
+  }
   interface FastifyRequest {
     /** Set by `app.authenticate`. */
     userId: string;
@@ -146,6 +154,11 @@ export const authPlugin = fp(async (app) => {
     const access = await loadAccess(app.db, claims.sub, claims.wid, claims.sid, billingEnabled(app.platform));
     // Revoked session or membership removed: the client refreshes (which picks a valid workspace).
     if (!access) throw new UnauthorizedError();
+    // Two-step verification required: read from the user row on every request, so turning it on
+    // locks existing sessions too, and enabling it frees the same session at once.
+    if (requireMfa(app.platform) && access.mfaEnabled !== true && request.routeOptions.config?.mfaEnrollment !== true) {
+      throw new AppError(403, MFA_ENROLLMENT_REQUIRED_ERROR, MFA_ENROLLMENT_REQUIRED_MESSAGE);
+    }
     request.userId = claims.sub;
     request.workspaceId = claims.wid;
     request.sessionId = claims.sid;

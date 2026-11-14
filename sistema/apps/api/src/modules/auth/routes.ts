@@ -32,7 +32,7 @@ import {
 } from '../../lib/auth';
 import { sha256Hex } from '../../lib/crypto/encoding';
 import { AppError, UnauthorizedError } from '../../lib/errors';
-import { billingEnabled, signupEnabled } from '../../lib/platform';
+import { billingEnabled, requireMfa, signupEnabled } from '../../lib/platform';
 import { requestContext } from '../../lib/request-context';
 import { prepareWorkspaceDeletion } from '../workspaces/deletion';
 import { getMe, getUserRow, resolveWorkspaceFor, switchWorkspace } from '../workspaces/service';
@@ -61,6 +61,12 @@ const relaxed = env.NODE_ENV === 'test';
 const limit = (max: number, timeWindow = '1 minute') => ({ rateLimit: { max: relaxed ? 1000 : max, timeWindow } });
 
 export const authRoutes: FastifyPluginAsyncZod = async (app) => {
+  /** `REQUIRE_MFA` and no factor yet: the new session is limited to the enrollment (lib/auth.ts). */
+  const enrollment = (user: Pick<UserRow, 'mfaEnabled'>): Pick<AuthResponse, 'mfaEnrollmentRequired'> =>
+    requireMfa(app.platform) && !user.mfaEnabled ? { mfaEnrollmentRequired: true } : {};
+  /** Routes a session owing the enrollment may still reach. */
+  const enrollmentRoute = { mfaEnrollment: true } as const;
+
   /** Opens a session on the user's preferred workspace and sets the cookies. */
   async function startSession(req: FastifyRequest, reply: FastifyReply, user: UserRow, method: string): Promise<AuthResponse> {
     const workspaceId = await resolveWorkspaceFor(app.db, user.id);
@@ -68,7 +74,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
     const session = await createSession(app.db, { userId: user.id, workspaceId, ...requestContext(req) });
     const token = await issueSessionCookies(reply, session, workspaceId);
     await audit(app.db, { ...requestContext(req), action: 'auth.login', userId: user.id, workspaceId, metadata: { method } });
-    return { user: toUser(user), token };
+    return { user: toUser(user), token, ...enrollment(user) };
   }
 
   app.post('/register', { schema: { body: registerSchema }, config: limit(5) }, async (req, reply) => {
@@ -83,7 +89,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
     const context = { ...requestContext(req), userId: user.id, workspaceId };
     await audit(app.db, { ...context, action: 'auth.register', metadata: { invite: viaInvite } });
     if (viaInvite) await audit(app.db, { ...context, action: 'member.joined', entity: 'user', entityId: user.id });
-    return reply.code(201).send({ user: toUser(user), token } satisfies AuthResponse);
+    return reply.code(201).send({ user: toUser(user), token, ...enrollment(user) } satisfies AuthResponse);
   });
 
   app.post('/login', { schema: { body: loginSchema }, config: limit(10) }, async (req, reply) => {
@@ -194,7 +200,9 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   const authenticated: FastifyPluginAsyncZod = async (authed) => {
     authed.addHook('onRequest', app.authenticate);
 
-    authed.get('/me', async (req) => getMe(app.db, req.userId, req.workspaceId, billingEnabled(app.platform)));
+    authed.get('/me', { config: enrollmentRoute }, async (req) =>
+      getMe(app.db, req.userId, req.workspaceId, billingEnabled(app.platform), requireMfa(app.platform)),
+    );
 
     authed.put('/me', { schema: { body: updateProfileSchema } }, async (req) => updateProfile(app.db, req.userId, req.body));
 
@@ -234,9 +242,9 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
       return reply.code(204).send();
     });
 
-    authed.post('/mfa/setup', async (req) => setupMfa(app.db, req.userId));
+    authed.post('/mfa/setup', { config: { ...enrollmentRoute, ...limit(10) } }, async (req) => setupMfa(app.db, req.userId));
 
-    authed.post('/mfa/enable', { schema: { body: mfaCodeSchema }, config: limit(10) }, async (req) => {
+    authed.post('/mfa/enable', { schema: { body: mfaCodeSchema }, config: { ...enrollmentRoute, ...limit(10) } }, async (req) => {
       const result = await enableMfa(app.db, req.userId, req.body.code, {
         password: req.body.password,
         sessionId: req.sessionId,
@@ -254,7 +262,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
     authed.post('/switch-workspace', { schema: { body: switchWorkspaceSchema } }, async (req, reply) => {
       await switchWorkspace(app.db, req.userId, req.body.workspaceId);
       await app.switchSession(req, reply, req.body.workspaceId);
-      return getMe(app.db, req.userId, req.body.workspaceId, billingEnabled(app.platform));
+      return getMe(app.db, req.userId, req.body.workspaceId, billingEnabled(app.platform), requireMfa(app.platform));
     });
   };
   await app.register(authenticated);

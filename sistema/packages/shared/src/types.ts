@@ -98,6 +98,11 @@ export interface User {
 export interface AuthResponse {
   user: User;
   token: string;
+  /**
+   * Two-step verification is required and the account has none yet: the session only reaches
+   * `GET /auth/me`, `POST /auth/mfa/setup`, `POST /auth/mfa/enable` and logout until it is enabled.
+   */
+  mfaEnrollmentRequired?: boolean;
 }
 
 // ---------------------------------------------------------------------------

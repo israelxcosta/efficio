@@ -1,7 +1,7 @@
 // Retention of security rows that are useless once expired (LGPD: data minimization). Every refresh
 // inserts a session row and rotated rows were never removed; reset links and invites (which hold an
 // e-mail address) stayed forever. Runs with the migrator/owner connection: `db:migrate` calls it on
-// every deploy; schedule it as well (e.g. a daily task running `dist/migrate.js`).
+// every deploy and the API runs it daily when JOBS_ENABLED (src/jobs/daily.ts).
 
 import { and, isNotNull, lt, or } from 'drizzle-orm';
 import type { DbExecutor } from './client';

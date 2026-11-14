@@ -1,7 +1,8 @@
 // Outgoing e-mail. `console` logs the message (development), `memory` keeps it for tests, `webhook`
 // POSTs it as JSON to an endpoint you control (e.g. a Lambda or an e-mail service integration), and
-// `ses` sends through Amazon SES v2 (production on AWS; see mailer-ses.ts, kept apart so the browser
-// demo never bundles the AWS SDK).
+// `ses` sends through Amazon SES v2 (production on AWS; see mailer-ses.ts) and `smtp` through the
+// office's mailbox (production on the VPS; see mailer-smtp.ts). Both live apart so the browser demo
+// never bundles the AWS SDK or nodemailer.
 
 export interface MailMessage {
   to: string;
@@ -15,7 +16,7 @@ export function oneLine(value: string): string {
 }
 
 export interface Mailer {
-  readonly name: 'console' | 'memory' | 'webhook' | 'ses';
+  readonly name: 'console' | 'memory' | 'webhook' | 'ses' | 'smtp';
   /** True when messages actually leave the server (links must not be returned in API responses). */
   readonly delivers: boolean;
   send(message: MailMessage): Promise<void>;

@@ -81,6 +81,14 @@ export const BILLING_ENABLED: boolean = false;
 export const SIGNUP_DISABLED_ERROR = 'signup_disabled';
 export const SIGNUP_DISABLED_MESSAGE = 'O cadastro é feito por convite do escritório.';
 
+/**
+ * Two-step verification required (`REQUIRE_MFA`, on by default in production): a session of someone
+ * without it may only read `GET /auth/me`, enroll (`POST /auth/mfa/setup` and `/auth/mfa/enable`) and
+ * sign out; every other authenticated route answers 403 with this code until the enrollment is done.
+ */
+export const MFA_ENROLLMENT_REQUIRED_ERROR = 'mfa_enrollment_required';
+export const MFA_ENROLLMENT_REQUIRED_MESSAGE = 'Ative a verificação em duas etapas para continuar.';
+
 export const BILLING_INTERVALS = ['month', 'year'] as const;
 export type BillingInterval = (typeof BILLING_INTERVALS)[number];
 
@@ -194,6 +202,11 @@ export interface MeResponse {
   user: MeUser;
   workspace: WorkspaceSummary;
   workspaces: WorkspaceSummary[];
+  /**
+   * The server requires two-step verification (`REQUIRE_MFA`). With `user.mfaEnabled` false the
+   * session is limited to the enrollment (`MFA_ENROLLMENT_REQUIRED_ERROR`). Absent = not required.
+   */
+  mfaRequired?: boolean;
 }
 
 /** POST /auth/login when the account has two-factor authentication enabled. */

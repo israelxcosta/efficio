@@ -7,6 +7,7 @@ import { fromBase64, sha256Hex, type Bytes } from './lib/crypto/encoding';
 import { LocalKeyProvider, type KeyProvider } from './lib/crypto/key-provider';
 import { ConsoleMailer, MemoryMailer, WebhookMailer, type Mailer } from './lib/mailer';
 import { createSesMailer } from './lib/mailer-ses';
+import { createSmtpMailer } from './lib/mailer-smtp';
 import type { Platform } from './lib/platform';
 import { FakeBillingProvider } from './modules/billing/providers/fake';
 import { BrasilApiCnpjProvider } from './modules/clients/providers/brasilapi';
@@ -16,7 +17,7 @@ import { MercadoPagoProvider } from './modules/billing/providers/mercadopago';
 import { FakeOpenFinanceProvider } from './modules/open-finance/providers/fake';
 import { PluggyProvider } from './modules/open-finance/providers/pluggy';
 import type { OpenFinanceSetup } from './modules/open-finance/providers/types';
-import { openFinanceProviderOf, signupEnabledOf, type Env } from './env';
+import { openFinanceProviderOf, requireMfaOf, signupEnabledOf, type Env } from './env';
 
 /** Development/test only: a fixed, public key. Never used when NODE_ENV=production. */
 async function insecureDevMasterKey(): Promise<Bytes> {
@@ -26,7 +27,14 @@ async function insecureDevMasterKey(): Promise<Bytes> {
 
 export async function createKeyProvider(env: Env, warn: (msg: string) => void = console.warn): Promise<KeyProvider> {
   if (env.KEY_PROVIDER === 'aws') return createAwsKmsKeyProvider({ keyId: env.KMS_KEY_ID!, region: env.AWS_REGION });
-  if (env.ENCRYPTION_MASTER_KEY) return LocalKeyProvider.create(fromBase64(env.ENCRYPTION_MASTER_KEY));
+  if (env.ENCRYPTION_MASTER_KEY) {
+    // Production on a single VPS (env.ts validates the key). No rotation for the local provider:
+    // the key must never change, and an offline copy is the only way back after losing the server.
+    if (env.NODE_ENV === 'production') {
+      warn('KEY_PROVIDER=local: a chave mestra está no ambiente do servidor; mantenha uma cópia offline (sem ela os dados cifrados se perdem).');
+    }
+    return LocalKeyProvider.create(fromBase64(env.ENCRYPTION_MASTER_KEY));
+  }
   if (env.NODE_ENV === 'production') throw new Error('ENCRYPTION_MASTER_KEY is required in production');
   // The public development key only when the environment SAYS development/test: a deploy that
   // forgot NODE_ENV (default "development") must not silently encrypt real data with it.
@@ -48,6 +56,15 @@ export async function createMailer(env: Env): Promise<Mailer> {
       return new WebhookMailer(env.MAIL_WEBHOOK_URL!, env.MAIL_WEBHOOK_SECRET, env.MAIL_FROM);
     case 'ses':
       return createSesMailer({ from: env.MAIL_FROM, region: env.AWS_REGION });
+    case 'smtp':
+      return createSmtpMailer({
+        from: env.MAIL_FROM,
+        host: env.SMTP_HOST!,
+        port: env.SMTP_PORT,
+        secure: env.SMTP_SECURE,
+        user: env.SMTP_USER!,
+        password: env.SMTP_PASSWORD!,
+      });
     default:
       return new ConsoleMailer();
   }
@@ -88,6 +105,7 @@ export async function createPlatform(env: Env): Promise<Platform> {
     mailer: await createMailer(env),
     billingEnabled: BILLING_ENABLED,
     signupEnabled: signupEnabledOf(env),
+    requireMfa: requireMfaOf(env),
     billing:
       env.BILLING_PROVIDER === 'mercadopago'
         ? new MercadoPagoProvider({ accessToken: env.MP_ACCESS_TOKEN!, webhookSecret: env.MP_WEBHOOK_SECRET! })

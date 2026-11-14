@@ -17,7 +17,7 @@ import {
 import { audit } from '../../lib/audit';
 import { ValidationError } from '../../lib/errors';
 import { oneLine } from '../../lib/mailer';
-import { billingEnabled, rateLimited } from '../../lib/platform';
+import { billingEnabled, rateLimited, requireMfa } from '../../lib/platform';
 import { assertPermission } from '../../lib/permissions';
 import { requestContext } from '../../lib/request-context';
 import { assertOwner, assertSubscriptionAllowsWrite } from './access';
@@ -208,7 +208,7 @@ export const inviteRoutes: FastifyPluginAsyncZod = async (app) => {
       const workspaceId = await acceptInvite(app.db, req.userId, req.params.token);
       await app.switchSession(req, reply, workspaceId);
       await audit(app.db, { ...requestContext(req), action: 'member.joined', workspaceId, userId: req.userId, entity: 'user', entityId: req.userId });
-      return getMe(app.db, req.userId, workspaceId, billingEnabled(app.platform));
+      return getMe(app.db, req.userId, workspaceId, billingEnabled(app.platform), requireMfa(app.platform));
     },
   );
 };

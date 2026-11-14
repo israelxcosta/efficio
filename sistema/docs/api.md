@@ -18,9 +18,9 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/health` | — | `{ status: 'ok' }` — vivacidade (não consulta o banco) |
 | GET | `/api/health/ready` | — | `{ status: 'ok' }`, ou 503 `{ status: 'unavailable' }` se o banco não responder a `select 1` em 2 s (sem detalhes) |
 | POST | `/api/auth/register` | `registerSchema` (`companyName` e `inviteToken` opcionais) | `AuthResponse` (201) — cria a empresa (`business`, "Minha empresa" se em branco) com categorias empresariais e a conta "Caixa"; com `inviteToken` a conta entra no espaço do convite (e-mail igual ao convidado; sem empresa própria) e o convite é usado. Com `SIGNUP_ENABLED=false` (padrão em produção) e sem convite: 403 `signup_disabled` "O cadastro é feito por convite do escritório." e nada é criado |
-| POST | `/api/auth/login` | `loginSchema` | `AuthResponse` |
+| POST | `/api/auth/login` | `loginSchema` | `AuthResponse` (com `mfaEnrollmentRequired: true` se `REQUIRE_MFA` e a conta ainda não tem 2FA), ou `MfaChallengeResponse` se a conta tem 2FA |
 | POST | `/api/auth/logout` | — | 204 |
-| GET | `/api/auth/me` | — | `MeResponse` (usuário com `photoUpdatedAt` + workspace ativo com `permissions` efetivas + lista) |
+| GET | `/api/auth/me` | — | `MeResponse` (usuário com `photoUpdatedAt` + workspace ativo com `permissions` efetivas + lista + `mfaRequired`) |
 | PUT | `/api/auth/me` | `updateProfileSchema` | `MeUser` |
 | GET | `/api/categories` | `categoryQuerySchema` | `CategoryWithChildren[]` |
 | POST | `/api/categories` | `categoryInputSchema` | `Category` (201) |
@@ -444,6 +444,15 @@ Contrato em `packages/shared/src/saas.ts`.
 - 2FA por TOTP (aplicativo autenticador) com códigos de recuperação de uso único (PBKDF2). Cada
   código é consumido de forma atômica (sem reuso em requisições simultâneas). Ativar exige `password`
   em `/auth/mfa/enable`, salvo login feito há menos de 15 min (`422` pede a senha).
+- **2FA obrigatória** (`REQUIRE_MFA`, padrão `true` em produção): quem entra sem 2FA recebe uma sessão
+  normal (cookies), mas `authenticate` (`lib/auth.ts`) lê `users.mfa_enabled` a cada requisição e, sem
+  2FA, só deixa passar as rotas marcadas `config.mfaEnrollment` — `GET /auth/me`,
+  `POST /auth/mfa/setup` e `POST /auth/mfa/enable` — além de `/auth/refresh` e `/auth/logout` (sem
+  `authenticate`). Todo o resto responde `403 mfa_enrollment_required` "Ative a verificação em duas
+  etapas para continuar." (`MFA_ENROLLMENT_REQUIRED_ERROR`). Ativar libera a mesma sessão na hora;
+  ligar a exigência trava também sessões já abertas; desativar a 2FA (com um código) volta a travar
+  até um novo cadastro (troca de celular). Login/cadastro devolvem `mfaEnrollmentRequired: true` e
+  `GET /auth/me` traz `mfaRequired` — a tela usa `mfaRequired && !user.mfaEnabled`.
 - Recuperação de senha por e-mail: link `${APP_URL}/redefinir-senha#token=…` (o token fica no
   fragmento, fora de logs e do `Referer`), uso único, 30 min, guardado como hash.
 - Primeiro acesso (sem rota HTTP): `bootstrap:owner` (`src/db/bootstrap-owner.ts` →
@@ -463,6 +472,35 @@ Contrato em `packages/shared/src/saas.ts`.
 - Conflitos de unicidade/integridade (convite pendente repetido, dono único) → `409`.
 - Log de auditoria (login, 2FA, membros, assinatura, exportação, exclusões) sem dados pessoais; os
   logs da aplicação removem parâmetros SQL, CPF em buscas, tokens no caminho e e-mails.
+- Eventos de segurança (`SECURITY_LOG_ACTIONS` em `lib/audit.ts`) também saem numa linha de log
+  estruturada `{ audit, userId, workspaceId, entity, entityId, ip }` (IP mascarado; sem nome, e-mail,
+  user agent ou metadados), mensagem `security event`: `warn` para `auth.login_failed`,
+  `auth.mfa_failed` e `auth.refresh_token_reuse`; `info` para revelação de acesso
+  (`client.credential_revealed`), exportação (`data.exported`), troca/redefinição de senha, 2FA
+  ligada/desligada, papel/permissões e exclusões. Monitoramento: `docker logs api | grep '"audit"'`.
+
+## Produção num VPS (Docker Compose)
+
+Uma instância da API com PostgreSQL e Caddy na mesma máquina (kit em `deploy/`, guia em
+`docs/deploy-hostinger.md`). O que `env.ts` aceita a mais nesse cenário (o resto continua fail closed):
+
+- `KEY_PROVIDER=local` com `ENCRYPTION_MASTER_KEY` obrigatória: base64 de 32 bytes (44 caracteres com
+  `=`), aleatória (recusa a chave de desenvolvimento e valores com bytes repetidos). Sem rotação no
+  provedor local: a chave nunca muda e perdê-la perde os dados cifrados — cópia offline obrigatória.
+- `DATABASE_SSL=disable` só quando o host de `DATABASE_URL` é `db`, `postgres`, `localhost`,
+  `127.0.0.1` ou `::1` (Postgres só na rede privada do Docker); qualquer outro host exige `verify-full`.
+- `MAILER=smtp` (`lib/mailer-smtp.ts`, nodemailer carregado sob demanda e fora do demo): `SMTP_HOST`,
+  `SMTP_PORT` (465), `SMTP_SECURE` (`true` = TLS implícito; `false` = STARTTLS obrigatório),
+  `SMTP_USER`, `SMTP_PASSWORD`, com `MAIL_FROM` = a caixa autenticada. Certificado sempre verificado,
+  timeouts de 10/10/20 s; erros viram `Falha ao enviar e-mail por SMTP (EAUTH 535)` (sem senha nem diálogo).
+- `REQUIRE_MFA` (acima) e `JOBS_ENABLED` (padrão `true` só em produção): o agendador interno
+  (`src/jobs/scheduler.ts`) roda `runDailyJobs` (`src/jobs/daily.ts`) todo dia às 03:00 de
+  America/Sao_Paulo: limpeza de retenção (`db/retention.ts`) e geração idempotente das obrigações
+  recorrentes do mês corrente e do seguinte em todos os espaços com assinatura que permite gravar
+  (`ensureOccurrences`, a mesma da abertura das telas). Trava em processo + advisory lock do
+  PostgreSQL (`pg_try_advisory_lock`, conexão reservada); cada parte falha sozinha (log de erro) e a
+  API segue; o resultado sai numa linha `job finished` com contagens. Com um login sem `DELETE` em
+  `sessions`/`open_finance_events` (AWS) a limpeza é pulada com aviso — ela também roda em cada `migrate`.
 
 ## Permissões e assinatura
 

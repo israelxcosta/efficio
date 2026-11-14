@@ -11,13 +11,16 @@ import {
 } from 'fastify-type-provider-zod';
 import { sql } from 'drizzle-orm';
 import type { ApiError } from '@effinance/shared';
-import { env } from './env';
+import { env, jobsEnabledOf } from './env';
+import { runDailyJobs } from './jobs/daily';
+import { advisoryLock, startDailyScheduler } from './jobs/scheduler';
 import { createDb, type Database } from './db/client';
+import { setSecurityLogSink } from './lib/audit';
 import { authPlugin } from './lib/auth';
 import { configureKeyring } from './lib/crypto/keyring';
 import { AppError, ForbiddenError, fromDatabaseError } from './lib/errors';
 import { serializeError, serializeRequest } from './lib/log';
-import type { Platform } from './lib/platform';
+import { billingEnabled, type Platform } from './lib/platform';
 import { tenantRoutes } from './lib/tenant-routes';
 import { authRoutes } from './modules/auth/routes';
 import { billingRoutes } from './modules/billing/routes';
@@ -102,8 +105,20 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
   const { db, client } = createDb();
   app.decorate('db', db);
+  setSecurityLogSink((level, line, message) => app.log[level](line, message));
   configureKeyring({ provider: await createKeyProvider(env, (m) => app.log.warn(m)), db });
   app.decorate('platform', { ...(await createPlatform(env)), ...options.platform });
+  // Daily maintenance (retention + recurring obligations, ~03:00 America/Sao_Paulo): a single API
+  // instance on the VPS. Failures are logged; the API keeps serving.
+  if (jobsEnabledOf(env)) {
+    const scheduler = startDailyScheduler({
+      name: 'daily-maintenance',
+      log: app.log,
+      tryLock: advisoryLock(client),
+      run: () => runDailyJobs({ db, billingEnabled: billingEnabled(app.platform), log: app.log }),
+    });
+    app.addHook('onClose', async () => scheduler.stop());
+  }
   const redis = env.REDIS_URL ? new Redis(env.REDIS_URL, { lazyConnect: false, maxRetriesPerRequest: 1 }) : null;
   app.addHook('onClose', async () => {
     // Webhook syncs still running use the pool.

@@ -129,6 +129,8 @@ export async function getMe(
   userId: string,
   workspaceId: string,
   billingEnabled: boolean = BILLING_ENABLED,
+  /** `REQUIRE_MFA` of the platform (lib/platform.ts → `requireMfa()`). */
+  mfaRequired = false,
 ): Promise<MeResponse> {
   const [user, list, photo] = await Promise.all([
     getUserRow(db, userId),
@@ -137,7 +139,7 @@ export async function getMe(
   ]);
   const workspace = list.find((w) => w.id === workspaceId);
   if (!workspace) throw new ForbiddenError('Você não participa deste espaço');
-  return { user: toMeUser(user, photo), workspace, workspaces: list };
+  return { user: toMeUser(user, photo), workspace, workspaces: list, mfaRequired };
 }
 
 /**

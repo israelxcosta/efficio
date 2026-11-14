@@ -661,7 +661,7 @@ describe('finding: http, logs and configuration', () => {
       ['placeholder JWT secret', { JWT_SECRET: 'change-me-to-a-long-random-secret-of-32-chars-or-more' }, 'JWT_SECRET'],
       ['dev-only JWT secret', { JWT_SECRET: 'dev-only-not-a-secret-replace-before-deploying-anywhere' }, 'JWT_SECRET'],
       ['short JWT secret', { JWT_SECRET: 'k'.repeat(40) }, 'JWT_SECRET'],
-      ['local master key', { KEY_PROVIDER: 'local', ENCRYPTION_MASTER_KEY: Buffer.alloc(32, 7).toString('base64') }, 'KEY_PROVIDER'],
+      ['non-random local master key', { KEY_PROVIDER: 'local', ENCRYPTION_MASTER_KEY: Buffer.alloc(32, 7).toString('base64') }, 'ENCRYPTION_MASTER_KEY'],
       ['unauthenticated mail webhook', { MAILER: 'webhook', MAIL_WEBHOOK_URL: 'https://mail.internal/send' }, 'MAIL_WEBHOOK_SECRET'],
       ['plain-http mail webhook', { MAILER: 'webhook', MAIL_WEBHOOK_URL: 'http://mail.internal/send', MAIL_WEBHOOK_SECRET: 's' }, 'MAIL_WEBHOOK_URL'],
     ])('refuses to start with %s (CWE-1188)', async (_label, overrides, variable) => {

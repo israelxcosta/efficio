@@ -35,6 +35,11 @@ export interface Access {
   workspaceName: string;
   workspaceKind: WorkspaceKind;
   subscription: SubscriptionSummary;
+  /**
+   * Whether the user has two-step verification on (read with the membership on every request).
+   * Absent = unknown: the `REQUIRE_MFA` gate (lib/auth.ts) treats it as not enrolled.
+   */
+  mfaEnabled?: boolean;
 }
 
 /** `billingEnabled`: the platform's switch (lib/platform.ts → `billingEnabled()`); off = never 402. */
@@ -70,6 +75,7 @@ export async function loadAccess(
       role: workspaceMembers.role,
       permissions: workspaceMembers.permissions,
       userName: users.name,
+      mfaEnabled: users.mfaEnabled,
       workspace: workspaces,
       subscription: subscriptions,
     })
@@ -91,6 +97,7 @@ export async function loadAccess(
     workspaceName: row.workspace.name,
     workspaceKind: row.workspace.kind,
     subscription: summarizeSubscription(row.subscription, billingEnabled, now),
+    mfaEnabled: row.mfaEnabled,
   };
 }
 
