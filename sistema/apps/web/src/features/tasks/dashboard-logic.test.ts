@@ -49,7 +49,7 @@ describe('certificates and other documents', () => {
     expect(documentBands(docs).map((b) => [b.key, b.label, b.count, b.tone])).toEqual([
       ['overdue', 'Vencidos', 2, 'danger'],
       ['within30', 'A vencer (30 dias)', 1, 'warning'],
-      ['ok', 'Em dia', 5, 'data'],
+      ['ok', 'Em dia', 5, 'success'],
     ]);
     expect(documentBands({ ...docs, counts: { ...docs.counts, noDate: 3 } }).at(-1)).toMatchObject({ key: 'noDate', label: 'Sem data', count: 3, tone: 'muted' });
   });
@@ -76,7 +76,7 @@ describe('collective agreements', () => {
       ['ok', 4],
       ['noDate', 1],
     ]);
-    expect(conventionBands(conv).map((b) => b.tone)).toEqual(['danger', 'warning', 'dataSoft', 'data', 'muted']);
+    expect(conventionBands(conv).map((b) => b.tone)).toEqual(['danger', 'warning', 'dataSoft', 'success', 'muted']);
   });
 });
 
@@ -103,8 +103,8 @@ describe('task cards', () => {
       ['pending', 9],
       ['concluded', 8],
     ]);
-    // Concluded in the data blue, pending in grey (a 0/3 obligation no longer looks full).
-    expect(r.bands.map((b) => b.tone)).toEqual(['danger', 'muted', 'data']);
+    // Concluded in green, pending in grey (a 0/3 obligation no longer looks full).
+    expect(r.bands.map((b) => b.tone)).toEqual(['danger', 'muted', 'success']);
     expect(r.percent).toBe(40);
     expect(taskStatusBands({ total: 0, pending: 0, concluded: 0, overdue: 0 }).percent).toBe(0);
   });
@@ -129,7 +129,7 @@ describe('task cards', () => {
     expect(overviewBands({ attention: 2, pending: 3, upToDate: 5 }).map((b) => [b.key, b.label, b.count, b.tone])).toEqual([
       ['attention', 'Atenção', 2, 'danger'],
       ['pending', 'Pendências', 3, 'warning'],
-      ['upToDate', 'Em dia', 5, 'data'],
+      ['upToDate', 'Em dia', 5, 'success'],
     ]);
   });
 
@@ -140,14 +140,14 @@ describe('task cards', () => {
 });
 
 describe('status cards of the Início', () => {
-  it('paints 31–60 days in the soft data tone and keeps green out of the bands', () => {
+  it('paints 31–60 days in the soft data tone and concluded/up to date in green', () => {
     expect(BAND_DOT.dataSoft).toBe('bg-data/45');
-    expect(Object.keys(BAND_DOT)).not.toContain('success');
+    expect(BAND_DOT.success).toBe('bg-success');
   });
 
   it('orders a progress bar as concluded, overdue, pending', () => {
     expect(progressSegments({ done: 5, overdue: 2, pending: 21 })).toEqual([
-      { value: 5, tone: 'data' },
+      { value: 5, tone: 'success' },
       { value: 2, tone: 'danger' },
       { value: 21, tone: 'muted' },
     ]);
@@ -161,7 +161,7 @@ describe('status cards of the Início', () => {
   it('heads a distribution card with its most severe band, or the share up to date', () => {
     expect(severityHeadline(documentBands({ counts: { overdue: 1, within30: 1, ok: 0, noDate: 0 } }))).toEqual({ value: '1', label: 'vencidos', tone: 'danger' });
     expect(severityHeadline(overviewBands({ attention: 0, pending: 8, upToDate: 0 }))).toEqual({ value: '8', label: 'pendências', tone: 'warning' });
-    expect(severityHeadline(documentBands({ counts: { overdue: 0, within30: 0, ok: 4, noDate: 0 } }))).toEqual({ value: '100%', label: 'em dia', tone: 'data' });
+    expect(severityHeadline(documentBands({ counts: { overdue: 0, within30: 0, ok: 4, noDate: 0 } }))).toEqual({ value: '100%', label: 'em dia', tone: 'success' });
     expect(severityHeadline(documentBands({ counts: { overdue: 0, within30: 0, ok: 0, noDate: 0 } }))).toEqual({ value: '0', label: 'nenhum cadastrado', tone: 'muted' });
   });
 

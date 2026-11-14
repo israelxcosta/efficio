@@ -6,6 +6,7 @@ import { BAND_DOT, type Band, type BandTone } from '../dashboard-logic';
 const COUNT_TONE: Record<BandTone, string> = {
   danger: 'text-danger',
   warning: 'text-warning',
+  success: 'text-fg',
   data: 'text-fg',
   dataSoft: 'text-fg',
   muted: 'text-fg',

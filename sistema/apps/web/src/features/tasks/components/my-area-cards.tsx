@@ -217,8 +217,8 @@ export function RhythmCardView({ overview, monthName, prevMonthName, footer }: {
           <div key={p.month} className="flex min-w-0 flex-1 flex-col items-center gap-1">
             <span className="tabular text-micro text-muted">{p.concluded || ''}</span>
             <div className="flex w-full max-w-11 flex-col-reverse overflow-hidden rounded-[4px]" style={{ height: `${Math.max(2, (p.concluded / max) * 72)}px` }}>
-              <span className="block w-full bg-data" style={{ height: `${p.concluded ? (p.onTime / p.concluded) * 100 : 0}%` }} />
-              <span className="block w-full bg-danger" style={{ height: `${p.concluded ? (p.late / p.concluded) * 100 : 0}%` }} />
+              <span className="block w-full bg-success" style={{ height: `${p.concluded ? (p.onTime / p.concluded) * 100 : 0}%` }} />
+              <span className="block w-full bg-chart-orange" style={{ height: `${p.concluded ? (p.late / p.concluded) * 100 : 0}%` }} />
             </div>
             <span className={cn('text-micro', p.month === overview.month ? 'font-semibold text-fg' : 'text-muted')}>{MONTH_ABBR[Number(p.month.slice(5, 7)) - 1]}</span>
           </div>
@@ -296,7 +296,7 @@ export function MyDepartmentCardView({
       <StackBar
         className="mt-2"
         segments={[
-          { value: done, className: 'bg-data' },
+          { value: done, className: 'bg-success' },
           { value: t.overdue, className: 'bg-danger' },
           { value: pending, className: 'bg-border-strong' },
         ]}

@@ -98,6 +98,7 @@ export interface DashboardLayout {
 /** Something in a widget that needs attention (red dot on the card). */
 export interface WidgetAlert {
   count: number;
+  /** The whole sentence, number included ("3 recebimentos vencidos"): the dot's tooltip and label. */
   label: string;
   href: string;
 }

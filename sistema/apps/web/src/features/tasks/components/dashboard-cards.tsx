@@ -248,7 +248,7 @@ export function ProcessesCard(p: CardProps) {
               />
               <Legend
                 items={[
-                  { label: 'Concluídas', className: BAND_DOT.data },
+                  { label: 'Concluídas', className: BAND_DOT.success },
                   { label: 'Atrasadas', className: BAND_DOT.danger },
                   { label: 'Pendentes', className: BAND_DOT.muted },
                 ]}
@@ -344,7 +344,7 @@ export function FiscalCard(p: CardProps) {
           const bands = [
             { key: 'overdue' as const, label: 'Atrasadas', count: t.overdue, tone: 'danger' as const },
             { key: 'pending' as const, label: 'Pendentes', count: t.pending, tone: 'muted' as const },
-            { key: 'done' as const, label: 'Concluídas', count: t.done, tone: 'data' as const },
+            { key: 'done' as const, label: 'Concluídas', count: t.done, tone: 'success' as const },
           ];
           return (
             <div className="flex min-h-0 flex-1 gap-5 @max-md:flex-col">
@@ -383,7 +383,7 @@ export function FiscalCard(p: CardProps) {
                         </span>
                         <SegmentBar
                           segments={[
-                            { value: o.done, tone: 'data' },
+                            { value: o.done, tone: 'success' },
                             { value: o.pending, tone: o.overdue ? 'danger' : 'muted' },
                           ]}
                         />

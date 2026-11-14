@@ -12,24 +12,27 @@ const ROW_ICON: Record<(typeof COMPARISON)[number]['id'], ComponentType<SVGProps
   atendimento: MessageCircle,
 };
 
-/** "Contabilidade com portal": the same subjects with the Efficio portal and without a portal. */
+/** "Contabilidade com portal" (coming soon): the same subjects with the client portal and without a portal. */
 export function CompareTable() {
   return (
     <section id="comparar" className="site-compare" aria-labelledby="comparar-title">
       <div className="site-compare__head" data-reveal>
+        <p className="site-pill site-soon">Em breve</p>
         <h2 id="comparar-title" className="site-h2">
           Contabilidade com portal
         </h2>
-        <p className="site-compare__lead">O mesmo trabalho do escritório, com tudo à vista: o que muda quando o mês da empresa tem um lugar.</p>
+        <p className="site-compare__lead">
+          O portal do cliente está em preparação. Até lá, as guias e os documentos chegam por e-mail e pelo WhatsApp do escritório.
+        </p>
       </div>
 
-      <div className="site-table" role="table" aria-label="Contabilidade com o portal da Efficio e sem portal" data-reveal>
+      <div className="site-table" role="table" aria-label="Contabilidade com o portal do cliente, em preparação, e sem portal" data-reveal>
         <div className="site-table__row site-table__row--head" role="row">
           <span className="site-table__corner" role="columnheader">
             <span className="site-sr-only">Assunto</span>
           </span>
           <span className="site-table__head site-table__head--on" role="columnheader">
-            Efficio
+            Com o portal
           </span>
           <span className="site-table__head site-table__head--off" role="columnheader">
             Sem portal

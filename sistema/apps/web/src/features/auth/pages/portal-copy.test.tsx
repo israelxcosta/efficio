@@ -1,25 +1,26 @@
-// The login is the office's portal: its words are the portal's, and it offers no sign-up (access is
-// by invitation of the office); the sign-up screen is only reached from an invite.
+// The login is the team's (there is no client portal yet): it speaks to the office's people and offers
+// no sign-up (access is by invitation of the office); the sign-up screen is only reached from an invite.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
-import { AuthLayout, PORTAL_NODES } from './auth-layout';
-import { LoginFooter, PORTAL_LOGIN_COPY } from './login';
+import { AuthLayout, TEAM_NODES } from './auth-layout';
+import { LoginFooter, TEAM_LOGIN_COPY } from './login';
 
 const render = (node: React.ReactNode) => renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>);
 const GENERIC = /finanças|grátis|honorários gerados|O financeiro da empresa/i;
 
-describe('portal login', () => {
-  it('speaks as the office portal', () => {
-    expect(PORTAL_LOGIN_COPY).toEqual({ title: 'Portal Efficio', subtitle: 'Entre com o e-mail cadastrado pelo escritório.' });
+describe('team login', () => {
+  it('speaks to the office team, not to clients', () => {
+    expect(TEAM_LOGIN_COPY).toEqual({ title: 'Efficio · Acesso da equipe', subtitle: 'Sistema interno do escritório. Entre com o e-mail que o escritório cadastrou para você.' });
     const html = render(
-      <AuthLayout title={PORTAL_LOGIN_COPY.title} subtitle={PORTAL_LOGIN_COPY.subtitle} footer={<LoginFooter state={null} fromInvite={false} />}>
+      <AuthLayout title={TEAM_LOGIN_COPY.title} subtitle={TEAM_LOGIN_COPY.subtitle} footer={<LoginFooter state={null} fromInvite={false} />}>
         <form />
       </AuthLayout>,
     );
-    expect(html).toContain('Portal Efficio');
+    expect(html).toContain('Efficio · Acesso da equipe');
+    expect(html).not.toMatch(/portal/i);
     expect(html).not.toMatch(GENERIC);
-    for (const node of PORTAL_NODES) expect(html).toContain(node.title);
+    for (const node of TEAM_NODES) expect(html).toContain(node.title);
     // The wordmark leads back to the office's site.
     expect(html).toContain('href="/site"');
   });

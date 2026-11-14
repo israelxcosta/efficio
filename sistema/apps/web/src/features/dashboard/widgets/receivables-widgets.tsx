@@ -31,17 +31,18 @@ const BAND_ROW_WITH_BAR_PX = 56;
 /** Body width (px) from which the bands sit side by side as columns (the card's @2xl). */
 const BANDS_AS_COLUMNS_PX = 672;
 
+/** Overdue age bands like the delinquency risk: up to 30 days yellow, 31–60 orange, over 60 red. */
 const AGING_BG: Record<AgingBucket['key'], string> = {
-  ate30: 'bg-aging-1',
-  ate60: 'bg-aging-2',
-  mais60: 'bg-aging-3',
+  ate30: 'bg-chart-yellow',
+  ate60: 'bg-chart-orange',
+  mais60: 'bg-danger',
 };
 
 /** Column bars on wide cards: tinted fill with a solid cap (solid blocks that big get heavy). */
 const AGING_COLUMN: Record<AgingBucket['key'], string> = {
-  ate30: 'bg-aging-1/30 border-aging-1',
-  ate60: 'bg-aging-2/20 border-aging-2',
-  mais60: 'bg-aging-3/20 border-aging-3',
+  ate30: 'bg-chart-yellow/30 border-chart-yellow',
+  ate60: 'bg-chart-orange/20 border-chart-orange',
+  mais60: 'bg-danger/15 border-danger',
 };
 
 /** Overdue receivables: total, share of what is still to receive and the aging bands. */

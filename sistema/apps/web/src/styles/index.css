@@ -43,8 +43,9 @@
   /* Status colours are signals (a change, an overdue fact), dark enough to be read as text. */
   --app-success: #18794a;
   --app-success-soft: #e6f4ec;
-  --app-danger: #c4242a;
-  --app-danger-soft: #fdeceb;
+  /* One red for every "overdue/critical/expense/negative" (owner's #cc3333; AA on white and on the soft). */
+  --app-danger: #cc3333;
+  --app-danger-soft: #fdf0ef;
   --app-warning: #95600f;
   --app-warning-soft: #fdf3dc;
 
@@ -58,10 +59,14 @@
   --app-chart-income-strong: #1e3f8a;
   --app-chart-expense: #c3c8d1;
   --app-chart-expense-strong: #7a818c;
-  /* Despesas no fluxo de caixa e resultado negativo do mês. */
-  --app-chart-negative: #cc3333;
-  /* Pago com atraso e risco alto (laranja) · atenção (amarelo). */
+  /* Despesas no fluxo de caixa e resultado negativo do mês: the same red as `danger`. */
+  --app-chart-negative: var(--app-danger);
+  /*
+   * Resolved late, high risk, 31–60 days overdue (orange) · due soon, waiting, attention, up to 30 days
+   * overdue (yellow). Marks only: text uses `--app-orange-strong` / `--app-warning`.
+   */
   --app-chart-orange: #ff9933;
+  --app-orange-strong: #a84b0f;
   --app-chart-yellow: #ffdb4d;
   /* Neutral series (e.g. the earlier period in comparisons). */
   --app-chart-neutral: #d0d5dd;
@@ -71,10 +76,6 @@
   --app-chart-2: #2f5fbf;
   --app-chart-3: #8fa9dd;
   --app-chart-accent: #2f5fbf;
-  /* Overdue age bands (até 30 / 31–60 / mais de 60 dias), light → dark red. */
-  --app-aging-1: #f3c88e;
-  --app-aging-2: #c9612f;
-  --app-aging-3: #8e2f1b;
 
   /* Former gradient "hero" cards now use a flat brand surface. */
   --app-hero-from: var(--brand-800);
@@ -142,8 +143,9 @@
   --app-chart-income-strong: #c3d4f6;
   --app-chart-expense: #5d5d5b;
   --app-chart-expense-strong: #96958f;
-  --app-chart-negative: #e66464;
+  --app-chart-negative: var(--app-danger);
   --app-chart-orange: #ffa652;
+  --app-orange-strong: #ffa652;
   --app-chart-yellow: #f5cf4a;
   --app-chart-neutral: #5d5d5b;
   --app-chart-grid: #3b3b3b;
@@ -151,9 +153,6 @@
   --app-chart-2: #8fb0ee;
   --app-chart-3: #4f6ea8;
   --app-chart-accent: #8fb0ee;
-  --app-aging-1: #7a5a32;
-  --app-aging-2: #d97b45;
-  --app-aging-3: #e8916f;
 
   --app-hero-from: #323232;
   --app-hero-via: #323232;
@@ -240,9 +239,9 @@
   --color-data-soft: var(--app-data-soft);
   --color-chart-income: var(--app-chart-income);
   --color-chart-expense: var(--app-chart-expense);
-  --color-aging-1: var(--app-aging-1);
-  --color-aging-2: var(--app-aging-2);
-  --color-aging-3: var(--app-aging-3);
+  --color-chart-yellow: var(--app-chart-yellow);
+  --color-chart-orange: var(--app-chart-orange);
+  --color-orange-strong: var(--app-orange-strong);
 
 
   --radius-sm: 8px;

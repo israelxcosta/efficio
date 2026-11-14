@@ -135,7 +135,7 @@ export function ServicesOrbit({ onPick }: { onPick: (service: Service) => void }
                 Fale conosco
               </SectionLink>
             </div>
-            <p className="site-orbit__note">Escolha um serviço para falar sobre ele. Uma equipe, sete frentes, um portal.</p>
+            <p className="site-orbit__note">Escolha um serviço para falar sobre ele. Uma equipe, sete frentes.</p>
           </div>
         </div>
       </div>

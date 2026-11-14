@@ -108,7 +108,7 @@ function DelinquencyKpis({ r }: { r: DelinquencyReportResponse | undefined }) {
       />
       <KpiCard
         compact
-        icon={<AlarmClock className="text-aging-2" />}
+        icon={<AlarmClock className="text-orange-strong" />}
         label="Média de dias de atraso"
         info="Média de dias entre o vencimento e o pagamento das mensalidades atrasadas; as em aberto contam até hoje"
         value={s ? (s.avgDaysLate === null ? 'sem atrasos' : formatDays(s.avgDaysLate)) : loading}

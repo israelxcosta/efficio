@@ -46,7 +46,7 @@ describe('a concluded occurrence', () => {
     const situation = col(render(), 'situation');
     expect(situation).toContain('controle');
     expect(situation).not.toContain('Concluída');
-    expect(situation).toMatch(/text-warning[^>]*>2 dias de atraso</);
+    expect(situation).toMatch(/text-orange-strong[^>]*>2 dias de atraso</);
   });
 
   it('fills "Data de conclusão" (no colour) and "Concluída por", hidden from screen readers', () => {
@@ -76,7 +76,7 @@ describe('a concluded occurrence', () => {
     expect(stacked).toContain('em 22/10');
     expect(stacked).toMatch(/class="[^"]*\bhidden\b[^"]*@sm:inline[^"]*">[^<]*em 22\/10, 07:45/);
     expect(stacked).toContain('Marina C.');
-    expect(stacked).toMatch(/font-medium text-warning[^>]*>[^<]*2 dias de atraso/);
+    expect(stacked).toMatch(/font-medium text-orange-strong[^>]*>[^<]*2 dias de atraso/);
   });
 });
 

@@ -10,6 +10,9 @@ export const CHART_COLORS = {
   expenseStrong: 'var(--app-chart-expense-strong)',
   /** Despesas do fluxo de caixa e resultado negativo do mês. */
   negative: 'var(--app-chart-negative)',
+  /** Resolvido com atraso, risco alto (laranja) · atenção, vence em breve (amarelo): marks only. */
+  orange: 'var(--app-chart-orange)',
+  yellow: 'var(--app-chart-yellow)',
   neutral: 'var(--app-chart-neutral)',
   grid: 'var(--app-chart-grid)',
   axis: 'var(--app-subtle)',

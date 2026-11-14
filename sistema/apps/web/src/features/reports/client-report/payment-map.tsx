@@ -9,10 +9,10 @@ import { paymentBuckets, paymentMap, yearSummaries, type ClientAnalysis, type Pa
 
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
-/** One hue for "paid on time"; amber and red only where the client was or is late. */
+/** "Cores de status": green paid on time, orange paid late, red overdue and still open. */
 const CELL: Record<ReceivableStatus | 'none', string> = {
-  em_dia: 'bg-data-soft text-data',
-  atrasado: 'bg-warning-soft text-warning',
+  em_dia: 'bg-success-soft text-success',
+  atrasado: 'bg-chart-orange/15 text-orange-strong',
   vencido: 'bg-danger-soft text-danger',
   aberto: 'border border-dashed border-border-strong text-subtle',
   none: 'bg-bg-subtle',
@@ -144,8 +144,8 @@ export function PaymentTimingCard({ analysis: a, className, children }: { analys
                 {b.count ? ` · ${Math.round(b.share * 100)}%` : ''}
               </span>
             </div>
-            {/* On time in the data hue; late in grey (the map already flags them in colour). */}
-            <ProgressBar value={b.share} size="sm" color={i < 2 ? 'var(--app-data)' : 'var(--app-chart-expense)'} label={`${b.label}: ${b.count}`} />
+            {/* On time in green; late in grey (the map already flags them in colour). */}
+            <ProgressBar value={b.share} size="sm" color={i < 2 ? 'var(--app-success)' : 'var(--app-chart-expense)'} label={`${b.label}: ${b.count}`} />
           </li>
         ))}
       </ul>

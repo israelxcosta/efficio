@@ -37,7 +37,7 @@
   --site-ui-success-soft: #e6f4ec;
   --site-ui-warning: #95600f;
   --site-ui-warning-soft: #fdf3dc;
-  --site-ui-danger: #c4242a;
+  --site-ui-danger: #cc3333;
 
   /* Shape and rhythm. */
   --r-8: 8px;
@@ -2585,7 +2585,7 @@
 .site-contact__list .site-inline-link {
   font-weight: 500;
 }
-.site-contact__portal {
+.site-contact__client {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2596,7 +2596,7 @@
   font-size: 14px;
   line-height: 18px;
 }
-.site-contact__portal strong {
+.site-contact__client strong {
   font-weight: 600;
 }
 @media (max-width: 1023px) {
@@ -2625,7 +2625,7 @@
   .site-contact__aside {
     padding: 24px 16px;
   }
-  .site-contact__portal {
+  .site-contact__client {
     flex-direction: column;
     align-items: stretch;
   }
@@ -2726,9 +2726,6 @@
 }
 .site-footer__fine:nth-child(2) {
   grid-column: 2 / 4;
-}
-.site-footer__portal {
-  justify-self: end;
 }
 .site-footer__end {
   position: relative;
@@ -2838,9 +2835,6 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
     margin-top: 8px;
-  }
-  .site-footer__portal {
-    justify-self: start;
   }
   .site-footer__end {
     display: flex;
@@ -3242,4 +3236,16 @@
     align-items: center;
     padding: 4px 2px;
   }
+}
+
+/* "Em breve": the client portal is still being prepared (why-bento and the comparison). */
+.site-soon {
+  margin-bottom: 24px;
+}
+.site-why__lead {
+  max-width: 620px;
+  margin-top: 24px;
+  font-size: 18px;
+  line-height: 26px;
+  color: var(--s-on-dark-soft);
 }

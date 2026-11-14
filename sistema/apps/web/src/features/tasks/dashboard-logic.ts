@@ -24,11 +24,11 @@ import {
 import { shortName } from './due';
 
 /**
- * Status tones (docs/dashboards-redesign.md §6): `danger` overdue/late; `warning` due in 30 days or
- * pending issues; `data` up to date/concluded; `dataSoft` 31 to 60 days; `muted` pending/no date.
- * Green stays out of the bands (only positive changes and results are green).
+ * Status tones ("Cores de status" in docs/design-system.md): `danger` overdue/late; `warning` due in
+ * 30 days or pending issues; `success` up to date/concluded; `data` in progress; `dataSoft` 31 to 60
+ * days; `muted` pending/no date.
  */
-export type BandTone = 'danger' | 'warning' | 'data' | 'dataSoft' | 'muted';
+export type BandTone = 'danger' | 'warning' | 'success' | 'data' | 'dataSoft' | 'muted';
 
 export interface Band<K extends string = string> {
   key: K;
@@ -42,6 +42,7 @@ export interface Band<K extends string = string> {
 export const BAND_DOT: Record<BandTone, string> = {
   danger: 'bg-danger',
   warning: 'bg-warning',
+  success: 'bg-success',
   data: 'bg-data',
   dataSoft: 'bg-data/45',
   muted: 'bg-border-strong',
@@ -52,7 +53,7 @@ export const BAND_DOT: Record<BandTone, string> = {
 const DOCUMENT_BAND: Record<DashboardDocumentSituation, { label: string; tone: BandTone }> = {
   overdue: { label: 'Vencidos', tone: 'danger' },
   within30: { label: 'A vencer (30 dias)', tone: 'warning' },
-  ok: { label: 'Em dia', tone: 'data' },
+  ok: { label: 'Em dia', tone: 'success' },
   noDate: { label: 'Sem data', tone: 'muted' },
 };
 
@@ -87,7 +88,7 @@ export function conventionBands(conv: Pick<TaskDashboardResponse['conventions'],
     { key: 'overdue', label: 'Data-base passou', count: overdue, tone: 'danger' },
     { key: 'within30', label: 'Em até 30 dias', count: within30, tone: 'warning' },
     { key: 'within60', label: 'Em 31 a 60 dias', count: within60, tone: 'dataSoft' },
-    { key: 'ok', label: 'Em dia', count: ok, tone: 'data' },
+    { key: 'ok', label: 'Em dia', count: ok, tone: 'success' },
     { key: 'noDate', label: 'Sem data-base', count: conv.noBaseMonth, tone: 'muted' },
   ];
 }
@@ -124,7 +125,7 @@ export function taskStatusBands(s: TaskDashboardResponse['taskStatus']): { bands
     bands: [
       { key: 'overdue', label: 'Atrasadas', count: s.overdue, tone: 'danger' },
       { key: 'pending', label: 'Pendentes', count: s.pending, tone: 'muted' },
-      { key: 'concluded', label: 'Concluídas', count: s.concluded, tone: 'data' },
+      { key: 'concluded', label: 'Concluídas', count: s.concluded, tone: 'success' },
     ],
     percent: s.total ? Math.round((s.concluded / s.total) * 100) : 0,
   };
@@ -154,7 +155,7 @@ export function processRows(rows: TaskDashboardResponse['processes']): TaskDashb
   );
 }
 
-const OVERVIEW_TONE: Record<ClientOverviewStatus, BandTone> = { attention: 'danger', pending: 'warning', upToDate: 'data' };
+const OVERVIEW_TONE: Record<ClientOverviewStatus, BandTone> = { attention: 'danger', pending: 'warning', upToDate: 'success' };
 
 /** "Visão geral dos clientes": Atenção (overdue), Pendências, Em dia — with Effy's hints. */
 export function overviewBands(counts: Record<ClientOverviewStatus, number>): Band<ClientOverviewStatus>[] {
@@ -173,10 +174,10 @@ export function incompleteText(item: { missing: ClientCompletenessField[] }): st
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 const dayMonth = (d: ISODate) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 
-/** Progress bar of a card: concluded (data) → overdue (danger) → pending not overdue (grey). */
+/** Progress bar of a card: concluded (success) → overdue (danger) → pending not overdue (grey). */
 export function progressSegments(s: { done: number; overdue: number; pending: number }): { value: number; tone: BandTone }[] {
   return [
-    { value: s.done, tone: 'data' },
+    { value: s.done, tone: 'success' },
     { value: s.overdue, tone: 'danger' },
     { value: s.pending, tone: 'muted' },
   ];
@@ -199,8 +200,8 @@ export function severityHeadline<K extends string>(bands: Band<K>[]): { value: s
   }
   const total = bands.reduce((a, b) => a + b.count, 0);
   if (total === 0) return { value: '0', label: 'nenhum cadastrado', tone: 'muted' };
-  const ok = bands.find((b) => b.tone === 'data');
-  return { value: `${Math.round(((ok?.count ?? 0) / total) * 100)}%`, label: ok ? lowerFirst(ok.label) : 'em dia', tone: 'data' };
+  const ok = bands.find((b) => b.tone === 'success');
+  return { value: `${Math.round(((ok?.count ?? 0) / total) * 100)}%`, label: ok ? lowerFirst(ok.label) : 'em dia', tone: 'success' };
 }
 
 /** Share of `month` already gone by on `today` (0 before it starts, 1 once it ended). */

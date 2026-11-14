@@ -2,8 +2,8 @@ import { useLayoutEffect, useRef, type AnchorHTMLAttributes, type ReactNode } fr
 import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
 
-/** Address of the portal: the app's login (signed-in users are sent on to their start page). */
-export const PORTAL_PATH = '/login';
+/** The team's login (signed-in users are sent on to their start page). There is no client portal yet. */
+export const TEAM_LOGIN_PATH = '/login';
 
 export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
@@ -52,10 +52,10 @@ export function wipe(label: ReactNode): { 'data-label'?: string } {
   return typeof label === 'string' ? { 'data-label': label } : {};
 }
 
-/** "Portal do cliente": the login of the office's system. */
-export function PortalLink({ className, children = 'Portal do cliente' }: { className?: string; children?: ReactNode }) {
+/** "Acesso da equipe": the login of the office's own system (top and footer only). */
+export function TeamAccessLink({ className, children = 'Acesso da equipe' }: { className?: string; children?: ReactNode }) {
   return (
-    <Link to={PORTAL_PATH} className={cn('site-btn', className)} {...wipe(children)}>
+    <Link to={TEAM_LOGIN_PATH} className={cn('site-btn', className)} {...wipe(children)}>
       {children}
     </Link>
   );

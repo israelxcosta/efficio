@@ -2,7 +2,7 @@ import { useEffect, useState, type ComponentType, type CSSProperties, type React
 import { ArrowRight, CalendarDays, Calculator, CircleCheck, FolderOpen, Inbox, Paperclip, Receipt } from 'lucide-react';
 import { portalFeature, whatsappHref } from '../site-content';
 import { DocThumb, DOCUMENTS, PortalHome, StatusGlyph } from './portal-fragments';
-import { ExternalLink, PortalLink, prefersReducedMotion, wipe } from './site-ui';
+import { ExternalLink, prefersReducedMotion, SectionLink, wipe } from './site-ui';
 
 function Tag({ icon: Icon, children }: { icon: ComponentType<SVGProps<SVGSVGElement>>; children: ReactNode }) {
   return (
@@ -64,7 +64,7 @@ function PendingShot() {
   );
 }
 
-/** A guide's way through the month: worked out, attached to the portal, paid by the due date. */
+/** A guide's way through the month: worked out, sent to the client, paid by the due date. */
 function DeadlineShot() {
   return (
     <div className="site-shot site-shot--flow" aria-hidden>
@@ -89,7 +89,7 @@ function DeadlineShot() {
         <span className="site-shot__badge">
           <Paperclip strokeWidth={1.6} />
         </span>
-        <span className="site-shot__stage-name">No portal</span>
+        <span className="site-shot__stage-name">Enviada</span>
         <div className="site-shot__doc">
           <DocThumb doc={DOCUMENTS[0]!} />
         </div>
@@ -137,7 +137,7 @@ function Deliveries() {
   );
 }
 
-/** "Por que empresas escolhem a Efficio": the portal in four cards and a closing line. */
+/** "Por que empresas escolhem a Efficio": the client portal (in preparation) in four cards and a closing line. */
 export function WhyBento() {
   const guias = portalFeature('guias');
   const documentos = portalFeature('documentos');
@@ -145,10 +145,17 @@ export function WhyBento() {
   const prazos = portalFeature('prazos');
   return (
     <section id="portal" className="site-why" aria-labelledby="portal-title">
+      <p className="site-pill site-soon" data-reveal>
+        Portal do cliente · em breve
+      </p>
       <h2 id="portal-title" className="site-h2 site-why__title" tabIndex={-1} data-section-heading data-reveal>
         Por que empresas
         <br /> escolhem a Efficio
       </h2>
+      <p className="site-why__lead" data-reveal>
+        O portal do cliente está em preparação. Até ele abrir, as guias e os documentos chegam por e-mail e pelo WhatsApp do escritório,
+        cada um com o seu prazo.
+      </p>
 
       <div className="site-bento">
         <article className="site-bento__card site-bento__card--row" data-reveal>
@@ -156,7 +163,7 @@ export function WhyBento() {
             <Tag icon={Receipt}>Guias</Tag>
             <h3 className="site-h3 site-bento__title">{guias.sentence}</h3>
             <p className="site-bento__text">
-              Cada obrigação do mês aparece no portal com o prazo e a situação, e a guia fica anexada a ela. {guias.result}
+              No portal, cada obrigação do mês vai aparecer com o prazo e a situação, e a guia anexada a ela. {guias.result}
             </p>
           </div>
           <div className="site-bento__shot site-bento__shot--home" aria-hidden>
@@ -174,7 +181,7 @@ export function WhyBento() {
             <Tag icon={FolderOpen}>Documentos</Tag>
             <h3 className="site-h4 site-bento__title">{documentos.sentence}</h3>
             <p className="site-bento__text">
-              Guias, holerites, recibos e certidões ficam no mês a que pertencem, prontos para baixar. {documentos.result}
+              No portal, guias, holerites, recibos e certidões vão ficar no mês a que pertencem, prontos para baixar. {documentos.result}
             </p>
           </div>
         </article>
@@ -187,7 +194,7 @@ export function WhyBento() {
             <Tag icon={Inbox}>Pendências</Tag>
             <h3 className="site-h4 site-bento__title">{pendencias.sentence}</h3>
             <p className="site-bento__text">
-              Quando o escritório precisa de um extrato ou de uma nota, o pedido aparece em destaque, com a data, até você enviar o arquivo.{' '}
+              No portal, quando o escritório precisar de um extrato ou de uma nota, o pedido vai aparecer em destaque, com a data, até você enviar o arquivo.{' '}
               {pendencias.result}
             </p>
           </div>
@@ -198,7 +205,7 @@ export function WhyBento() {
             <Tag icon={CalendarDays}>Prazos</Tag>
             <h3 className="site-h3 site-bento__title">{prazos.sentence}</h3>
             <p className="site-bento__text">
-              Você vê a situação de cada entrega sem precisar perguntar: apurada, anexada, paga. {prazos.result}
+              No portal, você vai ver a situação de cada entrega sem precisar perguntar: apurada, enviada, paga. {prazos.result}
             </p>
           </div>
           <div className="site-bento__shot">
@@ -210,7 +217,7 @@ export function WhyBento() {
           <div className="site-bento__close-copy">
             <Deliveries />
             <p className="site-bento__close-text">
-              A Efficio entrega cada peça do mês pronta e anexada no portal, para você conferir e baixar sem procurar em e-mail ou conversa.
+              Hoje a Efficio entrega cada peça do mês pronta, por e-mail e pelo WhatsApp do escritório. Com o portal, ela vai ficar anexada ao mês, para você conferir e baixar sem procurar.
             </p>
           </div>
           <div className="site-actions site-bento__close-actions">
@@ -221,7 +228,9 @@ export function WhyBento() {
             >
               Pedir proposta
             </ExternalLink>
-            <PortalLink className="site-btn--ghost" />
+            <SectionLink to="contato" className="site-btn site-btn--ghost" {...wipe('Fale conosco')}>
+              Fale conosco
+            </SectionLink>
           </div>
         </div>
       </div>

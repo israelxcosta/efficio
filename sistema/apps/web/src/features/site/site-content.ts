@@ -54,7 +54,7 @@ export const NAV = [
 
 /** A faixa abaixo do topo: o que o escritório garante, sem selo de terceiros. */
 export const GUARANTEES = [
-  { id: 'duas-etapas', title: 'Portal com duas etapas', caption: 'Código do aplicativo autenticador' },
+  { id: 'entregas', title: 'Guias por e-mail e WhatsApp', caption: 'Cada uma com o seu prazo' },
   { id: 'lgpd', title: 'Seus dados protegidos', caption: 'Tratamento conforme a LGPD' },
   { id: 'whatsapp', title: 'Atendimento pelo WhatsApp', caption: OFFICE.hours },
   { id: 'crc', title: 'Registro no CRC', caption: OFFICE.crc },
@@ -66,13 +66,13 @@ export const DUE_NUMBERS = [
     id: 'guias',
     figure: '20',
     label: 'Guias',
-    text: 'Dia de vencimento do DAS, do INSS e do FGTS. As guias chegam ao seu portal antes dele.',
+    text: 'Dia de vencimento do DAS, do INSS e do FGTS. As guias chegam antes dele, por e-mail e pelo WhatsApp do escritório.',
   },
   {
     id: 'folha',
     figure: '5º',
     label: 'Folha',
-    text: 'Dia útil do mês: a folha fechada e os holerites da equipe prontos no portal.',
+    text: 'Dia útil do mês: a folha fechada e os holerites da equipe enviados por e-mail e pelo WhatsApp.',
   },
 ] as const;
 
@@ -96,7 +96,7 @@ export const SERVICES: Service[] = [
   { id: 'certidoes', name: 'Certidões', detail: 'CND federal, CRF do FGTS, estadual e municipal, com a validade.' },
 ];
 
-/** Frases do portal: cada uma com a consequência em números (dados de exemplo das telas). */
+/** Frases do portal do cliente (em preparação): cada uma com a consequência em números (dados de exemplo das telas). */
 export const PORTAL_FEATURES = [
   { id: 'guias', sentence: 'As guias chegam antes do vencimento', result: 'DAS de setembro anexado em 17/10, três dias antes do vencimento.' },
   { id: 'pendencias', sentence: 'O que depende de você fica separado', result: '1 pendência: extratos bancários de setembro, pedidos em 06/10.' },
@@ -111,13 +111,13 @@ export function portalFeature(id: PortalFeatureId) {
   return PORTAL_FEATURES.find((f) => f.id === id)!;
 }
 
-/** A tabela "Contabilidade com portal": o mesmo assunto com o portal e sem ele. */
+/** A tabela "Contabilidade com portal" (em breve): o mesmo assunto com o portal e sem ele. */
 export const COMPARISON = [
   {
     id: 'guias',
     label: 'Guias',
     with: 'Chegam ao portal antes do vencimento, anexadas à obrigação',
-    without: 'Chegam por e-mail ou mensagem, perto do prazo',
+    without: 'Cada guia num e-mail ou numa conversa diferente',
   },
   {
     id: 'pendencias',
@@ -159,7 +159,7 @@ export const AUDIENCES: { id: AudienceId; name: string; text: string }[] = [
   { id: 'simples', name: 'Simples Nacional', text: 'O DAS apurado no PGDAS-D, a DEFIS no ano e, com funcionários, a folha, o eSocial e o FGTS Digital.' },
   { id: 'presumido', name: 'Lucro Presumido', text: 'PIS e COFINS todo mês, IRPJ e CSLL no trimestre, EFD-Contribuições, ECD e ECF.' },
   { id: 'real', name: 'Lucro Real', text: 'IRPJ e CSLL por estimativa, EFD-Reinf, SPED e o balancete conferido todo mês.' },
-  { id: 'servicos', name: 'Prestadores de serviço', text: 'Notas de serviço, ISS e retenções conferidos mês a mês, com as guias no portal.' },
+  { id: 'servicos', name: 'Prestadores de serviço', text: 'Notas de serviço, ISS e retenções conferidos mês a mês, com as guias por e-mail e WhatsApp.' },
   { id: 'comercio', name: 'Comércio', text: 'Notas de compra e venda, ICMS e SPED Fiscal no prazo do seu estado.' },
   { id: 'liberais', name: 'Profissionais liberais', text: 'Abertura da empresa, escolha do regime e pró-labore para quem trabalha por conta própria.' },
 ];
@@ -186,8 +186,8 @@ export const STEPS: { id: StepId; name: string; text: string; note?: string }[] 
   },
   {
     id: 'portal',
-    name: 'Portal',
-    text: 'Você recebe o link do convite, cria a sua conta com o seu e-mail e passa a ver as obrigações do mês, os documentos e o que depende de você.',
+    name: 'Portal (em breve)',
+    text: 'Até o portal do cliente abrir, as guias e os documentos chegam por e-mail e pelo WhatsApp do escritório. Quando ele abrir, você recebe o convite por e-mail.',
   },
   {
     id: 'rotina',
@@ -196,29 +196,24 @@ export const STEPS: { id: StepId; name: string; text: string; note?: string }[] 
   },
 ];
 
-export type FaqTopic = 'portal' | 'troca' | 'honorarios';
+export type FaqTopic = 'entregas' | 'troca' | 'honorarios';
 
 export const FAQ_TOPICS: { id: FaqTopic; label: string }[] = [
-  { id: 'portal', label: 'Portal' },
+  { id: 'entregas', label: 'Guias e portal' },
   { id: 'troca', label: 'Troca de contador' },
   { id: 'honorarios', label: 'Honorários' },
 ];
 
 export const FAQ: { q: string; a: string; topic: FaqTopic }[] = [
   {
-    topic: 'portal',
-    q: 'Como recebo o acesso ao portal?',
-    a: 'O escritório envia o link do convite para o seu e-mail e você cria a conta com ele. Depois é só entrar pelo botão Portal do cliente, no topo desta página.',
+    topic: 'entregas',
+    q: 'Como recebo as guias e os documentos do mês?',
+    a: 'Por e-mail e pelo WhatsApp do escritório, cada um com o seu prazo: as guias antes do vencimento e a folha com os holerites até o 5º dia útil.',
   },
   {
-    topic: 'portal',
-    q: 'Esqueci a senha. E agora?',
-    a: 'Na tela de entrada, use “Esqueci minha senha”: chega um link no seu e-mail para criar outra. Se o e-mail não chegar, fale com o escritório.',
-  },
-  {
-    topic: 'portal',
-    q: 'O portal tem verificação em duas etapas?',
-    a: 'Tem. Nas configurações da sua conta você ativa o código do aplicativo autenticador, e ele passa a ser pedido a cada novo acesso.',
+    topic: 'entregas',
+    q: 'O portal do cliente já está disponível?',
+    a: 'Ainda não: ele está em preparação. Quando abrir, você recebe o convite por e-mail para criar o seu acesso.',
   },
   {
     topic: 'troca',

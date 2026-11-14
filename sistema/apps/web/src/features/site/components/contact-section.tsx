@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { contactMessage, mailtoHref, OFFICE, whatsappHref } from '../site-content';
-import { ExternalLink, PortalLink } from './site-ui';
+import { ExternalLink } from './site-ui';
 
 /**
  * "Fale com o escritório" on the lime card: the form writes the WhatsApp message (name + subject) and
@@ -81,11 +81,11 @@ export function ContactSection({ subject, onSubjectChange }: { subject: string; 
               <dd>{OFFICE.address}</dd>
             </div>
           </dl>
-          <div className="site-contact__portal">
+          <div className="site-contact__client">
             <p>
-              <strong>Já é cliente?</strong> Guias, documentos e pendências do mês estão no portal.
+              <strong>Já é cliente?</strong> As guias e os documentos do mês chegam por e-mail e pelo WhatsApp do escritório, cada um
+              com o seu prazo.
             </p>
-            <PortalLink className="site-btn--sm">Entrar no portal</PortalLink>
           </div>
         </aside>
       </div>

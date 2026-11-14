@@ -11,7 +11,7 @@ import { cn, pluralize } from '@/lib/utils';
 import { formatDays, lateFinding, lateTrend, monthBars, type BarMode, type MonthBar } from '../delinquency-view';
 import { MonthTick } from './month-tick';
 
-const ON_TIME = 'var(--app-data)';
+const ON_TIME = CHART_COLORS.success;
 const PAID_LATE = 'var(--app-chart-orange)';
 const OPEN_LATE = CHART_COLORS.danger;
 

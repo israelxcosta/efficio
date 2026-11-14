@@ -73,8 +73,8 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Crie seu acesso ao portal"
-      subtitle="Use o e-mail em que você recebeu o convite do escritório."
+      title="Crie seu acesso da equipe"
+      subtitle="O cadastro é só por convite: use o e-mail em que você recebeu o convite do escritório."
       footer={
         <>
           Já tem acesso?{' '}

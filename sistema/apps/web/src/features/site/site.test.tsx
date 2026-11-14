@@ -1,5 +1,5 @@
-// Public site of the office: who sees it (visitors at `/`, everyone at `/site`), the portal button
-// (the app's login), the WhatsApp links and the month of obligations shown by its calendar.
+// Public site of the office: who sees it (visitors at `/`, everyone at `/site`), the team's access
+// (the app's login; there is no client portal yet), the WhatsApp links and the month of obligations.
 import { isValidElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
@@ -9,10 +9,10 @@ import { AppShell } from '@/components/layout/app-shell';
 import { FaqSection } from './components/faq-section';
 import { monthFigures } from './components/month-showcase';
 import { ServicesOrbit } from './components/services-orbit';
-import { AnnouncementBar } from './components/site-header';
+import { AnnouncementBar, SiteHeader } from './components/site-header';
 import { SiteFooter } from './components/site-footer';
 import { SiteHero } from './components/site-hero';
-import { PORTAL_PATH } from './components/site-ui';
+import { TEAM_LOGIN_PATH } from './components/site-ui';
 import { calendarCells, easter, lastBusinessDay, monthAgenda, nationalHolidays } from './obligations';
 import { contactMessage, FAQ, FAQ_TOPICS, OFFICE, SERVICES, whatsappHref } from './site-content';
 import { shellEntry, SITE_PATH, SitePage } from './site-entry';
@@ -51,18 +51,24 @@ describe('who sees the site', () => {
   });
 });
 
-describe('portal button', () => {
+describe('team access', () => {
   const render = (node: React.ReactNode) => renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>);
+  const loginLinks = (html: string) => html.match(/<a[^>]*href="\/login"[^>]*>/g) ?? [];
 
-  it('leads from the top of the page to the login', () => {
-    const html = render(<SiteHero />);
-    expect(PORTAL_PATH).toBe('/login');
-    expect(html).toMatch(/<a[^>]*href="\/login"[^>]*>.*Portal do cliente<\/a>/);
+  it('leads from the top of the page to the login, as the team\'s access', () => {
+    const html = render(<SiteHeader />);
+    expect(TEAM_LOGIN_PATH).toBe('/login');
+    expect(html).toMatch(/<a[^>]*href="\/login"[^>]*>Acesso da equipe<\/a>/);
+    expect(loginLinks(html)).toHaveLength(1);
   });
 
-  it('is repeated at the end of the page', () => {
-    const html = render(<SiteFooter />);
-    expect(html).toMatch(/<a[^>]*href="\/login"[^>]*>.*Entrar no portal<\/a>/);
+  it('is repeated once at the end of the page, and the hero promises no portal', () => {
+    const footer = render(<SiteFooter />);
+    expect(footer).toMatch(/<a[^>]*href="\/login"[^>]*>Acesso da equipe<\/a>/);
+    expect(loginLinks(footer)).toHaveLength(1);
+    const hero = render(<SiteHero />);
+    expect(loginLinks(hero)).toHaveLength(0);
+    expect(hero).not.toMatch(/portal|Entrar no/i);
   });
 
   it('opens WhatsApp in a new tab without handing it this page', () => {
@@ -71,10 +77,12 @@ describe('portal button', () => {
     expect(html).toContain('rel="noopener noreferrer"');
   });
 
-  it('is offered by the bar on top of the page, which can be closed', () => {
+  it('leaves the bar on top of the page to the first talk on WhatsApp, which can be closed', () => {
     const html = render(<AnnouncementBar />);
-    // "Entrar no portal" (the "no portal" part hides on phones, where the bar has one line).
-    expect(html).toMatch(/<a[^>]*href="\/login"[^>]*><span>Entrar<span[^>]*> no portal<\/span><\/span>/);
+    expect(html).toContain('Primeira conversa sem compromisso');
+    // "Chamar no WhatsApp" (the "no WhatsApp" part hides on phones, where the bar has one line).
+    expect(html).toMatch(/<a[^>]*href="https:\/\/wa\.me\/[^"]*"[^>]*><span>Chamar<span[^>]*> no WhatsApp<\/span><\/span>/);
+    expect(html).not.toMatch(/portal|href="\/login"/i);
     expect(html).toContain('aria-label="Fechar aviso"');
   });
 });
@@ -97,6 +105,14 @@ describe('the questions', () => {
     const topics = new Set(FAQ_TOPICS.map((t) => t.id));
     for (const item of FAQ) expect(topics.has(item.topic)).toBe(true);
     for (const t of FAQ_TOPICS) expect(FAQ.some((item) => item.topic === t.id)).toBe(true);
+  });
+
+  it('says how the month arrives and that the client portal is still being prepared', () => {
+    const questions = FAQ.map((item) => item.q);
+    expect(questions).toContain('Como recebo as guias e os documentos do mês?');
+    expect(questions).toContain('O portal do cliente já está disponível?');
+    expect(questions.join(' ')).not.toMatch(/acesso ao portal|senha|duas etapas/i);
+    expect(FAQ.find((item) => item.q.startsWith('Como recebo'))!.a).toMatch(/e-mail e pelo WhatsApp do escritório/);
   });
 
   it('shows all topics first, with the answers closed and tied to their questions', () => {

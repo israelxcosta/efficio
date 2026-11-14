@@ -1,17 +1,17 @@
 import { Link } from 'react-router';
 import { ArrowUp } from 'lucide-react';
 import { mailtoHref, OFFICE, whatsappHref } from '../site-content';
-import { ExternalLink, PortalLink, prefersReducedMotion, SectionLink, wipe } from './site-ui';
+import { ExternalLink, prefersReducedMotion, SectionLink, TEAM_LOGIN_PATH, wipe } from './site-ui';
 
 const BIG_LINKS: { id: string; label: string }[][] = [
   [
     { id: 'mes', label: 'O seu mês' },
     { id: 'servicos', label: 'Serviços' },
-    { id: 'portal', label: 'Portal' },
+    { id: 'portal', label: 'Portal (em breve)' },
     { id: 'comecar', label: 'Como começar' },
   ],
   [
-    { id: 'comparar', label: 'Com portal' },
+    { id: 'comparar', label: 'Comparativo' },
     { id: 'para-quem', label: 'Para quem' },
     { id: 'duvidas', label: 'Dúvidas' },
     { id: 'contato', label: 'Contato' },
@@ -54,10 +54,7 @@ export function SiteFooter() {
           ))}
           <ul className="site-footer__small">
             <li>
-              <Link to="/login">Entrar no portal</Link>
-            </li>
-            <li>
-              <Link to="/esqueci-senha">Esqueci minha senha</Link>
+              <Link to={TEAM_LOGIN_PATH}>Acesso da equipe</Link>
             </li>
             <li>
               <ExternalLink href={whatsappHref('Olá! Vim pelo site do escritório.')}>WhatsApp</ExternalLink>
@@ -86,12 +83,11 @@ export function SiteFooter() {
 
         <div className="site-footer__base">
           <p className="site-footer__fine">
-            {OFFICE.name} · Registro {OFFICE.crc}. Telas do portal com dados de exemplo.
+            {OFFICE.name} · Registro {OFFICE.crc}. Telas do portal do cliente (em preparação) com dados de exemplo.
           </p>
           <p className="site-footer__fine">
             © {year} {OFFICE.name}. Todos os direitos reservados.
           </p>
-          <PortalLink className="site-btn--white site-btn--sm site-footer__portal">Entrar no portal</PortalLink>
         </div>
       </div>
 
@@ -105,7 +101,13 @@ export function SiteFooter() {
           >
             Pedir proposta
           </ExternalLink>
-          <PortalLink className="site-btn--paper site-btn--xl" />
+          <ExternalLink
+            href={whatsappHref('Olá! Vim pelo site e quero falar com o escritório.')}
+            className="site-btn site-btn--paper site-btn--xl"
+            {...wipe('Fale conosco')}
+          >
+            Fale conosco
+          </ExternalLink>
         </div>
         <button
           type="button"

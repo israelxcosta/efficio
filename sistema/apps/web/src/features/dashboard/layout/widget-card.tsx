@@ -119,7 +119,7 @@ export function WidgetCard({ title, subtitle, info, action, alert, footer, child
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            {alert ? <span className="size-1.5 shrink-0 rounded-full bg-danger" aria-hidden /> : null}
+            {alert ? <span role="img" aria-label={alert.label} title={alert.label} className="size-1.5 shrink-0 rounded-full bg-danger" /> : null}
             <h3 className={cn('truncate text-title-sm font-semibold tracking-tight', hero ? 'text-white' : 'text-fg')}>{heading}</h3>
             {info ? (
               <Tooltip content={info}>

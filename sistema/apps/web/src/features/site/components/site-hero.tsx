@@ -1,10 +1,10 @@
 import type { ComponentType, CSSProperties, SVGProps } from 'react';
-import { BadgeCheck, KeyRound, LockKeyhole, MessageCircle } from 'lucide-react';
+import { BadgeCheck, LockKeyhole, Mail, MessageCircle } from 'lucide-react';
 import { GUARANTEES, OFFICE, whatsappHref } from '../site-content';
-import { ExternalLink, PortalLink, wipe } from './site-ui';
+import { ExternalLink, SectionLink, wipe } from './site-ui';
 
 const GUARANTEE_ICON: Record<(typeof GUARANTEES)[number]['id'], ComponentType<SVGProps<SVGSVGElement>>> = {
-  'duas-etapas': KeyRound,
+  entregas: Mail,
   lgpd: LockKeyhole,
   whatsapp: MessageCircle,
   crc: BadgeCheck,
@@ -16,7 +16,7 @@ function sheet(x: number, y: number, w: number, h: number, fold = 22): string {
 }
 
 /**
- * The office's month as a drawing: the DAS (a document) goes through the portal (the navy panel with
+ * The office's month as a drawing: the DAS (a document) goes through the office (the navy panel with
  * the lime lines being filled) and the payslip comes out checked. Loops softly; still with reduced motion.
  */
 function HeroFlow() {
@@ -93,8 +93,8 @@ export function SiteHero() {
               Sua empresa em dia com o fisco, sem papel na mesa
             </h1>
             <p className="site-hero__lead">
-              A Efficio cuida da contabilidade, dos impostos e da folha. Você acompanha guias, documentos e prazos do mês pelo portal do
-              cliente.
+              A Efficio cuida da contabilidade, dos impostos e da folha. As guias e os documentos do mês chegam por e-mail e pelo
+              WhatsApp do escritório, cada um com o seu prazo.
             </p>
           </div>
           <div className="site-actions">
@@ -105,7 +105,9 @@ export function SiteHero() {
             >
               Pedir proposta
             </ExternalLink>
-            <PortalLink className="site-btn--ghost-inverse" />
+            <SectionLink to="contato" className="site-btn site-btn--ghost-inverse" {...wipe('Fale conosco')}>
+              Fale conosco
+            </SectionLink>
           </div>
         </div>
         <div className="site-hero__media">

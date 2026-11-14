@@ -1,8 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Link } from 'react-router';
 import { ArrowRight, Menu, X } from 'lucide-react';
 import { NAV, whatsappHref } from '../site-content';
-import { ExternalLink, goToSection, PORTAL_PATH, PortalLink, SectionLink, wipe } from './site-ui';
+import { ExternalLink, goToSection, SectionLink, TeamAccessLink, wipe } from './site-ui';
 
 const ANNOUNCE_KEY = 'efficio-site-announce-closed';
 
@@ -14,7 +13,7 @@ function readClosed(): boolean {
   }
 }
 
-/** The lime bar on top of the page: one line about the portal, closed for the rest of the visit. */
+/** The lime bar on top of the page: the first talk on WhatsApp, closed for the rest of the visit. */
 export function AnnouncementBar() {
   const [closed, setClosed] = useState(readClosed);
   if (closed) return null;
@@ -22,15 +21,15 @@ export function AnnouncementBar() {
     <div className="site-announce" role="region" aria-label="Aviso">
       <p className="site-announce__inner">
         <span className="site-announce__text">
-          <span className="site-announce__long">Portal do cliente: guias, documentos e prazos do mês num só lugar</span>
-          <span className="site-announce__short">Guias e prazos do mês no portal</span>
+          <span className="site-announce__long">Primeira conversa sem compromisso pelo WhatsApp</span>
+          <span className="site-announce__short">Primeira conversa sem compromisso</span>
         </span>
-        <Link to={PORTAL_PATH} className="site-announce__link">
+        <ExternalLink href={whatsappHref('Olá! Vim pelo site e quero marcar uma primeira conversa.')} className="site-announce__link">
           <span>
-            Entrar<span className="site-announce__more"> no portal</span>
+            Chamar<span className="site-announce__more"> no WhatsApp</span>
           </span>
           <ArrowRight aria-hidden />
-        </Link>
+        </ExternalLink>
       </p>
       <button
         type="button"
@@ -110,7 +109,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="site-header__actions">
-          <PortalLink className="site-btn--sm" />
+          <TeamAccessLink className="site-btn--sm" />
           <ExternalLink
             href={whatsappHref('Olá! Vim pelo site e quero falar com o escritório.')}
             className="site-btn site-btn--ghost site-btn--sm site-header__contact"

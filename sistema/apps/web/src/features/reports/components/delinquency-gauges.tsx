@@ -11,8 +11,8 @@ import { bandNames, formatChance, reworkSummary, riskBands } from '../delinquenc
  */
 export const RISK_TONE: Record<DelinquencyRisk, { text: string; bg: string; soft: string; color: string }> = {
   baixo: { text: 'text-fg', bg: 'bg-[var(--app-chart-neutral)]', soft: 'bg-bg-subtle text-muted', color: 'var(--app-chart-neutral)' },
-  moderado: { text: 'text-warning', bg: 'bg-[var(--app-chart-yellow)]', soft: 'bg-warning-soft text-warning', color: 'var(--app-chart-yellow)' },
-  alto: { text: 'text-aging-3', bg: 'bg-[var(--app-chart-orange)]', soft: 'bg-aging-2/15 text-aging-3', color: 'var(--app-chart-orange)' },
+  moderado: { text: 'text-warning', bg: 'bg-chart-yellow', soft: 'bg-warning-soft text-warning', color: 'var(--app-chart-yellow)' },
+  alto: { text: 'text-orange-strong', bg: 'bg-chart-orange', soft: 'bg-chart-orange/15 text-orange-strong', color: 'var(--app-chart-orange)' },
   critico: { text: 'text-danger', bg: 'bg-danger', soft: 'bg-danger-soft text-danger', color: 'var(--app-danger)' },
 };
 

@@ -1,5 +1,6 @@
 import { formatDateBR, type DashboardResponse, type WorkspaceKind } from '@effinance/shared';
 import { summarizeProjection } from '@/components/charts/chart-scale';
+import { pluralize } from '@/lib/utils';
 import { useOfficeClients, useOverduePayables, useOverdueReceivables, useProjection } from '../widgets/data';
 import { isVisible } from './layout';
 import { SPEC_BY_ID } from './specs';
@@ -33,26 +34,26 @@ export function useDashboardAlerts({
   const alerts: Partial<Record<WidgetId, WidgetAlert>> = {};
   const overdueIn = receivables.data?.summary;
   if (shown('inadimplencia') && overdueIn && overdueIn.overdueCount > 0) {
-    alerts.inadimplencia = { count: overdueIn.overdueCount, label: 'recebimento(s) vencido(s)', href: OVERDUE_RECEIVABLES_HREF };
+    alerts.inadimplencia = { count: overdueIn.overdueCount, label: pluralize(overdueIn.overdueCount, 'recebimento vencido', 'recebimentos vencidos'), href: OVERDUE_RECEIVABLES_HREF };
   }
   // Dashboard count: card purchases stay out (an overdue invoice is reported by the card widget).
   const overdueOut = d?.overdue.count ?? 0;
   if (shown('proximos-vencimentos') && overdueOut > 0) {
-    alerts['proximos-vencimentos'] = { count: overdueOut, label: 'conta(s) a pagar vencida(s)', href: OVERDUE_PAYABLES_HREF };
+    alerts['proximos-vencimentos'] = { count: overdueOut, label: pluralize(overdueOut, 'conta a pagar vencida', 'contas a pagar vencidas'), href: OVERDUE_PAYABLES_HREF };
   }
   const invoices = d?.invoicesToPay.length ?? 0;
   if (shown('fatura-cartao') && invoices > 0) {
-    alerts['fatura-cartao'] = { count: invoices, label: 'fatura(s) fechada(s) em aberto', href: '/cartoes' };
+    alerts['fatura-cartao'] = { count: invoices, label: pluralize(invoices, 'fatura fechada em aberto', 'faturas fechadas em aberto'), href: '/cartoes' };
   }
   if (projection && cashflow.data && overdueIn && payables.data) {
     const { negativeFrom } = summarizeProjection(cashflow.data, overdueIn.overdue - payables.data.summary.overdue, prefs.projecaoDias);
     if (negativeFrom) {
-      alerts['projecao-caixa'] = { count: 1, label: `saldo negativo previsto em ${formatDateBR(negativeFrom)}`, href: '/relatorios?aba=cashflow' };
+      alerts['projecao-caixa'] = { count: 1, label: `Saldo negativo previsto em ${formatDateBR(negativeFrom)}`, href: '/relatorios?aba=cashflow' };
     }
   }
   const withoutFee = clients.data?.summary.withoutCurrentFee ?? 0;
   if (shown('vigencias-honorarios') && withoutFee > 0) {
-    alerts['vigencias-honorarios'] = { count: withoutFee, label: 'cliente(s) sem vigência de honorários', href: '/clientes' };
+    alerts['vigencias-honorarios'] = { count: withoutFee, label: pluralize(withoutFee, 'cliente sem vigência de honorários', 'clientes sem vigência de honorários'), href: '/clientes' };
   }
   return alerts;
 }

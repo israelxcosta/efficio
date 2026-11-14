@@ -67,7 +67,7 @@ export function MonthShowcase({ today = new Date() }: { today?: Date }) {
             As obrigações do seu mês, dia a dia
           </h2>
           <p className="site-mes__lead">
-            Escolha o regime e veja o que vence em {monthName}. É essa agenda que o escritório cumpre por você, e que você acompanha no portal.
+            Escolha o regime e veja o que vence em {monthName}. É essa agenda que o escritório cumpre por você, com as guias enviadas por e-mail e pelo WhatsApp do escritório.
           </p>
 
           <div className="site-mes__controls">

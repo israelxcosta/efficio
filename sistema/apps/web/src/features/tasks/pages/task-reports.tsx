@@ -190,8 +190,8 @@ export default function TaskReportsPage() {
             <Block className="lg:col-span-8 print:col-span-2" title="Pontualidade por mês" subtitle={f.preset === 'month' ? `Concluídas no prazo e com atraso nos últimos 6 meses, até ${formatMonthKey(f.month).split(' ')[0]!.toLowerCase()}` : `Concluídas no prazo e com atraso · ${label.charAt(0).toLowerCase()}${label.slice(1)}`}
               action={
                 <span className="hidden gap-3 sm:flex">
-                  <LegendDot size="sm" color={CHART_COLORS.brand} label="No prazo" />
-                  <LegendDot size="sm" color={CHART_COLORS.danger} label="Com atraso" />
+                  <LegendDot size="sm" color={CHART_COLORS.success} label="No prazo" />
+                  <LegendDot size="sm" color={CHART_COLORS.orange} label="Com atraso" />
                 </span>
               }
             >
@@ -415,9 +415,9 @@ function ReportSummary({ r, situation, onSituation }: { r: TaskReportResponse | 
   const rate = s && s.done > 0 ? Math.round((s.doneOnTime / s.done) * 100) : null;
   const notCanceled = s ? s.total - s.canceled : 0;
   const toggle = (v: ReportSituation) => onSituation(situation === v ? '' : v);
-  const number = (value: ReactNode, tone?: 'danger', big?: boolean) =>
+  const number = (value: ReactNode, tone?: 'danger' | 'late', big?: boolean) =>
     s ? (
-      <span className={cn('tabular mt-1 block leading-10 font-semibold tracking-tight', big ? 'text-[32px] lg:text-[28px] xl:text-[32px]' : 'text-kpi', tone === 'danger' ? 'text-danger' : 'text-fg')}>{value}</span>
+      <span className={cn('tabular mt-1 block leading-10 font-semibold tracking-tight', big ? 'text-[32px] lg:text-[28px] xl:text-[32px]' : 'text-kpi', tone === 'danger' ? 'text-danger' : tone === 'late' ? 'text-orange-strong' : 'text-fg')}>{value}</span>
     ) : (
       <span className="mt-1 flex h-10 items-center">
         <Skeleton className={big ? 'h-8 w-16' : 'h-6 w-10'} />
@@ -436,7 +436,7 @@ function ReportSummary({ r, situation, onSituation }: { r: TaskReportResponse | 
           {s ? <p className="mt-1 text-body-sm text-muted">de {notCanceled} ({notCanceled ? Math.round((s.done / notCanceled) * 100) : 0}% das não canceladas)</p> : null}
         </SummaryButton>
         <SummaryButton className="border-t border-l md:border-t-0" pressed={situation === 'doneLate'} label="Com atraso" aria={s ? `Concluídas com atraso: ${s.doneLate}. Filtrar.` : 'Com atraso'} onClick={() => toggle('doneLate')}>
-          {number(s?.doneLate ?? 0, s && s.doneLate > 0 ? 'danger' : undefined)}
+          {number(s?.doneLate ?? 0, s && s.doneLate > 0 ? 'late' : undefined)}
           {s ? <p className="mt-1 text-body-sm text-muted">concluídas depois do prazo</p> : null}
         </SummaryButton>
         <SummaryButton className="border-t md:border-l-0 lg:border-t-0 lg:border-l" pressed={situation === 'open'} label="Em aberto" aria={s ? `Em aberto: ${s.open}, mais ${s.overdue} atrasadas. Filtrar.` : 'Em aberto'} onClick={() => toggle('open')}>
@@ -507,7 +507,7 @@ interface MonthPoint {
   late: number;
 }
 
-/** Concluded on time (data) and late (danger) per due month (§14.1); a click picks the month. */
+/** Concluded on time (success) and late (orange) per due month (§14.1); a click picks the month. */
 function MonthlyPunctualityChart({ rows, range, onPick }: { rows: TaskBreakdownRow[]; range: { from: string; to: string }; onPick: (month: string) => void }) {
   // Every month of the range, the empty ones as zero (a month without conclusions is data too).
   const data = useMemo<MonthPoint[]>(() => {
@@ -533,8 +533,8 @@ function MonthlyPunctualityChart({ rows, range, onPick }: { rows: TaskBreakdownR
             <XAxis dataKey="label" {...categoryAxisProps} />
             <YAxis {...axisProps} allowDecimals={false} width={32} />
             <ChartTooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MonthTooltip />} />
-            <Bar dataKey="onTime" stackId="m" fill="var(--app-data)" maxBarSize={36} isAnimationActive={false} />
-            <Bar dataKey="late" stackId="m" fill={CHART_COLORS.danger} radius={[6, 6, 0, 0]} maxBarSize={36} isAnimationActive={false} />
+            <Bar dataKey="onTime" stackId="m" fill={CHART_COLORS.success} maxBarSize={36} isAnimationActive={false} />
+            <Bar dataKey="late" stackId="m" fill={CHART_COLORS.orange} radius={[6, 6, 0, 0]} maxBarSize={36} isAnimationActive={false} />
           </BarChart>
         </ChartBox>
       </div>
@@ -579,7 +579,7 @@ function MonthTooltip({ active, payload }: { active?: boolean; payload?: readonl
 function StatusBar100({ r }: { r: TaskReportResponse }) {
   const s = r.summary;
   const parts = [
-    { label: 'Concluídas', value: s.done, color: 'var(--app-data)' },
+    { label: 'Concluídas', value: s.done, color: 'var(--app-success)' },
     { label: 'Em aberto', value: s.open, color: 'var(--app-data-soft)' },
     { label: 'Atrasadas', value: s.overdue, color: 'var(--app-danger)' },
     { label: 'Canceladas', value: s.canceled, color: 'var(--app-chart-neutral)' },
@@ -685,13 +685,13 @@ function PunctualityList({
               {r.key && reworkKeys?.has(r.key) ? <ReworkBadge className="shrink-0" /> : null}
             </span>
             <span className="mt-1 flex h-2 min-w-0 overflow-hidden [grid-area:bar] @md:mt-0" aria-hidden>
-              {r.doneOnTime > 0 ? <span className="h-full rounded-l-full bg-data last:rounded-r-full" style={{ width: `${(r.doneOnTime / maxDone) * 100}%` }} /> : null}
-              {r.doneLate > 0 ? <span className="h-full rounded-r-full bg-danger first:rounded-l-full" style={{ width: `${(r.doneLate / maxDone) * 100}%`, marginLeft: r.doneOnTime ? 2 : 0 }} /> : null}
+              {r.doneOnTime > 0 ? <span className="h-full rounded-l-full bg-success last:rounded-r-full" style={{ width: `${(r.doneOnTime / maxDone) * 100}%` }} /> : null}
+              {r.doneLate > 0 ? <span className="h-full rounded-r-full bg-chart-orange first:rounded-l-full" style={{ width: `${(r.doneLate / maxDone) * 100}%`, marginLeft: r.doneOnTime ? 2 : 0 }} /> : null}
             </span>
             <span className="flex flex-col items-end leading-tight [grid-area:total]">
               <span className="tabular text-[13px] font-semibold text-fg">{rate === null ? '—' : `${rate}%`}</span>
               <span className="tabular text-mini whitespace-nowrap text-muted">
-                {r.doneOnTime} no prazo · <span className={r.doneLate ? 'text-danger' : undefined}>{r.doneLate} com atraso</span>
+                {r.doneOnTime} no prazo · <span className={r.doneLate ? 'text-orange-strong' : undefined}>{r.doneLate} com atraso</span>
                 {r.overdue ? <span className="text-danger"> · {r.overdue} {r.overdue === 1 ? 'atrasada' : 'atrasadas'} em aberto</span> : null}
               </span>
             </span>
@@ -774,13 +774,13 @@ function ProductivityList({ rows }: { rows: TaskProductivityRow[] }) {
                 <span className="truncate text-body-sm text-fg">{r.member?.name ?? 'Pessoa removida'}</span>
               </span>
               <span className="mt-1 flex h-2 overflow-hidden [grid-area:bar] @md:mt-0" aria-hidden>
-                {r.onTime ? <span className="h-full rounded-l-full bg-data last:rounded-r-full" style={{ width: `${(r.onTime / max) * 100}%` }} /> : null}
-                {r.late ? <span className="h-full rounded-r-full bg-danger first:rounded-l-full" style={{ width: `${(r.late / max) * 100}%`, marginLeft: r.onTime ? 2 : 0 }} /> : null}
+                {r.onTime ? <span className="h-full rounded-l-full bg-success last:rounded-r-full" style={{ width: `${(r.onTime / max) * 100}%` }} /> : null}
+                {r.late ? <span className="h-full rounded-r-full bg-chart-orange first:rounded-l-full" style={{ width: `${(r.late / max) * 100}%`, marginLeft: r.onTime ? 2 : 0 }} /> : null}
               </span>
               <span className="flex flex-col items-end leading-tight [grid-area:total]">
                 <span className="tabular text-[13px] font-semibold text-fg">{r.concluded ? `${Math.round((r.onTime / r.concluded) * 100)}%` : '—'}</span>
                 <span className="tabular text-mini whitespace-nowrap text-muted">
-                  {r.concluded} {r.concluded === 1 ? 'concluída' : 'concluídas'} · {r.onTime} no prazo · <span className={r.late ? 'text-danger' : undefined}>{r.late} com atraso</span>
+                  {r.concluded} {r.concluded === 1 ? 'concluída' : 'concluídas'} · {r.onTime} no prazo · <span className={r.late ? 'text-orange-strong' : undefined}>{r.late} com atraso</span>
                   {r.averageDays !== null ? ` · média de ${Math.round(r.averageDays)} ${Math.round(r.averageDays) === 1 ? 'dia' : 'dias'}` : ''}
                 </span>
               </span>

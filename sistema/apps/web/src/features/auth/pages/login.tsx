@@ -19,10 +19,10 @@ import { landingPath } from '@/components/layout/area-memory';
 
 type LoginForm = z.input<typeof loginSchema>;
 
-/** The login is the office's portal: clients and the team sign in with the e-mail the office registered. */
-export const PORTAL_LOGIN_COPY = {
-  title: 'Portal Efficio',
-  subtitle: 'Entre com o e-mail cadastrado pelo escritório.',
+/** The login is the team's: only the office's people (partners and employees) sign in. No client portal yet. */
+export const TEAM_LOGIN_COPY = {
+  title: 'Efficio · Acesso da equipe',
+  subtitle: 'Sistema interno do escritório. Entre com o e-mail que o escritório cadastrou para você.',
 } as const;
 
 /**
@@ -96,8 +96,8 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title={PORTAL_LOGIN_COPY.title}
-      subtitle={PORTAL_LOGIN_COPY.subtitle}
+      title={TEAM_LOGIN_COPY.title}
+      subtitle={TEAM_LOGIN_COPY.subtitle}
       footer={<LoginFooter state={location.state} fromInvite={from.startsWith('/convite')} />}
     >
       {IS_DEMO ? (
