@@ -14,8 +14,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runMigrations } from '../src/db/migrate';
 import { ADMIN_URL, IDENTITY_TABLES } from './db-roles';
 
-const OWNER = 'efficio_vps_test';
-const DB = 'effinance_test_vps';
+// Derived from the test database so parallel runs on other databases of the cluster never collide.
+const BASE = new URL(ADMIN_URL).pathname.slice(1).replace(/[^a-z0-9_]/gi, '_');
+const OWNER = `${BASE}_vps_owner`;
+const DB = `${BASE}_vps`;
 
 function urlAs(user: string, password: string, database: string): string {
   const url = new URL(ADMIN_URL);
