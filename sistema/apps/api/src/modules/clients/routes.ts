@@ -127,9 +127,9 @@ const clientContractRoutes: FastifyPluginAsyncZod = async (app) => {
  */
 export const cnpjRoutes: FastifyPluginAsyncZod = async (app) => {
   tenantGuards(app);
-  // Whoever registers something with a CNPJ: clients (`finance`), unions (`registry`) or the office
-  // (`office`). By default the administrators, the same people as before.
-  app.addHook('onRequest', requireAnyPermission(['finance', 'registry', 'office']));
+  // Whoever registers something with a CNPJ: clients (`finance` creates them, `clients` keeps their
+  // registry — by default every member), unions (`registry`) or the office (`office`).
+  app.addHook('onRequest', requireAnyPermission(['finance', 'clients', 'registry', 'office']));
 
   app.get('/:cnpj', { schema: { params: cnpjParamsSchema }, config: rateLimited(app.platform, 30, '1 minute') }, async (req) => {
     const provider = app.platform.cnpj;

@@ -15,6 +15,7 @@ import type { MemberRole } from './saas';
 /** Checked by the API on every operation. */
 export const ACTION_PERMISSION_KEYS = [
   'finance',
+  'clients',
   'registry',
   'deleteRegistry',
   'deleteTasks',
@@ -46,6 +47,7 @@ export type PermissionOverrides = Partial<Record<PermissionKey, boolean>>;
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   finance: 'Financeiro',
+  clients: 'Cadastro dos clientes',
   registry: 'Cadastros da gestão',
   deleteRegistry: 'Excluir cadastros',
   deleteTasks: 'Excluir tarefas',
@@ -64,7 +66,9 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
 /** Description shown under the switch (page keys have none). */
 export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string | null> = {
   finance:
-    'Abre a área Financeiro: painel, contas, extrato, clientes com honorários, cadastro de clientes, contrato e relatórios financeiros.',
+    'Abre a área Financeiro: painel, contas, extrato, clientes com honorários, inclusão, inativação e exclusão de clientes, contrato e relatórios financeiros.',
+  clients:
+    'Edita os dados cadastrais e fiscais, os documentos, as certidões e as inscrições dos clientes. Honorários, vigências, contrato e observações continuam na permissão Financeiro.',
   registry:
     'Cria e edita departamentos, categorias, tarefas recorrentes, modelos de processo e sindicatos; define os responsáveis dos clientes e o departamento de cada pessoa.',
   deleteRegistry: 'Exclui departamentos, categorias, tarefas recorrentes sem histórico, modelos de processo e sindicatos.',
@@ -88,11 +92,14 @@ const allPages = { 'page.audit': true, 'page.recurring': true, 'page.processes':
 /**
  * Defaults of each role: the behavior of phases 1 and 2. Administrators (owner and editor) keep the
  * finances, the registries, the deletions, the clients' accesses and the office; only the owner manages
- * members. The collaborator (`viewer`) uses the whole task area.
+ * members. The collaborator (`viewer`) uses the whole task area. Everyone edits the clients' registry
+ * (`clients`: registration and fiscal data, documents; the office's team works on the clients), which
+ * the owner may turn off per person.
  */
 export const ROLE_PERMISSION_DEFAULTS: Record<MemberRole, PermissionMap> = {
   owner: {
     finance: true,
+    clients: true,
     registry: true,
     deleteRegistry: true,
     deleteTasks: true,
@@ -104,6 +111,7 @@ export const ROLE_PERMISSION_DEFAULTS: Record<MemberRole, PermissionMap> = {
   },
   editor: {
     finance: true,
+    clients: true,
     registry: true,
     deleteRegistry: true,
     deleteTasks: true,
@@ -115,6 +123,7 @@ export const ROLE_PERMISSION_DEFAULTS: Record<MemberRole, PermissionMap> = {
   },
   viewer: {
     finance: false,
+    clients: true,
     registry: false,
     deleteRegistry: false,
     deleteTasks: false,

@@ -19,6 +19,7 @@ import {
   type clientInactivationSchema,
   type clientInputSchema,
   type clientQuerySchema,
+  type clientRegistrationInputSchema,
   type ClientUnionRef,
   type TaxRegime,
 } from '@effinance/shared';
@@ -46,6 +47,7 @@ type ClientInput = z.output<typeof clientInputSchema>;
 type ClientQuery = z.output<typeof clientQuerySchema>;
 type InactivationInput = z.output<typeof clientInactivationSchema>;
 type FeeInput = z.output<typeof clientFeeInputSchema>;
+type RegistrationInput = z.output<typeof clientRegistrationInputSchema>;
 
 const TABLE = 'contacts';
 
@@ -403,6 +405,53 @@ export async function updateClient(
   // Documents: the list replaces the stored one; absent keeps it (forms of earlier versions).
   if (input.documents) await replaceDocuments(db, cipher, workspaceId, id, input.documents, actor);
   return getClient(db, workspaceId, id, FULL_VIEW);
+}
+
+/**
+ * Registration of a client (permission `clients`, outside the financial boundary): only the fields of
+ * `CLIENT_REGISTRATION_FIELDS`, absent = keep. The financial ones (contract start, fee due day, notes,
+ * the responsible's CPF), the accesses and the documents are never touched here. Returns the client as
+ * `view` sees it and the fields sent (the audit record: names only, never values).
+ */
+export async function updateClientRegistration(
+  db: DbExecutor,
+  workspaceId: string,
+  id: string,
+  input: RegistrationInput,
+  view: ClientView,
+): Promise<{ client: Client; fields: string[] }> {
+  const current = await getClientOrThrow(db, workspaceId, id);
+  const patch = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) as RegistrationInput;
+  const fields = Object.keys(patch);
+  if (fields.length === 0) return { client: await getClient(db, workspaceId, id, view), fields };
+
+  // Rules that depend on what is stored (the form checks them over the whole body).
+  const regime = patch.taxRegime ?? current.taxRegime!;
+  const annex = patch.simplesAnnex !== undefined ? patch.simplesAnnex : current.simplesAnnex;
+  if (regime === 'simples_nacional' && !annex) throw new ValidationError('Selecione o anexo do Simples Nacional');
+  if (regime !== 'simples_nacional' && current.simplesAnnex !== null) patch.simplesAnnex = null;
+  const exempt = patch.stateRegistrationExempt ?? current.stateRegistrationExempt;
+  if (exempt && patch.stateRegistration) {
+    throw new ValidationError('O cliente está marcado como isento de inscrição estadual: desmarque a isenção para informar o número');
+  }
+
+  const cipher = await getCipher(workspaceId);
+  const { stateRegistration, stateRegistrationExempt, municipalRegistration, ...base } = patch;
+  const encrypted = await cipher.encryptFields(
+    TABLE,
+    base as Record<string, unknown>,
+    CLIENT_INPUT_ENCRYPTED_FIELDS.filter((f) => f in base),
+  );
+  const values = {
+    ...encrypted,
+    ...(await fiscalColumns(cipher, { stateRegistration, stateRegistrationExempt, municipalRegistration })),
+  } as Partial<ContactRow>;
+  if (base.document !== undefined) {
+    values.documentHash = await documentIndex(cipher, base.document);
+    await assertUniqueDocument(db, workspaceId, values.documentHash, id);
+  }
+  await db.update(contacts).set(values).where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.id, id)));
+  return { client: await getClient(db, workspaceId, id, view), fields };
 }
 
 /** Refused while any transaction (or series) is linked to the client: inactivate it instead. */

@@ -18,6 +18,7 @@ export const ADMIN_FORBIDDEN_MESSAGE = 'Somente os administradores do espaço po
 /** What a member without the key reads (403). "Administradores" stays the right word: it is who they ask. */
 export const PERMISSION_FORBIDDEN_MESSAGES: Record<PermissionKey, string> = {
   finance: FINANCE_FORBIDDEN_MESSAGE,
+  clients: 'Você não tem permissão para editar o cadastro dos clientes.',
   registry: ADMIN_FORBIDDEN_MESSAGE,
   deleteRegistry: ADMIN_FORBIDDEN_MESSAGE,
   deleteTasks: ADMIN_FORBIDDEN_MESSAGE,

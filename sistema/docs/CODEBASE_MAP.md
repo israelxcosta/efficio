@@ -189,7 +189,7 @@ sequenceDiagram
 | `goals` | `/goals` | metas e aportes (notas cifradas) |
 | `contacts` | `/contacts` | fornecedores; busca por nome ou CPF/CNPJ (índice cego) |
 | `clients` | `/clients`, `/cnpj/:cnpj` | clientes, inativação, vigências, resumo (`byRegime`, `averageFee`), BrasilAPI; fase 3 em `fiscal.ts` (inscrições, CPF e acessos cifrados em três estados, documentos substitutivos, sindicatos do cliente) e `GET /clients/:id/contract` (`finance`) |
-| `client-records` | `/clients/:id/credentials/*`, `/clients/:id/contract/issues` | revelar acesso (`clientCredentials`, limite por membro, auditoria antes do valor), quem viu, registrar emissão do contrato |
+| `client-records` | `/clients/:id/credentials/*`, `/clients/:id/contract/issues`, `/clients/:id/registration`, `/clients/:id/documents*` | revelar acesso (`clientCredentials`, limite por membro, auditoria antes do valor), quem viu, registrar emissão do contrato (`finance`); cadastro do cliente fora do financeiro (`clients`: `PATCH …/registration` só com `CLIENT_REGISTRATION_FIELDS`, campos financeiros recusados; documentos substitutivos ou um por vez; auditoria após o COMMIT) |
 | `unions` | `/unions` | sindicatos, ciclos de convenção (substitutivos; o cadastro não os apaga), vínculo N:N com clientes, ordem de urgência; `registry`/`deleteRegistry` |
 | `deadlines` | `/deadlines` | vencimentos de documentos (clientes ativos) e convenções (sindicatos ativos com clientes): lista, resumo do sino, resumo por cliente |
 | `office` | `/office` | escritório (CPF/Pix cifrados), logo e marca d'água por assinatura, modelo de contrato (null = fábrica), contrato do cliente; `office` (nome e logo para todos) |
@@ -365,6 +365,11 @@ sequenceDiagram
 17. **Acessos de clientes** (`simplesAccessCode`, `accountantPassword`): nunca entram em `toClient`,
     busca, opções ou alertas — só `revealCredential` (rota com `clientCredentials` e auditoria). Campo
     cifrado novo em `contacts` não vai para `CONTACT_ALL_ENCRYPTED_FIELDS` (que alimenta `toClient`).
+18. **Cadastro do cliente × financeiro**: o `PUT /clients/:id` (formulário completo) é `finance`; os
+    campos cadastrais/fiscais e os documentos também se escrevem por `client-records` com `clients`
+    (padrão ligada para todos). Campo novo de cliente: decida se é cadastral (entra em
+    `CLIENT_REGISTRATION_FIELDS` de `packages/shared/src/schemas.ts`) ou financeiro (fica fora e some de
+    `withoutFees`); o `PATCH …/registration` recusa (400) tudo o que não estiver na lista.
 
 ## Guia de navegação
 

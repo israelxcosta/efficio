@@ -1729,6 +1729,11 @@ em `packages/shared/test/phase3.test.ts`.
 | POST | `/api/clients/:id/contract/issues` | — | 204 (registra a emissão: quem, quando, versão do modelo) | `finance` (+ assinatura) |
 | POST | `/api/clients/:id/credentials/reveal` | `clientCredentialRevealSchema` (`field`) | `ClientCredentialReveal` (`no-store`) | `clientCredentials` |
 | GET | `/api/clients/:id/credentials/views` | — | `ClientCredentialView[]` (até 50, mais recentes) | `clientCredentials` |
+| PATCH | `/api/clients/:id/registration` | `clientRegistrationInputSchema` (só `CLIENT_REGISTRATION_FIELDS`, todos opcionais: ausente = mantém, vazio/`null` = remove) | `Client` como o membro o vê (sem `finance`: sem honorários, vencimento, observações e CPF; auditado `client.registration_updated` com os nomes dos campos) | `clients` (+ assinatura) |
+| PUT | `/api/clients/:id/documents` | `clientDocumentsInputSchema` (`documents`: lista substitutiva, até 50) | `ClientDocument[]` (auditado `client.documents_replaced`) | `clients` (+ assinatura) |
+| POST | `/api/clients/:id/documents` | `clientDocumentInputSchema` (`id` ignorado) | 201 `ClientDocument` (auditado `client.document_added`) | `clients` (+ assinatura) |
+| PUT | `/api/clients/:id/documents/:documentId` | `clientDocumentInputSchema` (`id` ignorado) | `ClientDocument` (renovação: novo vencimento; auditado `client.document_updated`) | `clients` (+ assinatura) |
+| DELETE | `/api/clients/:id/documents/:documentId` | — | 204 (auditado `client.document_deleted`) | `clients` (+ assinatura) |
 | PUT | `/api/profile/photo` | `profilePhotoInputSchema` (data URI, até 100 KB) | `ProfilePhotoResponse` | a própria pessoa |
 | DELETE | `/api/profile/photo` | — | 204 | a própria pessoa |
 | GET | `/api/profile/photos/:userId` | `?v=<photoUpdatedAt>` | a imagem (`image/png\|jpeg\|webp`, `private, max-age=300`) | você ou membros do seu espaço atual |
@@ -1747,15 +1752,30 @@ leitura). Mensagens em pt-BR; sem a chave → 403 com o texto de `PERMISSION_FOR
 (`lib/permissions.ts`): "Somente os administradores do espaço podem fazer isso." (cadastros e
 exclusões), "O financeiro é restrito aos administradores do espaço.", "O modelo de contrato e os dados
 do escritório são restritos aos administradores do espaço.", "Você não tem permissão para ver este
-acesso.", "Somente quem gerencia os membros do espaço pode fazer isso.".
+acesso.", "Somente quem gerencia os membros do espaço pode fazer isso.", "Você não tem permissão para
+editar o cadastro dos clientes.".
+
+**Cadastro do cliente fora do financeiro** (UX 2.3, permissão `clients`, padrão ligada para os três
+papéis; o proprietário desliga por pessoa): `PATCH /clients/:id/registration` altera só os campos
+cadastrais e fiscais (`CLIENT_REGISTRATION_FIELDS`: razão social, fantasia, CNPJ, abertura, CNAE,
+e-mail, telefone, responsável — nome, e-mail e telefone —, regime, anexo do Simples, endereço,
+inscrições estadual/municipal e isenção). Qualquer outro campo (início do contrato, vencimento do
+honorário, observações, CPF do responsável, acessos, documentos, status) é **recusado** com 400 (não é
+ignorado). As regras que dependem do que está gravado valem sobre o resultado: Simples Nacional sem anexo
+→ 422; regime fora do Simples zera o anexo; número de inscrição estadual com o cliente isento (sem
+desmarcar a isenção no mesmo corpo) → 422; CNPJ repetido → 409. Corpo vazio não grava nem audita. Os
+documentos têm rotas próprias (lista substitutiva, para o editor da ficha, ou um por vez); quem alterou
+fica no documento. Auditoria depois do COMMIT só com nomes de campos e tipos de documento (nunca
+valores). Criar, inativar, reativar e excluir cliente, vigências, contrato e observações continuam em
+`finance`; revelar acessos em `clientCredentials` (gravar acessos segue no `PUT /clients/:id`).
 
 ## Permissões por pessoa
 
-- **Chaves** (`PERMISSION_KEYS`): ações `finance`, `registry`, `deleteRegistry`, `deleteTasks`,
+- **Chaves** (`PERMISSION_KEYS`): ações `finance`, `clients`, `registry`, `deleteRegistry`, `deleteTasks`,
   `reopenOthers`, `clientCredentials`, `office`, `members` e páginas `page.audit`, `page.recurring`,
   `page.processes`, `page.clients`, `page.reports`, `page.registry`. Padrões (`ROLE_PERMISSION_DEFAULTS`):
-  proprietário tudo; administrador tudo menos `members`; colaborador só as páginas — exatamente o
-  comportamento das fases 1 e 2. As chaves `page.*` só escondem a página no web; a API não as usa.
+  proprietário tudo; administrador tudo menos `members`; colaborador as páginas e `clients` (cadastro dos
+  clientes, UX 2.3) — fora `clients`, exatamente o comportamento das fases 1 e 2. As chaves `page.*` só escondem a página no web; a API não as usa.
 - **Guardado**: `workspace_members.permissions` (jsonb) com **só os ajustes** (as chaves que diferem do
   padrão do papel; `normalizePermissionOverrides`). Trocar o papel leva junto tudo o que não foi
   ajustado; os ajustes ficam. Chaves desconhecidas e valores não booleanos são descartados na entrada e
@@ -1768,7 +1788,7 @@ acesso.", "Somente quem gerencia os membros do espaço pode fazer isso.".
   `deleteRegistry`, `deleteTasks` por rota (`requireTaskPermission`), `reopenOthers` e `deleteTasks`
   nos serviços (reabrir ocorrência, remover comentário/anexo de outra pessoa), `registry` em "salvar como
   modelo" e no Início de outro departamento; membros, papéis e convites → `members`; consulta de CNPJ →
-  `finance`, `registry` ou `office`; sindicatos, escritório e acessos de clientes → as chaves novas.
+  `finance`, `clients`, `registry` ou `office`; sindicatos, escritório e acessos de clientes → as chaves novas.
 - **Regras de quem ajusta**: precisa de `members`; ninguém altera as próprias permissões nem o próprio
   papel (422); o proprietário não é ajustável (422); **ninguém concede o que não tem**: toda chave que
   passa de desligada para ligada (por ajuste, troca de papel ou papel de um convite) tem de estar com
@@ -1826,7 +1846,8 @@ acesso.", "Somente quem gerencia os membros do espaço pode fazer isso.".
   opcional, observação até 200 caracteres (cifrada), quem alterou (nome gravado; "Usuário excluído" se a
   conta sair). Lista **substitutiva** em `documents` do cliente (ausente = não mexe; ids mantêm o
   documento e quem o alterou só muda se algo mudou; id de outro cliente → 404); até 50. Leitura por todos
-  os membros em `Client.documents` (mais urgente primeiro, sem data no fim); escrita só com `finance`.
+  os membros em `Client.documents` (mais urgente primeiro, sem data no fim); escrita com `finance` (no
+  formulário do cliente) ou `clients` (`/clients/:id/documents`).
 - **Alertas**: `GET /deadlines` (documentos de clientes **ativos**: vencidos, até 30, 31–60 e sem data,
   até 500 com `truncated`; convenções), `GET /deadlines/summary` (contagens; o sino soma
   `overdueTotal` — documentos e convenções **vencidos** — ao que já mostra; `overdueConvention` quando há
@@ -1910,9 +1931,10 @@ Revisão de segurança das fases 2 e 3, reexecutável e compatível com o PGlite
 - **Histórico de emissões** do contrato: só o registro em `audit_logs` (sem tela própria nem leitura
   na API além do log de auditoria do proprietário).
 - **Quem viu um acesso** fica em `audit_logs` (que segue a retenção do log de auditoria).
-- **Consulta de CNPJ** passou a exigir `finance`, `registry` ou `office` (antes qualquer membro chamava
-  a rota, embora a tela só a oferecesse a administradores) — §18.12.
-- **Itens a confirmar** (§18.19): colaborador do Fiscal atualizar vencimento de certificado sem
-  `finance` (hoje não); `clientCredentials` ligada para algum colaborador (padrão: só administradores).
+- **Consulta de CNPJ** exige `finance`, `clients`, `registry` ou `office` — §18.12 (com `clients`, que
+  vem ligada para todos, os colaboradores voltaram a alcançá-la).
+- **Itens a confirmar** (§18.19): `clientCredentials` ligada para algum colaborador (padrão: só
+  administradores). O colaborador atualiza vencimento de certificado sem `finance` desde a UX 2.3
+  (`clients`).
 - O demo do navegador só ganha os dados da fase 3 num banco novo: o marcador `SEED_VERSION` de
   `apps/web/src/demo/server.ts` precisa subir para reaplicar o seed em quem já tem o demo.

@@ -13,7 +13,13 @@ import {
   dateToWords,
   deadlineStatus,
   deadlineText,
+  ACTION_PERMISSION_KEYS,
+  CLIENT_REGISTRATION_FIELDS,
+  clientDocumentsInputSchema,
+  clientRegistrationInputSchema,
   effectivePermissions,
+  PERMISSION_DESCRIPTIONS,
+  PERMISSION_LABELS,
   fillContractBlocks,
   formatPercentBps,
   grantedPermissions,
@@ -55,6 +61,19 @@ describe('permissions per person (spec §13.10)', () => {
     }
   });
 
+  it('the clients registry (`clients`) is on for every role, labelled, described and listed after the finances', () => {
+    for (const role of ['owner', 'editor', 'viewer'] as const) expect(rolePermissions(role).clients, role).toBe(true);
+    expect(PERMISSION_LABELS.clients).toBe('Cadastro dos clientes');
+    expect(PERMISSION_DESCRIPTIONS.clients).toContain('continuam na permissão Financeiro');
+    expect(ACTION_PERMISSION_KEYS.indexOf('clients')).toBe(ACTION_PERMISSION_KEYS.indexOf('finance') + 1);
+    for (const k of PERMISSION_KEYS) {
+      expect(PERMISSION_LABELS[k], k).toBeTruthy();
+      if (!k.startsWith('page.')) expect(PERMISSION_DESCRIPTIONS[k], k).toBeTruthy();
+    }
+    // Turned off for a person: what a change grants lists it (nobody grants what they do not have).
+    expect(grantedPermissions(effectivePermissions('viewer', { clients: false }), rolePermissions('viewer'))).toEqual(['clients']);
+  });
+
   it('unknown roles get nothing; unknown keys and non-booleans are discarded', () => {
     expect(Object.values(rolePermissions('collaborator')).some(Boolean)).toBe(false);
     expect(Object.values(effectivePermissions(null, { finance: true })).some(Boolean)).toBe(false);
@@ -88,6 +107,47 @@ describe('permissions per person (spec §13.10)', () => {
     expect(memberPermissionsInputSchema.safeParse({ role: 'owner', overrides: {} }).success).toBe(false);
     const many = Object.fromEntries(Array.from({ length: 101 }, (_, i) => [`k${i}`, true]));
     expect(memberPermissionsInputSchema.safeParse({ overrides: many }).success).toBe(false);
+  });
+});
+
+describe('registration of a client (PATCH, permission `clients`)', () => {
+  it('every field is optional: absent keeps, empty removes, the form rules and messages apply', () => {
+    expect(clientRegistrationInputSchema.parse({})).toEqual({});
+    expect(clientRegistrationInputSchema.parse({ tradeName: '', phone: '(11) 98765-4321', state: 'sp', document: '11.222.333/0001-81' })).toEqual({
+      tradeName: null,
+      phone: '11987654321',
+      state: 'SP',
+      document: '11222333000181',
+    });
+    const bad = clientRegistrationInputSchema.safeParse({ name: '', document: '11.111.111/1111-11', email: 'x' });
+    expect(bad.success).toBe(false);
+    expect(bad.error!.issues.map((i) => [i.path.join('.'), i.message])).toEqual([
+      ['name', 'Informe a razão social'],
+      ['document', 'CNPJ inválido'],
+      ['email', 'E-mail inválido'],
+    ]);
+    expect(clientRegistrationInputSchema.safeParse({ name: null }).error!.issues[0]!.message).toBe('Informe a razão social');
+    // Exempt: no registration number.
+    expect(clientRegistrationInputSchema.parse({ stateRegistrationExempt: true, stateRegistration: '123' })).toEqual({
+      stateRegistrationExempt: true,
+      stateRegistration: null,
+    });
+  });
+
+  it('refuses the financial fields, the accesses and the documents (never ignores them)', () => {
+    for (const field of ['contractStartDate', 'feeDueDay', 'notes', 'responsibleDocument', 'simplesAccessCode', 'accountantPassword', 'documents', 'status']) {
+      const res = clientRegistrationInputSchema.safeParse({ name: 'Padaria', [field]: null });
+      expect(res.success, field).toBe(false);
+      expect(res.error!.issues[0]!.message, field).toContain('ficam no Financeiro');
+    }
+    expect(CLIENT_REGISTRATION_FIELDS).not.toContain('contractStartDate');
+  });
+
+  it('the documents list: substitutive, capped, no repeated id', () => {
+    expect(clientDocumentsInputSchema.parse({ documents: [] })).toEqual({ documents: [] });
+    const id = '00000000-0000-4000-8000-000000000001';
+    expect(clientDocumentsInputSchema.safeParse({ documents: [{ id, kind: 'cndt' }, { id, kind: 'pgr' }] }).success).toBe(false);
+    expect(clientDocumentsInputSchema.safeParse({}).success).toBe(false);
   });
 });
 

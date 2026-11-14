@@ -403,11 +403,20 @@ export const clientCredentialRevealSchema = z.object({
 });
 export type ClientCredentialRevealInput = z.infer<typeof clientCredentialRevealSchema>;
 
-export const clientInputSchema = z
-  .object({
+/** Documents of a client: the full list (replaces the stored one). */
+const clientDocumentListSchema = z
+  .array(clientDocumentInputSchema)
+  .max(MAX_CLIENT_DOCUMENTS, { message: `Máximo de ${MAX_CLIENT_DOCUMENTS} documentos por cliente` })
+  .superRefine((list, ctx) => {
+    const ids = list.map((d) => d.id).filter(Boolean);
+    if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', message: 'Documento repetido na lista' });
+  });
+
+/** Fields of the client form (`clientInputSchema`); the registration PATCH reuses their rules. */
+const clientFields = {
     /** Razão social. */
     name: z
-      .string()
+      .string({ message: 'Informe a razão social' })
       .trim()
       .min(1, { message: 'Informe a razão social' })
       .max(160, { message: 'Máximo de 160 caracteres' }),
@@ -448,11 +457,11 @@ export const clientInputSchema = z
     /** The office's password in this client's portals: keep, set or clear. */
     accountantPassword: credentialUpdateSchema.optional(),
     /** Documents with expiry date: the full list (replaces the stored one); absent = keep. */
-    documents: z
-      .array(clientDocumentInputSchema)
-      .max(MAX_CLIENT_DOCUMENTS, { message: `Máximo de ${MAX_CLIENT_DOCUMENTS} documentos por cliente` })
-      .optional(),
-  })
+    documents: clientDocumentListSchema.optional(),
+};
+
+export const clientInputSchema = z
+  .object(clientFields)
   .superRefine((v, ctx) => {
     if (v.taxRegime === 'simples_nacional' && !v.simplesAnnex) {
       ctx.addIssue({ code: 'custom', path: ['simplesAnnex'], message: 'Selecione o anexo do Simples Nacional' });
@@ -464,10 +473,6 @@ export const clientInputSchema = z
         message: 'O código de acesso do Simples Nacional só vale para clientes do Simples Nacional ou MEI',
       });
     }
-    const ids = (v.documents ?? []).map((d) => d.id).filter(Boolean);
-    if (new Set(ids).size !== ids.length) {
-      ctx.addIssue({ code: 'custom', path: ['documents'], message: 'Documento repetido na lista' });
-    }
   })
   .transform((v) => ({
     ...v,
@@ -476,6 +481,78 @@ export const clientInputSchema = z
     stateRegistration: v.stateRegistrationExempt === true ? null : v.stateRegistration,
   }));
 export type ClientInput = z.input<typeof clientInputSchema>;
+
+/**
+ * Fields of the client that the registry (`clients` permission) edits: registration, address,
+ * contacts, tax regime and the state/municipal registrations. The rest of the form is financial
+ * (contract start, fee due day, notes, the responsible's CPF: `finance`) or has its own route
+ * (accesses: `clientCredentials`; documents: `/clients/:id/documents`).
+ */
+export const CLIENT_REGISTRATION_FIELDS = [
+  'name',
+  'tradeName',
+  'document',
+  'openedAt',
+  'mainActivity',
+  'email',
+  'phone',
+  'responsibleName',
+  'responsibleEmail',
+  'responsiblePhone',
+  'taxRegime',
+  'simplesAnnex',
+  'zipCode',
+  'street',
+  'number',
+  'complement',
+  'district',
+  'city',
+  'state',
+  'stateRegistration',
+  'stateRegistrationExempt',
+  'municipalRegistration',
+] as const satisfies readonly (keyof typeof clientFields)[];
+export type ClientRegistrationField = (typeof CLIENT_REGISTRATION_FIELDS)[number];
+
+/** PATCH field: absent (`undefined`) keeps what is stored; anything else follows `schema` (same rules and messages). */
+type PatchField<O> = z.ZodOptional<z.ZodPipe<z.ZodUnknown, z.ZodTransform<O | undefined, unknown>>>;
+function patchable<T extends z.ZodType>(schema: T): PatchField<z.output<T>> {
+  return z
+    .unknown()
+    .transform((value, ctx): z.output<T> | undefined => {
+      if (value === undefined) return undefined;
+      const parsed = schema.safeParse(value);
+      if (parsed.success) return parsed.data;
+      for (const issue of parsed.error.issues) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+      return z.NEVER;
+    })
+    .optional();
+}
+
+const registrationShape = Object.fromEntries(CLIENT_REGISTRATION_FIELDS.map((k) => [k, patchable(clientFields[k])])) as {
+  [K in ClientRegistrationField]: PatchField<z.output<(typeof clientFields)[K]>>;
+};
+
+/**
+ * `PATCH /clients/:id/registration` (permission `clients`): only the registration fields, each one
+ * optional (absent = keep; empty or null = remove, for the optional ones). Any other field — fees,
+ * contract, notes, the responsible's CPF, accesses, documents — is refused (400), never ignored. The
+ * rules that depend on what is stored (Simples Nacional annex, exemption) are checked by the API.
+ */
+export const clientRegistrationInputSchema = z
+  .strictObject(registrationShape, {
+    error: (issue) =>
+      issue.code === 'unrecognized_keys'
+        ? 'Estes dados não são alterados pelo cadastro do cliente: honorários, vigências, contrato, observações e CPF do responsável ficam no Financeiro; acessos e documentos têm telas próprias.'
+        : undefined,
+  })
+  .transform((v) => (v.stateRegistrationExempt === true ? { ...v, stateRegistration: null } : v));
+/** Every field optional; the same input types as the client form. */
+export type ClientRegistrationInput = Partial<Pick<ClientInput, ClientRegistrationField>>;
+
+/** `PUT /clients/:id/documents` (permission `clients`): the full list replaces the stored one. */
+export const clientDocumentsInputSchema = z.object({ documents: clientDocumentListSchema });
+export type ClientDocumentsInput = z.input<typeof clientDocumentsInputSchema>;
 
 export const clientQuerySchema = paginationQuerySchema.extend({
   /** Razão social / nome fantasia (partial) or CNPJ (exact). */

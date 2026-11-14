@@ -145,6 +145,11 @@ describe('phase 3: every query filters by the workspace', () => {
     expect(fiscal.documentName({ kind: 'other', customName: 'Laudo' })).toBe('Laudo');
     const [docRow] = await run((c) => c.db.select().from(schema.clientDocuments).where(sql`${schema.clientDocuments.workspaceId} = ${ws}`));
     expect((await fiscal.toClientDocument(cipher, docRow!, '2026-10-20')).note).toBe('A1 renovado');
+    // One document at a time (registry routes, permission `clients`).
+    const actor = { userId: ana.userId, name: 'Ana' };
+    const one = await run((c) => fiscal.addDocument(c.db, c.cipher, ws, aClient, clientDocumentInputSchema.parse({ kind: 'cndt', expiresAt: '2026-12-01' }), actor, c.today));
+    await run((c) => fiscal.updateDocument(c.db, c.cipher, ws, aClient, one.id, clientDocumentInputSchema.parse({ kind: 'cndt', expiresAt: '2027-06-01', note: 'renovada' }), actor, c.today));
+    expect((await run((c) => fiscal.deleteDocument(c.db, ws, aClient, one.id))).kind).toBe('cndt');
 
     // Unions.
     const created = await run((c) =>

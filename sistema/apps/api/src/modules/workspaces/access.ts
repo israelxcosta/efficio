@@ -104,6 +104,7 @@ export function isMutation(method: string): boolean {
  * Writes of the financial boundary (lib/tenant-routes.ts, lib/tenant-scope.ts): every module mounted
  * there is the finance or the clients' registry, so a write needs the `finance` permission (by default
  * owner and editor, exactly the roles of phases 1 and 2) and a subscription that allows writing.
+ * The clients' registry is also written outside it, with `clients` (modules/client-records).
  */
 export function assertCanWrite(access: Access): void {
   if (!hasAccessPermission(access, 'finance')) throw new ForbiddenError('Você tem acesso somente leitura neste espaço');

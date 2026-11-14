@@ -1,13 +1,15 @@
 // Phase 3 of the client registry (spec §13.8): fiscal data, the encrypted accesses, the documents with
-// expiry date and the unions linked to the client. The registry stays the finance's (`finance` writes
-// it); documents, registrations and unions are read by every member (Gestão), and the accesses never
+// expiry date and the unions linked to the client. The registration, the fiscal data and the documents
+// are written by the client form (`finance`) and by the registry routes (`clients`, modules/client-records);
+// documents, registrations and unions are read by every member (Gestão), and the accesses never
 // leave in lists, searches or exports of lists — only `revealCredential`, behind its own permission,
 // a per-member limit and an audit record, decrypts one of them.
 
-import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import {
   CLIENT_DOCUMENT_KIND_LABELS,
   deadlineStatus,
+  MAX_CLIENT_DOCUMENTS,
   trackedConvention,
   type ClientCredentialField,
   type ClientCredentialFlags,
@@ -21,7 +23,7 @@ import type { DbExecutor } from '../../db/client';
 import { clientDocuments, contacts, unionClients, unionConventions, unions, type ClientDocumentRow, type ContactRow } from '../../db/schema';
 import type { FieldCipher } from '../../lib/crypto/field-cipher';
 import { groupBy } from '../../lib/collections';
-import { InvalidTextError, NotFoundError } from '../../lib/errors';
+import { InvalidTextError, NotFoundError, ValidationError } from '../../lib/errors';
 import { inChunks } from '../../lib/sql';
 
 type DocumentInput = z.output<typeof clientDocumentInputSchema>;
@@ -202,6 +204,72 @@ export async function replaceDocuments(
       .set({ ...values, ...who })
       .where(and(eq(clientDocuments.workspaceId, workspaceId), eq(clientDocuments.id, existing.id)));
   }
+}
+
+/** One document of the client (404 when it is not of this client and workspace). */
+async function documentOrThrow(db: DbExecutor, workspaceId: string, clientId: string, documentId: string): Promise<ClientDocumentRow> {
+  const [row] = await db
+    .select()
+    .from(clientDocuments)
+    .where(and(eq(clientDocuments.workspaceId, workspaceId), eq(clientDocuments.clientId, clientId), eq(clientDocuments.id, documentId)));
+  if (!row) throw new NotFoundError('Documento não encontrado');
+  return row;
+}
+
+async function documentValues(cipher: FieldCipher, doc: DocumentInput) {
+  if (doc.note && hasNul(doc.note)) throw new InvalidTextError();
+  return { kind: doc.kind, customName: doc.customName, expiresAt: doc.expiresAt, note: await cipher.encrypt(DOCUMENTS, 'note', doc.note) };
+}
+
+/** Adds one document to a client (the caller checked the client); up to `MAX_CLIENT_DOCUMENTS`. */
+export async function addDocument(
+  db: DbExecutor,
+  cipher: FieldCipher,
+  workspaceId: string,
+  clientId: string,
+  doc: DocumentInput,
+  actor: Actor,
+  today: string,
+): Promise<ClientDocument> {
+  const [stored] = await db
+    .select({ n: count() })
+    .from(clientDocuments)
+    .where(and(eq(clientDocuments.workspaceId, workspaceId), eq(clientDocuments.clientId, clientId)));
+  if ((stored?.n ?? 0) >= MAX_CLIENT_DOCUMENTS) throw new ValidationError(`Máximo de ${MAX_CLIENT_DOCUMENTS} documentos por cliente`);
+  const [row] = await db
+    .insert(clientDocuments)
+    .values({ workspaceId, clientId, ...(await documentValues(cipher, doc)), updatedBy: actor.userId, updatedByName: actor.name })
+    .returning();
+  return toClientDocument(cipher, row!, today);
+}
+
+/** Changes one document (e.g. a renewed certificate: the new expiry date). */
+export async function updateDocument(
+  db: DbExecutor,
+  cipher: FieldCipher,
+  workspaceId: string,
+  clientId: string,
+  documentId: string,
+  doc: DocumentInput,
+  actor: Actor,
+  today: string,
+): Promise<ClientDocument> {
+  await documentOrThrow(db, workspaceId, clientId, documentId);
+  const [row] = await db
+    .update(clientDocuments)
+    .set({ ...(await documentValues(cipher, doc)), updatedBy: actor.userId, updatedByName: actor.name })
+    .where(and(eq(clientDocuments.workspaceId, workspaceId), eq(clientDocuments.clientId, clientId), eq(clientDocuments.id, documentId)))
+    .returning();
+  return toClientDocument(cipher, row!, today);
+}
+
+/** Removes one document; returns its name (for the audit record). */
+export async function deleteDocument(db: DbExecutor, workspaceId: string, clientId: string, documentId: string): Promise<ClientDocumentRow> {
+  const row = await documentOrThrow(db, workspaceId, clientId, documentId);
+  await db
+    .delete(clientDocuments)
+    .where(and(eq(clientDocuments.workspaceId, workspaceId), eq(clientDocuments.clientId, clientId), eq(clientDocuments.id, documentId)));
+  return row;
 }
 
 // ---------------------------------------------------------------------------

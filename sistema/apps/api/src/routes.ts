@@ -47,8 +47,8 @@ export const domainRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] =
  * and write checks, explicit RLS phases): mounted under `/api` next to `tenantRoutes`, not inside it.
  * Tasks bring their own guards (modules/tasks/access.ts): every member writes there, `viewer` included.
  * Phase 3 modules check a permission key per route (lib/permissions.ts, lib/scoped-context.ts):
- * unions, deadlines, the office, the clients' accesses and contract issues (`/clients`, next to the
- * financial client routes), and the profile photo.
+ * unions, deadlines, the office, the clients' accesses, contract issues and registry (`/clients`, next
+ * to the financial client routes; the registry with `clients`), and the profile photo.
  */
 export const scopedRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] = [
   { prefix: '/imports', plugin: importRoutes },

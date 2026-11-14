@@ -166,7 +166,9 @@ describe('unions: registry and agreement cycles', () => {
     expect((await carla.get('/unions')).status).toBe(200);
     expect((await carla.get(`/unions/${id}`)).status).toBe(200);
 
-    // The CNPJ lookup is for whoever registers (clients, unions or the office).
+    // The CNPJ lookup is for whoever registers (clients, unions or the office): without the clients'
+    // registry either, 403.
+    expect((await ana.put(`/workspaces/current/members/${carla.userId}/permissions`, { overrides: { clients: false } })).status).toBe(200);
     expect((await carla.get(`/cnpj/${cnpj(30_100_071)}`)).status).toBe(403);
 
     // Adjustments: `registry` without `deleteRegistry`.
