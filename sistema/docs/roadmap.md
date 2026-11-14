@@ -118,6 +118,12 @@ recebido).
 
 - O dono tem plano na **Hostinger** e o domínio **efficio.com.br** no registro.br; a subida para produção ainda
   não foi marcada.
+- **Decisão (14/11/2026):** o sistema é **só do escritório** (não será vendido), com **5 usuários** (sócios e
+  empregados), e deve rodar **somente no VPS KVM 1 da Hostinger** (1 vCPU, 4 GB de RAM, 50 GB NVMe, 4 TB de
+  tráfego). Cabe com folga: PostgreSQL + API + proxy com TLS num Docker Compose, uma instância só, sem Redis
+  (limite de requisições em memória). O build do web e da imagem da API sai do CI (o VPS só baixa e roda).
+  Com um único servidor e sem AWS, a chave de criptografia passa a ser local (arquivo com permissão restrita +
+  cópia offline guardada pelo dono) — exige liberar `KEY_PROVIDER=local` em produção no `env.ts`.
 - O sistema precisa de Node.js e PostgreSQL 16. Na Hostinger isso só roda num **VPS (KVM)**; a hospedagem de sites
   compartilhada não oferece PostgreSQL. No VPS: Docker Compose com PostgreSQL, API e o web atrás de um proxy com
   TLS (Caddy ou Nginx), DNS do registro.br apontando para o VPS.
