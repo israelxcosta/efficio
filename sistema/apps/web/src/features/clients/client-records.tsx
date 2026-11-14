@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Copy, Ellipsis, Eye, EyeOff, ListPlus, Scale } from 'lucide-react';
 import { toast } from 'sonner';
@@ -145,19 +145,27 @@ export function CredentialField({ clientId, clientName, field, stored }: { clien
   );
 }
 
-/** "Inscrições e acessos" as a definition list (spec §13.8.3). */
-export function ClientRegistrations({ client: c }: { client: Client }) {
+/** State and municipal registrations (items of a definition list). */
+export function RegistrationItems({ client: c }: { client: Client }) {
+  return (
+    <>
+      <ProfileItem label="Inscrição estadual">{c.stateRegistrationExempt ? 'Isenta' : c.stateRegistration}</ProfileItem>
+      <ProfileItem label="Inscrição municipal">{c.municipalRegistration}</ProfileItem>
+    </>
+  );
+}
+
+/** "Acessos" of the client page (spec §13.8.3): masked, revealed one at a time and audited. */
+export function ClientAccesses({ client: c, footer }: { client: Client; footer?: ReactNode }) {
   const { can } = usePermissions();
   const simples = (SIMPLES_ACCESS_REGIMES as readonly string[]).includes(c.taxRegime);
   const anyStored = c.credentials.accountantPassword || (simples && c.credentials.simplesAccessCode);
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={`registrations-${c.id}`}>
-      <h3 id={`registrations-${c.id}`} className="text-body-sm font-semibold text-fg">
-        Inscrições e acessos
-      </h3>
-      <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-        <ProfileItem label="Inscrição estadual">{c.stateRegistrationExempt ? 'Isenta' : c.stateRegistration}</ProfileItem>
-        <ProfileItem label="Inscrição municipal">{c.municipalRegistration}</ProfileItem>
+    <section className="flex flex-col gap-3" aria-labelledby={`accesses-${c.id}`}>
+      <h2 id={`accesses-${c.id}`} className="text-body-sm font-semibold text-fg">
+        Acessos
+      </h2>
+      <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         {simples ? (
           <div>
             <dt className="text-xs font-medium text-muted">{CLIENT_CREDENTIAL_FIELD_LABELS.simplesAccessCode}</dt>
@@ -176,22 +184,22 @@ export function ClientRegistrations({ client: c }: { client: Client }) {
       {can('clientCredentials') && anyStored ? (
         <p className="text-caption text-subtle">Os acessos ficam cifrados. Cada visualização fica registrada com o nome de quem viu.</p>
       ) : null}
+      {footer}
     </section>
   );
 }
 
 /** "Documentos" of a client (spec §13.8.3): most urgent first, with "Criar tarefa de renovação". */
-export function ClientDocumentsList({ client: c, today, id }: { client: Client; today: string; id?: string }) {
-  const { can } = usePermissions();
+export function ClientDocumentsList({ client: c, today, id, onAdd }: { client: Client; today: string; id?: string; onAdd?: () => void }) {
   const { newTask } = useTaskSheetLinks();
   const docs = sortByDeadline(c.documents);
   const summary = documentsSummary(docs);
   return (
     <section className="flex scroll-mt-4 flex-col gap-2" aria-labelledby={`documents-${c.id}`} id={id}>
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <h3 id={`documents-${c.id}`} className="text-body-sm font-semibold text-fg">
-          Documentos{docs.length ? <span className="tabular font-medium text-muted"> {docs.length}</span> : null}
-        </h3>
+        <h2 id={`documents-${c.id}`} className="text-body-sm font-semibold text-fg">
+          Documentos e certidões{docs.length ? <span className="tabular font-medium text-muted"> {docs.length}</span> : null}
+        </h2>
         {summary.length ? (
           <p className="text-body-sm">
             {summary.map((p, i) => (
@@ -206,12 +214,12 @@ export function ClientDocumentsList({ client: c, today, id }: { client: Client; 
       {docs.length === 0 ? (
         <p className="text-body-sm text-subtle">
           Nenhum documento cadastrado.
-          {can('finance') ? (
+          {onAdd ? (
             <>
               {' '}
-              <Link to={`/clientes?editar=${c.id}`} className="font-medium text-brand-text hover:underline">
-                Cadastrar no financeiro
-              </Link>
+              <button type="button" onClick={onAdd} className="font-medium text-brand-text hover:underline">
+                Cadastrar documentos
+              </button>
             </>
           ) : null}
         </p>
@@ -260,9 +268,9 @@ export function ClientUnionsList({ client: c }: { client: Client }) {
   const { can } = usePermissions();
   return (
     <section className="flex flex-col gap-2" aria-labelledby={`unions-${c.id}`}>
-      <h3 id={`unions-${c.id}`} className="text-body-sm font-semibold text-fg">
+      <h2 id={`unions-${c.id}`} className="text-body-sm font-semibold text-fg">
         Sindicatos
-      </h3>
+      </h2>
       {c.unions.length === 0 ? (
         <p className="text-body-sm text-subtle">
           Nenhum sindicato vinculado.

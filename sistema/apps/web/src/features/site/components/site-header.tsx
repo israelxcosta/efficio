@@ -109,10 +109,10 @@ export function SiteHeader() {
         </nav>
 
         <div className="site-header__actions">
-          <TeamAccessLink className="site-btn--sm" />
+          <TeamAccessLink className="site-btn--ghost site-btn--sm" />
           <ExternalLink
             href={whatsappHref('Olá! Vim pelo site e quero falar com o escritório.')}
-            className="site-btn site-btn--ghost site-btn--sm site-header__contact"
+            className="site-btn site-btn--sm site-header__contact"
             {...wipe('Fale conosco')}
           >
             Fale conosco

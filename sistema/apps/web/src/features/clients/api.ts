@@ -10,9 +10,12 @@ import type {
   ClientFee,
   ClientFeeInput,
   ClientFeesResponse,
+  ClientDocument,
+  ClientDocumentsInput,
   ClientInactivationInput,
   ClientInput,
   ClientListResponse,
+  ClientRegistrationInput,
   ClientStatus,
   CnpjLookupResult,
   TaxRegime,
@@ -65,6 +68,26 @@ export function useSaveClient() {
     // The variables may carry a typed access (`{ action: 'set', value }`): gone from the mutation
     // cache as soon as the form lets go of it (spec §13.8: accesses never linger in the page).
     gcTime: 0,
+    onSuccess: () => invalidateClients(qc),
+  });
+}
+
+/** Registration and fiscal data only (`clients` permission): `PATCH /clients/:id/registration`. */
+export function useSaveClientRegistration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ClientRegistrationInput }) =>
+      api<Client>(`/clients/${id}/registration`, { method: 'PATCH', body: input }),
+    onSuccess: () => invalidateClients(qc),
+  });
+}
+
+/** Documents and certificates (`clients` permission): the full list replaces the stored one. */
+export function useSaveClientDocuments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ClientDocumentsInput }) =>
+      api<ClientDocument[]>(`/clients/${id}/documents`, { method: 'PUT', body: input }),
     onSuccess: () => invalidateClients(qc),
   });
 }
