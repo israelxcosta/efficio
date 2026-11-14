@@ -38,7 +38,7 @@ export interface NavItem {
   end?: boolean;
   /** Other paths (and their sub-paths) that also make it active: Tarefas on the hub pages (spec §2.2). */
   activeOn?: string[];
-  /** `hub` pages live in the tasks hub (spec §2.9), not in the rail nor the "Mais"; ⌘K keeps them. */
+  /** `hub` pages live in the tasks hub (spec §2.9), not in the rail; ⌘K and the phone's "Mais" keep them. */
   place?: 'rail' | 'hub';
   /** Page key that hides it (phase 3, spec §13.10): Início and Tarefas have none. */
   permission?: PagePermissionKey;
@@ -175,9 +175,35 @@ export function navItemsFor(area: Area, can?: (key: PermissionKey) => boolean): 
   return can ? items.filter((i) => !i.permission || can(i.permission)) : items;
 }
 
-/** Items of the rail and of the mobile "Mais": `navItemsFor` without the hub pages (spec §2.2). */
+/** Items of the rail (and of the phone's bottom bar): `navItemsFor` without the hub pages (spec §2.2). */
 export function railItemsFor(area: Area, can?: (key: PermissionKey) => boolean): NavItem[] {
   return navItemsFor(area, can).filter((i) => i.place !== 'hub');
+}
+
+/**
+ * Items of the phone's "Mais": the rail's, with the hub pages (Auditoria, Recorrentes, Processos)
+ * right after Tarefas. On the computer the hub's icons are named by their tooltips; a tap opens
+ * none, so on the phone these pages are also listed here by name.
+ */
+export function moreMenuItemsFor(area: Area, can?: (key: PermissionKey) => boolean): NavItem[] {
+  const items = navItemsFor(area, can);
+  const hub = items.filter((i) => i.place === 'hub');
+  if (hub.length === 0) return items;
+  const rail = items.filter((i) => i.place !== 'hub');
+  const after = rail.findIndex((i) => i.activeOn?.length);
+  return after < 0 ? [...rail, ...hub] : [...rail.slice(0, after + 1), ...hub, ...rail.slice(after + 1)];
+}
+
+/**
+ * The item of a list that is the current page: the most specific one, so on `/tarefas/auditoria` it
+ * is Auditoria and not Tarefas (which `isActivePath` also marks there, for the rail).
+ */
+export function currentItemOf<T extends Pick<NavItem, 'to' | 'end' | 'activeOn'>>(pathname: string, items: readonly T[]): T | null {
+  let current: T | null = null;
+  for (const item of items) {
+    if (isActivePath(pathname, item) && (current === null || item.to.length > current.to.length)) current = item;
+  }
+  return current;
 }
 
 /** Page key of a Gestão path (`/tarefas/auditoria/...` → `page.audit`); null for Início, Tarefas and others. */

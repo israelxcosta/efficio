@@ -98,22 +98,25 @@ function Blocked({ reason, children }: { reason: string | null; children: ReactN
 }
 
 /**
- * The hub without data hooks: Ver (links to the views and pages of tasks) and Criar (buttons). Only
- * icons: the name is the tooltip and the `aria-label` (spec §2.9).
+ * The hub without data hooks: Ver (links to the views and pages of tasks) and Criar (buttons). On the
+ * computer only icons: the name is the tooltip and the `aria-label` (spec §2.9). On touch or narrow
+ * screens the short name shows under each icon (`Caption`).
  */
 export function TasksHubView({ views, active, hrefOf, replaceViews, onViewChosen, creates, blockedReason, onCreate, onApplyTemplate, onAdHocProcess }: TasksHubViewProps) {
   const hasPages = views.some((v) => v.group === 'pages') && views.some((v) => v.group === 'views');
   const firstPage = views.findIndex((v) => v.group === 'pages');
   return (
-    <div className="flex items-center gap-3 max-sm:w-full">
-      <nav aria-label="Páginas de tarefas" className="inline-flex items-center gap-1 rounded-md bg-bg-subtle p-1 max-sm:w-full">
+    <div className="flex items-center gap-3 max-sm:w-full sm:pointer-coarse:flex-wrap sm:pointer-coarse:justify-end">
+      <nav aria-label="Páginas de tarefas" className="inline-flex items-center gap-1 rounded-md bg-bg-subtle p-1 max-sm:flex max-sm:w-full max-sm:flex-wrap max-sm:gap-y-0">
         {views.map((v, i) => {
           const Icon = HUB_VIEW_ICONS[v.id];
           const current = v.id === active;
           const isView = TASK_VIEWS.has(v.id);
           return (
             <span key={v.id} className="contents">
-              {hasPages && i === firstPage ? <span data-hub-divider aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-border" /> : null}
+              {hasPages && i === firstPage ? (
+                <span data-hub-divider aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-border max-sm:mx-0 max-sm:h-1 max-sm:w-full max-sm:bg-transparent" />
+              ) : null}
               <Tooltip content={v.label} side="bottom" delay={150}>
                 <Link
                   to={hrefOf(v.id)}
@@ -123,7 +126,8 @@ export function TasksHubView({ views, active, hrefOf, replaceViews, onViewChosen
                   onClick={isView && onViewChosen ? () => onViewChosen(v.id as TaskView) : undefined}
                   className={cn(itemClass, current ? 'bg-surface text-fg shadow-xs' : 'text-muted hover:text-fg')}
                 >
-                  <Icon className="size-4" aria-hidden />
+                  <Icon className="size-4 shrink-0" aria-hidden />
+                  <Caption>{v.short}</Caption>
                 </Link>
               </Tooltip>
             </span>
@@ -142,6 +146,7 @@ export function TasksHubView({ views, active, hrefOf, replaceViews, onViewChosen
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="icon" aria-label={a.label} className={createClass} disabled={Boolean(blockedReason)}>
                           <Icon aria-hidden />
+                          <Caption>{a.short}</Caption>
                         </Button>
                       </DropdownMenuTrigger>
                     </Tooltip>
@@ -176,6 +181,7 @@ export function TasksHubView({ views, active, hrefOf, replaceViews, onViewChosen
                     onClick={() => onCreate(id)}
                   >
                     <Icon aria-hidden />
+                    <Caption>{a.short}</Caption>
                   </Button>
                 </Tooltip>
               </Blocked>

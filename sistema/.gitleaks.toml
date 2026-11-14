@@ -12,4 +12,14 @@ useDefault = true
 description = "Fake passwords of the test fixtures (readable pt-BR values such as 'senha-forte-123')"
 targetRules = ["generic-api-key"]
 regexTarget = "match"
-regexes = ['''(?i)password['"]?\s*:\s*['"][a-z0-9-]*senha[a-z0-9-]*['"]''']
+regexes = [
+  # as an object property (`password: 'senha-forte-123'`), a constant (`NEW_PASSWORD = '...'`) or an
+  # argument (`reset(token, 'outra-senha-2026')`): lowercase words with "senha", never a real secret
+  '''['"][a-z0-9-]*senha[a-z0-9-]*['"]''',
+]
+
+[[allowlists]]
+description = "Placeholder webhook secret of the tests: words, then the digits and the alphabet in order"
+targetRules = ["generic-api-key"]
+regexTarget = "match"
+regexes = ['''whsec_[a-z_]+_0123456789_abcdefghijklmnop''']

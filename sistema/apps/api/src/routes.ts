@@ -10,6 +10,7 @@ import { clientRoutes, cnpjRoutes } from './modules/clients/routes';
 import { contactRoutes } from './modules/contacts/routes';
 import { creditCardRoutes } from './modules/credit-cards/routes';
 import { dashboardRoutes } from './modules/dashboard/routes';
+import { feeAdjustmentRoutes } from './modules/fee-adjustments/routes';
 import { feeChargeRoutes } from './modules/fee-charges/routes';
 import { goalRoutes } from './modules/goals/routes';
 import { importRoutes } from './modules/imports/routes';
@@ -52,6 +53,8 @@ export const domainRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] =
 export const scopedRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] = [
   { prefix: '/imports', plugin: importRoutes },
   { prefix: '/open-finance', plugin: openFinanceRoutes },
+  // Yearly fee adjustment in batch: financial (`finance`), audited after its transaction commits.
+  { prefix: '/fee-adjustments', plugin: feeAdjustmentRoutes },
   { prefix: '/cnpj', plugin: cnpjRoutes },
   { prefix: '/tasks', plugin: taskRoutes },
   { prefix: '/unions', plugin: unionRoutes },

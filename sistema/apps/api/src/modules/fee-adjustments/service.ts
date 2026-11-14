@@ -13,6 +13,7 @@ import {
   adjustByBps,
   adjustmentNoticeDeadline,
   chosenAdjustmentIndex,
+  feePeriod,
   indexValuesOf,
   monthRange,
   renewalPeriodIn,
@@ -488,10 +489,8 @@ export async function feeAdjustmentLetters(
         'district',
         'responsibleName',
       ]);
-      const period = renewalPeriodIn(client.contractStartDate!, batch.month) ?? {
-        index: fee.periodIndex,
-        ...periodDates(client.contractStartDate!, fee.periodIndex),
-      };
+      // Dates derive from the contract start, like every fee period (utils/fees.ts).
+      const period = feePeriod(client.contractStartDate!, fee.periodIndex);
       return {
         clientId: client.id,
         feeId: fee.id,

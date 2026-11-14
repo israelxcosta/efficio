@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { lastPathOf, type AreaMemory } from './area-memory';
-import { AREA_LABELS, isActivePath, MY_AREA_ITEM, railItemsFor, SETTINGS_ITEM, type Area, type NavItem } from './nav';
+import { AREA_LABELS, currentItemOf, isActivePath, moreMenuItemsFor, MY_AREA_ITEM, railItemsFor, SETTINGS_ITEM, type Area, type NavItem } from './nav';
 import { MemberAvatar } from '@/components/ui/member-avatar';
 import { useMyOverdueTasks, useOverdueBills } from './notifications';
 import { useDeadlinesSummary } from '@/features/deadlines/api';
@@ -43,9 +43,11 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
   const overdueBills = useOverdueBills().data?.filter((t) => t.type === 'expense').length ?? 0;
   const overdueTasks = useMyOverdueTasks().data?.total ?? 0;
   const overdueDeadlines = useDeadlinesSummary().data?.overdueTotal ?? 0;
-  // The hub pages (Auditoria, Recorrentes, Processos) open from the hub, not from the "Mais" (spec §2.4).
-  const areaItems = railItemsFor(area, can);
-  const items = areaItems.filter((i) => i.mobile);
+  const items = railItemsFor(area, can).filter((i) => i.mobile);
+  // The "Mais" lists the hub pages too (Auditoria, Recorrentes, Processos): on the phone the hub's
+  // icons have no tooltip to name them. Only the most specific item is the current page.
+  const menuItems = [...moreMenuItemsFor(area, can), SETTINGS_ITEM];
+  const currentMenuItem = currentItemOf(pathname, menuItems);
   // Tarefas is active on the hub pages too (`activeOn`), which `NavLink end` cannot express.
   const barLink = (i: NavItem) => {
     const isActive = isActivePath(pathname, i);
@@ -178,8 +180,8 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
             </button>
           ) : null}
           <span className="my-1 h-px bg-border" aria-hidden />
-          {[...areaItems, SETTINGS_ITEM].map((i) => {
-            const isActive = isActivePath(pathname, i);
+          {menuItems.map((i) => {
+            const isActive = i === currentMenuItem;
             return (
               <Link
                 key={i.to}
