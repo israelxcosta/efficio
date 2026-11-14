@@ -89,6 +89,21 @@ sudo -u efficio git clone git@github.com:israelxcosta/efficio.git /opt/efficio/a
 bash /opt/efficio/app/sistema/deploy/scripts/install.sh
 ```
 
+> **Alternativa sem GitHub no servidor (pacote ZIP).** Em vez dos passos 4.2 e 4.3, você pode enviar o
+> pacote `efficio-producao-AAAA-MM-DD.zip` (gerado a partir da versão final, sem senhas nem arquivos de
+> teste) do seu computador para o servidor:
+>
+> ```
+> PS> scp .\efficio-producao-AAAA-MM-DD.zip root@IP-DO-VPS:/opt/efficio/
+> ```
+> ```bash
+> apt-get install -y unzip
+> cd /opt/efficio && unzip -q efficio-producao-AAAA-MM-DD.zip    # cria /opt/efficio/app
+> chown -R efficio:efficio /opt/efficio/app && cat /opt/efficio/app/sistema/VERSAO.txt
+> ```
+> Depois siga no 4.4. Nesse modo o servidor não precisa de chave de deploy nem de acesso ao GitHub, e o
+> `atualizar.sh` reconhece que não há git (veja "Atualizar por pacote ZIP" no passo 11).
+
 O `install.sh` pede uma senha para o usuário `efficio` (é a senha do `sudo`; guarde-a). No fim ele
 **desliga o login como root e por senha** no SSH.
 
@@ -230,6 +245,18 @@ sistema anterior continua rodando quando o erro é no build.
 As atualizações de segurança do Ubuntu são automáticas (reinício automático às 04:30 quando o
 kernel exigir). O Docker e as imagens base (PostgreSQL, Node, Caddy) são atualizados pelo
 repositório (Dependabot) e chegam no próximo `atualizar.sh`.
+
+### Atualizar por pacote ZIP (instalação sem GitHub)
+
+1. Envie o pacote novo: `PS> scp .\efficio-producao-NOVO.zip efficio@IP-DO-VPS:/opt/efficio/`
+2. No servidor, extraia **por cima**, preservando o `.env` (ele não vem no pacote) e confira a versão:
+   ```bash
+   cd /opt/efficio && unzip -q -o efficio-producao-NOVO.zip && cat app/sistema/VERSAO.txt
+   cd /opt/efficio/app/sistema/deploy && ./scripts/atualizar.sh
+   ```
+   Arquivos que saíram de uma versão para outra podem sobrar, mas não atrapalham (o build usa só o que o
+   sistema importa). Para uma pasta limpa: renomeie `app` para `app-anterior`, extraia o pacote novo, copie
+   `app-anterior/sistema/deploy/.env` para o mesmo lugar em `app` e rode o `atualizar.sh`.
 
 ## 12. Checklist final de segurança
 

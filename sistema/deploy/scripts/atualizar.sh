@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Sobe ou atualiza o Efficio no VPS: baixa a versão nova do GitHub, constrói as imagens, aplica as
-# migrações, reinicia e confere a saúde. Use também na primeira subida.
+# Sobe ou atualiza o Efficio no VPS: baixa a versão nova do GitHub (ou usa o pacote ZIP já extraído),
+# constrói as imagens, aplica as migrações, reinicia e confere a saúde. Use também na primeira subida.
 #   cd /opt/efficio/app/sistema/deploy && ./scripts/atualizar.sh
 #   ./scripts/atualizar.sh --sem-git     (reconstrói sem baixar nada, ex.: depois de editar o .env)
 set -euo pipefail
@@ -17,12 +17,19 @@ main() {
   exec 9>/run/lock/efficio-atualizar.lock
   flock -n 9 || { echo "ERRO: já há uma atualização em andamento." >&2; exit 1; }
 
-  if [[ "${1:-}" != "--sem-git" ]]; then
-    echo "==> Baixando a versão nova (git pull)"
-    # --ff-only: nunca mistura alterações locais com as do GitHub; se falhar, nada muda.
-    git -C "$DEPLOY_DIR" pull --ff-only
+  # Instalação pelo GitHub (git clone) ou por pacote ZIP enviado ao servidor (sem .git: o código novo
+  # já foi extraído por cima, então não há nada para baixar).
+  if git -C "$DEPLOY_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if [[ "${1:-}" != "--sem-git" ]]; then
+      echo "==> Baixando a versão nova (git pull)"
+      # --ff-only: nunca mistura alterações locais com as do GitHub; se falhar, nada muda.
+      git -C "$DEPLOY_DIR" pull --ff-only
+    fi
+    echo "==> Versão: $(git -C "$DEPLOY_DIR" log -1 --format='%h %cd %s' --date=format:'%d/%m/%Y %H:%M')"
+  else
+    versao="$DEPLOY_DIR/../VERSAO.txt"
+    echo "==> Instalação por pacote ZIP (sem git). Versão: $( [[ -f "$versao" ]] && head -n 1 "$versao" || echo 'desconhecida')"
   fi
-  echo "==> Versão: $(git -C "$DEPLOY_DIR" log -1 --format='%h %cd %s' --date=format:'%d/%m/%Y %H:%M')"
 
   echo "==> Validando a configuração"
   dc config --quiet
