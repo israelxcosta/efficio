@@ -38,6 +38,8 @@ export function sanitizeUrl(url: string | undefined): string | undefined {
   const q = url.indexOf('?');
   const path = (q < 0 ? url : url.slice(0, q))
     .replace(/(\/invites\/)[^/?]+/, '$1[token]')
+    // The CNPJ lookup (who the office's clients are).
+    .replace(/(\/cnpj\/)[^/?]+/, '$1[cnpj]')
     // Open Finance webhooks authenticate with a secret path segment.
     .replace(/(\/open-finance\/webhooks\/[^/?]+\/)[^/?]+/, '$1[secret]');
   if (q < 0) return path;

@@ -19,9 +19,10 @@ import { DemoBanner } from './demo-banner';
 import { areaMemoryKey, forgetStaleAreaMemories, railAreaFor, readAreaMemory, rememberAreaPath } from './area-memory';
 import { areaOf } from './nav';
 import { shellEntry, SitePage } from '@/features/site/site-entry';
+import { MFA_ENROLLMENT_PATH } from '@/features/auth/mfa-enrollment';
 
 export function AppShell() {
-  const { user, workspace, loading, refreshMe, resyncSession } = useAuth();
+  const { user, workspace, loading, mfaEnrollmentPending, refreshMe, resyncSession } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -86,7 +87,7 @@ export function AppShell() {
     window.scrollTo({ top: 0 });
   }, [location.pathname]);
 
-  const entry = shellEntry({ loading, signedIn: Boolean(user), pathname: location.pathname });
+  const entry = shellEntry({ loading, signedIn: Boolean(user), pathname: location.pathname, mfaPending: mfaEnrollmentPending });
   if (entry === 'loading') return <FullPageLoader />;
   // Visitors see the office's site at `/`; any other app address asks for the login first.
   if (entry === 'site') {
@@ -97,6 +98,8 @@ export function AppShell() {
     );
   }
   if (entry === 'login') return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+  // Mandatory two-step verification not enabled yet: only the enrollment (back here afterwards).
+  if (entry === 'mfa') return <Navigate to={MFA_ENROLLMENT_PATH} replace state={{ from: location.pathname + location.search }} />;
 
   return (
     <TransactionActionsProvider>

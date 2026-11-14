@@ -1,4 +1,4 @@
-import { sanitizeFileName, type ApiError } from '@effinance/shared';
+import { MFA_ENROLLMENT_REQUIRED_ERROR, sanitizeFileName, type ApiError } from '@effinance/shared';
 import { isSafeApiPath } from './safe-url';
 
 /**
@@ -67,6 +67,7 @@ let expectedWorkspace: string | null = null;
 /** Errors the app reacts to globally (toast + navigation), whatever screen made the request. */
 export type AccessErrorKind = 'subscription_required' | 'forbidden' | 'workspace_mismatch';
 let accessErrorHandler: ((kind: AccessErrorKind, error: ApiRequestError) => void) | null = null;
+let mfaEnrollmentHandler: ((error: ApiRequestError) => void) | null = null;
 
 /**
  * Kept in memory only — the httpOnly cookies are the primary session mechanism. Dropped whenever the
@@ -91,6 +92,14 @@ export function onUnauthorized(handler: (() => void) | null): void {
 
 export function onAccessError(handler: ((kind: AccessErrorKind, error: ApiRequestError) => void) | null): void {
   accessErrorHandler = handler;
+}
+
+/**
+ * Called on 403 `mfa_enrollment_required` (two-step verification is mandatory and the account has
+ * none): the app sends the person to the enrollment screen instead of the generic "forbidden" toast.
+ */
+export function onMfaEnrollmentRequired(handler: ((error: ApiRequestError) => void) | null): void {
+  mfaEnrollmentHandler = handler;
 }
 
 /** Requests that must not trigger a session refresh on 401 (credentials are being checked). */
@@ -191,7 +200,8 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 
   if (!response.ok) {
     const error = new ApiRequestError(response.status, data as Partial<ApiError> | null);
-    if (response.status === 402 || error.code === 'subscription_required') accessErrorHandler?.('subscription_required', error);
+    if (error.code === MFA_ENROLLMENT_REQUIRED_ERROR) mfaEnrollmentHandler?.(error);
+    else if (response.status === 402 || error.code === 'subscription_required') accessErrorHandler?.('subscription_required', error);
     else if (response.status === 403) accessErrorHandler?.('forbidden', error);
     else if (error.code === 'workspace_mismatch') accessErrorHandler?.('workspace_mismatch', error);
     throw error;
@@ -259,8 +269,9 @@ export async function apiDownload(
       data = null;
     }
     const error = new ApiRequestError(response.status, data);
+    if (error.code === MFA_ENROLLMENT_REQUIRED_ERROR) mfaEnrollmentHandler?.(error);
     // Background loads (profile photos) fail quietly: the initials stay.
-    if (response.status === 403 && !silent) accessErrorHandler?.('forbidden', error);
+    else if (response.status === 403 && !silent) accessErrorHandler?.('forbidden', error);
     else if (error.code === 'workspace_mismatch') accessErrorHandler?.('workspace_mismatch', error);
     throw error;
   }

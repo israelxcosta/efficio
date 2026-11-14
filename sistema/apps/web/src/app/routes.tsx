@@ -5,11 +5,13 @@ import { FinanceGate } from '@/components/layout/finance-gate';
 import { Button } from '@/components/ui/button';
 import { IS_DEMO } from '@/lib/demo';
 import { SITE_PATH, SitePage } from '@/features/site/site-entry';
+import { MFA_ENROLLMENT_PATH } from '@/features/auth/mfa-enrollment';
 
 const LoginPage = lazy(() => import('@/features/auth/pages/login'));
 const RegisterPage = lazy(() => import('@/features/auth/pages/register'));
 const ForgotPasswordPage = lazy(() => import('@/features/auth/pages/forgot-password'));
 const ResetPasswordPage = lazy(() => import('@/features/auth/pages/reset-password'));
+const MfaEnrollmentPage = lazy(() => import('@/features/auth/pages/mfa-enrollment'));
 const InvitePage = lazy(() => import('@/features/workspaces/pages/invite'));
 const TermsPage = lazy(() => import('@/features/legal/pages/legal').then((m) => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import('@/features/legal/pages/legal').then((m) => ({ default: m.PrivacyPage })));
@@ -72,6 +74,8 @@ export const routes: RouteObject[] = [
   { path: '/cadastro', element: <RegisterPage /> },
   { path: '/esqueci-senha', element: <ForgotPasswordPage /> },
   { path: '/redefinir-senha', element: <ResetPasswordPage /> },
+  // Mandatory two-step verification (`REQUIRE_MFA`): outside the shell, like the login.
+  { path: MFA_ENROLLMENT_PATH, element: <MfaEnrollmentPage /> },
   { path: '/convite/:token', element: <InvitePage /> },
   // Same screen after the token leaves the address bar (it stays in the history state).
   { path: '/convite', element: <InvitePage /> },

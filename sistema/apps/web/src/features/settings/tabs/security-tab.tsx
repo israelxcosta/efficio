@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { QRCodeSVG } from 'qrcode.react';
-import { Check, Copy, KeyRound, LogOut, Monitor, ShieldCheck, ShieldOff, Smartphone } from 'lucide-react';
+import { KeyRound, LogOut, Monitor, ShieldCheck, ShieldOff, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { newPasswordSchema, type MfaSetupResponse, type SessionInfo } from '@effinance/shared';
@@ -17,12 +16,12 @@ import { ErrorState } from '@/components/ui/misc';
 import { Sheet } from '@/components/ui/sheet';
 import { SkeletonRows } from '@/components/ui/skeleton';
 import { ApiRequestError, errorMessage } from '@/lib/api';
-import { copyText } from '@/lib/clipboard';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { toastError } from '@/lib/notify';
 import { useAuth } from '@/features/auth/auth-context';
 import { useChangePassword, useMfaDisable, useMfaEnable, useMfaSetup, useRevokeSession, useSessions } from '@/features/auth/api';
 import { PasswordChecklist } from '@/features/auth/password-checklist';
+import { MfaQrCode, MfaStep, RecoveryCodes } from '@/features/auth/mfa-parts';
 import { PasswordInput } from '@/features/auth/pages/login';
 import { Cell, TabGrid } from './layout';
 
@@ -102,7 +101,7 @@ function ChangePasswordCard() {
 }
 
 function TwoFactorCard() {
-  const { user } = useAuth();
+  const { user, mfaRequired } = useAuth();
   const [setupOpen, setSetupOpen] = useState(false);
   const [disableOpen, setDisableOpen] = useState(false);
   const enabled = Boolean(user?.mfaEnabled);
@@ -116,14 +115,22 @@ function TwoFactorCard() {
       />
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface-muted px-4 py-3">
         <p className="max-w-lg text-[13px] text-muted">
-          {enabled
+          {enabled && mfaRequired
+            ? 'Obrigatória neste escritório: sua conta pede o código do aplicativo a cada novo login. Trocou de celular? Cadastre o novo aqui.'
+            : enabled
             ? 'Sua conta pede o código do aplicativo a cada novo login. Guarde os códigos de recuperação para não perder o acesso.'
             : 'Recomendado: mesmo que alguém descubra sua senha, não conseguirá entrar sem o seu celular.'}
         </p>
         {enabled ? (
-          <Button variant="danger-soft" onClick={() => setDisableOpen(true)}>
-            <ShieldOff /> Desativar
-          </Button>
+          mfaRequired ? (
+            <Button variant="outline" onClick={() => setDisableOpen(true)}>
+              <Smartphone /> Trocar de celular
+            </Button>
+          ) : (
+            <Button variant="danger-soft" onClick={() => setDisableOpen(true)}>
+              <ShieldOff /> Desativar
+            </Button>
+          )
         ) : (
           <Button onClick={() => setSetupOpen(true)}>
             <ShieldCheck /> Ativar
@@ -131,14 +138,9 @@ function TwoFactorCard() {
         )}
       </div>
       <MfaSetupSheet open={setupOpen} onOpenChange={setSetupOpen} />
-      <DisableMfaDialog open={disableOpen} onOpenChange={setDisableOpen} />
+      <DisableMfaDialog open={disableOpen} onOpenChange={setDisableOpen} required={mfaRequired} />
     </Card>
   );
-}
-
-/** Groups the base32 secret in blocks of 4 for manual typing. */
-function formatSecret(secret: string): string {
-  return secret.replace(/(.{4})/g, '$1 ').trim();
 }
 
 function MfaSetupSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -264,24 +266,10 @@ function MfaSetupSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o
         <SkeletonRows rows={3} />
       ) : (
         <div className="flex flex-col gap-5">
-          <Step n={1} title="Escaneie o QR code">
-            <div className="mt-3 flex flex-col items-center gap-3 sm:flex-row sm:items-start">
-              {/* White quiet zone so the code stays scannable in the dark theme. */}
-              <div className="rounded-xl border border-border bg-white p-3">
-                <QRCodeSVG value={data.otpauthUrl} size={168} level="M" title="QR code para o aplicativo autenticador" />
-              </div>
-              <div className="min-w-0 text-[13px] text-muted">
-                <p>Não consegue escanear? Digite esta chave no aplicativo:</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <code className="tabular rounded-md bg-bg-subtle px-2.5 py-1.5 text-[13px] font-semibold tracking-wider text-fg">
-                    {formatSecret(data.secret)}
-                  </code>
-                  <CopyButton text={data.secret} label="Copiar chave" />
-                </div>
-              </div>
-            </div>
-          </Step>
-          <Step n={2} title="Confirme sua senha">
+          <MfaStep n={1} title="Escaneie o QR code">
+            <MfaQrCode data={data} />
+          </MfaStep>
+          <MfaStep n={2} title="Confirme sua senha">
             <div className="mt-3 flex max-w-xs flex-col gap-1.5">
               <PasswordInput
                 show={showPassword}
@@ -297,8 +285,8 @@ function MfaSetupSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o
                 </p>
               ) : null}
             </div>
-          </Step>
-          <Step n={3} title="Digite o código de 6 dígitos">
+          </MfaStep>
+          <MfaStep n={3} title="Digite o código de 6 dígitos">
             <div className="mt-3 flex max-w-xs flex-col gap-1.5">
               <CodeInput value={code} onChange={setCode} onComplete={(v) => void confirm(v)} invalid={!!codeError} disabled={enable.isPending} />
               {codeError ? (
@@ -307,66 +295,18 @@ function MfaSetupSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o
                 </p>
               ) : null}
             </div>
-          </Step>
+          </MfaStep>
         </div>
       )}
     </Sheet>
   );
 }
 
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
-  return (
-    <section className="flex gap-3">
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-fg">{n}</span>
-      <div className="min-w-0 flex-1">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function RecoveryCodes({ codes, saved, onSavedChange }: { codes: string[]; saved: boolean; onSavedChange: (v: boolean) => void }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <ul className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-surface-muted p-4" aria-label="Códigos de recuperação">
-        {codes.map((c) => (
-          <li key={c} className="tabular rounded-md bg-surface px-3 py-2 text-center font-mono text-sm font-semibold tracking-wider">
-            {c}
-          </li>
-        ))}
-      </ul>
-      <CopyButton text={codes.join('\n')} label="Copiar todos os códigos" full />
-      <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-snug text-fg">
-        <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--app-primary)]" checked={saved} onChange={(e) => onSavedChange(e.target.checked)} />
-        Guardei os códigos em um local seguro (gerenciador de senhas ou papel guardado).
-      </label>
-    </div>
-  );
-}
-
-function CopyButton({ text, label, full }: { text: string; label: string; full?: boolean }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      variant="outline"
-      size={full ? 'md' : 'icon-sm'}
-      aria-label={label}
-      title={label}
-      onClick={async () => {
-        if (await copyText(text)) {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } else toast.error('Não foi possível copiar. Selecione e copie manualmente.');
-      }}
-    >
-      {copied ? <Check /> : <Copy />}
-      {full ? (copied ? 'Copiado' : label) : null}
-    </Button>
-  );
-}
-
-function DisableMfaDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/**
+ * With the verification mandatory (`mfaRequired`) turning it off is "changing phones": the current
+ * authenticator goes and the app sends the person straight to the enrollment of the new one.
+ */
+function DisableMfaDialog({ open, onOpenChange, required }: { open: boolean; onOpenChange: (open: boolean) => void; required: boolean }) {
   const disable = useMfaDisable();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -379,7 +319,7 @@ function DisableMfaDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
     }
     try {
       await disable.mutateAsync({ code: value });
-      toast.success('Verificação em duas etapas desativada');
+      toast.success(required ? 'Celular anterior desvinculado. Agora cadastre o novo.' : 'Verificação em duas etapas desativada');
       onOpenChange(false);
     } catch (err) {
       setError(errorMessage(err));
@@ -396,15 +336,19 @@ function DisableMfaDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
         }
         onOpenChange(o);
       }}
-      title="Desativar verificação em duas etapas?"
-      description="Sua conta ficará protegida apenas pela senha. Confirme com um código do aplicativo ou de recuperação."
+      title={required ? 'Trocar de celular?' : 'Desativar verificação em duas etapas?'}
+      description={
+        required
+          ? 'A verificação em duas etapas é obrigatória neste escritório: o celular atual deixa de valer e, em seguida, você cadastra o novo. Confirme com um código do aplicativo atual ou de recuperação.'
+          : 'Sua conta ficará protegida apenas pela senha. Confirme com um código do aplicativo ou de recuperação.'
+      }
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button variant="danger" loading={disable.isPending} onClick={() => void submit()}>
-            Desativar
+          <Button variant={required ? 'primary' : 'danger'} loading={disable.isPending} onClick={() => void submit()}>
+            {required ? 'Continuar' : 'Desativar'}
           </Button>
         </>
       }

@@ -62,6 +62,16 @@ export async function databaseReady(db: Database, timeoutMs = READINESS_TIMEOUT_
   }
 }
 
+/**
+ * HSTS of the API responses: the same header Caddy sends for the site (deploy/Caddyfile), so the browser
+ * never sees two policies for the same host. No `preload`: it is a commitment for the whole domain and
+ * every subdomain, to be taken only after checking them (and then in both places at once).
+ */
+export const HSTS_MAX_AGE_SECONDS = 63_072_000;
+export function hstsPolicy(production: boolean) {
+  return production ? { maxAge: HSTS_MAX_AGE_SECONDS, includeSubDomains: true, preload: false } : false;
+}
+
 export interface BuildAppOptions {
   logger?: FastifyServerOptions['logger'];
   /** Overrides of the services built from env (tests). */
@@ -134,7 +144,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
       directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'none'"] },
     },
     crossOriginResourcePolicy: { policy: 'same-site' },
-    hsts: env.NODE_ENV === 'production' ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false,
+    hsts: hstsPolicy(env.NODE_ENV === 'production'),
   });
   await app.register(cors, { origin: env.CORS_ORIGIN, credentials: true });
   // Financial and personal data must not linger in browser/proxy caches (unless a route says otherwise).

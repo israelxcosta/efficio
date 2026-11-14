@@ -501,6 +501,13 @@ Uma instância da API com PostgreSQL e Caddy na mesma máquina (kit em `deploy/`
   PostgreSQL (`pg_try_advisory_lock`, conexão reservada); cada parte falha sozinha (log de erro) e a
   API segue; o resultado sai numa linha `job finished` com contagens. Com um login sem `DELETE` em
   `sessions`/`open_finance_events` (AWS) a limpeza é pulada com aviso — ela também roda em cada `migrate`.
+- Papéis do banco (`deploy/db-init/10-efficio.sh`): a API e o `migrate` entram como `efficio`, **não**
+  superusuário mas dono do banco e de todas as tabelas; cada requisição de domínio troca para
+  `effinance_app`. O RLS continua valendo (FORCE vale também para o dono: sem `app.workspace_id` ele não
+  lê nem grava nada de um espaço), mas, diferente da AWS, o login da API tem acesso direto às tabelas de
+  identidade (inclusive `DELETE`/`TRUNCATE` em `audit_logs`) e DDL (poderia desligar o FORCE): uma injeção
+  de SQL não ficaria contida. Separar `efficio_owner` (migrações) de `efficio` (runtime com os grants de
+  `test/db-roles.ts`) é o ajuste recomendado. Coberto por `test/vps-db-owner.test.ts`.
 
 ## Permissões e assinatura
 

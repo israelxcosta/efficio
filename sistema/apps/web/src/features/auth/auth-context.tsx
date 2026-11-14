@@ -12,10 +12,11 @@ import type {
   UpdateProfileInput,
   WorkspaceSummary,
 } from '@effinance/shared';
-import { api, ApiRequestError, onUnauthorized, setBearerToken, setExpectedWorkspace } from '@/lib/api';
+import { api, ApiRequestError, onMfaEnrollmentRequired, onUnauthorized, setBearerToken, setExpectedWorkspace } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { announceSessionChange, onSessionChange } from '@/lib/session-sync';
 import { clearPhotoCache, photosBelongToAnotherSession } from '@/lib/photo-cache';
+import { markMfaEnrollmentRequired, needsMfaEnrollment } from './mfa-enrollment';
 
 /** Everything cached except the observed `me` query. */
 const notMe = { predicate: (q: Query) => q.queryKey[0] !== qk.me[0] };
@@ -29,6 +30,10 @@ interface AuthContextValue {
   workspace: WorkspaceSummary | null;
   workspaces: WorkspaceSummary[];
   loading: boolean;
+  /** The server requires two-step verification (`REQUIRE_MFA`). */
+  mfaRequired: boolean;
+  /** Required and not enabled yet: the session only reaches the enrollment screen. */
+  mfaEnrollmentPending: boolean;
   /** Resolves with an MFA challenge when the account has two-factor authentication enabled. */
   login: (input: LoginInput) => Promise<LoginResult>;
   verifyMfa: (input: MfaVerifyInput) => Promise<MeResponse>;
@@ -87,6 +92,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => onUnauthorized(null);
   }, [applySession]);
 
+  useEffect(() => {
+    // 403 `mfa_enrollment_required` from any request: the cached session is marked (the shell then
+    // sends the person to the enrollment screen, whose own requests are allowed: no loop) and
+    // reloaded from the server.
+    onMfaEnrollmentRequired(() => {
+      qc.setQueryData<MeResponse | null>(qk.me, markMfaEnrollmentRequired);
+      void qc.invalidateQueries({ queryKey: qk.me });
+    });
+    return () => onMfaEnrollmentRequired(null);
+  }, [qc]);
+
   // Another tab signed in/out or switched workspace: the shared cookies now point elsewhere, so
   // reload the session from the server instead of showing (and editing) stale tenant data.
   const resyncSession = useCallback(() => {
@@ -110,8 +126,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const startSession = useCallback(
     async (res: AuthResponse) => {
       setBearerToken(res.token);
-      const session = await fetchMe();
-      if (!session) throw new ApiRequestError(401, null);
+      const fetched = await fetchMe();
+      if (!fetched) throw new ApiRequestError(401, null);
+      // Required and not enabled yet: the session is limited to the enrollment screen.
+      const session = res.mfaEnrollmentRequired ? (markMfaEnrollmentRequired(fetched) ?? fetched) : fetched;
       applySession(session);
       announceSessionChange('login');
       return session;
@@ -201,6 +219,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       workspace: me.data?.workspace ?? null,
       workspaces: me.data?.workspaces ?? [],
       loading: me.isPending,
+      mfaRequired: Boolean(me.data?.mfaRequired),
+      mfaEnrollmentPending: needsMfaEnrollment(me.data),
       login,
       verifyMfa,
       register,

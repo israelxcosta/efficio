@@ -102,8 +102,11 @@ describe('B1: sign-up by invite only', () => {
 
     await admin().execute(sql`update workspace_invites set expires_at = now() + interval '1 day'`);
     expect((await signUp({ email: 'carla@escritorio.com', inviteToken: token })).statusCode).toBe(201);
-    // Used up: the same link cannot open a second account.
-    expect((await signUp({ email: 'carla@escritorio.com', inviteToken: token })).statusCode).toBe(409);
+    // Used up: the same link cannot open a second account (the invite is checked before the e-mail, so a
+    // made-up or used token never tells whether an account exists — test/onda1-security.test.ts).
+    const reused = await signUp({ email: 'carla@escritorio.com', inviteToken: token });
+    expect(reused.statusCode).toBe(404);
+    expect(reused.json().message).toBe('Convite inválido ou já utilizado');
     expect((await signUp({ email: 'carla2@escritorio.com', inviteToken: token })).statusCode).toBe(404);
   });
 

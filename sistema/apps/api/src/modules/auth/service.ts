@@ -88,11 +88,13 @@ export async function register(
   db: DbExecutor,
   input: RegisterInput,
 ): Promise<{ user: UserRow; workspaceId: string; viaInvite: boolean }> {
-  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email));
-  if (existing) throw new ConflictError('Já existe uma conta com este e-mail');
+  // The invite first: with public sign-up off, a made-up token must not tell whether an e-mail has an
+  // account (only whoever holds a valid invite for that e-mail reaches the check below).
   const invite = input.inviteToken
     ? await usableInvite(db, input.inviteToken, input.email, 'Crie a conta com esse e-mail.')
     : null;
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email));
+  if (existing) throw new ConflictError('Já existe uma conta com este e-mail');
 
   const passwordHash = await hashPassword(input.password);
   try {

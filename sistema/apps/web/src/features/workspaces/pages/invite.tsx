@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { MailWarning } from 'lucide-react';
 import { toast } from 'sonner';
 import { WORKSPACE_KIND_LABELS } from '@effinance/shared';
@@ -9,6 +9,7 @@ import { ApiRequestError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/features/auth/auth-context';
 import { ROLE_HINTS, ROLE_LABELS } from '@/features/auth/roles';
 import { AuthLayout } from '@/features/auth/pages/auth-layout';
+import { MFA_ENROLLMENT_PATH } from '@/features/auth/mfa-enrollment';
 import { acceptInvite, useInvitePreview } from '../api';
 import { WORKSPACE_KIND_ICONS } from '../kind-icon';
 
@@ -18,7 +19,7 @@ export default function InvitePage() {
   const location = useLocation();
   const stateToken = (location.state as { inviteToken?: unknown } | null)?.inviteToken;
   const token = urlToken ?? (typeof stateToken === 'string' ? stateToken : '');
-  const { user, loading, applySession, logout } = useAuth();
+  const { user, loading, mfaEnrollmentPending, applySession, logout } = useAuth();
   const navigate = useNavigate();
   // The token moves from the address bar into this history entry's state (`/convite`), so it doesn't
   // linger in the browser history, screenshots or the Referer of later requests.
@@ -42,6 +43,10 @@ export default function InvitePage() {
       </AuthLayout>
     );
   }
+
+  // Signed in without the mandatory two-step verification (also after a 403 on accepting): enroll
+  // first, then come back to this invite.
+  if (user && mfaEnrollmentPending) return <Navigate to={MFA_ENROLLMENT_PATH} replace state={back} />;
 
   if (loading || preview.isPending) {
     return (
