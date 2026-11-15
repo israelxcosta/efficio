@@ -38,7 +38,7 @@ import type { z } from 'zod';
 import { recurringTasks } from '../../db/schema';
 import { ValidationError } from '../../lib/errors';
 import type { TaskContext } from './access';
-import { appliesTo, clientActiveIn, defaultWindow, ensureOccurrences, loadClients, loadDefs, syncOpenOccurrences, type GenDef } from './generation';
+import { clientActiveIn, defaultWindow, ensureOccurrences, loadClients, loadDefs, syncOpenOccurrences, type GenDef } from './generation';
 import { insertRecurring } from './recurring';
 import { createDepartment } from './registry';
 import { departmentNames, getDepartmentOrThrow } from './shared';
@@ -209,7 +209,7 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
         await syncOpenOccurrences(ctx, def.row.id);
         // It already runs this month: the regime's clients get this month's occurrences, whatever `fromMonth`.
         const perClient = currentOverdue(item, ctx.today);
-        if (perClient > 0) overdueCreated += perClient * regimeClients.filter((c) => appliesTo(def, c)).length;
+        if (perClient > 0) overdueCreated += perClient * regimeClients.filter((c) => !def.excluded.has(c.id)).length;
         out.push({ key: item.key, recurringTaskId: def.row.id, name: def.row.name, result: 'regimeAdded' });
       }
       continue;

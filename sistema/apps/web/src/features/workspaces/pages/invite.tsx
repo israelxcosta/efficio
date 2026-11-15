@@ -13,6 +13,8 @@ import { MFA_ENROLLMENT_PATH } from '@/features/auth/mfa-enrollment';
 import { acceptInvite, useInvitePreview } from '../api';
 import { WORKSPACE_KIND_ICONS } from '../kind-icon';
 
+const INVALID_INVITE = 'Este link de convite não é válido. Peça um novo ao escritório.';
+
 /** `/convite/:token` — public preview; accepting requires being signed in with the invited e-mail. */
 export default function InvitePage() {
   const { token: urlToken } = useParams();
@@ -57,14 +59,17 @@ export default function InvitePage() {
   }
 
   if (preview.isError || !preview.data) {
-    const notFound = preview.error instanceof ApiRequestError && preview.error.status === 404;
+    // A short/garbled token is refused by validation (400) and a revoked one is not found (404/410):
+    // both mean the link is no good, and trying again cannot help. Only network/server errors retry.
+    const status = preview.error instanceof ApiRequestError ? preview.error.status : 0;
+    const invalid = status >= 400 && status < 500;
     return (
       <AuthLayout
-        title={notFound ? 'Convite não encontrado' : 'Não foi possível abrir o convite'}
-        subtitle={notFound ? 'O link pode ter sido revogado ou digitado incorretamente.' : errorMessage(preview.error)}
+        title={invalid ? 'Convite inválido' : 'Não foi possível abrir o convite'}
+        subtitle={invalid ? INVALID_INVITE : errorMessage(preview.error)}
         footer={footer}
       >
-        {notFound ? null : (
+        {invalid ? null : (
           <Button variant="outline" onClick={() => preview.refetch()}>
             Tentar novamente
           </Button>
