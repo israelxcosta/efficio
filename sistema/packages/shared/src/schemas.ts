@@ -57,7 +57,7 @@ import {
   UNION_CYCLE_MIN_YEAR,
   UNION_SITUATIONS,
 } from './constants';
-import { REGIME_GROUP_ITEMS, REGIME_GROUP_REGIMES } from './regime-groups';
+import { REGIME_GROUP_FROM_MONTHS, REGIME_GROUP_ITEMS, REGIME_GROUP_REGIMES } from './regime-groups';
 import { isISODate } from './utils/dates';
 import { OCCURRENCE_PERIOD_RE, sanitizeFileName, TASK_TIME_RE } from './utils/tasks';
 import { isValidCNPJ, isValidCPF, isValidDocument, isValidPhone, onlyDigits } from './utils/documents';
@@ -1368,6 +1368,11 @@ export const regimeGroupApplySchema = z.object({
     .default({}),
   /** Items to create even when a recurring task made by hand with the same name covers them. */
   force: z.array(z.enum(REGIME_GROUP_KEYS)).max(REGIME_GROUP_KEYS.length).default([]),
+  /**
+   * First competence of the recurring tasks created: `current` (default; occurrences whose deadline
+   * already passed are born overdue, see `currentOverdue`) or `next` (nothing in the current month).
+   */
+  fromMonth: z.enum(REGIME_GROUP_FROM_MONTHS).default('current'),
 });
 export type RegimeGroupApplyInput = z.input<typeof regimeGroupApplySchema>;
 

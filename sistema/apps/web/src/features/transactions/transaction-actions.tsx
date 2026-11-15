@@ -94,6 +94,7 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
   const [transferSheet, setTransferSheet] = useState<TransferSheetState>(CLOSED_TRANSFER);
   const [toDelete, setToDelete] = useState<Transaction | null>(null);
   const [payTarget, setPayTarget] = useState<Transaction | null>(null);
+  const [toUnpay, setToUnpay] = useState<Transaction | null>(null);
   const [anticipateTarget, setAnticipateTarget] = useState<Transaction | null>(null);
   const [savingPaidId, setSavingPaidId] = useState<string | null>(null);
   const txSheetUsed = useStickyTrue(txSheet.open);
@@ -205,6 +206,11 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
         toast.info('Compras no cartão são quitadas ao pagar a fatura.');
         return;
       }
+      // Undoing a settlement also removes the interest/fine rows: never on a single click.
+      if (!paid && tx.paid && tx.type !== 'transfer') {
+        setToUnpay(tx);
+        return;
+      }
       // No account yet, settled after the due date (interest and fine may be charged) or a fee with a
       // discount for paying on time (the discount is confirmed with the amount received): ask first.
       const late = tx.type !== 'transfer' && tx.date < todayISO();
@@ -291,6 +297,18 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
               void applyPaid(tx, true, extra);
             }}
           />
+          <ConfirmDialog
+            open={Boolean(toUnpay)}
+            onOpenChange={(o) => !o && setToUnpay(null)}
+            title={toUnpay ? unpayTitle(toUnpay) : ''}
+            description={toUnpay ? unpayDescription(toUnpay) : undefined}
+            confirmLabel={toUnpay?.type === 'income' ? 'Desfazer recebimento' : 'Desfazer pagamento'}
+            onConfirm={() => {
+              const tx = toUnpay!;
+              setToUnpay(null);
+              void applyPaid(tx, false);
+            }}
+          />
           <AnticipateDialog tx={anticipateTarget} onClose={() => setAnticipateTarget(null)} />
         </>
       ) : null}
@@ -299,6 +317,18 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
 }
 
 /** Becomes true the first time `value` is true and stays true. */
+/** "Desfazer o recebimento?" / "Desfazer o pagamento?" */
+export function unpayTitle(tx: Pick<Transaction, 'type'>): string {
+  return tx.type === 'income' ? 'Desfazer o recebimento?' : 'Desfazer o pagamento?';
+}
+
+/** What undoing a settlement takes with it (the interest/fine rows are deleted by the API). */
+export function unpayDescription(tx: Pick<Transaction, 'type' | 'description' | 'amount' | 'lateFees'>): string {
+  const back = tx.type === 'income' ? 'a receber' : 'pendente';
+  const base = `"${tx.description}" de ${formatBRL(tx.amount)} volta para ${back}.`;
+  return tx.lateFees && tx.lateFees.interest + tx.lateFees.fine > 0 ? `${base} Os juros e a multa lançados também saem.` : base;
+}
+
 function useStickyTrue(value: boolean): boolean {
   const [sticky, setSticky] = useState(value);
   if (value && !sticky) setSticky(true);

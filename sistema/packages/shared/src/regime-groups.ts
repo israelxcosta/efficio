@@ -315,6 +315,10 @@ export function normalizeRecurringName(name: string): string {
 }
 
 /** What applying a group did with each item. */
+/** Where the recurring tasks created by applying a group start: this competence or the next one. */
+export const REGIME_GROUP_FROM_MONTHS = ['current', 'next'] as const;
+export type RegimeGroupFromMonth = (typeof REGIME_GROUP_FROM_MONTHS)[number];
+
 export const REGIME_GROUP_APPLY_RESULTS = ['created', 'regimeAdded', 'unchanged', 'ended'] as const;
 export type RegimeGroupApplyResult = (typeof REGIME_GROUP_APPLY_RESULTS)[number];
 

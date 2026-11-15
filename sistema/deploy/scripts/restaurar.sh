@@ -13,6 +13,11 @@ ENV_FILE="$DEPLOY_DIR/.env"
 dc() { docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" --project-directory "$DEPLOY_DIR" "$@"; }
 # </dev/null: o docker exec não pode consumir o que a pessoa digita nas confirmações.
 psql_su() { dc exec -T db psql -U postgres -v ON_ERROR_STOP=1 -X -q "$@" </dev/null; }
+# Grants mínimos do login da API (o mesmo arquivo do serviço grants), como o dono do banco $1.
+grants_api() {
+  dc exec -T db psql -U postgres -v ON_ERROR_STOP=1 -X -q -d "$1" -c "SET ROLE efficio_owner" -f - \
+    <"$DEPLOY_DIR/sql/grants-api.sql"
+}
 
 ler_env() {
   local valor
@@ -52,14 +57,23 @@ echo "Banco novo:  $novo  (o banco em uso NÃO é alterado nesta etapa)"
 confirmar SIM || { echo "Cancelado."; exit 1; }
 
 echo "==> Criando o banco $novo"
-psql_su -d postgres -c "CREATE DATABASE \"$novo\" OWNER efficio TEMPLATE template0 ENCODING 'UTF8'" \
+psql_su -d postgres -c "CREATE DATABASE \"$novo\" OWNER efficio_owner TEMPLATE template0 ENCODING 'UTF8'" \
   -c "REVOKE ALL ON DATABASE \"$novo\" FROM PUBLIC" \
-  -c "GRANT CONNECT, TEMPORARY ON DATABASE \"$novo\" TO efficio"
+  -c "GRANT CONNECT ON DATABASE \"$novo\" TO efficio_owner, efficio"
 
 echo "==> Restaurando (pode levar alguns minutos)"
 if ! gpg --batch --quiet --pinentry-mode loopback --passphrase-file "$PASS_FILE" --decrypt "$arquivo" \
     | dc exec -T db pg_restore -U postgres -d "$novo" --exit-on-error; then
   echo "ERRO: a restauração falhou. Apagando o banco incompleto $novo." >&2
+  psql_su -d postgres -c "DROP DATABASE IF EXISTS \"$novo\"" || true
+  exit 1
+fi
+
+echo "==> Papéis: tudo do dono (efficio_owner) e só os grants mínimos para a API (efficio)"
+# REASSIGN: se algo do backup pertencer ao login da API, passa ao dono (a API não pode ser dona de nada).
+psql_su -d "$novo" -c "REASSIGN OWNED BY efficio TO efficio_owner"
+if ! grants_api "$novo"; then
+  echo "ERRO: não consegui aplicar os grants da API. Apagando o banco $novo." >&2
   psql_su -d postgres -c "DROP DATABASE IF EXISTS \"$novo\"" || true
   exit 1
 fi
@@ -99,7 +113,7 @@ psql_su -d postgres \
   -c "ALTER DATABASE efficio RENAME TO \"$antigo\"" \
   -c "ALTER DATABASE \"$novo\" RENAME TO efficio"
 
-echo "==> Subindo de novo (aplica migrações mais novas que o backup, se houver)"
+echo "==> Subindo de novo (migrate + grants: aplica migrações mais novas que o backup, se houver)"
 dc up -d api
 for _ in $(seq 1 36); do
   estado="$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q api)" 2>/dev/null || echo desconhecido)"

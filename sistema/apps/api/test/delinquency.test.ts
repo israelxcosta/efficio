@@ -248,6 +248,15 @@ describe('delinquency report', () => {
     expect((await c.get('/reports/delinquency?months=3')).body.summary).toMatchObject({ paidWithFeesCount: 1, interestTotal: 0, fineTotal: 700 });
   });
 
+  it('treats a due date on a weekend as payable on the next business day (QA #2)', async () => {
+    const a = await createClient(c, BAKERY);
+    // Due Saturday 17/10, paid Monday 19/10: on time. Due Saturday 03/10, paid Tuesday 06/10: 3 days late.
+    await receivable(c, a, '2026-10-17', 35000, { paidAt: '2026-10-19' });
+    await receivable(c, a, '2026-10-03', 35000, { paidAt: '2026-10-06' });
+    const client = (await c.get('/reports/delinquency?months=1')).body.clients[0];
+    expect(client).toMatchObject({ dueCount: 2, onTimeCount: 1, lateCount: 1, maxDaysLate: 3, openCount: 0 });
+  });
+
   it('counts only income of clients outside cards and transfers', async () => {
     const a = await createClient(c, BAKERY);
     const supplier = (await c.post('/contacts', { name: 'Papelaria Central' })).body.id;

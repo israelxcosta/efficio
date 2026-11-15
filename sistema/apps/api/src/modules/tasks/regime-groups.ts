@@ -10,8 +10,10 @@
 
 import { and, eq } from 'drizzle-orm';
 import {
+  addMonthKey,
   matchSuggestedDepartment,
   monthKey,
+  occurrencesInCompetence,
   normalizeRecurringName,
   recurringMonths,
   recurringTaskInputSchema,
@@ -23,6 +25,8 @@ import {
   type RecurrencePeriod,
   type regimeGroupApplySchema,
   type RegimeGroupApplyResponse,
+  type ISODate,
+  type RegimeGroupItem,
   type RegimeGroupItemState,
   type RegimeGroupRecurringRef,
   type RegimeGroupRegime,
@@ -34,7 +38,7 @@ import type { z } from 'zod';
 import { recurringTasks } from '../../db/schema';
 import { ValidationError } from '../../lib/errors';
 import type { TaskContext } from './access';
-import { clientActiveIn, defaultWindow, ensureOccurrences, loadClients, loadDefs, syncOpenOccurrences, type GenDef } from './generation';
+import { appliesTo, clientActiveIn, defaultWindow, ensureOccurrences, loadClients, loadDefs, syncOpenOccurrences, type GenDef } from './generation';
 import { insertRecurring } from './recurring';
 import { createDepartment } from './registry';
 import { departmentNames, getDepartmentOrThrow } from './shared';
@@ -66,6 +70,22 @@ function handmadeByName(defs: GenDef[], regime: RegimeGroupRegime, current: stri
     if (!out.has(key)) out.set(key, def);
   }
   return out;
+}
+
+/**
+ * Occurrences per client of the item in the current competence whose legal deadline is before today:
+ * applying it from the current month creates them already overdue (QA #4).
+ */
+function currentOverdue(item: RegimeGroupItem, today: ISODate): number {
+  const schedule = {
+    period: item.period,
+    dueDay: item.dueDay,
+    dueMonth: item.dueMonth,
+    targetDaysBefore: item.targetDaysBefore,
+    nonBusinessDayRule: item.nonBusinessDayRule,
+    referenceOffset: item.referenceOffset,
+  };
+  return occurrencesInCompetence(schedule, monthKey(today)).filter((o) => o.legalDueDate < today).length;
 }
 
 /** The office's department for each suggested one (first by name), when its name matches. */
@@ -108,14 +128,18 @@ export async function listRegimeGroups(ctx: TaskContext): Promise<RegimeGroupsRe
         handmade: twin ? recurringRef(twin, departments, current) : null,
         applied,
         state,
+        currentOverdue: currentOverdue(item, ctx.today),
       };
     });
+    const clientCount = clients.filter((c) => c.taxRegime === regime && clientActiveIn(c, current)).length;
+    const missing = items.filter((i) => i.state === 'missing');
     return {
       regime,
       label: TAX_REGIME_LABELS[regime],
-      clientCount: clients.filter((c) => c.taxRegime === regime && clientActiveIn(c, current)).length,
+      clientCount,
       items,
-      missing: items.filter((i) => i.state === 'missing').length,
+      missing: missing.length,
+      currentMonthOverdue: missing.reduce((sum, i) => sum + i.currentOverdue * clientCount, 0),
       recurring: defs.filter((d) => d.row.regimes.includes(regime)).map((d) => recurringRef(d, departments, current)),
     };
   });
@@ -124,7 +148,7 @@ export async function listRegimeGroups(ctx: TaskContext): Promise<RegimeGroupsRe
 
 /**
  * POST /tasks/regime-groups/:regime/apply (`registry`). Creates the missing items (from the current
- * competence, no default responsible: the department's queue), adds the regime to the existing ones of
+ * competence or the next one, `fromMonth`; no default responsible: the department's queue), adds the regime to the existing ones of
  * the catalog and leaves the ended ones ended. Departments: the chosen one, else a match by name, else
  * created with the suggested name — only in offices that use departments.
  */
@@ -132,6 +156,7 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
   const items = regimeGroupItems(regime).filter((i) => !input.keys || input.keys.includes(i.key));
   if (items.length === 0) throw new ValidationError('Nenhuma das tarefas escolhidas faz parte deste grupo.');
   const current = monthKey(ctx.today);
+  const startCompetence = input.fromMonth === 'next' ? addMonthKey(current, 1) : current;
   const departments = await departmentNames(ctx.db, ctx.workspaceId);
   for (const id of Object.values(input.departments)) if (id) await getDepartmentOrThrow(ctx.db, ctx.workspaceId, id);
   const matched = matchedDepartments(departments);
@@ -158,6 +183,9 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
 
   const out: RegimeGroupApplyResponse['items'] = [];
   const createdIds: string[] = [];
+  // Occurrences of the current competence born overdue, per client: counted below over the regime's clients.
+  const regimeClients = (await loadClients(ctx)).filter((c) => c.taxRegime === regime && clientActiveIn(c, current));
+  let overdueCreated = 0;
   for (const item of items) {
     const def = byKey.get(item.key);
     const covered = !def || !isActive(def, current) || !def.row.regimes.includes(regime);
@@ -179,6 +207,9 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
           .where(and(eq(recurringTasks.workspaceId, ctx.workspaceId), eq(recurringTasks.id, def.row.id)));
         // The clients of the regime get their occurrences (and a system-canceled one comes back).
         await syncOpenOccurrences(ctx, def.row.id);
+        // It already runs this month: the regime's clients get this month's occurrences, whatever `fromMonth`.
+        const perClient = currentOverdue(item, ctx.today);
+        if (perClient > 0) overdueCreated += perClient * regimeClients.filter((c) => appliesTo(def, c)).length;
         out.push({ key: item.key, recurringTaskId: def.row.id, name: def.row.name, result: 'regimeAdded' });
       }
       continue;
@@ -196,10 +227,12 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
         nonBusinessDayRule: item.nonBusinessDayRule,
         referenceOffset: item.referenceOffset,
         regimes: [regime],
+        startCompetence,
       }),
       { catalogKey: item.key },
     );
     createdIds.push(id);
+    if (startCompetence === current) overdueCreated += currentOverdue(item, ctx.today) * regimeClients.length;
     out.push({ key: item.key, recurringTaskId: id, name: item.name, result: 'created' });
   }
   if (createdIds.length > 0) await ensureOccurrences(ctx, defaultWindow(ctx.today), { recurringTaskIds: createdIds });
@@ -213,5 +246,8 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
     items: out,
     skipped,
     departmentsCreated,
+    fromMonth: input.fromMonth,
+    startCompetence,
+    overdueCreated,
   };
 }

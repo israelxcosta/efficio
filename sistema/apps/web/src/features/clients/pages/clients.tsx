@@ -42,7 +42,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
 import { toastError } from '@/lib/notify';
 import { isUuid } from '@/lib/safe-url';
-import { cn, initials } from '@/lib/utils';
+import { cn, initials, pluralize } from '@/lib/utils';
 import { useClient, useClients, useDeleteClient, useReactivateClient } from '../api';
 import { clientPagePath } from '../client-page-logic';
 import { ClientSheet } from '../client-sheet';
@@ -111,8 +111,8 @@ function FeeCell({ client, today, onOpen }: { client: Client; today: string; onO
         className="text-left"
         aria-label={`Honorários de ${client.name}`}
       >
-        <span className="tabular block font-semibold text-fg">{formatBRL(fee.amount)}</span>
-        <span className="tabular block text-[11px] text-muted">
+        <span className="tabular block font-semibold whitespace-nowrap text-fg">{formatBRL(fee.amount)}</span>
+        <span className="tabular block text-[11px] whitespace-nowrap text-muted">
           {formatBRL(fee.employeeFee)} / empregado
         </span>
       </button>
@@ -333,7 +333,7 @@ export default function ClientsPage() {
             ))}
           </Select>
           {data ? (
-            <span className="ml-auto text-xs text-muted">{data.total} cliente(s)</span>
+            <span className="ml-auto text-xs text-muted">{pluralize(data.total, 'cliente', 'clientes')}</span>
           ) : null}
         </div>
 
@@ -388,9 +388,11 @@ export default function ClientsPage() {
                     </Link>
                     {statusBadge(c)}
                   </div>
-                  <div className="flex items-center justify-between gap-2 pl-12">
+                  {/* The six actions take ~200px: on narrow phones they wrap below the fee instead of
+                      overflowing the card. */}
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pl-12">
                     <FeeCell client={c} today={today} onOpen={() => setFeesFor(c)} />
-                    {actions(c)}
+                    <div className="-mr-1.5 ml-auto">{actions(c)}</div>
                   </div>
                 </li>
               ))}

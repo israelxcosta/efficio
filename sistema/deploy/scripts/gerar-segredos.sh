@@ -43,6 +43,7 @@ done
 # Segredos: senhas do banco em hexadecimal (seguras dentro da URL), JWT em base64url, chave mestra
 # em base64 de exatamente 32 bytes.
 POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+EFFICIO_OWNER_DB_PASSWORD="$(openssl rand -hex 32)"
 EFFICIO_DB_PASSWORD="$(openssl rand -hex 32)"
 JWT_SECRET="$(openssl rand -base64 48 | tr '+/' '-_' | tr -d '=\n')"
 ENCRYPTION_MASTER_KEY="$(openssl rand -base64 32 | tr -d '\n')"
@@ -56,6 +57,7 @@ DOMAIN=$DOMAIN
 ACME_EMAIL=$EMAIL
 
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+EFFICIO_OWNER_DB_PASSWORD=$EFFICIO_OWNER_DB_PASSWORD
 EFFICIO_DB_PASSWORD=$EFFICIO_DB_PASSWORD
 
 JWT_SECRET=$JWT_SECRET

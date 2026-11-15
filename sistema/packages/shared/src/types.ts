@@ -57,6 +57,7 @@ import type {
 import type { TransactionOrigin } from './integrations';
 import type {
   RegimeGroupApplyResult,
+  RegimeGroupFromMonth,
   RegimeGroupItemState,
   RegimeGroupRegime,
   RegimeGroupSkipReason,
@@ -1747,6 +1748,11 @@ export interface RegimeGroupItemView {
   /** The catalog recurring task exists, is active and includes this regime (`state = 'applied'`). */
   applied: boolean;
   state: RegimeGroupItemState;
+  /**
+   * Occurrences per client in the current competence whose legal deadline is before today: applying
+   * from the current month creates them already overdue (`fromMonth: 'next'` avoids it).
+   */
+  currentOverdue: number;
 }
 
 export interface RegimeGroup {
@@ -1757,6 +1763,11 @@ export interface RegimeGroup {
   items: RegimeGroupItemView[];
   /** Items in the `missing` state (applying creates them or adds the regime). */
   missing: number;
+  /**
+   * Occurrences born overdue if every missing item is applied from the current month: `currentOverdue`
+   * × `clientCount`, summed over the `missing` items (0: no warning needed).
+   */
+  currentMonthOverdue: number;
   /** Every recurring task of the office that applies to the regime (catalog or made by hand). */
   recurring: RegimeGroupRecurringRef[];
 }
@@ -1783,6 +1794,15 @@ export interface RegimeGroupApplyResponse {
   skipped: { key: string; name: string; reason: RegimeGroupSkipReason; existing: { id: string; name: string } }[];
   /** Departments created for the suggested ones that had no match. */
   departmentsCreated: TaskRef[];
+  /** The `fromMonth` used and the first competence of the recurring tasks created. */
+  fromMonth: RegimeGroupFromMonth;
+  startCompetence: MonthKey;
+  /**
+   * Occurrences of the current competence born overdue (legal deadline before today) for the regime's
+   * active clients: those of the items created from the current month plus those of `regimeAdded` (an
+   * existing recurring task already runs this month, whatever `fromMonth`).
+   */
+  overdueCreated: number;
 }
 
 /** Audit column: the occurrence of a recurring task in a period, counted over the clients in view. */

@@ -7,6 +7,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   addMonthKey,
+  adjustToBusinessDay,
   daysInMonth,
   FEE_CATEGORY,
   feePeriodIndexAt,
@@ -38,10 +39,13 @@ export function competenceLabel(competence: MonthKey): string {
   return `${month}/${year}`;
 }
 
-/** Due date of a competence: `dueDay` of the following month, clamped to that month's length. */
+/**
+ * Due date of a competence: `dueDay` of the following month, clamped to that month's length; on a
+ * Saturday, Sunday or national holiday it moves to the next business day (QA #2).
+ */
 export function feeDueDate(competence: MonthKey, dueDay: number): ISODate {
   const { year, month } = parseISODate(`${addMonthKey(competence, 1)}-01`);
-  return toISODate(year, month, Math.min(dueDay, daysInMonth(year, month)));
+  return adjustToBusinessDay(toISODate(year, month, Math.min(dueDay, daysInMonth(year, month))), 'postpone');
 }
 
 /** Index of the fee period in force at the end of the competence month. */

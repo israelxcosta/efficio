@@ -11,6 +11,7 @@ import {
   suggestLateFees,
   discountAmount,
   earnsDiscount,
+  effectiveDueDate,
   formatBps,
   enumeratePeriods,
   getInvoiceForPurchase,
@@ -115,6 +116,20 @@ describe('late fees', () => {
     expect(suggestLateFees(35000, '2026-01-15', '2026-02-14')).toEqual({ fine: 700, interest: 350, days: 30 });
     expect(suggestLateFees(37800, '2026-01-15', '2026-01-25')).toEqual({ fine: 756, interest: 126, days: 10 });
     expect(suggestLateFees(35000, '2026-01-15', '2026-01-15')).toEqual({ fine: 0, interest: 0, days: 0 });
+  });
+
+  it('moves a due date on a weekend or national holiday to the next business day (QA #2)', () => {
+    expect(effectiveDueDate('2026-12-05')).toBe('2026-12-07'); // Saturday → Monday
+    expect(effectiveDueDate('2026-12-20')).toBe('2026-12-21'); // Sunday → Monday
+    expect(effectiveDueDate('2026-12-25')).toBe('2026-12-28'); // Christmas (Friday) → Monday
+    expect(effectiveDueDate('2026-12-08')).toBe('2026-12-08');
+    // Paying on the next business day is on time: no delay, charges or lost discount.
+    expect(daysLate('2026-12-05', '2026-12-07')).toBe(0);
+    expect(suggestLateFees(35000, '2026-12-20', '2026-12-21')).toEqual({ fine: 0, interest: 0, days: 0 });
+    expect(earnsDiscount('2026-12-05', '2026-12-07')).toBe(true);
+    expect(earnsDiscount('2026-12-05', '2026-12-08')).toBe(false);
+    // Past the grace, the delay counts from the nominal due date.
+    expect(daysLate('2026-12-05', '2026-12-08')).toBe(3);
   });
 });
 

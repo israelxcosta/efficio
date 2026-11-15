@@ -1,11 +1,24 @@
 import { diffInDays, type ISODate } from './dates';
+import { adjustToBusinessDay } from './tasks';
 
 /** Usual charges on a late payment in Brazil: 2% fine plus 1% interest a month, pro rata by day. */
 export const SUGGESTED_FINE_RATE = 0.02;
 export const SUGGESTED_MONTHLY_INTEREST_RATE = 0.01;
 
-/** Days between the due date and the payment (0 when paid on time or early). */
+/**
+ * Last day to pay without charges: a due date on a Saturday, Sunday or national holiday moves to the
+ * next business day (bank slips are payable then without fine, interest or losing the discount).
+ */
+export function effectiveDueDate(dueDate: ISODate): ISODate {
+  return adjustToBusinessDay(dueDate, 'postpone');
+}
+
+/**
+ * Days late of a payment on `paidAt` (0 when paid by the effective due date, see `effectiveDueDate`).
+ * Past that grace, the delay counts from the nominal due date, as banks charge it.
+ */
 export function daysLate(dueDate: ISODate, paidAt: ISODate): number {
+  if (paidAt <= effectiveDueDate(dueDate)) return 0;
   return Math.max(0, diffInDays(paidAt, dueDate));
 }
 
@@ -25,9 +38,9 @@ export function discountAmount(amount: number, bps: number | null | undefined): 
   return bps ? Math.round((amount * bps) / 10_000) : 0;
 }
 
-/** Whether a payment on `paidAt` still earns the discount for paying by `dueDate`. */
+/** Whether a payment on `paidAt` still earns the discount for paying by `dueDate` (or the next business day). */
 export function earnsDiscount(dueDate: ISODate, paidAt: ISODate): boolean {
-  return paidAt <= dueDate;
+  return paidAt <= effectiveDueDate(dueDate);
 }
 
 /** "5%", "2,5%" for basis points. */

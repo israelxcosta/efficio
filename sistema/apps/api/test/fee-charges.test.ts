@@ -165,14 +165,15 @@ describe('Gerar honorários', () => {
     expect(client.feeDueDay).toBe(10); // default
     expect((await c.get(`/clients/${ids.bakery}`)).body.feeDueDay).toBe(31);
 
-    // Day 31: the last day of short months (February of a common year, November).
+    // Day 31: the last day of short months (February of a common year, November); a weekend or
+    // national holiday moves to the next business day (QA #2: 28/02/2027 and 10/01/2027 are Sundays).
     const january = await generate({ competence: '2027-01', dryRun: true });
-    expect(january.body.created.find((x: any) => x.clientId === ids.bakery).dueDate).toBe('2027-02-28');
+    expect(january.body.created.find((x: any) => x.clientId === ids.bakery).dueDate).toBe('2027-03-01');
     const december = await generate({ competence: '2026-12', dryRun: true });
     expect(december.body.created.map((x: any) => [x.name, x.dueDate])).toEqual([
-      ['Horizonte Engenharia Ltda', '2027-01-10'],
-      ['Pão Quente', '2027-01-31'],
-      ['Tecnova', '2027-01-10'],
+      ['Horizonte Engenharia Ltda', '2027-01-11'],
+      ['Pão Quente', '2027-02-01'],
+      ['Tecnova', '2027-01-11'],
     ]);
 
     // A new due day applies to the next generation; fees already generated keep theirs.
@@ -183,7 +184,13 @@ describe('Gerar honorários', () => {
     expect(updated.body.feeDueDay).toBe(25);
     expect((await incomes()).find((t) => t.contactId === ids.software).date).toBe('2026-11-10');
     const november = await generate({ competence: '2026-11', dryRun: true });
-    expect(november.body.created.find((x: any) => x.clientId === ids.software).dueDate).toBe('2026-12-25');
+    // 25/12 is Christmas (Friday): the next business day is Monday 28/12.
+    expect(november.body.created.find((x: any) => x.clientId === ids.software).dueDate).toBe('2026-12-28');
+    for (const [feeDueDay, dueDate] of [[5, '2026-12-07'], [20, '2026-12-21'], [7, '2026-12-07']] as const) {
+      await c.put(`/clients/${ids.software}`, { ...input, feeDueDay });
+      const res = await generate({ competence: '2026-11', dryRun: true });
+      expect(res.body.created.find((x: any) => x.clientId === ids.software).dueDate, String(feeDueDay)).toBe(dueDate);
+    }
 
     for (const feeDueDay of [0, 32, 1.5, '10']) {
       const res = await c.put(`/clients/${ids.software}`, { ...input, feeDueDay });

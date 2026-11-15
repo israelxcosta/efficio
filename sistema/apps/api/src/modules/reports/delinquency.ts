@@ -8,7 +8,8 @@ import { alias } from 'drizzle-orm/pg-core';
 import {
   addMonthKey,
   clientScore,
-  diffInDays,
+  daysLate,
+  effectiveDueDate,
   monthKey,
   type DelinquencyClient,
   type DelinquencyMonth,
@@ -43,10 +44,12 @@ interface Receivable {
   fine: number;
 }
 
-/** Days late: paid → payment date − due date; open → today − due date (never negative). */
+/**
+ * Days late: paid → payment date − due date; open → today − due date (never negative). A due date on
+ * a weekend or national holiday is only late after the next business day (`daysLate`).
+ */
 function lateDays(r: Receivable, now: string): number {
-  const end = r.paid ? (r.paidAt ?? r.date) : now;
-  return Math.max(0, diffInDays(end, r.date));
+  return daysLate(r.date, r.paid ? (r.paidAt ?? r.date) : now);
 }
 
 const monthIndex = (key: MonthKey) => Number(key.slice(0, 4)) * 12 + Number(key.slice(5, 7)) - 1;
@@ -69,7 +72,7 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
     sql<number>`(select coalesce(sum(${fee.amount}), 0) from ${transactions} as ${sql.identifier('fee')}
       where ${fee.workspaceId} = ${transactions.workspaceId} and ${fee.lateFeeOf} = ${transactions.id} and ${fee.lateFeeKind} = ${kind})`.mapWith(Number);
 
-  const rows: Receivable[] = await db
+  const fetched: Receivable[] = await db
     .select({
       id: transactions.id,
       contactId: sql<string>`${transactions.contactId}`,
@@ -101,6 +104,8 @@ export async function delinquencyReport(db: DbExecutor, workspaceId: string, q: 
     )
     // Overdue lists read oldest first; a fee before the employee charge made after it.
     .orderBy(asc(transactions.date), asc(transactions.createdAt));
+  // Open ones due on a weekend/holiday are not past due until the next business day has gone by.
+  const rows = fetched.filter((r) => r.paid || effectiveDueDate(r.date) < now);
 
   const feesOf = (r: Receivable) => (r.interest > 0 || r.fine > 0 ? { interest: r.interest, fine: r.fine } : undefined);
 

@@ -31,6 +31,7 @@ x-hardening: &hardening
 # deploy/.env.example.
 x-api-env: &api-env
   NODE_ENV: production
+  # Login "efficio": não é dono de nada; só os grants de sql/grants-api.sql (o migrate usa o dono).
   DATABASE_URL: postgres://efficio:${EFFICIO_DB_PASSWORD:?}@db:5432/efficio
   # Sem TLS só porque o banco está na rede interna do Docker (host "db"); a API recusa em outro host.
   DATABASE_SSL: disable
@@ -66,7 +67,8 @@ services:
     environment:
       # Superusuário de manutenção (backup/restauração pelo socket local). A API não o usa.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
-      # Lida só por db-init/10-efficio.sh na primeira inicialização (banco vazio).
+      # Lidas só por db-init/10-efficio.sh na primeira inicialização (banco vazio).
+      EFFICIO_OWNER_DB_PASSWORD: ${EFFICIO_OWNER_DB_PASSWORD:?}
       EFFICIO_DB_PASSWORD: ${EFFICIO_DB_PASSWORD:?}
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
       TZ: America/Sao_Paulo
@@ -107,7 +109,8 @@ services:
           memory: 1g
           pids: 200
 
-  # Roda as migrações (node dist/migrate.js) e termina; a API só sobe se ela terminar com sucesso.
+  # Roda as migrações (node dist/migrate.js) como o DONO do banco e termina; depois o serviço grants
+  # reaplica os privilégios da API. A API só sobe se os dois terminarem com sucesso.
   migrate:
     # Mesma imagem da api (construída pelo serviço api; nunca baixada de um registro).
     image: efficio-api:local
@@ -115,7 +118,10 @@ services:
     <<: *hardening
     command: ['node', 'dist/migrate.js']
     restart: 'no'
-    environment: *api-env
+    environment:
+      <<: *api-env
+      # Só aqui: DDL das migrações (efficio_owner, dono das tabelas). A API nunca recebe esta senha.
+      DATABASE_URL: postgres://efficio_owner:${EFFICIO_OWNER_DB_PASSWORD:?}@db:5432/efficio
     tmpfs:
       - /tmp:size=16m
     networks: [interna]
@@ -127,6 +133,36 @@ services:
         limits:
           memory: 512m
           pids: 100
+
+  # Grants mínimos do login da API (sql/grants-api.sql), reaplicados depois de cada migração, como o
+  # dono. psql da mesma imagem do banco (já baixada); termina em seguida.
+  grants:
+    image: postgres:16.15-alpine3.24@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    <<: *hardening
+    user: '70:70'
+    entrypoint: ['psql']
+    command: ['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-f', '/sql/grants-api.sql']
+    restart: 'no'
+    environment:
+      PGHOST: db
+      PGPORT: '5432'
+      PGDATABASE: efficio
+      PGUSER: efficio_owner
+      PGPASSWORD: ${EFFICIO_OWNER_DB_PASSWORD:?}
+      PGAPPNAME: efficio-grants
+    volumes:
+      - ./sql:/sql:ro
+    tmpfs:
+      - /tmp:size=1m
+    networks: [interna]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          pids: 20
 
   api:
     # Imagem endurecida de apps/api/Dockerfile (não root, só dependências de produção).
@@ -143,7 +179,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      migrate:
+      grants:
         condition: service_completed_successfully
     healthcheck:
       # /ready testa também o banco (o /api/health da imagem só testa o processo).
@@ -198,7 +234,7 @@ services:
           pids: 100
 
 networks:
-  # Sem rota para fora: só db, migrate e api.
+  # Sem rota para fora: só db, migrate, grants e api.
   interna:
     internal: true
   borda: {}
