@@ -76,7 +76,7 @@ export function AccountSheet({ open, onOpenChange, account }: { open: boolean; o
       <form className="flex flex-col gap-5" onSubmit={(e) => { e.preventDefault(); void onSubmit(); }} noValidate>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Nome" error={formState.errors.name?.message}>
-            <Input placeholder="Ex: Nubank, Carteira, Reserva" {...register('name')} />
+            <Input placeholder="Ex: Itaú PJ, Caixa do escritório" {...register('name')} />
           </Field>
           <Field label="Tipo" error={formState.errors.type?.message}>
             <Select

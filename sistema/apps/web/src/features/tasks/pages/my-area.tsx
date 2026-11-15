@@ -86,7 +86,7 @@ export default function MyAreaPage() {
   const forYou = forYouInsights(o?.insights ?? []);
   const cells: MetricCell[] = o
     ? myMetricCells(o, appointmentsToday(o))
-    : ['Atrasadas', 'Hoje', 'Próximos 7 dias', `Concluídas em ${monthName}`].map((label, i) => ({ key: String(i), label, value: '', loading: true, hero: i === 0 }));
+    : ['Atrasadas', 'Hoje', 'Próximos 7 dias', `Minhas concluídas em ${monthName}`].map((label, i) => ({ key: String(i), label, value: '', loading: true, hero: i === 0 }));
   const obligation = home.data?.obligations.items.find((x) => x.pending > 0) ?? null;
 
   return (

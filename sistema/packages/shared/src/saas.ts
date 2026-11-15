@@ -7,6 +7,7 @@
 // with a per-workspace data key (envelope encryption, AWS KMS in production).
 
 import { z } from 'zod';
+import { isISODate } from './utils/dates';
 import type { PermissionMap, PermissionOverrides } from './permissions';
 import type { User } from './types';
 
@@ -285,6 +286,31 @@ export interface AuditLogEntry {
   createdAt: string;
 }
 
+/** Audit trail kept this long by default (`AUDIT_LOG_RETENTION_MONTHS`), never less than the minimum. */
+export const AUDIT_LOG_RETENTION_MONTHS_DEFAULT = 24;
+export const AUDIT_LOG_RETENTION_MONTHS_MIN = 6;
+/** Members with the `members` permission are warned this many days before records are deleted. */
+export const AUDIT_RETENTION_NOTICE_DAYS = 30;
+
+/**
+ * GET /workspaces/current/audit/retention (`members` permission): what the daily clean-up of the audit
+ * trail deletes and when. `pending` lists the records that go within `AUDIT_RETENTION_NOTICE_DAYS`
+ * (download them first: GET /workspaces/current/audit/export, by default that same period).
+ */
+export interface AuditRetentionResponse {
+  retentionMonths: number;
+  /** Records created before this day are deleted by the clean-up (today − `retentionMonths`). */
+  cutoff: string;
+  pending: {
+    count: number;
+    /** Days (America/Sao_Paulo) of the oldest and newest record that will be deleted. */
+    from: string;
+    to: string;
+    /** When the clean-up starts deleting them (the oldest one turns `retentionMonths` old; today at the latest). */
+    purgeDate: string;
+  } | null;
+}
+
 // ---------------------------------------------------------------------------
 // Input schemas
 // ---------------------------------------------------------------------------
@@ -379,6 +405,17 @@ export const auditQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
+
+const auditDay = z.string().refine(isISODate, { message: 'Data inválida' });
+
+/**
+ * GET /workspaces/current/audit/export: the audit trail of a period (days, America/Sao_Paulo,
+ * inclusive) as CSV. Without `from`/`to`: the period about to be deleted (`AuditRetentionResponse.pending`).
+ */
+export const auditExportQuerySchema = z
+  .object({ from: auditDay.optional(), to: auditDay.optional() })
+  .refine((v) => !v.from || !v.to || v.from <= v.to, { message: 'O início deve ser antes do fim', path: ['to'] });
+export type AuditExportQuery = z.infer<typeof auditExportQuerySchema>;
 
 // ---------------------------------------------------------------------------
 // Profile photo (phase 3, spec §15.3)

@@ -23,7 +23,7 @@ import {
 import { getCipher } from '../lib/crypto/keyring';
 import { isEncrypted } from '../lib/crypto/field-cipher';
 import { withTenant } from '../lib/tenant';
-import { CONTACT_ENCRYPTED_FIELDS, encryptContactInput } from '../modules/contacts/service';
+import { CONTACT_ENCRYPTED_FIELDS, encryptContactInput, responsibleNameIndex } from '../modules/contacts/service';
 import { encryptTaskText, TASK_COMMENT_TEXT, TASK_DESCRIPTION } from '../modules/tasks/encrypted-text';
 
 const pendingWorkspaces = or(isNull(workspaces.wrappedKey), isNull(workspaces.encryptionBackfilledAt));
@@ -45,6 +45,17 @@ export async function backfillEncryption(db: DbExecutor): Promise<{ workspaces: 
         }
         const { id: contactId, workspaceId: _w, createdAt: _c, documentHash: _h, ...input } = decrypted;
         await tx.update(contacts).set(await encryptContactInput(cipher, { ...input, name: c.name })).where(eq(contacts.id, contactId));
+        n++;
+      }
+      // Blind index of the responsible name of clients saved before 0022 (exact search).
+      for (const c of await tx
+        .select({ id: contacts.id, responsibleName: contacts.responsibleName })
+        .from(contacts)
+        .where(and(isNull(contacts.responsibleNameHash), sql`${contacts.responsibleName} is not null`))) {
+        const name = isEncrypted(c.responsibleName) ? await cipher.decrypt('contacts', 'responsibleName', c.responsibleName) : c.responsibleName;
+        const hash = await responsibleNameIndex(cipher, name);
+        if (!hash) continue;
+        await tx.update(contacts).set({ responsibleNameHash: hash }).where(eq(contacts.id, c.id));
         n++;
       }
       for (const t of await tx.select({ id: transactions.id, notes: transactions.notes }).from(transactions)) {

@@ -150,8 +150,8 @@ cd /opt/efficio/app/sistema/deploy
 
 Na primeira vez leva de 5 a 15 minutos (constrói as imagens no próprio VPS). O script cria o banco,
 aplica as migrações, sobe tudo e confere a saúde. Termina com `OK: https://efficio.com.br responde`
-e a lista dos serviços `db`, `api` e `caddy` como `healthy` (o `migrate` aparece como `Exited (0)`,
-que é o normal: ele roda e termina).
+e a lista dos serviços `db`, `api` e `caddy` como `healthy` (o `migrate` e o `grants` aparecem como
+`Exited (0)`, que é o normal: rodam e terminam).
 
 Conferir no navegador: `https://efficio.com.br` abre a tela de login com cadeado;
 `http://efficio.com.br` e `https://www.efficio.com.br` redirecionam para `https://efficio.com.br`.
@@ -309,9 +309,10 @@ repositório (Dependabot) e chegam no próximo `atualizar.sh`.
 
 | Arquivo | Para quê |
 |---------|----------|
-| `deploy/docker-compose.prod.yml` | serviços db, migrate, api e caddy, redes e limites de memória |
+| `deploy/docker-compose.prod.yml` | serviços db, migrate, grants, api e caddy, redes e limites de memória |
 | `deploy/web.Dockerfile` + `deploy/Caddyfile` | imagem do Caddy com o site; HTTPS, cabeçalhos de segurança (CSP gerada do build), cache, proxy `/api` |
-| `deploy/db-init/10-efficio.sh` | cria o usuário `efficio` (sem superusuário) e o papel do RLS na 1ª subida |
+| `deploy/db-init/10-efficio.sh` | na 1ª subida: `efficio_owner` (dono do banco, só migrações), `efficio` (login da API, dono de nada) e o papel do RLS |
+| `deploy/sql/grants-api.sql` | privilégios mínimos do login da API, reaplicados depois de cada migração e de cada restauração |
 | `deploy/scripts/*.sh` | `install`, `gerar-segredos`, `atualizar`, `backup`, `restaurar` |
 | `deploy/systemd/efficio-backup.*` | agendamento do backup às 02:30 |
 | `deploy/.env.example` | todas as variáveis do `.env`, comentadas |
@@ -319,5 +320,7 @@ repositório (Dependabot) e chegam no próximo `atualizar.sh`.
 Decisões de segurança deste formato (vs. `docs/deploy-aws.md`): a chave mestra fica no `.env` do
 servidor (`KEY_PROVIDER=local`) em vez do KMS, por isso a cópia offline é obrigatória; o banco fala
 sem TLS apenas dentro da rede interna do Docker (`DATABASE_SSL=disable`, aceito só com host `db`);
-a API usa um login sem superusuário e as tabelas financeiras continuam sob RLS; o build acontece no
+as migrações usam o dono do banco (`efficio_owner`) e a API um login separado (`efficio`) que não é dono
+de nada: sem DDL, sem apagar a trilha de auditoria e sem acesso direto às tabelas financeiras (só pelo
+RLS); o build acontece no
 próprio VPS (o CI valida o compose, os scripts e a imagem do site a cada push).

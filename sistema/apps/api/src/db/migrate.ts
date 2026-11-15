@@ -24,9 +24,9 @@ export async function runMigrations(url?: string) {
       // backups until they expire). When rows > 0, run `VACUUM FULL contacts, transactions,
       // recurrences, goals, goal_contributions, tasks, task_comments` in a maintenance window.
     }
-    const purged = await purgeExpiredSecurityRows(db);
+    const purged = await purgeExpiredSecurityRows(db, new Date(), { auditLogRetentionMonths: env.AUDIT_LOG_RETENTION_MONTHS });
     console.log(
-      `✔ retention: ${purged.sessions} sessions, ${purged.passwordResets} reset links, ${purged.invites} invites, ${purged.webhookEvents} webhook events removed`,
+      `✔ retention: ${purged.sessions} sessions, ${purged.passwordResets} reset links, ${purged.invites} invites, ${purged.webhookEvents} webhook events, ${purged.auditLogs} audit records removed`,
     );
   } finally {
     await client.end();

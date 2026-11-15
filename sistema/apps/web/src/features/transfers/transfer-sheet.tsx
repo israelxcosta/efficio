@@ -241,7 +241,7 @@ export function TransferSheet({ state, onOpenChange }: { state: TransferSheetSta
         </div>
 
         <Field label="Descrição" hint="Opcional">
-          <Input placeholder={values.mode === 'investment' ? 'Ex: Aporte CDB' : values.mode === 'redemption' ? 'Ex: Resgate reserva' : 'Ex: Reserva para viagem'} maxLength={120} {...register('description')} />
+          <Input placeholder={values.mode === 'investment' ? 'Ex: Aplicação CDB do caixa' : values.mode === 'redemption' ? 'Ex: Resgate para pagar a folha' : 'Ex: Reforço do caixa para o 13º'} maxLength={120} {...register('description')} />
         </Field>
         <Field label="Observações">
           <Textarea maxLength={1000} {...register('notes')} />

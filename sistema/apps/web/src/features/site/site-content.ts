@@ -46,7 +46,7 @@ export function contactMessage(name: string, subject: string): string {
 export const NAV = [
   { id: 'mes', label: 'O seu mês' },
   { id: 'servicos', label: 'Serviços' },
-  { id: 'portal', label: 'Portal' },
+  { id: 'portal', label: 'Portal (em breve)' },
   { id: 'comecar', label: 'Como começar' },
   { id: 'duvidas', label: 'Dúvidas' },
   { id: 'contato', label: 'Contato' },

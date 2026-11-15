@@ -46,6 +46,17 @@ export function documentIndex(cipher: FieldCipher, digits: string): Promise<stri
   return cipher.blindIndex(`document:${digits}`);
 }
 
+/** A person's name for exact comparison: lowercase, without accents, single spaces. */
+export function normalizePersonName(name: string): string {
+  return name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/** Blind index of a client's responsible name (normalized) for exact search; null without a name. */
+export async function responsibleNameIndex(cipher: FieldCipher, name: string | null | undefined): Promise<string | null> {
+  const normalized = name ? normalizePersonName(name) : '';
+  return normalized ? cipher.blindIndex(`responsible:${normalized}`) : null;
+}
+
 export async function toContact(cipher: FieldCipher, row: ContactRow): Promise<Contact> {
   const plain = await cipher.decryptFields(TABLE, row, CONTACT_ENCRYPTED_FIELDS);
   return {

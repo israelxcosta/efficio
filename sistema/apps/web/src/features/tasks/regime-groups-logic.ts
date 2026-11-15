@@ -1,7 +1,7 @@
 // Tarefas recorrentes › "Grupos por regime": the URL of the view, the state of each catalog item in the
 // office and the wording of applying a group. Pure functions, tested in regime-groups.test.ts.
 
-import { REGIME_GROUP_REGIMES, type RegimeGroup, type RegimeGroupApplyResponse, type RegimeGroupItemView, type RegimeGroupRegime } from '@effinance/shared';
+import { REGIME_GROUP_REGIMES, type RegimeGroup, type RegimeGroupApplyResponse, type RegimeGroupFromMonth, type RegimeGroupItemView, type RegimeGroupRegime } from '@effinance/shared';
 import { pluralize } from '@/lib/utils';
 
 export type RecurringView = 'list' | 'regimes';
@@ -69,15 +69,46 @@ export function applyPreview(group: Pick<RegimeGroup, 'items'>, usesDepartments:
   };
 }
 
-/** The body of "Aplicar grupo": the hand-made ones go in `force` only when asked ("Criar mesmo assim"). */
-export function applyInput(group: Pick<RegimeGroup, 'items'>, createHandmade: boolean): { force: string[] } {
-  return { force: createHandmade ? group.items.filter((i) => i.state === 'handmade').map((i) => i.key) : [] };
+/**
+ * The body of "Aplicar grupo": the hand-made ones go in `force` only when asked ("Criar mesmo assim");
+ * `fromMonth: 'next'` when the person chose "Começar no mês que vem".
+ */
+export function applyInput(
+  group: Pick<RegimeGroup, 'items'>,
+  createHandmade: boolean,
+  fromMonth: RegimeGroupFromMonth = 'current',
+): { force: string[]; fromMonth: RegimeGroupFromMonth } {
+  return { force: createHandmade ? group.items.filter((i) => i.state === 'handmade').map((i) => i.key) : [], fromMonth };
+}
+
+/**
+ * Occurrences of the current month born overdue (legal deadline already gone) by start month (QA #4).
+ * `next` only spares the recurring tasks created: an existing one that gains the regime already runs
+ * this month.
+ */
+export function overdueOnApply(group: Pick<RegimeGroup, 'items' | 'clientCount'>, createHandmade: boolean): { current: number; next: number } {
+  let created = 0;
+  let added = 0;
+  for (const i of group.items) {
+    const state = itemState(i);
+    if (state === 'missing' || (state === 'handmade' && createHandmade)) created += i.currentOverdue;
+    else if (state === 'addRegime') added += i.currentOverdue;
+  }
+  return { current: (created + added) * group.clientCount, next: added * group.clientCount };
+}
+
+/** "3 ocorrências deste mês já nascem vencidas" / "1 ocorrência deste mês já nasce vencida". */
+export function overdueText(n: number): string {
+  return pluralize(n, 'ocorrência deste mês já nasce vencida', 'ocorrências deste mês já nascem vencidas');
 }
 
 const GENERATES = 'Elas geram todo mês uma tarefa para cada empresa do regime.';
 
 /** The toast after applying: "Simples Nacional: 5 tarefas recorrentes criadas e 2 passaram a incluir o regime. …". */
-export function applyResultText(res: Pick<RegimeGroupApplyResponse, 'created' | 'regimeAdded' | 'departmentsCreated' | 'skipped'>, label: string): string {
+export function applyResultText(
+  res: Pick<RegimeGroupApplyResponse, 'created' | 'regimeAdded' | 'departmentsCreated' | 'skipped'> & Partial<Pick<RegimeGroupApplyResponse, 'fromMonth' | 'overdueCreated'>>,
+  label: string,
+): string {
   const parts: string[] = [];
   if (res.created) parts.push(res.created === 1 ? '1 tarefa recorrente criada' : `${res.created} tarefas recorrentes criadas`);
   if (res.regimeAdded) parts.push(`${res.regimeAdded} ${res.regimeAdded === 1 ? 'passou' : 'passaram'} a incluir o regime`);
@@ -87,7 +118,11 @@ export function applyResultText(res: Pick<RegimeGroupApplyResponse, 'created' | 
   const depts = res.departmentsCreated.length
     ? ` ${res.departmentsCreated.length === 1 ? 'Departamento criado' : 'Departamentos criados'}: ${res.departmentsCreated.map((d) => d.name).join(', ')}.`
     : '';
-  return `${label}: ${parts.join(' e ')}.${depts}${skipped ? ` ${skipped.charAt(0).toUpperCase()}${skipped.slice(1)}.` : ''} ${GENERATES}`;
+  const start = res.fromMonth === 'next' && res.created ? ' As novas começam no mês que vem.' : '';
+  const overdue = res.overdueCreated
+    ? ` ${pluralize(res.overdueCreated, 'ocorrência deste mês nasceu vencida', 'ocorrências deste mês nasceram vencidas')}.`
+    : '';
+  return `${label}: ${parts.join(' e ')}.${depts}${skipped ? ` ${skipped.charAt(0).toUpperCase()}${skipped.slice(1)}.` : ''} ${GENERATES}${start}${overdue}`;
 }
 
 /** "12 empresas" / "1 empresa" / "nenhuma empresa". */

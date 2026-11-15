@@ -1,0 +1,58 @@
+// Labels of the audit trail actions (Configurações › Privacidade). Every action the API (or the demo)
+// writes must have one: audit-labels.test.ts scans their sources and fails on a missing label.
+
+export const AUDIT_LABELS: Record<string, string> = {
+  'auth.register': 'Conta criada',
+  'auth.owner_bootstrapped': 'Proprietário criado na instalação',
+  'auth.login': 'Entrou no sistema',
+  'auth.login_failed': 'Tentativa de entrada recusada',
+  'auth.logout': 'Saiu do sistema',
+  'auth.mfa_enabled': 'Verificação em duas etapas ativada',
+  'auth.mfa_disabled': 'Verificação em duas etapas desativada',
+  'auth.mfa_failed': 'Código de verificação inválido',
+  'auth.password_changed': 'Senha alterada',
+  'auth.password_reset_requested': 'Recuperação de senha solicitada',
+  'auth.password_reset': 'Senha redefinida',
+  'auth.session_revoked': 'Sessão encerrada',
+  'auth.refresh_token_reuse': 'Reuso de sessão bloqueado',
+  'workspace.created': 'Espaço criado',
+  'workspace.renamed': 'Espaço renomeado',
+  'workspace.deleted': 'Espaço excluído',
+  'data.exported': 'Dados exportados',
+  'member.invited': 'Convite enviado',
+  'member.joined': 'Membro entrou pelo convite',
+  'member.role_changed': 'Papel do membro alterado',
+  'member.permissions_changed': 'Permissões do membro alteradas',
+  'member.removed': 'Membro removido',
+  'member.left': 'Membro saiu',
+  'invite.revoked': 'Convite revogado',
+  'billing.checkout_started': 'Pagamento da assinatura iniciado',
+  'billing.activated': 'Assinatura ativada',
+  'billing.canceled': 'Assinatura cancelada',
+  'billing.webhook': 'Atualização do Mercado Pago',
+  'account.deleted': 'Conta excluída',
+  'office.updated': 'Dados do escritório alterados',
+  'office.logo_changed': 'Logotipo do escritório alterado',
+  'office.logo_removed': 'Logotipo do escritório removido',
+  'office.contract_updated': 'Modelo de contrato alterado',
+  'office.contract_reset': 'Modelo de contrato restaurado',
+  'client.registration_updated': 'Cadastro do cliente alterado',
+  'client.credential_revealed': 'Senha de acesso do cliente exibida',
+  'client.contract_issued': 'Contrato do cliente gerado',
+  'client.documents_replaced': 'Documentos do cliente substituídos',
+  'client.document_added': 'Documento do cliente adicionado',
+  'client.document_updated': 'Documento do cliente alterado',
+  'client.document_deleted': 'Documento do cliente excluído',
+  'fee_adjustment.applied': 'Reajuste de honorários aplicado',
+  'import.created': 'Planilha importada',
+  'import.undone': 'Importação desfeita',
+  'open_finance.connected': 'Banco conectado (Open Finance)',
+  'open_finance.disconnected': 'Banco desconectado (Open Finance)',
+  'open_finance.synced': 'Banco sincronizado (Open Finance)',
+  'union.deleted': 'Sindicato excluído',
+};
+
+/** pt-BR label of an audit action; an unknown one (newer API) still reads as "Outra ação (x.y)". */
+export function auditLabel(action: string): string {
+  return AUDIT_LABELS[action] ?? `Outra ação (${action})`;
+}

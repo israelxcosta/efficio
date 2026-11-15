@@ -125,6 +125,11 @@ const buildEnvSchema = ({ billingEnabled = BILLING_ENABLED }: EnvOptions = {}) =
        * ~03:00 America/Sao_Paulo). Default: on in production, off elsewhere. One API instance only.
        */
       JOBS_ENABLED: booleanFlag,
+      /**
+       * Months the audit trail (`audit_logs`: IP, user agent) is kept before the daily clean-up and
+       * `db:migrate` delete it (default 24; minimum 6). Members are warned 30 days before.
+       */
+      AUDIT_LOG_RETENTION_MONTHS: z.coerce.number().int().min(6, 'AUDIT_LOG_RETENTION_MONTHS: mínimo de 6 meses').max(240).default(24),
 
       BILLING_PROVIDER: z.enum(['fake', 'mercadopago']).default('fake'),
       MP_ACCESS_TOKEN: optional,

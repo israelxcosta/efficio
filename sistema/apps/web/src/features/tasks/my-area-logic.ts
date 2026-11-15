@@ -93,7 +93,8 @@ export function myMetricCells(o: TaskMyOverviewResponse, appointments: { count: 
     },
     {
       key: 'concluded',
-      label: `Concluídas em ${monthName(o.month)}`,
+      // Mine, by conclusion date: "Resolvidas de …" in /tarefas counts the office's items due in the month.
+      label: `Minhas concluídas em ${monthName(o.month)}`,
       value: done,
       footer: doneFooter,
       href: tasksHref({ scope: 'mine', situation: 'done', month: o.month }),

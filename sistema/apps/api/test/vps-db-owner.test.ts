@@ -202,9 +202,9 @@ describe('VPS: the API login (efficio) is not the owner', () => {
   for (const table of ['sessions', 'open_finance_events']) expected[table] = [...new Set([...expected[table]!, 'DELETE'])];
 
   async function grants(): Promise<Record<string, string[]>> {
-    const rows = await admin<{ table_name: string; privilege_type: string }[]>`
-      select table_name, privilege_type from information_schema.role_table_grants
-       where grantee = ${RUNTIME} and table_catalog = ${DB}`;
+    // As the owner (the grantor): information_schema only lists the current database.
+    const rows = await owner<{ table_name: string; privilege_type: string }[]>`
+      select table_name, privilege_type from information_schema.role_table_grants where grantee = ${RUNTIME}`;
     const out: Record<string, string[]> = {};
     for (const r of rows) (out[r.table_name] ??= []).push(r.privilege_type);
     return out;
@@ -232,6 +232,7 @@ describe('VPS: the API login (efficio) is not the owner', () => {
     expect(sorted(await grants())).toEqual(sorted(expected));
     // Only the owner may apply it.
     expect(await code(applyApiGrants(runtime))).toBe('P0001');
+    await runtime.unsafe('rollback'); // psql stops at the error; here the session is left in the failed BEGIN
   });
 
   it('cannot erase the audit trail, run DDL or reach workspace tables without the per-request role', async () => {

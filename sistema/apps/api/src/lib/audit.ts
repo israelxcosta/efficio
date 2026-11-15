@@ -29,6 +29,7 @@ export const SECURITY_LOG_ACTIONS: ReadonlyMap<string, 'warn' | 'info'> = new Ma
   ['auth.refresh_token_reuse', 'warn'],
   ['client.credential_revealed', 'info'],
   ['data.exported', 'info'],
+  ['audit.exported', 'info'],
   ['auth.password_reset', 'info'],
   ['auth.password_changed', 'info'],
   ['auth.mfa_enabled', 'info'],

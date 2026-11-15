@@ -480,6 +480,8 @@ export const contacts = pgTable(
     openedAt: calendarDate(),
     mainActivity: text(),
     responsibleName: text(),
+    /** HMAC (per-workspace key) of the normalized responsible name: exact search (migration 0022). */
+    responsibleNameHash: text(),
     responsibleEmail: text(),
     responsiblePhone: text(),
     taxRegime: text().$type<TaxRegime>(),
@@ -511,6 +513,7 @@ export const contacts = pgTable(
   (t) => [
     index('contacts_workspace_idx').on(t.workspaceId, t.name),
     index('contacts_document_hash_idx').on(t.workspaceId, t.documentHash),
+    index('contacts_responsible_name_hash_idx').on(t.workspaceId, t.responsibleNameHash),
     index('contacts_kind_idx').on(t.workspaceId, t.kind, t.name),
     // One client per CNPJ in the workspace (blind index of the encrypted document).
     uniqueIndex('contacts_client_document_uq')

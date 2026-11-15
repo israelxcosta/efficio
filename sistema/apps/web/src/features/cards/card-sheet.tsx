@@ -95,7 +95,7 @@ export function CardSheet({ open, onOpenChange, card }: { open: boolean; onOpenC
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Nome do cartão" error={formState.errors.name?.message}>
-            <Input placeholder="Ex: Nubank Ultravioleta" {...register('name')} />
+            <Input placeholder="Ex: Cartão corporativo Itaú" {...register('name')} />
           </Field>
           <Field label="Bandeira" error={formState.errors.brand?.message}>
             <Select {...register('brand')}>

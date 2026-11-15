@@ -5,9 +5,11 @@
 // Each part fails on its own: an error is logged and the rest goes on. Server-only (never in the demo).
 
 import { asc, eq } from 'drizzle-orm';
-import { addMonthKey, dateInTimeZone, effectivePermissions, monthKey, TASK_TIME_ZONE, type MonthKey } from '@effinance/shared';
+import { addMonthKey, AUDIT_LOG_RETENTION_MONTHS_DEFAULT, dateInTimeZone, effectivePermissions, monthKey, TASK_TIME_ZONE, type MonthKey } from '@effinance/shared';
 import type { DbExecutor } from '../db/client';
 import { purgeExpiredSecurityRows, type PurgeResult } from '../db/retention';
+import type { Mailer } from '../lib/mailer';
+import { notifyAuditRetention } from '../modules/workspaces/audit-retention';
 import { subscriptions, workspaces } from '../db/schema';
 import { inTenant } from '../lib/tenant-scope';
 import { summarizeSubscription } from '../modules/billing/entitlements';
@@ -33,6 +35,12 @@ export interface DailyJobsOptions {
   log: JobLog;
   /** Injected clock (tests). */
   now?: () => Date;
+  /** Months the audit trail is kept (`AUDIT_LOG_RETENTION_MONTHS`; default 24). */
+  auditLogRetentionMonths?: number;
+  /** Sends the warning that audit records go within 30 days (absent: no e-mail). */
+  mailer?: Mailer;
+  /** Public URL of the web app (link of the warning). */
+  appUrl?: string;
 }
 
 export interface DailyJobsResult {
@@ -43,6 +51,8 @@ export interface DailyJobsResult {
   workspaces: number;
   created: number;
   failed: number;
+  /** Workspaces warned by e-mail that audit records go within 30 days (`skipped`: no mailer). */
+  auditNotices: number | 'skipped' | 'failed';
 }
 
 const INSUFFICIENT_PRIVILEGE = '42501';
@@ -55,7 +65,7 @@ function pgCode(error: unknown): string | undefined {
 
 async function runRetention(o: DailyJobsOptions, at: Date): Promise<DailyJobsResult['retention']> {
   try {
-    return await purgeExpiredSecurityRows(o.maintenanceDb ?? o.db, at);
+    return await purgeExpiredSecurityRows(o.maintenanceDb ?? o.db, at, { auditLogRetentionMonths: o.auditLogRetentionMonths });
   } catch (error) {
     if (pgCode(error) === INSUFFICIENT_PRIVILEGE) {
       o.log.warn({ job: 'retention' }, 'retention skipped: the database login has no DELETE on the security tables (it runs on migrate)');
@@ -122,5 +132,20 @@ export async function runDailyJobs(o: DailyJobsOptions): Promise<DailyJobsResult
     o.log.error({ job: 'recurring_tasks', err: error }, 'recurring obligations generation failed');
     generation.failed = 1;
   }
-  return { retention, competences, ...generation };
+  let auditNotices: DailyJobsResult['auditNotices'] = 'skipped';
+  if (o.mailer) {
+    try {
+      auditNotices = await notifyAuditRetention(o.db, {
+        mailer: o.mailer,
+        appUrl: o.appUrl ?? '',
+        months: o.auditLogRetentionMonths ?? AUDIT_LOG_RETENTION_MONTHS_DEFAULT,
+        now: at,
+        log: o.log,
+      });
+    } catch (error) {
+      o.log.error({ job: 'audit-retention', err: error }, 'audit retention notices failed');
+      auditNotices = 'failed';
+    }
+  }
+  return { retention, competences, ...generation, auditNotices };
 }

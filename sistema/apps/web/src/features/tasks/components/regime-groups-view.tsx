@@ -15,7 +15,7 @@ import { toastError } from '@/lib/notify';
 import { cn, pluralize } from '@/lib/utils';
 import { useApplyRegimeGroup, useRegimeGroups } from '../api';
 import { dueRuleText } from '../recurring-rules';
-import { applyInput, applyPreview, applyResultText, companiesText, ITEM_STATE_LABELS, itemState, type RegimeItemState } from '../regime-groups-logic';
+import { applyInput, applyPreview, applyResultText, companiesText, ITEM_STATE_LABELS, itemState, overdueOnApply, overdueText, type RegimeItemState } from '../regime-groups-logic';
 
 const STATE_STYLE: Record<RegimeItemState, { tone: 'success' | 'neutral' | 'warning' | 'brand'; icon: typeof Check }> = {
   applied: { tone: 'success', icon: Check },
@@ -109,7 +109,9 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
   const apply = useApplyRegimeGroup();
   const [confirming, setConfirming] = useState(false);
   const [createHandmade, setCreateHandmade] = useState(false);
+  const [nextMonth, setNextMonth] = useState(false);
   const preview = applyPreview(g, usesDepartments);
+  const overdue = overdueOnApply(g, createHandmade);
   const twins = preview.handmade;
   const pending = preview.create + preview.addRegime + twins.length;
   const creates = preview.create + (createHandmade ? twins.length : 0);
@@ -118,7 +120,7 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
 
   async function confirm() {
     try {
-      const res = await apply.mutateAsync({ regime: g.regime, input: applyInput(g, createHandmade) });
+      const res = await apply.mutateAsync({ regime: g.regime, input: applyInput(g, createHandmade, nextMonth ? 'next' : 'current') });
       toast.success(applyResultText(res, g.label), { duration: 7000 });
       setConfirming(false);
     } catch (error) {
@@ -195,6 +197,25 @@ function GroupDetail({ group: g, usesDepartments, onOpenRecurring }: { group: Re
               <Checkbox checked={createHandmade} onCheckedChange={setCreateHandmade} />
               Criar mesmo assim
             </label>
+          </div>
+        ) : null}
+        {overdue.current > 0 ? (
+          // QA #4: applied mid-month, the occurrences whose legal deadline already passed are born late.
+          <div className="mt-3 rounded-lg border border-border bg-warning-soft p-3">
+            <p className="text-body-sm text-fg">
+              <strong className="font-semibold">{overdueText(overdue.current)}</strong>: o prazo legal já passou e elas entram atrasadas no acompanhamento.
+            </p>
+            <label className="mt-2 flex items-center gap-2 text-body-sm font-medium text-fg">
+              <Checkbox checked={nextMonth} onCheckedChange={setNextMonth} />
+              Começar no mês que vem
+            </label>
+            {nextMonth ? (
+              <p className="mt-1.5 text-caption text-muted">
+                {overdue.next
+                  ? `As novas começam no mês que vem; ainda assim ${overdueText(overdue.next)}, porque as tarefas recorrentes existentes que passam a incluir o regime já rodam neste mês.`
+                  : 'Nada é gerado neste mês: a primeira tarefa de cada obrigação sai no mês que vem.'}
+              </p>
+            ) : null}
           </div>
         ) : null}
         <p className="mt-3 text-caption text-muted">Prazos, metas e responsável padrão são sugestões; ajuste em cada tarefa recorrente depois de aplicar. Aplicar de novo não duplica nada.</p>

@@ -2,7 +2,7 @@
 // Built from the environment by the API (src/setup.ts) and by hand in the browser demo, so the
 // modules never import `env.ts` directly.
 
-import { BILLING_ENABLED } from '@effinance/shared';
+import { AUDIT_LOG_RETENTION_MONTHS_DEFAULT, BILLING_ENABLED } from '@effinance/shared';
 import type { BillingProvider } from '../modules/billing/providers/types';
 import type { CnpjProvider } from '../modules/clients/providers/types';
 import type { OpenFinanceSetup } from '../modules/open-finance/providers/types';
@@ -34,6 +34,13 @@ export interface Platform {
    * without it only reaches the routes marked `config.mfaEnrollment` (lib/auth.ts). Absent = off (demo).
    */
   requireMfa?: boolean;
+  /** Months the audit trail is kept (`AUDIT_LOG_RETENTION_MONTHS`). Absent = 24. */
+  auditLogRetentionMonths?: number;
+}
+
+/** Months the audit trail is kept before the clean-up deletes it. */
+export function auditLogRetentionMonths(platform: Pick<Platform, 'auditLogRetentionMonths'> | null | undefined): number {
+  return platform?.auditLogRetentionMonths ?? AUDIT_LOG_RETENTION_MONTHS_DEFAULT;
 }
 
 /** Whether paid subscriptions are on: the platform's setting, else `BILLING_ENABLED`. */

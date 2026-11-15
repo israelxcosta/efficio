@@ -106,6 +106,7 @@ export async function createPlatform(env: Env): Promise<Platform> {
     billingEnabled: BILLING_ENABLED,
     signupEnabled: signupEnabledOf(env),
     requireMfa: requireMfaOf(env),
+    auditLogRetentionMonths: env.AUDIT_LOG_RETENTION_MONTHS,
     billing:
       env.BILLING_PROVIDER === 'mercadopago'
         ? new MercadoPagoProvider({ accessToken: env.MP_ACCESS_TOKEN!, webhookSecret: env.MP_WEBHOOK_SECRET! })

@@ -164,12 +164,12 @@ export function TasksSummary({ summary, scope, situation, assignee, onSituation,
           <button
             type="button"
             aria-pressed={situation === 'done'}
-            aria-label={summary ? `Concluídas em ${month}: ${summary.monthDone}. Filtrar a lista.` : 'Concluídas'}
+            aria-label={summary ? `Resolvidas de ${month} (concluídas ou canceladas): ${summary.monthDone}. Filtrar a lista.` : 'Resolvidas'}
             onClick={() => toggle('done')}
             className={cn('-m-2 block w-[calc(100%+1rem)] p-2 text-left', toggleClass)}
           >
             <SummaryLabel info={summary ? `Tarefas com vencimento em ${month} já concluídas ou canceladas.` : undefined}>
-              {summary ? `Concluídas em ${month}` : 'Concluídas'}
+              {summary ? `Resolvidas de ${month}` : 'Resolvidas'}
             </SummaryLabel>
             {summary ? (
               <span className="tabular mt-1 block text-kpi leading-10 font-semibold tracking-tight text-fg">{summary.monthDone}</span>

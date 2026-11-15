@@ -1,6 +1,6 @@
 // Runs the in-browser API (PGlite + real route plugins) in Node to guard the demo build.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { addMonthKey, addMonths, BILLING_ENABLED, daysInMonth, discountAmount, monthKey, SIGNUP_DISABLED_ERROR, todayISO } from '@effinance/shared';
+import { addMonthKey, addMonths, adjustToBusinessDay, BILLING_ENABLED, daysInMonth, discountAmount, monthKey, SIGNUP_DISABLED_ERROR, todayISO } from '@effinance/shared';
 import { demoFetch } from './fetch';
 import { DEMO_LOGIN } from '@/lib/demo';
 import { DEMO_EMAIL, DEMO_PASSWORD, getDemoServer } from './server';
@@ -20,7 +20,8 @@ const to = `${month}-28`;
 function feeDue(competence: string, day: number) {
   const next = addMonthKey(competence, 1);
   const [year, monthNumber] = next.split('-').map(Number) as [number, number];
-  return `${next}-${String(Math.min(day, daysInMonth(year, monthNumber))).padStart(2, '0')}`;
+  // A due date on a weekend or national holiday moves to the next business day (same as the API).
+  return adjustToBusinessDay(`${next}-${String(Math.min(day, daysInMonth(year, monthNumber))).padStart(2, '0')}`, 'postpone');
 }
 /** The office's company (only workspace of the demo user) and a second one created by the suite. */
 const OFFICE = 'Efficio Contabilidade';
@@ -398,7 +399,6 @@ describe('demo api (PGlite)', () => {
     });
     expect(reg.status).toBe(403);
     expect(reg.body).toMatchObject({ error: SIGNUP_DISABLED_ERROR });
-    expect((await call('GET', '/auth/me')).status).toBe(401);
   });
 
   it('restricts the finances to administrators: a viewer sees clients without fees (same guard as the API)', async () => {

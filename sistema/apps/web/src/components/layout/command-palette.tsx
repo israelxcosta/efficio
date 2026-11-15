@@ -116,6 +116,28 @@ export function paletteNavFor(area: Area, can?: (key: PermissionKey) => boolean)
   return { heading: AREA_LABELS.gestao, items: [...navItemsFor('gestao', can), ...regimeGroups] };
 }
 
+/** Reajuste em lote: a finance page reached from Clientes, without a menu item of its own. */
+export const FEE_ADJUSTMENT_PAGE: NavItem = {
+  to: '/clientes/reajuste',
+  label: 'Reajuste em lote dos honorários',
+  icon: BadgePercent,
+  keywords: 'reajuste anual indice ipca igpm inpc cct cartas vigencias clientes honorarios',
+};
+
+/**
+ * Pages of the other area, listed only while typing: from the Gestão, "reajuste", "contas" or
+ * "relatórios" still find the finance pages (and the other way round). The Financeiro only with
+ * access to the finances.
+ */
+export function otherAreaPages(scope: Area, canAccessFinance: boolean, can?: (key: PermissionKey) => boolean): { heading: string; items: NavItem[] } | null {
+  if (!canAccessFinance) return null;
+  const here = new Set([...paletteNavFor(scope, can).items.map((i) => i.to), SETTINGS_ITEM.to, MY_AREA_ITEM.to]);
+  if (scope === 'gestao') {
+    return { heading: `Páginas · ${AREA_LABELS.financeiro}`, items: [...FINANCE_NAV_ITEMS, FEE_ADJUSTMENT_PAGE].filter((i) => !here.has(i.to)) };
+  }
+  return { heading: `Páginas · ${AREA_LABELS.gestao}`, items: paletteNavFor('gestao', can).items.filter((i) => !here.has(i.to)) };
+}
+
 /** An action or page of the palette: what it says and the words that also find it. */
 export interface PaletteEntry {
   id: string;
@@ -223,12 +245,13 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
     { id: 'transfer', label: 'Transferir entre contas', icon: <ArrowLeftRight />, onSelect: () => run(() => actions.openTransfer('transfer')) },
     { id: 'invest', label: 'Investir', keywords: 'aplicar', icon: <TrendingUp />, onSelect: () => run(() => actions.openTransfer('investment')) },
     { id: 'import', label: 'Importar extrato ou fatura (OFX/CSV)', keywords: 'arquivo ofx csv banco', icon: <FileUp />, onSelect: () => run(() => openImport()) },
-    { id: 'fee-adjustment', label: 'Reajuste em lote dos honorários', keywords: 'reajuste anual indice ipca igpm inpc cct cartas vigencias clientes', icon: <BadgePercent />, onSelect: go('/clientes/reajuste') },
+    { id: 'fee-adjustment', label: FEE_ADJUSTMENT_PAGE.label, keywords: FEE_ADJUSTMENT_PAGE.keywords, icon: <BadgePercent />, onSelect: go(FEE_ADJUSTMENT_PAGE.to) },
     ...(openFinance.enabled
       ? [{ id: 'open-finance', label: 'Conectar banco (Open Finance)', keywords: 'integracoes sincronizar', icon: <Landmark />, onSelect: go('/configuracoes?aba=integracoes') }]
       : []),
   ];
   const otherArea: Area = scope === 'financeiro' ? 'gestao' : 'financeiro';
+  const otherPages = q.length >= 2 ? otherAreaPages(scope, canAccessFinance, can) : null;
   const groups = filterPaletteGroups(
     [
       scope === 'financeiro' ? { heading: 'Ações do financeiro', entries: financeEntries } : { heading: 'Ações da gestão', entries: taskEntries },
@@ -236,6 +259,9 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
         heading: `Ir para · ${nav.heading}`,
         entries: nav.items.map((item) => ({ id: item.to, label: item.label, keywords: item.keywords, icon: <item.icon />, onSelect: go(item.to) })),
       },
+      ...(otherPages
+        ? [{ heading: otherPages.heading, entries: otherPages.items.map((item) => ({ id: `other:${item.to}`, label: item.label, keywords: item.keywords, icon: <item.icon />, onSelect: go(item.to) })) }]
+        : []),
       {
         heading: 'Outros',
         entries: [

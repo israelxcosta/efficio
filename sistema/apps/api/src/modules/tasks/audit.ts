@@ -41,7 +41,8 @@ function summarize(
     clients.add(c.clientId);
     s.total += 1;
     const dept = byDept.get(c.departmentId) ?? { total: 0, done: 0, overduePending: 0 };
-    dept.total += 1;
+    // Same base as the top ("10 de 40" = done of total − canceled): a canceled cell is not counted (QA #6).
+    if (c.status !== 'canceled') dept.total += 1;
     const l = live.get(c.clientId) ?? { total: 0, done: 0 };
     if (c.status !== 'canceled') l.total += 1;
     if (c.status === 'done') {

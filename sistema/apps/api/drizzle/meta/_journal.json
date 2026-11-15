@@ -155,6 +155,13 @@
       "when": 1794588899920,
       "tag": "0021_late_fees_fee_adjustments",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794705894882,
+      "tag": "0022_responsible_name_index",
+      "breakpoints": true
     }
   ]
 }

@@ -130,7 +130,7 @@ export function CategorySheet({
           />
         ) : null}
         <Field label="Nome" error={formState.errors.name?.message}>
-          <Input placeholder="Ex: Alimentação" maxLength={60} {...register('name')} />
+          <Input placeholder="Ex: Material de escritório" maxLength={60} {...register('name')} />
         </Field>
         <Field label="Cor">
           <Controller control={control} name="color" render={({ field }) => <ColorPicker value={field.value ?? '#152B61'} onChange={field.onChange} />} />

@@ -39,7 +39,7 @@ describe('the four numbers', () => {
 
   it('labels, footers and links like the spec', () => {
     const cells = myMetricCells(overview, { count: 2, next: '14:00' });
-    expect(cells.map((c) => c.label)).toEqual(['Atrasadas', 'Hoje', 'Próximos 7 dias', 'Concluídas em novembro']);
+    expect(cells.map((c) => c.label)).toEqual(['Atrasadas', 'Hoje', 'Próximos 7 dias', 'Minhas concluídas em novembro']);
     expect(cells.map((c) => c.footer)).toEqual(['a mais antiga venceu há 6 dias', '2 compromissos · próximo às 14:00', 'até 12/11', '92% no prazo · outubro: 18']);
     expect(cells[0]).toMatchObject({ href: '/tarefas?escopo=minhas&situacao=atrasadas', hero: true, tone: 'danger', footerTitle: 'Balancete' });
     expect(cells[1]!.href).toBe('/tarefas?escopo=minhas&vencimento=2026-11-05');

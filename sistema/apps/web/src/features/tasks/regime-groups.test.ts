@@ -2,7 +2,7 @@
 // already has and what applying the group does.
 import { describe, expect, it } from 'vitest';
 import type { RegimeGroup, RegimeGroupApplyResponse, RegimeGroupItemView } from '@effinance/shared';
-import { applyInput, applyPreview, applyResultText, itemState, parseRecurringView, regimeFromParam, writeRecurringView } from './regime-groups-logic';
+import { applyInput, applyPreview, applyResultText, itemState, overdueOnApply, overdueText, parseRecurringView, regimeFromParam, writeRecurringView } from './regime-groups-logic';
 
 const item = (patch: Partial<RegimeGroupItemView> = {}): RegimeGroupItemView => ({
   key: 'das',
@@ -20,6 +20,7 @@ const item = (patch: Partial<RegimeGroupItemView> = {}): RegimeGroupItemView => 
   handmade: null,
   applied: false,
   state: 'missing',
+  currentOverdue: 0,
   ...patch,
 });
 const ref = (patch: Partial<NonNullable<RegimeGroupItemView['recurringTask']>> = {}) => ({
@@ -61,6 +62,7 @@ describe('applying a group', () => {
     clientCount: 12,
     items,
     missing: items.filter((i) => !i.applied).length,
+    currentMonthOverdue: 0,
     recurring: [],
   });
 
@@ -80,8 +82,22 @@ describe('applying a group', () => {
 
   it('sends the hand-made ones in `force` only when the person asks to create them anyway', () => {
     const g = group([item({ key: 'a' }), item({ key: 'f', handmade: ref({ id: 'h', catalogKey: null }), state: 'handmade' })]);
-    expect(applyInput(g, false)).toEqual({ force: [] });
-    expect(applyInput(g, true)).toEqual({ force: ['f'] });
+    expect(applyInput(g, false)).toEqual({ force: [], fromMonth: 'current' });
+    expect(applyInput(g, true, 'next')).toEqual({ force: ['f'], fromMonth: 'next' });
+  });
+
+  it('counts the occurrences of the current month born overdue, with and without "Começar no mês que vem"', () => {
+    const g = group([
+      item({ key: 'a', currentOverdue: 1 }),
+      item({ key: 'c', recurringTask: ref({ regimes: ['real_profit'] }), currentOverdue: 1 }),
+      item({ key: 'd', recurringTask: ref(), applied: true, state: 'applied', currentOverdue: 1 }),
+      item({ key: 'f', handmade: ref({ id: 'h', catalogKey: null }), state: 'handmade', currentOverdue: 1 }),
+    ]);
+    // 12 clients: "a" (created) and "c" (gains the regime) → 24; the applied one is already running.
+    expect(overdueOnApply(g, false)).toEqual({ current: 24, next: 12 });
+    expect(overdueOnApply(g, true)).toEqual({ current: 36, next: 12 });
+    expect(overdueText(1)).toBe('1 ocorrência deste mês já nasce vencida');
+    expect(overdueText(24)).toBe('24 ocorrências deste mês já nascem vencidas');
   });
 
   it('says what happened, in one toast', () => {
@@ -94,6 +110,9 @@ describe('applying a group', () => {
       ended: 0,
       items: [],
       departmentsCreated: [],
+      fromMonth: 'current',
+      startCompetence: '2026-11',
+      overdueCreated: 0,
       ...patch,
     });
     expect(applyResultText(res({ created: 5, regimeAdded: 2 }), 'Simples Nacional')).toBe(
@@ -108,6 +127,9 @@ describe('applying a group', () => {
     );
     expect(applyResultText(res({ skipped: [{ key: 'f', name: 'DAS-MEI', reason: 'handmade', existing: { id: 'h', name: 'DAS MEI' } }] }), 'MEI')).toBe(
       'MEI: nada criado; 1 já existia feita à mão e não foi duplicada.',
+    );
+    expect(applyResultText(res({ created: 2, fromMonth: 'next', overdueCreated: 12 }), 'MEI')).toBe(
+      'MEI: 2 tarefas recorrentes criadas. Elas geram todo mês uma tarefa para cada empresa do regime. As novas começam no mês que vem. 12 ocorrências deste mês nasceram vencidas.',
     );
   });
 });

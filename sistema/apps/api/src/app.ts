@@ -20,7 +20,7 @@ import { authPlugin } from './lib/auth';
 import { configureKeyring } from './lib/crypto/keyring';
 import { AppError, ForbiddenError, fromDatabaseError } from './lib/errors';
 import { serializeError, serializeRequest } from './lib/log';
-import { billingEnabled, type Platform } from './lib/platform';
+import { auditLogRetentionMonths, billingEnabled, type Platform } from './lib/platform';
 import { tenantRoutes } from './lib/tenant-routes';
 import { authRoutes } from './modules/auth/routes';
 import { billingRoutes } from './modules/billing/routes';
@@ -125,7 +125,15 @@ export async function buildApp(options: BuildAppOptions = {}) {
       name: 'daily-maintenance',
       log: app.log,
       tryLock: advisoryLock(client),
-      run: () => runDailyJobs({ db, billingEnabled: billingEnabled(app.platform), log: app.log }),
+      run: () =>
+        runDailyJobs({
+          db,
+          billingEnabled: billingEnabled(app.platform),
+          log: app.log,
+          auditLogRetentionMonths: auditLogRetentionMonths(app.platform),
+          mailer: app.platform.mailer,
+          appUrl: app.platform.appUrl,
+        }),
     });
     app.addHook('onClose', async () => scheduler.stop());
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SearchResponse } from '@effinance/shared';
-import { contactPathFor, filterPaletteGroups, matchesPaletteQuery, paletteAreaFor, paletteNavFor, SEARCH_PLACEHOLDERS, visibleSearchHits } from './command-palette';
+import { contactPathFor, filterPaletteGroups, matchesPaletteQuery, otherAreaPages, paletteAreaFor, paletteNavFor, SEARCH_PLACEHOLDERS, visibleSearchHits } from './command-palette';
 import { FINANCE_NAV_ITEMS, GESTAO_NAV_ITEMS } from './nav';
 
 // A search answer with hits of both areas, as an administrator gets it (or as it stays in the cache
@@ -195,5 +195,22 @@ describe('filterPaletteGroups (⌘K actions and pages while searching)', () => {
     expect(matchesPaletteQuery({ label: 'Grupos por regime', keywords: 'simples presumido' }, 'Simples')).toBe(true);
     expect(matchesPaletteQuery({ label: 'Grupos por regime' }, 'gr reg')).toBe(true);
     expect(matchesPaletteQuery({ label: 'Grupos por regime' }, 'mei')).toBe(false);
+  });
+});
+
+describe('otherAreaPages (⌘K)', () => {
+  it('from the Gestão finds the finance pages, Reajuste em lote included, for who can access the finances', () => {
+    const other = otherAreaPages('gestao', true)!;
+    const found = filterPaletteGroups([{ heading: other.heading, entries: other.items }], 'reajuste')[0]!.entries.map((i) => i.label);
+    expect(found).toEqual(['Reajuste em lote dos honorários']);
+    expect(other.items.map((i) => i.to)).toEqual(expect.arrayContaining(['/contas', '/relatorios', '/clientes/reajuste']));
+    expect(otherAreaPages('gestao', false)).toBeNull();
+  });
+
+  it('from the Financeiro finds the Gestão pages, without repeating the area ones', () => {
+    const other = otherAreaPages('financeiro', true)!;
+    const finance = new Set(paletteNavFor('financeiro').items.map((i) => i.to));
+    expect(other.items.length).toBeGreaterThan(0);
+    expect(other.items.some((i) => finance.has(i.to))).toBe(false);
   });
 });

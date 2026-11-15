@@ -1840,6 +1840,7 @@ export interface AuditSummary {
   clientsConcluded: number;
   byDepartment: {
     department: TaskRef | null;
+    /** Cells not canceled (the base of the top: `total − canceled`). */
     total: number;
     done: number;
     overduePending: number;

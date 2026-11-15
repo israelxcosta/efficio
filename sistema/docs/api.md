@@ -501,13 +501,18 @@ Uma instância da API com PostgreSQL e Caddy na mesma máquina (kit em `deploy/`
   PostgreSQL (`pg_try_advisory_lock`, conexão reservada); cada parte falha sozinha (log de erro) e a
   API segue; o resultado sai numa linha `job finished` com contagens. Com um login sem `DELETE` em
   `sessions`/`open_finance_events` (AWS) a limpeza é pulada com aviso — ela também roda em cada `migrate`.
-- Papéis do banco (`deploy/db-init/10-efficio.sh`): a API e o `migrate` entram como `efficio`, **não**
-  superusuário mas dono do banco e de todas as tabelas; cada requisição de domínio troca para
-  `effinance_app`. O RLS continua valendo (FORCE vale também para o dono: sem `app.workspace_id` ele não
-  lê nem grava nada de um espaço), mas, diferente da AWS, o login da API tem acesso direto às tabelas de
-  identidade (inclusive `DELETE`/`TRUNCATE` em `audit_logs`) e DDL (poderia desligar o FORCE): uma injeção
-  de SQL não ficaria contida. Separar `efficio_owner` (migrações) de `efficio` (runtime com os grants de
-  `test/db-roles.ts`) é o ajuste recomendado. Coberto por `test/vps-db-owner.test.ts`.
+  No VPS o login da API tem esse `DELETE` (abaixo) e a limpeza roda todo dia.
+- Papéis do banco (`deploy/db-init/10-efficio.sh`, mesmo modelo da AWS): o `migrate` entra como
+  `efficio_owner` (**não** superusuário; dono do banco e de todas as tabelas, só ele roda DDL); a API
+  entra como `efficio` (`NOINHERIT`, não é dono de nada, membro de `effinance_app` só para o
+  `SET LOCAL ROLE` de cada requisição). Depois de cada migração o serviço `grants` do compose roda
+  `deploy/sql/grants-api.sql` como o dono (idempotente, numa transação): `CONNECT`, `USAGE` no schema e
+  exatamente `IDENTITY_GRANTS` (`test/db-roles.ts`) + `DELETE` em `sessions`/`open_finance_events` para a
+  limpeza diária; `audit_logs` só `SELECT`/`INSERT`; tabelas financeiras e `drizzle.*` sem grant nenhum.
+  `scripts/restaurar.sh` reaplica o mesmo arquivo depois de restaurar. Tabela nova fora do RLS: acrescente
+  em `IDENTITY_GRANTS`, `grants-api.sql` e `docs/deploy-aws.md`. Coberto por `test/vps-db-owner.test.ts`
+  (migrações como dono sob FORCE RLS; o login da API sem DDL, sem apagar a auditoria e sem acesso direto
+  às tabelas financeiras; grants exatos e idempotentes).
 
 ## Permissões e assinatura
 

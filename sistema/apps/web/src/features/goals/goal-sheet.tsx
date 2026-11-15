@@ -70,7 +70,7 @@ export function GoalSheet({ open, onOpenChange, goal }: { open: boolean; onOpenC
     >
       <form className="flex flex-col gap-5" onSubmit={(e) => { e.preventDefault(); void onSubmit(); }} noValidate>
         <Field label="Nome da meta" error={formState.errors.name?.message}>
-          <Input placeholder="Ex: Reserva de emergência, Viagem" {...register('name')} />
+          <Input placeholder="Ex: Reserva para o 13º, Troca dos computadores" {...register('name')} />
         </Field>
         <Field label="Valor alvo" error={formState.errors.targetAmount?.message}>
           <Controller control={control} name="targetAmount" render={({ field }) => <MoneyInput size="lg" value={field.value} onChange={field.onChange} />} />

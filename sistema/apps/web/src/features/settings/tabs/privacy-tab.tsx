@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ChevronLeft, ChevronRight, Download, History, Trash2, UserX } from 'lucide-react';
 import { toast } from 'sonner';
-import { BILLING_ENABLED, todayISO, type AuditLogEntry } from '@effinance/shared';
+import { BILLING_ENABLED, todayISO } from '@effinance/shared';
+import { auditLabel } from '../audit-labels';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Modal } from '@/components/ui/dialog';
@@ -98,7 +99,7 @@ function ExportCard() {
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface-muted px-4 py-3">
         <p className="max-w-lg text-[13px] text-muted">
           {isOwner
-            ? 'Inclui contas, cartões, lançamentos, categorias, metas e contatos, com os campos protegidos já decifrados. Guarde o arquivo com cuidado.'
+            ? 'O arquivo leva tudo deste espaço (clientes, honorários, lançamentos, contas e demais cadastros) com os campos protegidos decifrados, inclusive as senhas de acesso dos clientes. Guarde-o em local seguro, não o envie por e-mail ou mensagem e apague as cópias que não forem mais necessárias.'
             : 'Somente o proprietário pode exportar os dados deste espaço.'}
         </p>
         <Button variant="outline" onClick={() => void run()} loading={exporting} disabled={!isOwner}>
@@ -107,40 +108,6 @@ function ExportCard() {
       </div>
     </Card>
   );
-}
-
-const AUDIT_LABELS: Record<string, string> = {
-  'auth.register': 'Conta criada',
-  'auth.login': 'Login',
-  'auth.login_failed': 'Tentativa de login falhou',
-  'auth.logout': 'Logout',
-  'auth.mfa_enabled': '2FA ativada',
-  'auth.mfa_disabled': '2FA desativada',
-  'auth.mfa_failed': 'Código 2FA inválido',
-  'auth.password_changed': 'Senha alterada',
-  'auth.password_reset_requested': 'Recuperação de senha solicitada',
-  'auth.password_reset': 'Senha redefinida',
-  'auth.session_revoked': 'Sessão encerrada',
-  'auth.refresh_token_reuse': 'Reuso de sessão bloqueado',
-  'workspace.created': 'Espaço criado',
-  'workspace.renamed': 'Espaço renomeado',
-  'workspace.deleted': 'Espaço excluído',
-  'data.exported': 'Dados exportados',
-  'member.invited': 'Convite enviado',
-  'member.joined': 'Membro entrou',
-  'member.role_changed': 'Permissão alterada',
-  'member.removed': 'Membro removido',
-  'member.left': 'Membro saiu',
-  'invite.revoked': 'Convite revogado',
-  'billing.checkout_started': 'Checkout iniciado',
-  'billing.activated': 'Assinatura ativada',
-  'billing.canceled': 'Assinatura cancelada',
-  'billing.webhook': 'Atualização do Mercado Pago',
-  'account.deleted': 'Conta excluída',
-};
-
-function auditLabel(entry: AuditLogEntry): string {
-  return AUDIT_LABELS[entry.action] ?? entry.action.replace(/[._]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 }
 
 function AuditCard() {
@@ -173,7 +140,7 @@ function AuditCard() {
                 {audit.data.items.map((e) => (
                   <tr key={e.id} className={audit.isPlaceholderData ? 'opacity-60' : undefined}>
                     <td className="tabular px-2 py-2.5 whitespace-nowrap text-muted">{formatDateTime(e.createdAt)}</td>
-                    <td className="px-2 py-2.5 font-medium">{auditLabel(e)}</td>
+                    <td className="px-2 py-2.5 font-medium">{auditLabel(e.action)}</td>
                     <td className="px-2 py-2.5">{e.userName ?? '—'}</td>
                     <td className="tabular px-2 py-2.5 text-muted">{e.ip ?? '—'}</td>
                   </tr>

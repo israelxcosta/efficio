@@ -371,7 +371,7 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
           </Field>
 
           <Field label="Nome" error={formState.errors.description?.message}>
-            <Input placeholder={type === 'income' ? 'Ex: Salário, Freelance, Aluguel' : 'Ex: iFood, Netflix, Uber'} maxLength={120} {...register('description')} />
+            <Input placeholder={type === 'income' ? 'Ex: Honorários ref. 11/2026, Abertura de empresa' : 'Ex: Aluguel da sala, Licença do sistema contábil'} maxLength={120} {...register('description')} />
           </Field>
 
           {!isCard ? (

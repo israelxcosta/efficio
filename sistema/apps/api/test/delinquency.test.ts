@@ -253,7 +253,7 @@ describe('delinquency report', () => {
     // Due Saturday 17/10, paid Monday 19/10: on time. Due Saturday 03/10, paid Tuesday 06/10: 3 days late.
     await receivable(c, a, '2026-10-17', 35000, { paidAt: '2026-10-19' });
     await receivable(c, a, '2026-10-03', 35000, { paidAt: '2026-10-06' });
-    const client = (await c.get('/reports/delinquency?months=1')).body.clients[0];
+    const client = (await c.get('/reports/delinquency?months=3')).body.clients[0];
     expect(client).toMatchObject({ dueCount: 2, onTimeCount: 1, lateCount: 1, maxDaysLate: 3, openCount: 0 });
   });
 

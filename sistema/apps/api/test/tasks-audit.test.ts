@@ -99,6 +99,11 @@ describe('monthly audit', () => {
     const third = (await carla.get('/tasks/audit?competence=2026-10')).body;
     expect(third.clients.find((c: any) => c.id === clinica)).toMatchObject({ done: 1, canceled: 1 });
     expect(third.clients.find((c: any) => c.id === clinica).monthConcludedAt).not.toBeNull();
+    // "Por departamento" uses the base of the top (QA #6): canceled cells are out of each total.
+    const deptSum = (key: 'total' | 'done') => third.summary.byDepartment.reduce((a: number, d: any) => a + d[key], 0);
+    expect(third.summary.canceled).toBe(1);
+    expect(deptSum('total')).toBe(third.summary.total - third.summary.canceled);
+    expect(deptSum('done')).toBe(third.summary.done);
 
     // Filters: department, regime, recurring task, responsible (their clients, all their cells).
     const byDept = (await carla.get(`/tasks/audit?competence=2026-10&departmentId=${pessoal}`)).body;

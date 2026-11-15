@@ -1,11 +1,15 @@
 // Retention of security rows that are useless once expired (LGPD: data minimization). Every refresh
 // inserts a session row and rotated rows were never removed; reset links and invites (which hold an
 // e-mail address) stayed forever. Runs with the migrator/owner connection: `db:migrate` calls it on
-// every deploy and the API runs it daily when JOBS_ENABLED (src/jobs/daily.ts).
+// every deploy and the API runs it daily when JOBS_ENABLED (src/jobs/daily.ts). The audit trail
+// (`audit_logs`, with IP and user agent) is kept `AUDIT_LOG_RETENTION_MONTHS` (default 24, minimum 6);
+// the members are warned 30 days before (modules/workspaces/audit-retention.ts).
 
 import { and, isNotNull, lt, or } from 'drizzle-orm';
+import { AUDIT_LOG_RETENTION_MONTHS_DEFAULT, AUDIT_LOG_RETENTION_MONTHS_MIN } from '@effinance/shared';
 import type { DbExecutor } from './client';
-import { openFinanceEvents, passwordResets, sessions, workspaceInvites } from './schema';
+import { auditLogs, openFinanceEvents, passwordResets, sessions, workspaceInvites } from './schema';
+import { auditRetentionCutoff } from '../modules/workspaces/audit-retention';
 
 const DAY_MS = 86_400_000;
 /** Accepted/expired invites stay visible this long (support questions), then go. */
@@ -18,9 +22,25 @@ export interface PurgeResult {
   passwordResets: number;
   invites: number;
   webhookEvents: number;
+  auditLogs: number;
 }
 
-export async function purgeExpiredSecurityRows(db: DbExecutor, now: Date = new Date()): Promise<PurgeResult> {
+export interface PurgeOptions {
+  /** Months the audit trail is kept (`AUDIT_LOG_RETENTION_MONTHS`); below the minimum it is raised to it. */
+  auditLogRetentionMonths?: number;
+}
+
+/** Deletes the audit records older than the retention period (every workspace, and the ones without). */
+export async function purgeExpiredAuditLogs(db: DbExecutor, months: number, now: Date = new Date()): Promise<number> {
+  const kept = Math.max(AUDIT_LOG_RETENTION_MONTHS_MIN, Math.trunc(months));
+  const deleted = await db
+    .delete(auditLogs)
+    .where(lt(auditLogs.createdAt, auditRetentionCutoff(now, kept)))
+    .returning({ id: auditLogs.id });
+  return deleted.length;
+}
+
+export async function purgeExpiredSecurityRows(db: DbExecutor, now: Date = new Date(), opts: PurgeOptions = {}): Promise<PurgeResult> {
   // A refresh row past `expires_at` is rejected by `rotateSession` before reuse detection, so it no
   // longer protects anything.
   const deletedSessions = await db
@@ -45,7 +65,9 @@ export async function purgeExpiredSecurityRows(db: DbExecutor, now: Date = new D
     .delete(openFinanceEvents)
     .where(lt(openFinanceEvents.createdAt, new Date(now.getTime() - WEBHOOK_EVENT_RETENTION_DAYS * DAY_MS)))
     .returning({ id: openFinanceEvents.id });
+  const deletedAudit = await purgeExpiredAuditLogs(db, opts.auditLogRetentionMonths ?? AUDIT_LOG_RETENTION_MONTHS_DEFAULT, now);
   return {
+    auditLogs: deletedAudit,
     sessions: deletedSessions.length,
     passwordResets: deletedResets.length,
     invites: deletedInvites.length,

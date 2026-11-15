@@ -4,6 +4,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
+  auditExportQuerySchema,
   auditQuerySchema,
   deleteWorkspaceSchema,
   idSchema,
@@ -17,7 +18,8 @@ import {
 import { audit } from '../../lib/audit';
 import { ValidationError } from '../../lib/errors';
 import { oneLine } from '../../lib/mailer';
-import { billingEnabled, rateLimited, requireMfa } from '../../lib/platform';
+import { auditLogRetentionMonths, billingEnabled, rateLimited, requireMfa } from '../../lib/platform';
+import { auditRetentionStatus, exportAuditCsv } from './audit-retention';
 import { assertPermission } from '../../lib/permissions';
 import { requestContext } from '../../lib/request-context';
 import { assertOwner, assertSubscriptionAllowsWrite } from './access';
@@ -193,6 +195,35 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
     assertOwner(req.access);
     return listAudit(app.db, req.workspaceId, req.query.page, req.query.pageSize);
   });
+
+  // Retention of the audit trail (`members` permission): what the clean-up deletes within 30 days, and
+  // the download of a period before it goes (CSV; audited).
+  app.get('/current/audit/retention', async (req) => {
+    assertPermission(req.access, 'members');
+    return auditRetentionStatus(app.db, req.workspaceId, auditLogRetentionMonths(app.platform));
+  });
+
+  app.get(
+    '/current/audit/export',
+    { schema: { querystring: auditExportQuerySchema }, config: rateLimited(app.platform, 5, '1 minute') },
+    async (req, reply) => {
+      assertPermission(req.access, 'members');
+      const result = await exportAuditCsv(app.db, req.workspaceId, auditLogRetentionMonths(app.platform), req.query);
+      await audit(app.db, {
+        ...requestContext(req),
+        action: 'audit.exported',
+        workspaceId: req.workspaceId,
+        userId: req.userId,
+        entity: 'workspace',
+        entityId: req.workspaceId,
+        metadata: { from: result.from, to: result.to, count: result.count },
+      });
+      reply.header('content-type', 'text/csv; charset=utf-8');
+      reply.header('content-disposition', `attachment; filename="auditoria-${result.from}-a-${result.to}.csv"`);
+      reply.header('cache-control', 'no-store');
+      return result.csv;
+    },
+  );
 };
 
 /** Public preview + accept (the accept needs a signed-in user with the invited e-mail). */

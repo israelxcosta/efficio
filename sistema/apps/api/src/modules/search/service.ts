@@ -19,7 +19,7 @@ import { likePattern } from '../../lib/sql';
 import { listAccountsWithBalances } from '../accounts/service';
 import { toCategory } from '../categories/service';
 import { getCipher } from '../../lib/crypto/keyring';
-import { documentIndex, toContact } from '../contacts/service';
+import { documentIndex, responsibleNameIndex, toContact } from '../contacts/service';
 import { toTransactions } from '../transactions/mapper';
 
 /**
@@ -34,7 +34,9 @@ export interface SearchScope {
 const none = <T>(): Promise<T[]> => Promise.resolve([]);
 
 /**
- * Notes and contact details are encrypted: search covers descriptions, names and exact CPF/CNPJ (the
+ * Notes and contact details are encrypted: search covers descriptions, names, the exact CPF/CNPJ
+ * (complete, with or without punctuation) and the client's responsible by full name (any case and
+ * accents; blind index, migration 0022 — a partial CNPJ or name does not match) (the
  * clients' accesses are never searched nor returned). Unions by name, acronym, category or CNPJ. Tasks
  * (standalone and process steps, by title) and recurring tasks (by name) are found by every member;
  * occurrences of recurring tasks are not listed one by one (the recurring task stands for them).
@@ -43,8 +45,11 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
   const pattern = likePattern(q);
   const digits = onlyDigits(q);
   const cipher = await getCipher(workspaceId);
+  // CPF/CNPJ complete (with or without punctuation) and the responsible's full name: exact, through
+  // their blind indexes (both are encrypted; a partial CNPJ or name cannot match).
   const documentHash =
     digits.length === 11 || digits.length === 14 ? await documentIndex(cipher, digits) : null;
+  const responsibleHash = /\p{L}/u.test(q) ? await responsibleNameIndex(cipher, q) : null;
   const day = todayIn(TASK_TIME_ZONE);
   const [txRows, accountRows, categoryRows, contactRows, taskRows, recurringRows, unionRows] = await Promise.all([
     !scope.finance
@@ -81,6 +86,7 @@ export async function search(db: DbExecutor, workspaceId: string, q: string, sco
             ilike(contacts.name, pattern),
             ilike(contacts.tradeName, pattern),
             documentHash ? eq(contacts.documentHash, documentHash) : undefined,
+            responsibleHash ? eq(contacts.responsibleNameHash, responsibleHash) : undefined,
           ),
         ),
       )

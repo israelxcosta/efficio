@@ -43,7 +43,7 @@ main() {
   echo "==> Aplicando migrações e reiniciando"
   if ! dc up -d --remove-orphans; then
     echo "ERRO ao subir. Últimas linhas dos registros:" >&2
-    dc logs --no-color --tail 40 migrate api >&2 || true
+    dc logs --no-color --tail 40 migrate grants api >&2 || true
     exit 1
   fi
 

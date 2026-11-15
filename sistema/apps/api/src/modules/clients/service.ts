@@ -32,7 +32,7 @@ import type { FieldCipher } from '../../lib/crypto/field-cipher';
 import { ConflictError, NotFoundError, ValidationError } from '../../lib/errors';
 import { countAll, inChunks, likePattern } from '../../lib/sql';
 import { getClientOrThrow } from '../common/ownership';
-import { CONTACT_ALL_ENCRYPTED_FIELDS, CONTACT_ENCRYPTED_FIELDS, documentIndex } from '../contacts/service';
+import { CONTACT_ALL_ENCRYPTED_FIELDS, CONTACT_ENCRYPTED_FIELDS, documentIndex, responsibleNameIndex } from '../contacts/service';
 import {
   credentialFlags,
   fiscalColumns,
@@ -260,7 +260,12 @@ async function encryptClientInput(cipher: FieldCipher, input: ClientInput) {
     simplesAccessCode,
     accountantPassword,
   });
-  return { ...encrypted, ...fiscal, documentHash: await documentIndex(cipher, input.document) };
+  return {
+    ...encrypted,
+    ...fiscal,
+    documentHash: await documentIndex(cipher, input.document),
+    responsibleNameHash: await responsibleNameIndex(cipher, input.responsibleName),
+  };
 }
 
 async function assertUniqueDocument(db: DbExecutor, workspaceId: string, documentHash: string, exceptId?: string) {
@@ -446,6 +451,9 @@ export async function updateClientRegistration(
     ...encrypted,
     ...(await fiscalColumns(cipher, { stateRegistration, stateRegistrationExempt, municipalRegistration })),
   } as Partial<ContactRow>;
+  if ('responsibleName' in base && base.responsibleName !== undefined) {
+    values.responsibleNameHash = await responsibleNameIndex(cipher, base.responsibleName as string | null);
+  }
   if (base.document !== undefined) {
     values.documentHash = await documentIndex(cipher, base.document);
     await assertUniqueDocument(db, workspaceId, values.documentHash, id);
