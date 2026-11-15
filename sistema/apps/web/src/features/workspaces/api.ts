@@ -1,6 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AuditExportQuery,
   AuditLogEntry,
+  AuditRetentionResponse,
   Invite,
   InviteInput,
   InvitePreview,
@@ -13,7 +15,7 @@ import type {
   WorkspaceInput,
   WorkspaceSummary,
 } from '@effinance/shared';
-import { api } from '@/lib/api';
+import { api, apiDownload, saveBlob } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 
 // The active workspace (tenant): settings, members, invites and LGPD tools. Routes act on
@@ -127,6 +129,27 @@ export function acceptInvite(token: string): Promise<MeResponse> {
 
 export function exportWorkspaceData(): Promise<unknown> {
   return api<unknown>('/workspaces/current/export');
+}
+
+/**
+ * What the clean-up of the audit trail deletes within 30 days (`members` permission). Shared by the
+ * bell and Configurações › Privacidade; a failure only hides the notice.
+ */
+export function useAuditRetention(enabled: boolean) {
+  return useQuery({
+    queryKey: qk.auditRetention,
+    queryFn: () => api<AuditRetentionResponse>('/workspaces/current/audit/retention'),
+    enabled,
+    staleTime: 30 * 60_000,
+    retry: false,
+  });
+}
+
+/** CSV of the audit trail of a period (without one: the records about to be deleted). */
+export async function downloadAuditCsv(query: AuditExportQuery = {}): Promise<void> {
+  const fallback = query.from && query.to ? `auditoria-${query.from}-a-${query.to}.csv` : 'auditoria.csv';
+  const { blob, fileName } = await apiDownload('/workspaces/current/audit/export', { query: { ...query } }, fallback);
+  saveBlob(blob, fileName);
 }
 
 export function useAuditLog(page: number, enabled: boolean) {

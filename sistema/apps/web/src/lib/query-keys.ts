@@ -29,6 +29,7 @@ export const qk = {
   members: ['workspace', 'members'] as const,
   invites: ['workspace', 'invites'] as const,
   audit: (page: number) => ['workspace', 'audit', page] as const,
+  auditRetention: ['workspace', 'audit-retention'] as const,
   invitePreview: (token: string) => ['invite', token] as const,
   plans: ['billing', 'plans'] as const,
   subscription: ['billing', 'subscription'] as const,
