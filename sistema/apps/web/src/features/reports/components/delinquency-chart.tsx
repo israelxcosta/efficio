@@ -170,7 +170,7 @@ function PaidTooltip({ active, payload, mode }: { active?: boolean; payload?: re
   const m = p.source;
   const value = (count: number, amount: number) => (mode === 'count' ? String(count) : formatBRL(amount));
   return (
-    <div className="w-[236px] rounded-lg border border-border bg-surface px-2.5 py-2 text-caption shadow-lg">
+    <div className="w-max min-w-[236px] max-w-[320px] rounded-lg border border-border bg-surface px-3 py-2 text-caption shadow-lg">
       <p className="mb-1.5 font-semibold text-muted">{`${formatMonthKey(m.month).split(' ')[0]} · ${pluralize(m.dueCount, 'mensalidade', 'mensalidades')}${m.partial ? ' · parcial' : ''}`}</p>
       {m.dueCount === 0 ? (
         <p className="text-muted">Nenhuma mensalidade vencida.</p>

@@ -1,5 +1,6 @@
 import { Fragment, forwardRef, useId, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes, cloneElement, isValidElement, type ReactElement } from 'react';
 import { cn } from '@/lib/utils';
+import { HelpTip } from './help-tip';
 
 export const inputClasses =
   'h-11 w-full rounded-md border border-border bg-surface px-3.5 text-sm text-fg shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-subtle hover:border-border-strong focus:border-brand-500 focus:ring-[3px] focus:ring-brand-500/15 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:opacity-70 aria-[invalid=true]:border-danger aria-[invalid=true]:focus:ring-danger/15';
@@ -59,7 +60,14 @@ export function Field({ label, hint, error, className, aside, children }: FieldP
     <div className={cn('flex flex-col gap-1.5', className)}>
       {label || aside ? (
         <div className="flex items-center justify-between gap-2">
-          {label ? <Label htmlFor={controlId}>{label}</Label> : <span />}
+          {label ? (
+            <span className="flex min-w-0 items-center gap-1">
+              <Label htmlFor={controlId}>{label}</Label>
+              {hint ? <HelpTip>{hint}</HelpTip> : null}
+            </span>
+          ) : (
+            <span />
+          )}
           {aside}
         </div>
       ) : null}
@@ -69,7 +77,8 @@ export function Field({ label, hint, error, className, aside, children }: FieldP
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-hint`} className="text-xs text-muted">
+        // With a label the hint lives in the "?" balloon; screen readers still get it as the description.
+        <p id={`${id}-hint`} className={label ? 'sr-only' : 'text-xs text-muted'}>
           {hint}
         </p>
       ) : null}

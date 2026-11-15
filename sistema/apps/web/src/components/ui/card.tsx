@@ -1,7 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react';
-import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Tooltip } from './tooltip';
+import { HelpTip } from './help-tip';
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('rounded-xl border border-border bg-surface', className)} {...props} />;
@@ -23,11 +22,7 @@ export function CardHeader({ title, subtitle, info, action, icon, className }: C
         <div className="flex items-center gap-1.5">
           <h2 className="truncate text-title-sm font-semibold tracking-tight text-fg">{title}</h2>
           {info ? (
-            <Tooltip content={info}>
-              <button type="button" className="text-subtle hover:text-muted" aria-label="Mais informações">
-                <Info className="size-3.5" />
-              </button>
-            </Tooltip>
+            <HelpTip label="Mais informações">{info}</HelpTip>
           ) : null}
         </div>
         {subtitle ? <p className="mt-0.5 text-xs text-muted">{subtitle}</p> : null}
