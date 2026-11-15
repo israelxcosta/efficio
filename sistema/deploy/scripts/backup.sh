@@ -47,7 +47,7 @@ fi
 GNUPGHOME="$(mktemp -d)"
 export GNUPGHOME
 parcial=""
-# shellcheck disable=SC2329  # chamada pelo trap EXIT
+# shellcheck disable=SC2329,SC2317  # chamada pelo trap EXIT
 limpar() { rm -rf "$GNUPGHOME"; [[ -n "$parcial" ]] && rm -f "$parcial"; return 0; }
 trap limpar EXIT
 
