@@ -86,9 +86,9 @@ export default function TaskRegistryPage() {
     tab === 'sindicatos'
       ? unionsHeader.description
       : tab === 'departamentos'
-      ? `${departments.data ? pluralize(departments.data.length, 'departamento', 'departamentos') : 'Departamentos'} · cada tarefa pertence a um departamento.${note}`
+      ? `${departments.data ? pluralize(departments.data.length, 'departamento', 'departamentos') : 'Departamentos'}${note ? `.${note}` : ''}`
       : tab === 'categorias'
-        ? `Rótulos para filtrar e analisar as tarefas.${note}`
+        ? note.trim() || undefined
         : `${pluralize(members.length, 'pessoa', 'pessoas')} · ${pluralize(admins, 'administrador', 'administradores')} e ${pluralize(members.length - admins, 'colaborador', 'colaboradores')}.${note}`;
 
   const action =

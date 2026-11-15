@@ -108,7 +108,7 @@ function WorkspaceCard() {
 
   return (
     <Card className="p-6">
-      <CardHeader title="Espaço" subtitle={BILLING_ENABLED ? 'Cada espaço tem dados, membros e assinatura próprios.' : 'Cada espaço tem dados e membros próprios.'} />
+      <CardHeader title="Espaço" />
       <div className="mt-5 flex items-start gap-4">
         <span className={cn('flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-primary-soft text-primary-soft-fg', isOwner && 'sm:mt-[26px]')}>
           <Icon className="size-5" />
@@ -327,7 +327,7 @@ function InvitesCard() {
 
   return (
     <Card className="p-6">
-      <CardHeader title="Convidar pessoas" subtitle="O convite vale por 7 dias e precisa ser aceito com o mesmo e-mail." icon={<MailPlus />} />
+      <CardHeader title="Convidar pessoas" info="O convite vale por 7 dias e precisa ser aceito com o mesmo e-mail." icon={<MailPlus />} />
       {limit ? (
         <div className="mt-4 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-[13px]">
           <p className="font-semibold text-fg">{limit.title}</p>

@@ -58,7 +58,6 @@ export function GoalSheet({ open, onOpenChange, goal }: { open: boolean; onOpenC
       open={open}
       onOpenChange={onOpenChange}
       title={goal ? 'Editar meta' : 'Nova meta'}
-      description="Defina um objetivo e acompanhe seu progresso"
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>

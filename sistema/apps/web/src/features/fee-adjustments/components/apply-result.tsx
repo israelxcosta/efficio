@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { CircleCheck, Printer, TriangleAlert, X } from 'lucide-react';
 import { FEE_ADJUSTMENT_SKIP_LABELS, formatBRL, formatMonthKey, type FeeAdjustmentApplyResponse } from '@effinance/shared';
+import { HelpTip } from '@/components/ui/help-tip';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { pluralize } from '@/lib/utils';
@@ -61,7 +62,7 @@ export function ApplyResult({ result, onClose }: { result: FeeAdjustmentApplyRes
               <Printer /> Imprimir cartas
             </Link>
           </Button>
-          <p className="text-xs text-muted">Uma carta por cliente, com a memória de cálculo, para o aviso de 30 dias (cláusula 3.5).</p>
+          <HelpTip label="Sobre as cartas">Uma carta por cliente, com a memória de cálculo, para o aviso de 30 dias (cláusula 3.5).</HelpTip>
         </div>
       ) : null}
     </Card>

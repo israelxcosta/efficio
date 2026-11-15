@@ -121,7 +121,7 @@ export default function CardDetailPage() {
         </Card>
 
         <Card className="p-5">
-          <CardHeader title="Faturas" subtitle="Últimos meses e próximas faturas (parcelas futuras)" />
+          <CardHeader title="Faturas" info="Últimos meses e próximas faturas (parcelas futuras)." />
           <div className="mt-4 h-52">
             {invoices.isPending ? (
               <Skeleton className="h-full" />

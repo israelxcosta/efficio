@@ -17,6 +17,7 @@ import {
   type TaskOptionsResponse,
   type TaxRegime,
 } from '@effinance/shared';
+import { HelpTip } from '@/components/ui/help-tip';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Modal } from '@/components/ui/dialog';
@@ -595,7 +596,10 @@ function ClientsField({
 
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[13px] font-medium text-fg">Clientes específicos</span>
+          <span className="flex items-center gap-1.5 text-[13px] font-medium text-fg">
+            Clientes específicos
+            <HelpTip>Somam-se aos regimes.</HelpTip>
+          </span>
           <span className="flex items-center gap-1 text-caption text-muted">
             <span className="tabular">{form.clientIds.length} selecionados</span>
             {!readOnly ? (
@@ -631,7 +635,6 @@ function ClientsField({
           ))}
           {visible.length === 0 ? <li className="px-2 py-3 text-center text-caption text-muted">Nenhum cliente encontrado</li> : null}
         </ul>
-        <p className="text-xs text-muted">Somam-se aos regimes.</p>
       </div>
 
       <div className="flex flex-col gap-1.5">

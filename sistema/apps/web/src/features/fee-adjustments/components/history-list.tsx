@@ -51,7 +51,7 @@ export function HistoryList({ onStart }: { onStart: () => void }) {
     <Card className="@container overflow-hidden">
       <div className="border-b border-border p-5">
         <h2 className="text-title-sm font-semibold tracking-tight text-fg">Lotes aplicados</h2>
-        <p className="mt-0.5 text-xs text-muted">{data?.total ? `${pluralize(data.total, 'reajuste', 'reajustes')} em lote, o mais recente primeiro.` : 'Cada reajuste aplicado fica aqui, com as cartas.'}</p>
+        {data?.total ? <p className="mt-0.5 text-xs text-muted">{pluralize(data.total, 'reajuste', 'reajustes')} em lote</p> : null}
       </div>
       {list.isPending ? (
         <SkeletonRows rows={4} className="p-4" />

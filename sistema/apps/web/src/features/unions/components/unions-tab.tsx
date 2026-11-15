@@ -82,7 +82,7 @@ export function useUnionsHeader(enabled: boolean): { description: ReactNode; act
   const summary = list.data?.summary;
   const note = can('registry') ? '' : ' Somente administradores alteram estes cadastros.';
   return {
-    description: summary ? `${unionsDescription(summary)}.${note}` : `Sindicatos e convenções coletivas dos clientes.${note}`,
+    description: summary ? `${unionsDescription(summary)}.${note}` : note.trim() || undefined,
     action: (
       <WriteGate scope="admin">
         <Button
@@ -347,7 +347,6 @@ function UnionToolbar({ filters, total, onChange }: { filters: UnionFilters; tot
         open={sheet}
         onOpenChange={setSheet}
         title="Filtros"
-        description="Refine a lista de sindicatos."
         footer={
           <>
             <Button variant="ghost" onClick={() => onChange({ status: 'active', situation: '' })}>

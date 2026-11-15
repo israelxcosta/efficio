@@ -84,7 +84,6 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
             'Analisando os números do mês…'
           )}
         </h2>
-        <p className="mt-2 text-sm text-muted">Análises automáticas dos lançamentos, honorários e contas do mês, pela competência.</p>
       </section>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -96,7 +95,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
 
       <div className="grid gap-4 lg:grid-cols-12">
         <Card className="p-5 lg:col-span-8">
-          <CardHeader title="Insights do mês" subtitle="O que chamou atenção nos números do mês" />
+          <CardHeader title="Insights do mês" />
           <div className="mt-4">
             {loading || overview.isPending ? (
               <SkeletonRows rows={3} />
@@ -114,7 +113,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-5">
-          <CardHeader title="Fixas x variáveis" subtitle="Composição das despesas" />
+          <CardHeader title="Fixas x variáveis" />
           <div className="mt-4 h-48">
             {overview.isPending ? (
               <Skeleton className="h-full" />
@@ -133,7 +132,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
           </div>
         </Card>
         <Card className="p-5">
-          <CardHeader title="Formas de pagamento" subtitle="Como as despesas foram pagas" />
+          <CardHeader title="Formas de pagamento" />
           <div className="mt-4">
             {overview.isPending ? (
               <Skeleton className="h-40" />
@@ -157,7 +156,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
         </Card>
         <Card className="overflow-hidden">
           <div className="p-5 pb-2">
-            <CardHeader title="Maiores despesas" subtitle="Top 5 do mês" />
+            <CardHeader title="Maiores despesas" />
           </div>
           <div className="p-1.5">
             {overview.isPending ? (
@@ -172,7 +171,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
       </div>
       {o && o.topCategories.length ? (
         <Card className="p-5">
-          <CardHeader title="Categorias que mais pesaram" subtitle="Distribuição das despesas do mês" />
+          <CardHeader title="Categorias que mais pesaram" />
           <div className="mt-4">
             <DonutChart
               data={o.topCategories}

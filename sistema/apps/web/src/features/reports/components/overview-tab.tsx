@@ -53,7 +53,7 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
       </div>
 
       <Card className="p-5">
-        <CardHeader title="Insights do período" subtitle="Análises automáticas dos seus números" icon={<Sparkles />} />
+        <CardHeader title="Insights do período" icon={<Sparkles />} />
         <div className="mt-4">
           {report.isPending ? (
             <SkeletonRows rows={2} />
@@ -67,7 +67,7 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <CardHeader title="Despesas por categoria" subtitle="Onde o dinheiro foi gasto" icon={<ChartPie />} />
+          <CardHeader title="Despesas por categoria" icon={<ChartPie />} />
           <div className="mt-4">
             {report.isPending ? (
               <Skeleton className="h-48" />
@@ -79,7 +79,7 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
           </div>
         </Card>
         <Card className="p-5">
-          <CardHeader title="Perfil das despesas" subtitle="Fixas, parceladas e variáveis · formas de pagamento" />
+          <CardHeader title="Perfil das despesas" />
           {report.isPending ? (
             <Skeleton className="mt-4 h-48" />
           ) : o && o.expense > 0 ? (
@@ -121,7 +121,7 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
 
       <Card className="overflow-hidden">
         <div className="p-5 pb-2">
-          <CardHeader title="Maiores despesas" subtitle="Lançamentos de maior valor no período" icon={<Receipt />} />
+          <CardHeader title="Maiores despesas" icon={<Receipt />} />
         </div>
         <div className="p-1.5">
           {report.isPending ? (

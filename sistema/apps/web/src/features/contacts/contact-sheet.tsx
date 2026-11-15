@@ -67,7 +67,6 @@ export function ContactSheet({ open, onOpenChange, contact }: { open: boolean; o
       open={open}
       onOpenChange={onOpenChange}
       title={contact ? 'Editar fornecedor' : 'Novo fornecedor'}
-      description="Empresas e pessoas que fornecem para o escritório"
       width="lg"
       footer={
         <>

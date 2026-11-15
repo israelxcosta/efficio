@@ -43,7 +43,6 @@ export function PaymentMapCard({ analysis: a, className }: { analysis: ClientAna
     <Card className={cn('flex flex-col p-5 print:break-inside-avoid', className)}>
       <CardHeader
         title="Mapa de pagamentos"
-        subtitle="Cada mês de vencimento, do mais recente ao primeiro"
         info="Quando o mês tem mais de uma cobrança (honorário e empregados), vale a pior situação. O número é o maior atraso do mês, em dias."
       />
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">

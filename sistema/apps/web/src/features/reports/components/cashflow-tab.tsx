@@ -62,7 +62,7 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
       </div>
 
       <Card className="p-5">
-        <CardHeader title="Fluxo de caixa" subtitle="Entradas e saídas por período" icon={<Waves />} />
+        <CardHeader title="Fluxo de caixa" icon={<Waves />} />
         <div className="mt-3 flex flex-wrap gap-4">
           <LegendDot color={CHART_COLORS.income} label="Entradas" />
           <LegendDot color={CHART_COLORS.negative} label="Saídas" />

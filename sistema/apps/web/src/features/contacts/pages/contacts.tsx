@@ -76,7 +76,6 @@ export default function ContactsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Fornecedores"
-        description="Empresas e pessoas que fornecem para o escritório, vinculadas às contas a pagar."
         actions={<WriteGate><Button onClick={() => setSheet({ open: true, contact: null })}><Plus /> Novo fornecedor</Button></WriteGate>}
       />
 

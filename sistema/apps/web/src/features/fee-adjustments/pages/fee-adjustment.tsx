@@ -41,10 +41,7 @@ import {
 
 type Tab = 'new' | 'history';
 
-const DESCRIPTIONS: Record<Tab, string> = {
-  new: 'Contrato, cláusula 3: reajuste anual pelo maior índice entre IGP-M, IPCA, INPC e CCT, com aviso 30 dias antes.',
-  history: 'Reajustes já aplicados, com as cartas para reimprimir.',
-};
+const RULE = 'Contrato, cláusula 3: reajuste anual pelo maior índice entre IGP-M, IPCA, INPC e CCT, com aviso 30 dias antes.';
 
 /**
  * Reajuste em lote (finance): the clients whose period renews in a month get the next period with the
@@ -122,7 +119,7 @@ export default function FeeAdjustmentPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Reajuste em lote"
-        description={DESCRIPTIONS[tab]}
+        info={tab === 'new' ? RULE : undefined}
         actions={
           <Button variant="ghost" asChild>
             <Link to="/clientes">

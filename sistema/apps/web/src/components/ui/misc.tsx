@@ -4,6 +4,7 @@ import { formatBRL } from '@effinance/shared';
 import { cn } from '@/lib/utils';
 import { errorMessage } from '@/lib/api';
 import { Button } from './button';
+import { HelpTip } from './help-tip';
 
 export function ErrorState({ error, onRetry, className }: { error: unknown; onRetry?: () => void; className?: string }) {
   return (
@@ -24,6 +25,8 @@ export function ErrorState({ error, onRetry, className }: { error: unknown; onRe
 interface PageHeaderProps {
   title: ReactNode;
   description?: ReactNode;
+  /** Explanation of a rule, behind a "?" next to the title. */
+  info?: ReactNode;
   actions?: ReactNode;
   className?: string;
   /** Classes of the actions row (e.g. full width on phones). */
@@ -31,11 +34,18 @@ interface PageHeaderProps {
 }
 
 /** Page title (h1) with one plain line about the data under it; no label above the title. */
-export function PageHeader({ title, description, actions, className, actionsClassName }: PageHeaderProps) {
+export function PageHeader({ title, description, info, actions, className, actionsClassName }: PageHeaderProps) {
   return (
     <div className={cn('flex flex-wrap items-end justify-between gap-4', className)}>
       <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-tight text-fg">{title}</h1>
+        {info ? (
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-[22px] font-semibold tracking-tight text-fg">{title}</h1>
+            <HelpTip label="Mais informações" side="bottom">{info}</HelpTip>
+          </div>
+        ) : (
+          <h1 className="text-[22px] font-semibold tracking-tight text-fg">{title}</h1>
+        )}
         {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
       </div>
       {actions ? <div className={cn('flex flex-wrap items-center gap-2', actionsClassName)}>{actions}</div> : null}
@@ -90,10 +100,17 @@ export function StatPill({ label, value, tone = 'neutral', className }: { label:
   );
 }
 
-export function MiniStat({ label, value, tone, hint, className }: { label: string; value: ReactNode; tone?: 'success' | 'danger' | 'warning' | 'brand'; hint?: ReactNode; className?: string }) {
+export function MiniStat({ label, value, tone, hint, info, className }: { label: string; value: ReactNode; tone?: 'success' | 'danger' | 'warning' | 'brand'; hint?: ReactNode; info?: ReactNode; className?: string }) {
   return (
     <div className={cn('rounded-lg border border-border bg-surface px-4 py-3', className)}>
-      <p className="text-xs font-medium text-muted">{label}</p>
+      {info ? (
+        <div className="flex items-center gap-1">
+          <p className="text-xs font-medium text-muted">{label}</p>
+          <HelpTip label={`Sobre ${label.toLowerCase()}`}>{info}</HelpTip>
+        </div>
+      ) : (
+        <p className="text-xs font-medium text-muted">{label}</p>
+      )}
       {/* Figures stay in ink; colour only flags a problem (a negative result, an overdue total). */}
       <p
         className={cn(

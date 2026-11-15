@@ -70,7 +70,7 @@ export function HistoryTable({ receivables, today }: { receivables: ClientReceiv
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-start sm:justify-between">
-        <CardHeader title="Histórico de cobranças" subtitle={`${pluralize(receivables.length, 'cobrança', 'cobranças')}, do vencimento mais recente ao primeiro`} />
+        <CardHeader title="Histórico de cobranças" subtitle={pluralize(receivables.length, 'cobrança', 'cobranças')} info="Do vencimento mais recente ao primeiro." />
         <SegmentedControl<Filter> size="sm" ariaLabel="Filtrar cobranças" value={filter} onChange={setFilter} options={FILTERS} className="shrink-0 self-start print:hidden" />
       </div>
 

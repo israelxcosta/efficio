@@ -110,7 +110,7 @@ export default function RecurringTasksPage() {
   // Revision 4: the permission note left the top (it lives in the read-only registry's footer).
   const description = data
     ? `${data.summary.active} ${data.summary.active === 1 ? 'ativa' : 'ativas'} · ${monthName}: ${data.summary.occurrences.done} de ${data.summary.occurrences.total - data.summary.occurrences.canceled} concluídas`
-    : 'Obrigações e repetições, por departamento e cliente.';
+    : undefined;
 
   const emptyAll = data && data.items.length === 0 && count === 0 && data.summary.active + data.summary.ended === 0;
 
@@ -415,7 +415,6 @@ function RecurringFiltersBar({
         open={sheet}
         onOpenChange={setSheet}
         title="Filtros"
-        description="Refine a lista de tarefas recorrentes."
         footer={
           <>
             <Button variant="ghost" onClick={clear}>

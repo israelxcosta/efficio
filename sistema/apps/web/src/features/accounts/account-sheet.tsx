@@ -58,7 +58,6 @@ export function AccountSheet({ open, onOpenChange, account }: { open: boolean; o
       open={open}
       onOpenChange={onOpenChange}
       title={account ? 'Editar conta' : 'Nova conta'}
-      description="Contas bancárias, carteiras, benefícios e investimentos"
       width="lg"
       footer={
         <>

@@ -68,7 +68,7 @@ export function ContactsTab({ from, to }: { from: string; to: string }) {
           ) : null}
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="p-5">
-              <CardHeader title="Totais por contato" subtitle="Top 10 por movimentação" />
+              <CardHeader title="Totais por contato" info="Os 10 contatos com mais movimentação." />
               <div className="mt-4" style={{ height: Math.max(220, top.length * 38) }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={top} layout="vertical" margin={{ left: 8, right: 12 }} barGap={2}>
@@ -83,7 +83,7 @@ export function ContactsTab({ from, to }: { from: string; to: string }) {
               </div>
             </Card>
             <Card className="p-5">
-              <CardHeader title={current ? `Evolução de ${current.name}` : 'Evolução'} subtitle="Selecione um contato na tabela abaixo" />
+              <CardHeader title={current ? `Evolução de ${current.name}` : 'Evolução'} info="Selecione um contato na tabela abaixo." />
               <div className="mt-4 h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={evolution} margin={{ left: -4, right: 8, top: 8 }}>

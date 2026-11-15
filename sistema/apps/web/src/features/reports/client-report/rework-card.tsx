@@ -57,17 +57,11 @@ export function ReworkCardView({
           ))}
         </ul>
       )}
-      {data && data.rework.last12Months > 0 ? (
-        <p className="mt-auto pt-3 text-caption text-subtle">
-          {`Tarefas das categorias marcadas "Conta como retrabalho": −${REWORK_PENALTY_RECENT} por tarefa nos últimos 90 dias e −${REWORK_PENALTY_OLDER} pelas de até 12 meses (até −200).`}
-          {categoriesLink ? (
-            <>
-              {' '}
-              <Link to="/tarefas/cadastros?aba=categorias" className="font-medium text-brand-text hover:underline print:hidden">
-                Ver categorias
-              </Link>
-            </>
-          ) : null}
+      {data && data.rework.last12Months > 0 && categoriesLink ? (
+        <p className="mt-auto pt-3 text-caption print:hidden">
+          <Link to="/tarefas/cadastros?aba=categorias" className="font-medium text-brand-text hover:underline">
+            Ver categorias
+          </Link>
         </p>
       ) : null}
     </Card>

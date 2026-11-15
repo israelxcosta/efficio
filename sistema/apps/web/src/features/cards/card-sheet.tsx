@@ -61,7 +61,6 @@ export function CardSheet({ open, onOpenChange, card }: { open: boolean; onOpenC
       open={open}
       onOpenChange={onOpenChange}
       title={card ? 'Editar cartão' : 'Novo cartão de crédito'}
-      description="Limite, fechamento e vencimento da fatura"
       width="lg"
       footer={
         <>

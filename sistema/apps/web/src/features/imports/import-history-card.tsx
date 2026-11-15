@@ -52,7 +52,7 @@ export function ImportHistoryCard() {
     <Card className="p-6">
       <CardHeader
         title="Histórico de importações"
-        subtitle="Arquivos OFX/CSV e sincronizações. Desfazer exclui os lançamentos criados pelo lote."
+        info="Arquivos OFX/CSV e sincronizações. Desfazer exclui os lançamentos criados pelo lote."
         action={
           <WriteGate>
             <Button size="sm" variant="outline" onClick={() => openImport()}>

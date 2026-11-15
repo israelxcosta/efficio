@@ -217,7 +217,7 @@ function PlansCard({ sub, plans }: { sub: Subscription; plans: Plan[] | undefine
     <Card className="p-6">
       <CardHeader
         title={paying ? 'Mudar de plano' : 'Escolha um plano'}
-        subtitle="Cancele quando quiser. Os valores são cobrados em reais, com renovação automática."
+        info="Cancele quando quiser. Os valores são cobrados em reais, com renovação automática."
         icon={<CreditCard />}
       />
       {!plans ? (

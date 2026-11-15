@@ -94,10 +94,7 @@ export function CustomizeSheet({ open, onOpenChange, kind }: { open: boolean; on
           })}
 
           <section className="flex flex-col gap-2">
-            <div>
-              <SectionLabel>Cards ocultos no Dashboard</SectionLabel>
-              <p className="mt-0.5 text-caption text-muted">Cards que você ocultou pelo botão de olho ficam listados aqui para reexibir.</p>
-            </div>
+            <SectionLabel>Cards ocultos no Dashboard</SectionLabel>
             {hidden.length === 0 ? (
               <p className="text-caption text-muted">
                 Nenhum card oculto no momento. Passe o mouse sobre um card no Dashboard e clique no ícone de olho para ocultá-lo.

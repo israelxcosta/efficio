@@ -254,7 +254,6 @@ export default function ClientsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Clientes"
-        description="Empresas atendidas pelo escritório: contrato, regime tributário e honorários."
         actions={
           <>
             <Button variant="outline" asChild>

@@ -92,11 +92,7 @@ export default function TaskClientsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Clientes"
-        description={
-          ready
-            ? `${pluralize(active.length, 'cliente ativo', 'clientes ativos')} · abra um cliente para ver a ficha completa`
-            : 'Abra um cliente para ver a ficha completa'
-        }
+        description={ready ? pluralize(active.length, 'cliente ativo', 'clientes ativos') : undefined}
       />
 
       {clients.isError && !clients.data ? null : (

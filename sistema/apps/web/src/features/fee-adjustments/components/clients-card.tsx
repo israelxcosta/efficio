@@ -267,10 +267,12 @@ export function ClientsCard(props: ClientsCardProps) {
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border p-5">
         <div className="min-w-0">
           <h2 className="text-title-sm font-semibold tracking-tight text-fg">2. Clientes com vigência em {monthLabel}</h2>
-          <p className="mt-0.5 text-xs text-muted">
-            {data && items.length ? monthSummary(items) : 'Contratos que completam mais um ano no mês.'}
-            {late ? <span className="font-medium text-danger"> · {late} com o prazo do aviso vencido</span> : null}
-          </p>
+          {data && items.length ? (
+            <p className="mt-0.5 text-xs text-muted">
+              {monthSummary(items)}
+              {late ? <span className="font-medium text-danger"> · {late} com o prazo do aviso vencido</span> : null}
+            </p>
+          ) : null}
         </div>
         {ready.length > 0 ? (
           <label className="flex items-center gap-2 text-[13px] font-medium text-fg @3xl:hidden">

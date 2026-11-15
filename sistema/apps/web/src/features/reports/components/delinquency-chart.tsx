@@ -127,11 +127,6 @@ export function DelinquencyChart({ monthly, clients, lateRate }: { monthly: Deli
               </BarChart>
             </ChartBox>
           </div>
-          <p className="mt-2 text-caption text-subtle">
-            {partial
-              ? `Por mês de vencimento. ${formatMonthKey(partial.month).split(' ')[0]} parcial: ainda não teve tempo de atrasar, fica sem taxa.`
-              : 'Por mês de vencimento.'}
-          </p>
         </>
       ) : (
         <EmptyState compact className="mt-4" icon={<CalendarClock />} title="Nenhuma mensalidade vencida no período" description="O gráfico aparece quando houver recebimentos de clientes com vencimento nestes meses." />

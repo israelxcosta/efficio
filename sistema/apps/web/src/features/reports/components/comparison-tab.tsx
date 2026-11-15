@@ -109,7 +109,7 @@ export function ComparisonTab() {
           </div>
 
           <Card className="p-5">
-            <CardHeader title="Por categoria" subtitle="Período A × Período B" icon={<GitCompareArrows />} />
+            <CardHeader title="Por categoria" icon={<GitCompareArrows />} />
             <div className="mt-3 flex gap-4">
               <LegendDot color={CHART_COLORS.neutral} label="Período A" />
               <LegendDot color={CHART_COLORS.income} label="Período B" />

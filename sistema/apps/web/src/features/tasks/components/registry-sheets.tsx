@@ -10,6 +10,7 @@ import {
   type TaskDepartment,
   type TaskMember,
 } from '@effinance/shared';
+import { HelpTip } from '@/components/ui/help-tip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CategoryIcon } from '@/components/ui/category-icon';
@@ -90,7 +91,6 @@ export function DepartmentSheet({
       open={open}
       onOpenChange={onOpenChange}
       title={department ? 'Editar departamento' : 'Novo departamento'}
-      description="Departamentos agrupam a equipe; o Início mostra o trabalho de cada um."
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -110,7 +110,10 @@ export function DepartmentSheet({
         </Field>
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[13px] font-medium text-fg">Membros</span>
+            <span className="flex items-center gap-1.5 text-[13px] font-medium text-fg">
+              Membros
+              <HelpTip>Cada pessoa fica em um departamento: marcar aqui tira a pessoa do departamento atual.</HelpTip>
+            </span>
             <span className="tabular text-xs text-muted">{chosen.size} marcados</span>
           </div>
           <div className="relative">
@@ -151,7 +154,6 @@ export function DepartmentSheet({
             })}
             {list.length === 0 ? <li className="px-3 py-4 text-center text-sm text-muted">Ninguém com esse nome</li> : null}
           </ul>
-          <p className="text-xs text-muted">Cada pessoa fica em um departamento: marcar aqui tira a pessoa do departamento atual.</p>
         </div>
       </div>
     </Sheet>
@@ -236,7 +238,6 @@ export function TaskCategorySheet({
       open={open}
       onOpenChange={onOpenChange}
       title={category ? 'Editar categoria' : 'Nova categoria'}
-      description="Rótulos para filtrar e analisar as tarefas."
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

@@ -112,11 +112,6 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
     <div className="flex flex-col gap-5">
       <PageHeader
         title={labels.title}
-        description={
-          isExpense
-            ? 'Controle vencimentos, parcelas e despesas fixas. Marque 👍 quando pagar.'
-            : 'Acompanhe recebimentos previstos, parcelas e receitas fixas. Marque 👍 quando receber.'
-        }
         actions={
           <>
             {extraActions}

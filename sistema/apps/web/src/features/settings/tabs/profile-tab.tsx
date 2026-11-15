@@ -43,7 +43,7 @@ export function ProfileTab() {
     <TabGrid>
       <Cell>
         <Card className="p-6">
-          <CardHeader title="Perfil" subtitle="Como você aparece para os membros dos seus espaços" />
+          <CardHeader title="Perfil" />
           <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-4" noValidate>
             <div className="flex flex-wrap items-center gap-4">
               <MemberAvatar size="xl" name={user?.name} userId={user?.id} photoVersion={user?.photoUpdatedAt ?? null} />
@@ -72,7 +72,7 @@ export function ProfileTab() {
 
       <Cell>
         <Card className="p-6">
-          <CardHeader title="Aparência" subtitle="Escolha o tema da interface" />
+          <CardHeader title="Aparência" />
           <SegmentedControl
             className="mt-5"
             ariaLabel="Tema"
@@ -90,7 +90,7 @@ export function ProfileTab() {
       {canAccessFinance ? (
         <Cell>
           <Card className="p-6">
-            <CardHeader title="Painel financeiro" subtitle="Cards exibidos, tamanhos e cards ocultos pelo botão de olho" />
+            <CardHeader title="Painel financeiro" info="Cards exibidos, tamanhos e cards ocultos pelo botão de olho." />
             <Button className="mt-5" variant="outline" asChild>
               <Link to="/financeiro?personalizar=1">
                 <SlidersHorizontal /> Personalizar painel

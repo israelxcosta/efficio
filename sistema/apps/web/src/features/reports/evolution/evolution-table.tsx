@@ -23,8 +23,7 @@ export function EvolutionTableView({ rows, active, onPick, className }: { rows: 
       <div className="p-4 sm:p-5">
         <CardHeader
           title="Mês a mês"
-          subtitle="Mais recente primeiro · cada linha comparada ao mês anterior · clique em Novos ou Encerrados para ver os nomes"
-          info="Ativos, novos e encerrados pela data de início do contrato e pela data de inativação; honorário mensal pela vigência do último dia do mês (ou de hoje, no mês corrente). Faturado pelo vencimento; recebido pela data do pagamento, com juros e multa."
+          info="Mais recente primeiro, cada linha comparada ao mês anterior; clique em Novos ou Encerrados para ver os nomes. Ativos, novos e encerrados pela data de início do contrato e pela data de inativação; honorário mensal pela vigência do último dia do mês (ou de hoje, no mês corrente). Faturado pelo vencimento; recebido pela data do pagamento, com juros e multa."
         />
       </div>
 

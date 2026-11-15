@@ -438,7 +438,6 @@ function TasksSection({ client: c }: { client: Client }) {
       <Card className="flex flex-col gap-3 p-5 sm:p-6">
         <CardHeader
           title={`Obrigações de ${competenceName(month).split(' ')[0]}`}
-          subtitle="Recorrentes deste cliente com prazo no mês"
           action={
             <Button variant="ghost" size="sm" asChild>
               <Link to={`/tarefas/auditoria?busca=${encodeURIComponent(name)}`}>

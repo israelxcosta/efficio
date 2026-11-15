@@ -72,11 +72,9 @@ export default function SettingsPage() {
         description={
           workspace ? (
             <>
-              Conta, segurança e o espaço <span className="font-semibold text-fg">{workspace.name}</span> ({WORKSPACE_KIND_LABELS[workspace.kind]}).
+              Espaço <span className="font-semibold text-fg">{workspace.name}</span> ({WORKSPACE_KIND_LABELS[workspace.kind]})
             </>
-          ) : (
-            BILLING_ENABLED ? 'Conta, segurança e assinatura.' : 'Conta e segurança.'
-          )
+          ) : undefined
         }
       />
       <div ref={tabsRef} className="-mx-1 overflow-x-auto px-1 pb-1">

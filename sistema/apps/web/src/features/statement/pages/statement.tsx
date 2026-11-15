@@ -60,7 +60,6 @@ export default function StatementPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Extrato"
-        description="Selecione a conta e o período para ver entradas, saídas e o saldo dia a dia."
         actions={
           <WriteGate>
             <Button variant="outline" onClick={() => openImport({ target: accountId ? { kind: 'account', accountId } : undefined })}>

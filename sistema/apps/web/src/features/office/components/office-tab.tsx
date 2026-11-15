@@ -161,7 +161,7 @@ function OfficeForm({ office }: { office: Office }) {
 
   return (
     <Card className="p-6">
-      <CardHeader title="Dados do escritório" subtitle="Aparecem no contrato, nos relatórios em PDF e na mensagem de cobrança." icon={<Stamp />} />
+      <CardHeader title="Dados do escritório" info="Aparecem no contrato, nos relatórios em PDF e na mensagem de cobrança." icon={<Stamp />} />
       <form
         className="mt-5 flex flex-col gap-6"
         noValidate
@@ -362,7 +362,7 @@ function LogoCard({ office }: { office: Office | undefined }) {
 
   return (
     <Card className="p-6">
-      <CardHeader title="Logo" subtitle="PNG, JPG ou WebP de até 500 KB. Aparece no contrato e nos PDFs." icon={<ImageUp />} />
+      <CardHeader title="Logo" info="PNG, JPG ou WebP de até 500 KB. Aparece no contrato e nos PDFs; não substitui a marca Efficio no menu." icon={<ImageUp />} />
       <div className="mt-5 flex flex-wrap items-center gap-4">
         <div className="flex h-16 w-40 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted">
           {!office ? (
@@ -405,7 +405,6 @@ function LogoCard({ office }: { office: Office | undefined }) {
           {error}
         </p>
       ) : null}
-      <p className="mt-3 text-caption text-muted">A logo não substitui a marca Efficio no menu.</p>
     </Card>
   );
 }
@@ -424,7 +423,7 @@ function ContractTemplateCard({ office }: { office: Office | undefined }) {
   const missing = office?.missingForContract ?? [];
   return (
     <Card className="flex flex-col p-6">
-      <CardHeader title="Modelo de contrato" subtitle="Um modelo para todos os clientes. O sistema preenche os dados do cliente, do escritório e do honorário." icon={<FileSignature />} />
+      <CardHeader title="Modelo de contrato" info="Um modelo para todos os clientes. O sistema preenche os dados do cliente, do escritório e do honorário." icon={<FileSignature />} />
       <div className="mt-5 flex flex-1 flex-col gap-1.5 text-body-sm">
         {c ? (
           <>

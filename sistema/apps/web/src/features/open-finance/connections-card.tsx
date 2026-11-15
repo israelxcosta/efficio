@@ -54,7 +54,7 @@ export function BankConnectionsCard() {
     <Card className="p-6">
       <CardHeader
         title="Bancos conectados"
-        subtitle="Open Finance Brasil: lançamentos e faturas chegam sozinhos, somente leitura."
+        info="Open Finance Brasil: lançamentos e faturas chegam sozinhos, somente leitura."
         action={
           <WriteGate>
             <Button size="sm" onClick={() => flow.connect()} loading={flow.busy}>

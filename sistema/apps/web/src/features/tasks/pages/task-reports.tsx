@@ -203,10 +203,10 @@ export default function TaskReportsPage() {
                 <Skeleton className="h-64 w-full" />
               )}
             </Block>
-            <Block className="lg:col-span-4" title="Por situação" subtitle="Atrasadas contam à parte de Em aberto">
+            <Block className="lg:col-span-4" title="Por situação" info="Atrasadas contam à parte de Em aberto.">
               {r ? <StatusBar100 r={r} /> : <SkeletonRows rows={4} />}
             </Block>
-            <PunctualityBlock className="lg:col-span-6" title="Por departamento" subtitle="Onde o atraso se concentra" rows={r?.byDepartment} active={f.department} onPick={(key) => update({ department: key ?? '' })} mutedNull="Sem departamento" />
+            <PunctualityBlock className="lg:col-span-6" title="Por departamento" rows={r?.byDepartment} active={f.department} onPick={(key) => update({ department: key ?? '' })} mutedNull="Sem departamento" />
             <AssigneeBlock className="lg:col-span-6" r={r} active={f.assignee} onPick={(key) => update({ assignee: key ?? 'none' })} />
             <PunctualityBlock className="lg:col-span-6" title="Por cliente" rows={r?.byClient} max={8} active={f.client} onPick={(key) => update({ client: key ?? 'internal' })} mutedNull="Interna" />
             <PunctualityBlock
@@ -386,7 +386,6 @@ function ReportFiltersBar({ f, options, onChange }: { f: ReportFilters; options:
         open={sheet}
         onOpenChange={setSheet}
         title="Filtros"
-        description="Refine o relatório de tarefas."
         footer={
           <>
             <Button variant="ghost" onClick={clear}>
@@ -491,10 +490,10 @@ function SummaryButton({ className, pressed, label, aria, onClick, children }: {
   );
 }
 
-function Block({ title, subtitle, action, className, children }: { title: string; subtitle?: string; action?: ReactNode; className?: string; children: ReactNode }) {
+function Block({ title, subtitle, info, action, className, children }: { title: string; subtitle?: string; info?: string; action?: ReactNode; className?: string; children: ReactNode }) {
   return (
     <Card className={cn('flex min-w-0 flex-col p-5 print:break-inside-avoid', className)}>
-      <CardHeader title={title} subtitle={subtitle} action={action} />
+      <CardHeader title={title} subtitle={subtitle} info={info} action={action} />
       <div className="mt-3 flex min-h-0 flex-1 flex-col">{children}</div>
     </Card>
   );
@@ -727,7 +726,7 @@ function AssigneeBlock({ r, active, onPick, className }: { r: TaskReportResponse
     <Block
       className={className}
       title="Por responsável"
-      subtitle={mode === 'concluder' ? 'Conclusões no período por quem clicou, com a média de dias da criação à conclusão' : undefined}
+      info={mode === 'concluder' ? 'Conclusões no período por quem clicou, com a média de dias da criação à conclusão.' : undefined}
       action={
         <span className="flex flex-wrap justify-end gap-1.5 print:hidden">
           <SegmentedControl<'assignee' | 'concluder'>

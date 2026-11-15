@@ -125,7 +125,6 @@ export function TransferSheet({ state, onOpenChange }: { state: TransferSheetSta
       open={state.open}
       onOpenChange={onOpenChange}
       title={isEdit ? 'Editar movimentação' : 'Movimentar dinheiro'}
-      description="Transferências entre contas, aplicações e resgates"
       headerExtra={
         <Controller
           control={control}

@@ -1240,7 +1240,6 @@ function NewTaskSheet({
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title={duplicateId ? 'Duplicar tarefa' : 'Nova tarefa'}
-      description="Atribua um responsável e um prazo."
       width="lg"
       footer={
         <>

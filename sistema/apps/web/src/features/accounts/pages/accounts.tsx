@@ -65,7 +65,6 @@ export default function AccountsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Contas e carteiras"
-        description="Contas bancárias, carteiras, vale-benefício e investimentos."
         actions={
           <>
             <label className="mr-2 flex cursor-pointer items-center gap-2 text-[13px] font-medium text-muted">
@@ -89,9 +88,9 @@ export default function AccountsPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MiniStat label="Saldo em contas" value={formatBRL(inTotal)} tone={inTotal < 0 ? 'danger' : undefined} />
-        <MiniStat label="Investimentos" value={formatBRL(invested)} tone="brand" hint="Somados à parte" />
+        <MiniStat label="Investimentos" value={formatBRL(invested)} tone="brand" info="Somados à parte do saldo em contas." />
         <MiniStat label="Patrimônio" value={formatBRL(inTotal + invested)} />
-        <MiniStat label="Previsto fim do mês" value={formatBRL(projected)} hint="Contas + pendentes do mês" />
+        <MiniStat label="Previsto fim do mês" value={formatBRL(projected)} info="Saldo das contas mais os lançamentos pendentes do mês." />
       </div>
 
       {accounts.isPending ? (

@@ -19,6 +19,7 @@ import {
   type ContractTemplateInput,
   type ContractTemplateResponse,
 } from '@effinance/shared';
+import { HelpTip } from '@/components/ui/help-tip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -259,7 +260,7 @@ function EditorBody({ template, sample }: { template: ContractTemplateResponse; 
           }
           aria-label="Inserir campo"
         />
-        <p className="text-caption text-muted">Os campos entre colchetes são trocados pelos dados de cada cliente ao gerar o contrato.</p>
+        <HelpTip label="Sobre os campos">Os campos entre colchetes são trocados pelos dados de cada cliente ao gerar o contrato.</HelpTip>
       </div>
 
       {unknown.length ? (
@@ -315,11 +316,15 @@ function EditorBody({ template, sample }: { template: ContractTemplateResponse; 
             <img src={watermark.image} alt="Marca d'água" className={cn('size-full object-contain', !watermark.enabled && 'opacity-35')} />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <label className="flex items-center justify-between gap-3 text-sm font-medium text-fg" htmlFor="watermark-enabled">
-              Usar marca d'água
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5">
+                <label className="text-sm font-medium text-fg" htmlFor="watermark-enabled">
+                  Usar marca d'água
+                </label>
+                <HelpTip>Aparece atrás do texto em todas as páginas. PNG, JPG ou WebP até 500 KB.</HelpTip>
+              </span>
               <Switch id="watermark-enabled" checked={watermark.enabled} onCheckedChange={(v) => setWatermark((w) => ({ ...w, enabled: v }))} />
-            </label>
-            <p className="text-caption text-muted">Aparece atrás do texto em todas as páginas. PNG, JPG ou WebP até 500 KB.</p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => void changeWatermark()}>
                 Trocar imagem

@@ -45,7 +45,6 @@ export default function CardsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Cartões de crédito"
-        description="Limites, faturas e compras parceladas em um só lugar."
         actions={
           <WriteGate>
             <Button onClick={() => setSheet({ open: true, card: null })}>

@@ -50,7 +50,6 @@ export default function TransfersPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Transferências e investimentos"
-        description="Mova dinheiro entre contas, aplique em investimentos e acompanhe o saldo investido à parte."
         actions={
           <>
             <WriteGate>
@@ -75,7 +74,7 @@ export default function TransfersPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <MiniStat label="Total investido" value={accounts.isPending ? '—' : formatBRL(invested)} tone="brand" hint="Somado à parte do saldo em contas" />
+            <MiniStat label="Total investido" value={accounts.isPending ? '—' : formatBRL(invested)} tone="brand" info="Somado à parte do saldo em contas." />
             <MiniStat label="Aplicado no período" value={formatBRL(applied)} tone="success" />
             <MiniStat label="Resgatado no período" value={formatBRL(redeemed)} tone="warning" />
             <MiniStat label="Transferido" value={formatBRL(moved)} />
@@ -129,7 +128,7 @@ export default function TransfersPage() {
         </div>
 
         <Card className="h-fit p-5">
-          <CardHeader title="Investimentos" subtitle="Saldo por conta de investimento" icon={<PiggyBank />} />
+          <CardHeader title="Investimentos" icon={<PiggyBank />} />
           <div className="mt-4 rounded-xl bg-gradient-to-br from-hero-from to-hero-to p-5 text-white">
             <p className="eyebrow text-white/70">Patrimônio investido</p>
             <p className="tabular mt-2 text-[28px] font-semibold tracking-tight">{formatBRL(invested)}</p>

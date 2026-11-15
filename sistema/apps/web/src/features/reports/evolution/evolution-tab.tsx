@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { useEvolutionReport } from '../api';
 import { useReportMonths } from '../components/report-months';
 import { EvolutionBridgeView } from './evolution-bridge';
-import { MoneyChart, PortfolioChart, REACTIVATION_NOTE } from './evolution-charts';
+import { MoneyChart, PortfolioChart } from './evolution-charts';
 import { evolutionKpis, evolutionRows, type EvolutionKpi } from './evolution-logic';
 import { EvolutionTableView } from './evolution-table';
 
@@ -145,7 +145,7 @@ export function EvolutionTab() {
       </div>
       <MoneyChart months={list} active={ref} onPick={setRef} />
       <EvolutionTableView rows={rows} active={ref} onPick={setRef} />
-      <p className="text-caption text-subtle">{`${REACTIVATION_NOTE} Dados de ${formatDateBR(report.data.today)}.`}</p>
+      <p className="text-caption text-subtle">{`Dados de ${formatDateBR(report.data.today)}.`}</p>
     </div>
   );
 }

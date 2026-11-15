@@ -305,7 +305,7 @@ export function EvolutionWidget({ month, size, prefs, setPref, alert }: WidgetPr
   }
 
   return (
-    <WidgetCard alert={alert} subtitle="Total por mês, com linha de tendência" action={action}>
+    <WidgetCard alert={alert} action={action}>
       {content}
     </WidgetCard>
   );

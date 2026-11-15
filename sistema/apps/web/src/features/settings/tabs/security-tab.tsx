@@ -76,7 +76,7 @@ function ChangePasswordCard() {
 
   return (
     <Card className="p-6">
-      <CardHeader title="Senha" subtitle="Ao trocar a senha, as sessões em outros dispositivos são encerradas." icon={<KeyRound />} />
+      <CardHeader title="Senha" info="Ao trocar a senha, as sessões em outros dispositivos são encerradas." icon={<KeyRound />} />
       <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-4" noValidate>
         <Field label="Senha atual" error={form.formState.errors.currentPassword?.message} className="sm:max-w-[calc(50%-6px)]">
           <PasswordInput show={show} onToggle={() => setShow((s) => !s)} autoComplete="current-password" {...form.register('currentPassword')} />
@@ -110,7 +110,7 @@ function TwoFactorCard() {
     <Card className="p-6">
       <CardHeader
         title="Verificação em duas etapas"
-        subtitle="Além da senha, pede um código do aplicativo autenticador (Google Authenticator, Microsoft Authenticator, 1Password…)."
+        info="Além da senha, pede um código do aplicativo autenticador (Google Authenticator, Microsoft Authenticator, 1Password…)."
         action={enabled ? <Badge tone="success" size="md"><ShieldCheck /> Ativa</Badge> : <Badge tone="neutral" size="md">Desativada</Badge>}
       />
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface-muted px-4 py-3">
@@ -432,7 +432,7 @@ function SessionsCard() {
     <Card className="p-6">
       <CardHeader
         title="Sessões ativas"
-        subtitle="Dispositivos conectados à sua conta. Encerre os que você não reconhece."
+        info="Dispositivos conectados à sua conta. Encerre os que você não reconhece."
         action={
           others.length > 0 ? (
             <Button variant="outline" size="sm" onClick={() => setTarget('others')}>
@@ -503,7 +503,6 @@ function LogoutCard() {
     <Card className="flex flex-wrap items-center justify-between gap-4 p-6">
       <div>
         <h2 className="text-[15px] font-semibold">Sair da conta</h2>
-        <p className="text-xs text-muted">Encerra a sessão neste dispositivo.</p>
       </div>
       <Button
         variant="danger-soft"

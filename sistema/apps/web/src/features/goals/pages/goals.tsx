@@ -47,7 +47,6 @@ export default function GoalsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Metas"
-        description="Trace seu caminho: defina objetivos, guarde dinheiro e acompanhe o progresso."
         actions={<WriteGate><Button onClick={() => setSheet({ open: true, goal: null })}><Plus /> Nova meta</Button></WriteGate>}
       />
 
@@ -55,7 +54,7 @@ export default function GoalsPage() {
         <MiniStat label="Já conquistado" value={formatBRL(saved)} tone="success" />
         <MiniStat label="Objetivo total" value={formatBRL(target)} />
         <MiniStat label="Progresso geral" value={formatPercent(target ? saved / target : 0, 0)} tone="brand" />
-        <MiniStat label="Guardar por mês" value={formatBRL(monthly)} hint="Para cumprir os prazos" />
+        <MiniStat label="Guardar por mês" value={formatBRL(monthly)} />
       </div>
 
       {goals.isPending ? (

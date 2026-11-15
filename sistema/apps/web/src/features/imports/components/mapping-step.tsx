@@ -58,7 +58,7 @@ export function MappingStep({ content, mapping, onChange, apiColumns, live }: Ma
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-muted">Diga o que cada coluna representa. A prévia ao lado é atualizada na hora.</p>
+        <p className="text-sm text-muted">Diga o que cada coluna representa.</p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Separador">
             <Select value={mapping.delimiter} onChange={(e) => set({ delimiter: e.target.value as CsvMapping['delimiter'] })}>

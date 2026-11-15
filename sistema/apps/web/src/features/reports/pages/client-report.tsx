@@ -334,7 +334,7 @@ function Kpis({ analysis: a }: { analysis: ClientAnalysis }) {
         value={formatBRL(a.billed)}
         hint={a.firstDue ? `${pluralize(a.count, 'cobrança', 'cobranças')} desde ${formatMonthKey(monthKey(a.firstDue), 'short')}` : 'nenhuma cobrança'}
       />
-      <MiniStat label="Recebido" value={formatBRL(a.received)} hint={`${pluralize(a.paidCount, 'pagamento', 'pagamentos')}, com juros e descontos`} />
+      <MiniStat label="Recebido" value={formatBRL(a.received)} hint={pluralize(a.paidCount, 'pagamento', 'pagamentos')} info="Com juros e descontos." />
       <MiniStat
         label="Em aberto"
         value={formatBRL(a.open)}
@@ -389,8 +389,8 @@ function BilledChart({ analysis: a, className }: { analysis: ClientAnalysis; cla
     <Card className={cn('flex min-w-0 flex-col p-5 print:break-inside-avoid', className)}>
       <CardHeader
         title="Faturado e recebido por mês"
-        subtitle={`Pelo mês de vencimento${a.months.length > CHART_MONTHS ? ` · últimos ${CHART_MONTHS} meses` : ''}`}
-        info="Recebido inclui juros e multa e já desconta o desconto por pontualidade. O que segue em aberto aparece hachurado sobre o recebido: vencido em vermelho, a vencer em cinza."
+        subtitle={a.months.length > CHART_MONTHS ? `Últimos ${CHART_MONTHS} meses` : undefined}
+        info="Pelo mês de vencimento. Recebido inclui juros e multa e já desconta o desconto por pontualidade. O que segue em aberto aparece hachurado sobre o recebido: vencido em vermelho, a vencer em cinza."
       />
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
         <LegendDot size="sm" color={CHART_COLORS.expense} label="Faturado" />
@@ -477,7 +477,7 @@ function FeePeriodsCard({ fees, failed, className }: { fees: ClientFeesResponse 
   const items = fees?.items ?? [];
   return (
     <Card className={cn('flex flex-col p-5 print:break-inside-avoid', className)}>
-      <CardHeader title="Vigências do honorário" subtitle="Anuais, a partir do início do contrato" />
+      <CardHeader title="Vigências do honorário" info="Anuais, a partir do início do contrato." />
       {failed ? (
         <p className="mt-4 text-body-sm text-muted">Não foi possível carregar as vigências agora.</p>
       ) : !fees ? (

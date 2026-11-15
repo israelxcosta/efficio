@@ -65,7 +65,7 @@ export default function ReportsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Relatórios"
-        description={DESCRIPTIONS[tab]}
+        info={DESCRIPTIONS[tab]}
         actions={
           tab === 'inadimplencia' ? (
             <ReportMonthsControl ariaLabel="Período do relatório de inadimplência" />

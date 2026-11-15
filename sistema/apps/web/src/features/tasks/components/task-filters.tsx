@@ -255,7 +255,6 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         title="Filtros"
-        description="Refine a lista de tarefas."
         footer={
           <>
             <Button

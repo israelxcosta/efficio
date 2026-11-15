@@ -44,7 +44,6 @@ export default function CategoriesPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Categorias"
-        description="Classifique receitas e despesas com ícones, cores e subcategorias."
         actions={
           <>
             <label className="mr-2 flex cursor-pointer items-center gap-2 text-[13px] font-medium text-muted">

@@ -97,7 +97,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
         <MiniStat label={`Total ${type === 'expense' ? 'de despesas' : 'de receitas'}`} value={r ? formatBRL(r.total) : '—'} />
         <MiniStat label="Média por período" value={r && periodsWithData ? formatBRL(Math.round(r.total / periodsWithData)) : '—'} />
         <MiniStat label="Maior categoria" value={r && r.series[0] ? [...r.series].sort((a, b) => b.total - a.total)[0]!.name : '—'} />
-        <MiniStat label="Períodos projetados" value={String(projected.length)} hint="Gerados por fixas, recorrentes e parcelas" />
+        <MiniStat label="Períodos projetados" value={String(projected.length)} info="Gerados por fixas, recorrentes e parcelas" />
       </div>
 
       {report.isError ? (
@@ -106,7 +106,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
         <Card className="p-5">
           <CardHeader
             title={drill ? `Evolução — ${drill.name}` : 'Evolução por categoria'}
-            subtitle="Barras empilhadas por período · linha = total · área sombreada = projeção"
+            info="Barras empilhadas por período · linha = total · área sombreada = projeção."
             icon={<Layers />}
           />
           <div className="mt-4 h-80">

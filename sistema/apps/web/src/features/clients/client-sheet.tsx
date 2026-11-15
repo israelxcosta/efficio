@@ -33,6 +33,7 @@ import {
   type CnpjLookupResult,
   type TaxRegime,
 } from '@effinance/shared';
+import { HelpTip } from '@/components/ui/help-tip';
 import { Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Label, Textarea } from '@/components/ui/input';
@@ -296,7 +297,10 @@ export function ClientSheet({
           <Building2 className="size-3.5" /> Dados da empresa
         </p>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="client-document">CNPJ</Label>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="client-document">CNPJ</Label>
+            <HelpTip>Digite o CNPJ e importe os dados básicos da Receita Federal.</HelpTip>
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             {masked('document', formatCNPJ, {
               id: 'client-document',
@@ -321,7 +325,7 @@ export function ClientSheet({
               {e.document.message}
             </p>
           ) : (
-            <p id="client-document-help" className="text-xs text-muted">
+            <p id="client-document-help" className="sr-only">
               Digite o CNPJ e importe os dados básicos da Receita Federal
             </p>
           )}

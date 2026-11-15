@@ -9,6 +9,7 @@ import {
   type TaskOptionsResponse,
   type TaskPriority,
 } from '@effinance/shared';
+import { HelpTip } from '@/components/ui/help-tip';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Modal } from '@/components/ui/dialog';
@@ -390,10 +391,10 @@ export function FlowTemplateSheet({ open, onOpenChange, template, duplicate, opt
             <Textarea disabled={readOnly} rows={2} maxLength={5000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Para que serve este roteiro" />
           </Field>
           <div className="flex flex-col gap-2">
-            <h3 className="text-body-sm font-semibold text-fg">Etapas</h3>
-            <p className="text-xs text-muted">
-              O prazo de cada etapa conta em dias corridos a partir da conclusão da anterior. Na primeira, conta do dia em que o modelo for aplicado. Use 0 para vencer no mesmo dia.
-            </p>
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-body-sm font-semibold text-fg">Etapas</h3>
+              <HelpTip>O prazo de cada etapa conta em dias corridos a partir da conclusão da anterior. Na primeira, conta do dia em que o modelo for aplicado. Use 0 para vencer no mesmo dia.</HelpTip>
+            </div>
             {errors.steps ? (
               <p role="alert" className="text-xs font-medium text-danger">
                 {errors.steps}

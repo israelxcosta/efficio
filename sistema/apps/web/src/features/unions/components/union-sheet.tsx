@@ -20,6 +20,7 @@ import {
   type TaxRegime,
   type UnionDetail,
 } from '@effinance/shared';
+import { HelpTip } from '@/components/ui/help-tip';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -156,7 +157,6 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title={title}
-      description="Dados da entidade, data-base e os clientes cujos empregados seguem esta convenção."
       width="lg"
       footer={
         readOnly ? (
@@ -199,7 +199,10 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
             <legend className="sr-only">Identificação</legend>
             <h3 aria-hidden className={groupTitle}>Identificação</h3>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="union-document">CNPJ*</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="union-document">CNPJ*</Label>
+                {!readOnly ? <HelpTip>Importa nome, endereço, telefone e e-mail da Receita Federal.</HelpTip> : null}
+              </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 {masked('document', formatCNPJ, {
                   id: 'union-document',
@@ -220,7 +223,7 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
                   {e.document.message}
                 </p>
               ) : !readOnly ? (
-                <p id="union-document-help" className="text-xs text-muted">
+                <p id="union-document-help" className="sr-only">
                   Importa nome, endereço, telefone e e-mail da Receita Federal.
                 </p>
               ) : null}
@@ -279,7 +282,10 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
           </fieldset>
 
           <section className="flex flex-col gap-3">
-            <h3 className={groupTitle}>Clientes vinculados</h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className={groupTitle}>Clientes vinculados</h3>
+              <HelpTip>Clientes cujos empregados seguem esta convenção. O alerta mostra quantos clientes cada convenção afeta, e a ficha do cliente mostra os sindicatos dele.</HelpTip>
+            </div>
             <Controller
               control={control}
               name="clientIds"
@@ -287,9 +293,6 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
                 <UnionClientsPicker value={field.value ?? []} onChange={field.onChange} options={options.data} disabled={readOnly} linked={union?.clients ?? []} />
               )}
             />
-            <p className="text-caption text-muted">
-              Clientes cujos empregados seguem esta convenção. O alerta mostra quantos clientes cada convenção afeta, e a ficha do cliente mostra os sindicatos dele.
-            </p>
           </section>
 
           <fieldset className="flex flex-col gap-3" disabled={readOnly}>
@@ -380,8 +383,10 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
               render={({ field }) => (
                 <div className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
                   <div>
-                    <Label htmlFor="union-active">Sindicato ativo</Label>
-                    <p className="text-caption text-muted">Inativo sai dos alertas e da lista padrão; o histórico fica.</p>
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="union-active">Sindicato ativo</Label>
+                      <HelpTip>Inativo sai dos alertas e da lista padrão; o histórico fica.</HelpTip>
+                    </div>
                   </div>
                   <Switch id="union-active" checked={field.value !== false} onCheckedChange={field.onChange} disabled={readOnly} />
                 </div>

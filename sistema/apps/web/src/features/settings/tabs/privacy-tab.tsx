@@ -99,7 +99,7 @@ function ExportCard() {
     <Card className="p-6">
       <CardHeader
         title="Exportar dados"
-        subtitle="Baixe uma cópia completa dos dados deste espaço em JSON (portabilidade, LGPD art. 18)."
+        info="Baixe uma cópia completa dos dados deste espaço em JSON (portabilidade, LGPD art. 18)."
         icon={<Download />}
       />
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface-muted px-4 py-3">
@@ -123,7 +123,7 @@ function AuditCard() {
 
   return (
     <Card className="p-6">
-      <CardHeader title="Registro de auditoria" subtitle={BILLING_ENABLED ? 'Ações sensíveis neste espaço: acessos, membros, assinatura e exportações.' : 'Ações sensíveis neste espaço: acessos, membros e exportações.'} icon={<History />} />
+      <CardHeader title="Registro de auditoria" info={BILLING_ENABLED ? 'Ações sensíveis neste espaço: acessos, membros, assinatura e exportações.' : 'Ações sensíveis neste espaço: acessos, membros e exportações.'} icon={<History />} />
       <div className="mt-4">
         {audit.isPending ? (
           <SkeletonRows rows={3} />
