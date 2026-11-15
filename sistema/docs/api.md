@@ -596,6 +596,8 @@ Uma instância da API com PostgreSQL e Caddy na mesma máquina (kit em `deploy/`
 | POST | `/api/invites/:token/accept` | — | `MeResponse` (e-mail do convite = e-mail logado) |
 | GET | `/api/workspaces/current/export` | — | JSON com todos os dados decifrados (owner, LGPD) — inclui, na fase 3, os acessos dos clientes decifrados e a foto de quem exporta |
 | GET | `/api/workspaces/current/audit` | `auditQuerySchema` | `Paginated<AuditLogEntry>` (owner) |
+| GET | `/api/workspaces/current/audit/retention` | — | `AuditRetentionResponse` (permissão `members`): o que a limpeza apaga nos próximos 30 dias e quando |
+| GET | `/api/workspaces/current/audit/export` | `auditExportQuerySchema` (`from`, `to` opcionais) | CSV do período (permissão `members`; auditado como `audit.exported`) |
 | GET | `/api/billing/plans` | — | `Plan[]` |
 | GET | `/api/billing/subscription` | — | `Subscription` |
 | POST | `/api/billing/checkout` | `checkoutSchema` | `CheckoutResponse` (owner) — `404` com a cobrança desativada |
@@ -1973,6 +1975,49 @@ Revisão de segurança das fases 2 e 3, reexecutável e compatível com o PGlite
   SECURITY DEFINER, `search_path` fixo, EXECUTE só para `effinance_app`): bloco objeto só com
   `type`/`text`/`rule`, tipo e regra dos catálogos, até 20.000 caracteres por bloco e 400.000 no total.
 - Teste: `test/phase23-db-review.test.ts`.
+
+## Correções do QA (14/11/2026, migração 0022)
+
+- **Vencimento em dia não útil** (QA #2): `feeDueDate` (honorários gerados) passa o vencimento que cai em
+  sábado, domingo ou feriado nacional para o **próximo dia útil** (`adjustToBusinessDay(…, 'postpone')`,
+  o mesmo calendário das tarefas). Para o que já estava lançado com vencimento em dia não útil,
+  `effectiveDueDate(dueDate)` (shared, `utils/late-fees.ts`) dá o último dia sem encargos:
+  `earnsDiscount`, `daysLate` e `suggestLateFees` consideram em dia quem paga até ele (passado esse dia,
+  o atraso conta do vencimento nominal). O relatório de inadimplência e o score usam a mesma regra
+  (um aberto só entra como vencido depois do dia útil seguinte).
+- **Grupo por regime no meio do mês** (QA #4): `POST /tasks/regime-groups/:regime/apply` aceita
+  `fromMonth: 'current' | 'next'` (padrão `current`); com `next` as recorrentes criadas começam na
+  competência seguinte. `GET /tasks/regime-groups` devolve, por item, `currentOverdue` (ocorrências por
+  cliente da competência corrente com prazo legal anterior a hoje) e, por grupo, `currentMonthOverdue`
+  (soma sobre os itens `missing` × `clientCount`: quantas nasceriam vencidas aplicando a partir do mês
+  corrente). A resposta do apply traz `fromMonth`, `startCompetence` e `overdueCreated`. Um item
+  `regimeAdded` (recorrente que já existe para outro regime) já roda no mês corrente: `fromMonth` não o
+  adia e suas ocorrências vencidas entram em `overdueCreated`.
+- **Busca global** (QA #5): cliente pelo **CNPJ completo** (com ou sem pontuação) e pelo **nome completo
+  do responsável** (qualquer caixa/acentos). Os dois campos são cifrados: a comparação é por igualdade
+  no índice cego (`document_hash`, `responsible_name_hash` — migração 0022, preenchido pelo backfill);
+  **parte** do CNPJ ou do nome do responsável não encontra.
+- **Auditoria mensal** (QA #6): `summary.byDepartment[].total` não conta as canceladas (mesma base do
+  topo: `total − canceled`).
+- **Retenção de `audit_logs`**: os registros (com IP e navegador) ficam `AUDIT_LOG_RETENTION_MONTHS`
+  (padrão **24**, mínimo 6) e são apagados por `purgeExpiredAuditLogs` (`db/retention.ts`), chamado pela
+  limpeza diária (`JOBS_ENABLED`) e pelo `db:migrate`. O login da API mantém a trilha só de inserção
+  (sem `DELETE` em `audit_logs`): nesse caso a limpeza diária registra `auditLogs: 'skipped_no_privilege'`
+  (aviso no log) e os registros saem no próximo `db:migrate`, que roda como dono.
+  - Aviso no sistema: `GET /workspaces/current/audit/retention` → `AuditRetentionResponse`
+    `{ retentionMonths, cutoff, pending: { count, from, to, purgeDate } | null }`; `pending` = registros
+    que serão apagados nos próximos 30 dias (`AUDIT_RETENTION_NOTICE_DAYS`), datas em America/Sao_Paulo.
+  - Aviso por e-mail (tarefa diária, `notifyAuditRetention`): uma vez por espaço e mês dos registros que
+    estão para sair, a quem tem a permissão `members`; o marcador idempotente é um registro
+    `audit.retention_notified` (`entity_id` = `YYYY-MM`), gravado só depois que o envio deu certo.
+  - Download: `GET /workspaces/current/audit/export?from=YYYY-MM-DD&to=YYYY-MM-DD` — CSV UTF-8 com BOM,
+    separador `;`, CRLF, colunas `Data e hora;Usuário;Ação;Entidade;ID da entidade;IP;Navegador;Detalhes`
+    (células que começam com `= + - @` ganham apóstrofo). Sem `from`/`to`: o período de `pending`
+    (422 se não há nada para sair). Só do espaço ativo; 5 por minuto; grava `audit.exported`
+    (`metadata: { from, to, count }`).
+- Testes: `test/qa-search-audit-retention.test.ts`, `test/tasks-regime-groups.test.ts`,
+  `test/fee-charges.test.ts`, `test/delinquency.test.ts`, `test/tasks-audit.test.ts` e
+  `packages/shared/test/utils.test.ts`.
 
 ## Lacunas
 

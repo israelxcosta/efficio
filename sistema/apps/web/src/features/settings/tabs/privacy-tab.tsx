@@ -20,10 +20,11 @@ import { usePermissions } from '@/features/auth/permissions';
 import { PasswordInput } from '@/features/auth/pages/login';
 import { useSwitchWorkspace } from '@/features/workspaces/workspace-switcher';
 import { exportWorkspaceData, useAuditLog, useDeleteWorkspace } from '@/features/workspaces/api';
+import { AuditRetentionCard } from './audit-retention-card';
 import { Cell, TabGrid } from './layout';
 
 export function PrivacyTab() {
-  const { isOwner } = usePermissions();
+  const { isOwner, can } = usePermissions();
   const { workspace, workspaces } = useAuth();
   // The last company stays (the account needs one); it goes only with the account itself.
   const canDeleteWorkspace = isOwner && workspace?.kind !== 'personal' && workspaces.length > 1;
@@ -35,6 +36,11 @@ export function PrivacyTab() {
       {isOwner ? (
         <Cell wide>
           <AuditCard />
+        </Cell>
+      ) : null}
+      {can('members') ? (
+        <Cell wide>
+          <AuditRetentionCard />
         </Cell>
       ) : null}
       {canDeleteWorkspace ? (

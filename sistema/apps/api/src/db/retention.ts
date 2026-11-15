@@ -22,7 +22,11 @@ export interface PurgeResult {
   passwordResets: number;
   invites: number;
   webhookEvents: number;
-  auditLogs: number;
+  /**
+   * Audit records removed. `skipped_no_privilege`: the login has no DELETE on `audit_logs` (the API
+   * login keeps the trail append-only) — then they go on the next `db:migrate`, which runs as the owner.
+   */
+  auditLogs: number | 'skipped_no_privilege';
 }
 
 export interface PurgeOptions {
@@ -65,7 +69,15 @@ export async function purgeExpiredSecurityRows(db: DbExecutor, now: Date = new D
     .delete(openFinanceEvents)
     .where(lt(openFinanceEvents.createdAt, new Date(now.getTime() - WEBHOOK_EVENT_RETENTION_DAYS * DAY_MS)))
     .returning({ id: openFinanceEvents.id });
-  const deletedAudit = await purgeExpiredAuditLogs(db, opts.auditLogRetentionMonths ?? AUDIT_LOG_RETENTION_MONTHS_DEFAULT, now);
+  // Last and on its own: the API login may delete the rows above and still not the audit trail.
+  let deletedAudit: PurgeResult['auditLogs'];
+  try {
+    deletedAudit = await purgeExpiredAuditLogs(db, opts.auditLogRetentionMonths ?? AUDIT_LOG_RETENTION_MONTHS_DEFAULT, now);
+  } catch (error) {
+    const e = error as { code?: unknown; cause?: { code?: unknown } } | null;
+    if ((e?.code ?? e?.cause?.code) !== '42501') throw error;
+    deletedAudit = 'skipped_no_privilege';
+  }
   return {
     auditLogs: deletedAudit,
     sessions: deletedSessions.length,

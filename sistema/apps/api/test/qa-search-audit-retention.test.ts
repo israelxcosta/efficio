@@ -139,7 +139,7 @@ describe('audit trail retention', () => {
     expect(today).toContain('audit.exported');
     expect((await ana.get('/workspaces/current/audit/export?from=2026-02-01&to=2026-01-01')).status).toBe(400);
     const eve = await registerUser(app, 'Eve Nova'); // nothing about to go
-    expect((await eve.get('/workspaces/current/audit/export')).status).toBe(400);
+    expect((await eve.get('/workspaces/current/audit/export')).status).toBe(422);
 
     // E-mail once per period to who holds `members` (the owner here), never to Carla.
     const mailer = new MemoryMailer();

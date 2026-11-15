@@ -65,7 +65,11 @@ function pgCode(error: unknown): string | undefined {
 
 async function runRetention(o: DailyJobsOptions, at: Date): Promise<DailyJobsResult['retention']> {
   try {
-    return await purgeExpiredSecurityRows(o.maintenanceDb ?? o.db, at, { auditLogRetentionMonths: o.auditLogRetentionMonths });
+    const result = await purgeExpiredSecurityRows(o.maintenanceDb ?? o.db, at, { auditLogRetentionMonths: o.auditLogRetentionMonths });
+    if (result.auditLogs === 'skipped_no_privilege') {
+      o.log.warn({ job: 'retention' }, 'audit trail clean-up skipped: the database login has no DELETE on audit_logs (it runs on migrate)');
+    }
+    return result;
   } catch (error) {
     if (pgCode(error) === INSUFFICIENT_PRIVILEGE) {
       o.log.warn({ job: 'retention' }, 'retention skipped: the database login has no DELETE on the security tables (it runs on migrate)');

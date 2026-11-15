@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Bell } from 'lucide-react';
+import { Bell, Download } from 'lucide-react';
 import {
   formatBRL,
   formatDateBR,
@@ -29,6 +29,9 @@ import type { Area } from './nav';
 import { useDeadlinesSummary } from '@/features/deadlines/api';
 import { bellDeadlines } from '@/features/deadlines/deadline-logic';
 import { useTaskActions } from '@/features/tasks/task-actions';
+import { useAuditRetention } from '@/features/workspaces/api';
+import { pendingNoticeText } from '@/features/settings/audit-retention';
+import { useAuditDownload } from '@/features/settings/use-audit-download';
 
 /**
  * Overdue bills (payables and receivables). Card purchases are settled through the invoice. Financial
@@ -63,12 +66,18 @@ export function useMyOverdueTasks() {
  * Text of the bell's accessible name: "Notificações (2 tarefas atrasadas, 3 contas vencidas, 1
  * documento vencido)". Phase 3 adds the overdue documents and agreements.
  */
-export function notificationsLabel(tasks: number, bills: number | null, deadlines: { documents: number; conventions: number } = { documents: 0, conventions: 0 }): string {
+export function notificationsLabel(
+  tasks: number,
+  bills: number | null,
+  deadlines: { documents: number; conventions: number } = { documents: 0, conventions: 0 },
+  auditPurge = false,
+): string {
   const parts = [
     tasks ? pluralize(tasks, 'tarefa atrasada', 'tarefas atrasadas') : null,
     bills ? pluralize(bills, 'conta vencida', 'contas vencidas') : null,
     deadlines.documents ? pluralize(deadlines.documents, 'documento vencido', 'documentos vencidos') : null,
     deadlines.conventions ? pluralize(deadlines.conventions, 'convenção vencida', 'convenções vencidas') : null,
+    auditPurge ? 'registro de auditoria a apagar' : null,
   ].filter(Boolean);
   return parts.length ? `Notificações (${parts.join(', ')})` : 'Notificações';
 }
@@ -77,7 +86,10 @@ export function notificationsLabel(tasks: number, bills: number | null, deadline
 export function Notifications({ area, className }: { area: Area; className?: string }) {
   const navigate = useNavigate();
   const actions = useTransactionActions();
-  const { canAccessFinance } = usePermissions();
+  const { canAccessFinance, can } = usePermissions();
+  // Audit records about to be deleted (24-month retention): whoever manages members is warned 30 days before.
+  const auditPending = useAuditRetention(can('members')).data?.pending ?? null;
+  const auditDownload = useAuditDownload();
   const bills = useOverdueBills().data ?? [];
   const tasks = useMyOverdueTasks().data;
   const activity = useTaskActivity().data ?? [];
@@ -86,7 +98,7 @@ export function Notifications({ area, className }: { area: Area; className?: str
   // Documents and agreements: only the overdue ones count (the number keeps saying "already passed").
   const deadlines = bellDeadlines(useDeadlinesSummary().data);
   const { openDeadlines } = useTaskActions();
-  const count = taskCount + billCount + deadlines.documents + deadlines.conventions;
+  const count = taskCount + billCount + deadlines.documents + deadlines.conventions + (auditPending ? 1 : 0);
 
   const taskGroup = (
     <>
@@ -145,6 +157,21 @@ export function Notifications({ area, className }: { area: Area; className?: str
     </>
   );
 
+  const auditGroup = auditPending ? (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>Registro de auditoria</DropdownMenuLabel>
+      <p className="px-2.5 pt-1 text-sm text-fg">{pendingNoticeText(auditPending)}</p>
+      <DropdownMenuItem disabled={auditDownload.downloading} onSelect={() => void auditDownload.download()}>
+        <Download className="size-4 text-muted" aria-hidden />
+        <span className="font-semibold">Baixar registro (CSV)</span>
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => navigate('/configuracoes?aba=privacidade')}>
+        <span className="text-caption text-muted">Ver em Configurações › Privacidade</span>
+      </DropdownMenuItem>
+    </>
+  ) : null;
+
   const billGroup = canAccessFinance ? (
     <>
       <DropdownMenuLabel>Contas vencidas</DropdownMenuLabel>
@@ -178,7 +205,7 @@ export function Notifications({ area, className }: { area: Area; className?: str
             'relative inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-bg-subtle hover:text-fg [&_svg]:size-4',
             className,
           )}
-          aria-label={notificationsLabel(taskCount, billCount, deadlines)}
+          aria-label={notificationsLabel(taskCount, billCount, deadlines, Boolean(auditPending))}
         >
           <Bell />
           {count ? (
@@ -210,6 +237,7 @@ export function Notifications({ area, className }: { area: Area; className?: str
             ) : null}
           </>
         )}
+        {auditGroup}
       </DropdownMenuContent>
     </DropdownMenu>
   );
