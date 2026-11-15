@@ -1,23 +1,30 @@
-// VPS database roles (deploy/db-init/10-efficio.sh): the API and `migrate` log in as `efficio`, a
-// NON-superuser that owns the database and every table, and each tenant request switches to
-// `effinance_app` (SET LOCAL ROLE). The rest of the suite owns the tables as the superuser `postgres`,
-// which bypasses RLS even when it is forced — so nothing there proves the VPS setup. This file mirrors it
-// in a database of its own: the whole migration chain must run as that owner (0021 reclassifies interest
-// and fines under FORCE RLS), FORCE must keep the owner login itself out of every workspace's rows unless
-// it pins one, and the per-request role must stay confined to its workspace.
+// VPS database roles (deploy/db-init/10-efficio.sh): `migrate` logs in as `efficio_owner`, a
+// NON-superuser that owns the database and every table; the API logs in as `efficio` (NOINHERIT, owns
+// nothing, only the grants of deploy/sql/grants-api.sql, reapplied after every migration) and each tenant
+// request switches to `effinance_app` (SET LOCAL ROLE). The rest of the suite owns the tables as the
+// superuser `postgres`, which bypasses RLS even when it is forced — so nothing there proves the VPS setup.
+// This file mirrors it in a database of its own: the whole migration chain must run as that owner (0021
+// reclassifies interest and fines under FORCE RLS), FORCE must keep the owner login itself out of every
+// workspace's rows unless it pins one, the per-request role must stay confined to its workspace, and the
+// API login must get exactly the identity grants (no DDL, no erasing the audit trail).
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createDb } from '../src/db/client';
 import { runMigrations } from '../src/db/migrate';
-import { ADMIN_URL, IDENTITY_TABLES } from './db-roles';
+import { purgeExpiredSecurityRows } from '../src/db/retention';
+import { ADMIN_URL, IDENTITY_GRANTS, IDENTITY_TABLES } from './db-roles';
 
 // Derived from the test database so parallel runs on other databases of the cluster never collide.
 const BASE = new URL(ADMIN_URL).pathname.slice(1).replace(/[^a-z0-9_]/gi, '_');
 const OWNER = `${BASE}_vps_owner`;
 const DB = `${BASE}_vps`;
+/** Stands for the API login `efficio` (cluster-wide name, so derived like the others). */
+const RUNTIME = `${BASE}_vps_api`;
+const GRANTS_SQL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../deploy/sql/grants-api.sql');
 
 function urlAs(user: string, password: string, database: string): string {
   const url = new URL(ADMIN_URL);
@@ -29,10 +36,22 @@ function urlAs(user: string, password: string, database: string): string {
 
 let admin: postgres.Sql;
 let owner: postgres.Sql;
+let runtime: postgres.Sql;
+
+/** deploy/sql/grants-api.sql as the `grants` service runs it (psql meta-commands dropped, role renamed). */
+async function applyApiGrants(as: postgres.Sql = owner): Promise<void> {
+  const text = (await readFile(GRANTS_SQL, 'utf8'))
+    .split('\n')
+    .filter((line) => !line.startsWith('\\'))
+    .join('\n')
+    .replace(/\befficio\b/g, RUNTIME);
+  await as.unsafe(text).simple();
+}
 
 async function dropScenario() {
   await admin.unsafe(`drop database if exists ${DB} with (force)`);
   await admin.unsafe(`drop role if exists ${OWNER}`);
+  await admin.unsafe(`drop role if exists ${RUNTIME}`);
 }
 
 beforeAll(async () => {
@@ -45,11 +64,18 @@ beforeAll(async () => {
   await admin.unsafe(`grant effinance_app to ${OWNER} with admin option`);
   await admin.unsafe(`create database ${DB} owner ${OWNER} encoding 'UTF8' template template0`);
   await admin.unsafe(`revoke all on database ${DB} from public`);
+  await admin.unsafe(
+    `create role ${RUNTIME} login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls password '${RUNTIME}'`,
+  );
+  await admin.unsafe(`grant effinance_app to ${RUNTIME} with inherit false, set true`);
   await runMigrations(urlAs(OWNER, OWNER, DB));
   owner = postgres(urlAs(OWNER, OWNER, DB), { onnotice: () => {}, max: 1 });
+  await applyApiGrants();
+  runtime = postgres(urlAs(RUNTIME, RUNTIME, DB), { onnotice: () => {}, max: 1 });
 }, 120_000);
 
 afterAll(async () => {
+  await runtime?.end();
   await owner?.end();
   if (admin) {
     await dropScenario();
@@ -165,5 +191,90 @@ describe('VPS: API and migrations as the non-superuser owner of the tables', () 
     expect(moved).toEqual({ parent: 'Receitas financeiras', sub: 'Juros e multas recebidos' });
     // The other workspace (no interest or fines) got nothing.
     expect(await as(b, (tx) => tx`select count(*)::int as n from categories`)).toEqual([{ n: 0 }]);
+  });
+});
+
+describe('VPS: the API login (efficio) is not the owner', () => {
+  // Identity grants + DELETE for the daily retention (src/db/retention.ts) — and nothing else.
+  const expected: Record<string, string[]> = Object.fromEntries(
+    Object.entries(IDENTITY_GRANTS).map(([table, privileges]) => [table, privileges.map((p) => p.toUpperCase())]),
+  );
+  for (const table of ['sessions', 'open_finance_events']) expected[table] = [...new Set([...expected[table]!, 'DELETE'])];
+
+  async function grants(): Promise<Record<string, string[]>> {
+    const rows = await admin<{ table_name: string; privilege_type: string }[]>`
+      select table_name, privilege_type from information_schema.role_table_grants
+       where grantee = ${RUNTIME} and table_catalog = ${DB}`;
+    const out: Record<string, string[]> = {};
+    for (const r of rows) (out[r.table_name] ??= []).push(r.privilege_type);
+    return out;
+  }
+  const sorted = (g: Record<string, string[]>) =>
+    Object.fromEntries(
+      Object.entries(g)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([t, p]) => [t, [...p].sort()] as const),
+    );
+
+  it('owns nothing, inherits nothing and gets exactly the identity grants (idempotent)', async () => {
+    const [role] = await admin<{ inherit: boolean; admin: boolean; inheritOption: boolean }[]>`
+      select r.rolinherit as inherit, m.admin_option as admin, m.inherit_option as "inheritOption"
+        from pg_roles r join pg_auth_members m on m.member = r.oid
+       where r.rolname = ${RUNTIME} and m.roleid = 'effinance_app'::regrole`;
+    expect(role).toEqual({ inherit: false, admin: false, inheritOption: false });
+    const [owned] = await runtime<{ n: number }[]>`
+      select count(*)::int as n from pg_class where relowner = (select oid from pg_roles where rolname = current_user)`;
+    expect(owned!.n).toBe(0);
+    expect(sorted(await grants())).toEqual(sorted(expected));
+    // Every migrate reapplies the file: same result, and a privilege granted by hand disappears.
+    await owner.unsafe(`grant delete, truncate on audit_logs to ${RUNTIME}`);
+    await applyApiGrants();
+    expect(sorted(await grants())).toEqual(sorted(expected));
+    // Only the owner may apply it.
+    expect(await code(applyApiGrants(runtime))).toBe('P0001');
+  });
+
+  it('cannot erase the audit trail, run DDL or reach workspace tables without the per-request role', async () => {
+    const ws = await workspace('Escritório E');
+    await as(ws, (tx) => tx`insert into categories (workspace_id, name, type, icon, color)
+                            values (${ws}, 'Aluguel', 'expense', 'home', '#123456')`);
+    // The audit screen reads and every action appends.
+    await runtime`insert into audit_logs (workspace_id, action) values (${ws}, 'vps.test')`;
+    const [logged] = await runtime<{ n: number }[]>`select count(*)::int as n from audit_logs where workspace_id = ${ws}`;
+    expect(logged!.n).toBe(1);
+    for (const statement of [
+      'truncate audit_logs',
+      'delete from audit_logs',
+      'update audit_logs set action = action',
+      'drop table audit_logs',
+      'alter table categories no force row level security',
+      'alter table audit_logs add column x int',
+      'create table vps_probe (id int)',
+      'select count(*) from categories',
+      'select count(*) from drizzle.__drizzle_migrations',
+    ]) {
+      expect(await code(runtime.unsafe(statement)), statement).toBe('42501');
+    }
+    // The tenant path (withTenant): SET LOCAL ROLE effinance_app + workspace pinned.
+    const seen = await runtime.begin(async (tx) => {
+      await tx`select set_config('role', 'effinance_app', true), set_config('app.workspace_id', ${ws}, true)`;
+      return tx<{ n: number }[]>`select count(*)::int as n from categories`;
+    });
+    expect(seen).toEqual([{ n: 1 }]);
+    const other = await runtime.begin(async (tx) => {
+      await tx`select set_config('role', 'effinance_app', true)`;
+      return tx<{ n: number }[]>`select count(*)::int as n from categories`;
+    });
+    expect(other).toEqual([{ n: 0 }]);
+  });
+
+  it('runs the daily retention (DELETE on the expired security rows only)', async () => {
+    const { db, client } = createDb(urlAs(RUNTIME, RUNTIME, DB));
+    try {
+      const result = await purgeExpiredSecurityRows(db, new Date());
+      expect(result).toEqual(expect.objectContaining({ sessions: expect.any(Number), webhookEvents: expect.any(Number) }));
+    } finally {
+      await client.end();
+    }
   });
 });

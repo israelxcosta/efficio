@@ -1,6 +1,6 @@
 // Runs the in-browser API (PGlite + real route plugins) in Node to guard the demo build.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { addMonthKey, addMonths, BILLING_ENABLED, daysInMonth, discountAmount, monthKey, todayISO } from '@effinance/shared';
+import { addMonthKey, addMonths, BILLING_ENABLED, daysInMonth, discountAmount, monthKey, SIGNUP_DISABLED_ERROR, todayISO } from '@effinance/shared';
 import { demoFetch } from './fetch';
 import { DEMO_LOGIN } from '@/lib/demo';
 import { DEMO_EMAIL, DEMO_PASSWORD, getDemoServer } from './server';
@@ -388,7 +388,7 @@ describe('demo api (PGlite)', () => {
     expect(ids.every((r) => r.id.startsWith('v1.') && !r.id.includes(itemId))).toBe(true);
   });
 
-  it('registers new users with their company and business categories', async () => {
+  it('refuses sign-up without an invite, like the API with public sign-up off', async () => {
     const reg = await call('POST', '/auth/register', {
       name: 'Teste',
       email: 'teste@demo.app',
@@ -396,19 +396,9 @@ describe('demo api (PGlite)', () => {
       companyName: 'Teste Contábil Ltda',
       acceptTerms: true,
     });
-    expect(reg.status).toBe(201);
-    const me = (await call('GET', '/auth/me')).body;
-    expect(me.workspace).toMatchObject({ name: 'Teste Contábil Ltda', kind: 'business', role: 'owner', subscription: { status: BILLING_ENABLED ? 'trialing' : 'active' } });
-    expect(me.workspaces).toHaveLength(1);
-    expect((await call('GET', '/accounts')).body.map((a: { name: string }) => a.name)).toEqual(['Caixa']);
-    const cats = await call('GET', '/categories');
-    expect(cats.body.length).toBeGreaterThan(5);
-    expect(cats.body.map((c: { name: string }) => c.name)).toEqual(expect.arrayContaining(['Serviços Prestados', 'Despesas financeiras']));
-    const sessions = await call('GET', '/auth/sessions');
-    expect(sessions.body).toEqual([expect.objectContaining({ current: true })]);
-    expect((await call('POST', '/auth/logout')).status).toBe(204);
+    expect(reg.status).toBe(403);
+    expect(reg.body).toMatchObject({ error: SIGNUP_DISABLED_ERROR });
     expect((await call('GET', '/auth/me')).status).toBe(401);
-    expect((await call('POST', '/auth/refresh')).status).toBe(401);
   });
 
   it('restricts the finances to administrators: a viewer sees clients without fees (same guard as the API)', async () => {
@@ -416,11 +406,13 @@ describe('demo api (PGlite)', () => {
     const invite = await call('POST', '/workspaces/current/invites', { email: 'colaboradora@demo.app', role: 'viewer' });
     expect(invite.status).toBe(201);
     expect((await call('POST', '/auth/logout')).status).toBe(204);
-    const reg = await call('POST', '/auth/register', { name: 'Colaboradora', email: 'colaboradora@demo.app', password: 'senha12345', acceptTerms: true });
+    // The invite link creates the account straight into the inviting office.
+    const inviteToken = invite.body.inviteUrl.split('/convite/')[1];
+    const reg = await call('POST', '/auth/register', { name: 'Colaboradora', email: 'colaboradora@demo.app', password: 'senha12345', acceptTerms: true, inviteToken });
     expect(reg.status).toBe(201);
-    const accepted = await call('POST', `/invites/${invite.body.inviteUrl.split('/convite/')[1]}/accept`);
-    expect(accepted.status).toBe(200);
-    expect(accepted.body.workspace).toMatchObject({ name: OFFICE, role: 'viewer' });
+    expect((await call('GET', '/auth/me')).body.workspace).toMatchObject({ name: OFFICE, role: 'viewer' });
+    const sessions = await call('GET', '/auth/sessions');
+    expect(sessions.body).toEqual([expect.objectContaining({ current: true })]);
 
     const financial = [
       `/dashboard?month=${month}`,

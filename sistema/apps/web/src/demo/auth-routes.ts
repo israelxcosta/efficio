@@ -10,6 +10,8 @@ import {
   mfaVerifySchema,
   registerSchema,
   resetPasswordSchema,
+  SIGNUP_DISABLED_ERROR,
+  SIGNUP_DISABLED_MESSAGE,
   switchWorkspaceSchema,
   updateProfileSchema,
 } from '@effinance/shared';
@@ -17,8 +19,8 @@ import type { Database } from '@api/db/client';
 import type { UserRow } from '@api/db/schema';
 import { audit } from '@api/lib/audit';
 import { randomToken } from '@api/lib/crypto/encoding';
-import { UnauthorizedError } from '@api/lib/errors';
-import type { Platform } from '@api/lib/platform';
+import { AppError, UnauthorizedError } from '@api/lib/errors';
+import { signupEnabled, type Platform } from '@api/lib/platform';
 import { requestContext } from '@api/lib/request-context';
 import { disableMfa, enableMfa, setupMfa, verifyMfaCode } from '@api/modules/auth/mfa';
 import {
@@ -59,6 +61,10 @@ export async function demoAuthRoutes(app: Scope) {
   }
 
   app.post('/register', { schema: { body: registerSchema } }, async (req: DemoRequest, reply: DemoReply) => {
+    // Same rule as the API: without an invite the sign-up is refused while public sign-up is off.
+    if (!(req.body as { inviteToken?: string }).inviteToken && !signupEnabled(app.platform)) {
+      throw new AppError(403, SIGNUP_DISABLED_ERROR, SIGNUP_DISABLED_MESSAGE);
+    }
     const { user, workspaceId } = await register(app.db, req.body as never);
     const session = await createSession(app.db, { userId: user.id, workspaceId, ...requestContext(req) });
     setSession({ userId: user.id, workspaceId, sessionId: session.familyId });

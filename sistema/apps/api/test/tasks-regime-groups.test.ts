@@ -6,7 +6,7 @@
 
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { regimeGroupItems } from '@effinance/shared';
+import { occurrencesInCompetence, regimeGroupItems, type RegimeGroupRegime } from '@effinance/shared';
 import type { App } from '../src/app';
 import { executeRows } from '../src/lib/sql';
 import { admin, createTestApp, registerUser, resetDb } from './helpers';
@@ -168,5 +168,57 @@ describe('regime groups', () => {
     expect(res.body.departmentsCreated).toEqual([]);
     const created = await rows<{ department_id: string | null }>(sql`select department_id from recurring_tasks where workspace_id = ${ws}`);
     expect(created.every((r) => r.department_id === null)).toBe(true);
+  });
+
+  it('warns how many occurrences of the current month are born overdue and can start next month (QA #4)', async () => {
+    const ana = await registerUser(app, 'Ana Meio do Mês');
+    const ws = await workspaceOf(ana);
+    await createClient(ana, { tradeName: 'Construtora', taxRegime: 'presumed_profit' });
+    await createClient(ana, { tradeName: 'Padaria' });
+    await createClient(ana, { tradeName: 'Clínica' });
+    // Per client: occurrences of October whose legal deadline is before today (20/10).
+    const overdue = (key: string) => {
+      const item = regimeGroupItems('presumed_profit').concat(regimeGroupItems('simples_nacional')).find((i) => i.key === key)!;
+      return occurrencesInCompetence(item, '2026-10').filter((o) => o.legalDueDate < '2026-10-20').length;
+    };
+    const group = async (regime: RegimeGroupRegime) =>
+      (await ana.get('/tasks/regime-groups')).body.groups.find((g: any) => g.regime === regime);
+
+    const presumed = await group('presumed_profit');
+    expect(presumed.items.map((i: any) => i.currentOverdue)).toEqual(presumed.items.map((i: any) => overdue(i.key)));
+    expect(presumed.currentMonthOverdue).toBe(presumed.items.reduce((a: number, i: any) => a + i.currentOverdue, 0));
+    expect(presumed.currentMonthOverdue).toBeGreaterThan(0);
+
+    // From the current month (default): the overdue occurrences are created and counted.
+    const now = await ana.post('/tasks/regime-groups/presumed_profit/apply', {});
+    expect(now.status, JSON.stringify(now.body)).toBe(200);
+    expect(now.body).toMatchObject({ fromMonth: 'current', startCompetence: '2026-10', overdueCreated: presumed.currentMonthOverdue });
+    const [born] = await rows<{ n: number }>(sql`
+      select count(*)::int as n from tasks where workspace_id = ${ws} and competence = '2026-10' and due_date < '2026-10-20' and status = 'todo'`);
+    expect(born!.n).toBe(presumed.currentMonthOverdue);
+    expect((await group('presumed_profit')).currentMonthOverdue).toBe(0); // nothing missing anymore
+
+    // From next month: the new recurring tasks start in November; the common ones (regimeAdded) already
+    // run in October, so their overdue occurrences for the 2 Simples clients are still reported.
+    const simples = await group('simples_nacional');
+    expect(simples.currentMonthOverdue).toBe(simples.items.filter((i: any) => i.state === 'missing').reduce((a: number, i: any) => a + i.currentOverdue * 2, 0));
+    const next = await ana.post('/tasks/regime-groups/simples_nacional/apply', { fromMonth: 'next' });
+    expect(next.status, JSON.stringify(next.body)).toBe(200);
+    const created = next.body.items.filter((i: any) => i.result === 'created');
+    const added = next.body.items.filter((i: any) => i.result === 'regimeAdded');
+    expect(created.length).toBeGreaterThan(0);
+    expect(next.body).toMatchObject({
+      fromMonth: 'next',
+      startCompetence: '2026-11',
+      overdueCreated: added.reduce((a: number, i: any) => a + overdue(i.key) * 2, 0),
+    });
+    const ids = created.map((i: any) => i.recurringTaskId);
+    const byCompetence = await rows<{ competence: string; start: string }>(sql`
+      select t.competence, r.start_competence as start from recurring_tasks r left join tasks t on t.recurring_task_id = r.id
+      where r.workspace_id = ${ws} and r.id in ${sql.raw(`('${ids.join("','")}')`)}`);
+    expect(new Set(byCompetence.map((r) => r.start))).toEqual(new Set(['2026-11']));
+    expect(byCompetence.some((r) => r.competence === '2026-10')).toBe(false);
+
+    expect((await ana.post('/tasks/regime-groups/mei/apply', { fromMonth: 'later' })).status).toBe(400);
   });
 });
