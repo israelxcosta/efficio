@@ -99,6 +99,14 @@ if [[ -n "$RCLONE_REMOTE" ]]; then
   fi
 fi
 
+# Limpeza diária que só o dono do banco pode fazer: o login da API não tem DELETE em audit_logs
+# (a trilha não pode ser apagada por ela), então os registros de auditoria além do prazo de guarda
+# (AUDIT_LOG_RETENTION_MONTHS) saem aqui, DEPOIS do backup do dia, pelo serviço "migrate" (dono).
+echo "==> Limpeza de retenção (registro de auditoria além do prazo)"
+if ! dc run --rm -T migrate </dev/null >/dev/null 2>&1; then
+  echo "AVISO: a limpeza de retenção falhou (será refeita na próxima atualização)." >&2
+fi
+
 if (( status == 0 )) && [[ -n "$BACKUP_PING_URL" ]]; then
   curl -fsS --max-time 15 --retry 3 "$BACKUP_PING_URL" >/dev/null || echo "AVISO: monitor não avisado." >&2
 fi

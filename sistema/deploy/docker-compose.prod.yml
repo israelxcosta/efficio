@@ -52,6 +52,8 @@ x-api-env: &api-env
   SIGNUP_ENABLED: 'false'
   REQUIRE_MFA: 'true'
   JOBS_ENABLED: 'true'
+  # Guarda do registro de auditoria (meses). O aviso para baixar o CSV sai 30 dias antes da limpeza.
+  AUDIT_LOG_RETENTION_MONTHS: ${AUDIT_LOG_RETENTION_MONTHS:-24}
   CNPJ_PROVIDER: brasilapi
   OPEN_FINANCE_PROVIDER: disabled
   LOG_LEVEL: ${LOG_LEVEL:-info}
