@@ -57,6 +57,7 @@ import type {
 import type { TransactionOrigin } from './integrations';
 import type {
   RegimeGroupApplyResult,
+  RegimeGroupChange,
   RegimeGroupFromMonth,
   RegimeGroupItemState,
   RegimeGroupRegime,
@@ -1770,6 +1771,60 @@ export interface RegimeGroup {
   currentMonthOverdue: number;
   /** Every recurring task of the office that applies to the regime (catalog or made by hand). */
   recurring: RegimeGroupRecurringRef[];
+  /**
+   * The office's own tasks of the group: active recurring tasks of the registry that include the regime
+   * and are not an item of this group (made by hand, or created from another regime's item and included
+   * here). A made-by-hand twin of an item (`items[].handmade`) is listed here too.
+   */
+  own: RegimeGroupOwnTask[];
+  /**
+   * Catalog items the office removed from this group (not in `items`, not counted in `missing`;
+   * applying the group does not recreate them; POST …/restore brings one back as "Falta aplicar").
+   */
+  excluded: RegimeGroupExcludedItem[];
+}
+
+/** An own task of a regime's group, with what the table shows. */
+export interface RegimeGroupOwnTask extends RegimeGroupRecurringRef {
+  dueDay: number;
+  dueMonth: number | null;
+  /** Months (1–12) it occurs in. */
+  months: number[];
+  targetDaysBefore: number;
+  nonBusinessDayRule: NonBusinessDayRule;
+}
+
+/** A catalog item removed from a regime's group by the office. */
+export interface RegimeGroupExcludedItem {
+  key: string;
+  name: string;
+  description: string;
+  period: RecurrencePeriod;
+  dueDay: number;
+  dueMonth: number | null;
+  months: number[];
+  department: { key: SuggestedDepartment; name: string };
+  /** The recurring task created from this item (any regime), if any. */
+  recurringTask: RegimeGroupRecurringRef | null;
+  excludedAt: string;
+}
+
+/**
+ * POST /tasks/regime-groups/:regime/include | exclude | restore. The open occurrences follow the edit
+ * rule of recurring tasks (`syncOpenOccurrences`): from the current competence on, the "A fazer" ones of
+ * the regime's clients are canceled (exclude, with the reason in their history) or generated/restored
+ * (include); in progress and concluded ones never change.
+ */
+export interface RegimeGroupChangeResponse {
+  regime: RegimeGroupRegime;
+  /** The catalog item involved (sent, or the catalog key of the recurring task), else null. */
+  key: string | null;
+  /** The item is removed from the office's group after the call. */
+  excluded: boolean;
+  /** What happened to the recurring task. */
+  change: RegimeGroupChange;
+  /** The recurring task involved, as it is now (null: the item was never applied). */
+  recurringTask: RegimeGroupRecurringRef | null;
 }
 
 /** GET /tasks/regime-groups. */

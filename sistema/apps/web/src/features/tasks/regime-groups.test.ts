@@ -64,6 +64,8 @@ describe('applying a group', () => {
     missing: items.filter((i) => !i.applied).length,
     currentMonthOverdue: 0,
     recurring: [],
+    own: [],
+    excluded: [],
   });
 
   it('previews what it creates, what gains the regime, what stays, and what a hand-made one already covers', () => {

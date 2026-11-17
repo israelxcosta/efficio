@@ -237,7 +237,8 @@ sequenceDiagram
   `recurring_tasks.catalog_key` e índice de conclusões (`tasks_completed_idx`) · 0019 recorrência em qualquer
   tarefa (`recurring_tasks.origin`/`internal`/regra por data, `tasks.occurrence_origin`, índice das internas) · 0020
   categoria de retrabalho (`task_categories.is_rework`) · 0021 juros/multa em categoria própria
-  (reclassificação), reajuste em lote (`fee_adjustments`/`_items`) e procuração e-CAC. Escritas
+  (reclassificação), reajuste em lote (`fee_adjustments`/`_items`) e procuração e-CAC · 0023 itens removidos dos grupos por
+  regime (`regime_group_exclusions`). Escritas
   para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tarefas usam `todayIn('America/Sao_Paulo')` (o dia do escritório, não o do servidor

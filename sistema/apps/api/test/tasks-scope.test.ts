@@ -23,6 +23,9 @@ import {
   recurringTaskInputSchema,
   recurringTaskQuerySchema,
   regimeGroupApplySchema,
+  regimeGroupExcludeSchema,
+  regimeGroupIncludeSchema,
+  regimeGroupRestoreSchema,
   rolePermissions,
   TASK_TIME_ZONE,
   taskAttachmentInputSchema,
@@ -509,9 +512,15 @@ describe('tasks: every query filters by the workspace', () => {
     await run(carlaCtx, (c) => regimeGroups.listRegimeGroups(c));
     await run(anaCtx, (c) => regimeGroups.applyRegimeGroup(c, 'simples_nacional', regimeGroupApplySchema.parse({ keys: ['fgts_digital', 'pgdas_das'] })));
     await run(anaCtx, (c) => regimeGroups.applyRegimeGroup(c, 'presumed_profit', regimeGroupApplySchema.parse({ keys: ['fgts_digital', 'ecd'] })));
-    await run(anaCtx, (c) =>
+    const inserted = await run(anaCtx, (c) =>
       recurring.insertRecurring(c, recurringTaskInputSchema.parse({ name: 'Inserida', departmentId: fiscal.id, dueDay: 8, regimes: ['mei'] })),
     );
+    // Editing a group: include an own task, exclude it (ends), remove/restore a catalog item.
+    await run(anaCtx, (c) => regimeGroups.includeInRegimeGroup(c, 'simples_nacional', regimeGroupIncludeSchema.parse({ recurringTaskId: inserted })));
+    await run(anaCtx, (c) => regimeGroups.excludeFromRegimeGroup(c, 'mei', regimeGroupExcludeSchema.parse({ recurringTaskId: inserted })));
+    await run(anaCtx, (c) => regimeGroups.excludeFromRegimeGroup(c, 'simples_nacional', regimeGroupExcludeSchema.parse({ key: 'pgdas_das' })));
+    await run(anaCtx, (c) => regimeGroups.restoreRegimeGroupItem(c, 'simples_nacional', regimeGroupRestoreSchema.parse({ key: 'pgdas_das' })));
+    await run(carlaCtx, (c) => regimeGroups.listRegimeGroups(c));
 
     // Processes and templates.
     const template = await run(anaCtx, (c) =>

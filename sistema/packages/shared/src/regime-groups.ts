@@ -322,6 +322,14 @@ export type RegimeGroupFromMonth = (typeof REGIME_GROUP_FROM_MONTHS)[number];
 export const REGIME_GROUP_APPLY_RESULTS = ['created', 'regimeAdded', 'unchanged', 'ended'] as const;
 export type RegimeGroupApplyResult = (typeof REGIME_GROUP_APPLY_RESULTS)[number];
 
+/**
+ * What including/excluding a task in a regime's group did to its recurring task: the regime was added,
+ * removed, removed and the recurring task ended (no regime nor client left; "Encerra em" = the current
+ * competence, or its start when later), or nothing changed (already so, or no recurring task involved).
+ */
+export const REGIME_GROUP_CHANGES = ['regimeAdded', 'regimeRemoved', 'ended', 'none'] as const;
+export type RegimeGroupChange = (typeof REGIME_GROUP_CHANGES)[number];
+
 /** The items of a regime's group, in catalog order. */
 export function regimeGroupItems(regime: RegimeGroupRegime): RegimeGroupItem[] {
   return REGIME_GROUP_ITEMS.filter((i) => i.regimes.includes(regime));

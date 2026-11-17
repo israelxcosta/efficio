@@ -162,6 +162,13 @@
       "when": 1794705894882,
       "tag": "0022_responsible_name_index",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794935771397,
+      "tag": "0023_regime_group_exclusions",
+      "breakpoints": true
     }
   ]
 }

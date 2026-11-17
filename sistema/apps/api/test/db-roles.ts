@@ -77,4 +77,6 @@ export const TENANT_TABLES = [
   // Yearly fee adjustment in batch (migration 0021).
   'fee_adjustments',
   'fee_adjustment_items',
+  // Catalog items an office removed from a regime's group (migration 0023).
+  'regime_group_exclusions',
 ] as const;

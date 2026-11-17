@@ -57,6 +57,7 @@ import type {
   TaskEventKind,
   TaskPriority,
   TaskStatus,
+  RegimeGroupRegime,
   TaxRegime,
   TransactionOrigin,
   TransactionType,
@@ -1654,6 +1655,27 @@ export const recurringTaskClients = pgTable(
       columns: [t.workspaceId, t.clientId, t.clientKind],
       foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
     }).onDelete('cascade'),
+  ],
+);
+
+/**
+ * Catalog items an office removed from a regime's group (migration 0023): listed apart, not counted as
+ * missing and never recreated by "Aplicar grupo"; restoring deletes the row.
+ */
+export const regimeGroupExclusions = pgTable(
+  'regime_group_exclusions',
+  {
+    workspaceId: workspaceRef().notNull(),
+    regime: text().$type<RegimeGroupRegime>().notNull(),
+    catalogKey: text().notNull(),
+    createdBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'regime_group_exclusions_pk', columns: [t.workspaceId, t.regime, t.catalogKey] }),
+    check('regime_group_exclusions_regime_chk', sql`${t.regime} in ('simples_nacional', 'mei', 'presumed_profit', 'real_profit')`),
+    check('regime_group_exclusions_catalog_key_chk', sql`${t.catalogKey} ~ '^[a-z0-9_]{1,60}$'`),
+    index('regime_group_exclusions_created_by_idx').on(t.createdBy).where(sql`${t.createdBy} is not null`),
   ],
 );
 

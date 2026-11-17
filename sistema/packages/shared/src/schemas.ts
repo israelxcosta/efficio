@@ -1376,6 +1376,32 @@ export const regimeGroupApplySchema = z.object({
 });
 export type RegimeGroupApplyInput = z.input<typeof regimeGroupApplySchema>;
 
+/**
+ * POST /tasks/regime-groups/:regime/include: puts an existing recurring task of the registry (active) in
+ * the regime — the regime is added to its `regimes` (a catalog item removed from this group comes back).
+ * A new task of the regime is created with POST /tasks/recurring (`regimes: [regime]`).
+ */
+export const regimeGroupIncludeSchema = z.object({ recurringTaskId: idSchema });
+export type RegimeGroupIncludeInput = z.input<typeof regimeGroupIncludeSchema>;
+
+/**
+ * POST /tasks/regime-groups/:regime/exclude: `key` (a catalog item of the group: removed from the
+ * office's group, and the regime leaves its recurring task if applied) or `recurringTaskId` (a
+ * recurring task of the registry: the regime leaves its `regimes`; one created from an item of this
+ * group also removes the item). Exactly one of them.
+ */
+export const regimeGroupExcludeSchema = z
+  .object({ key: z.enum(REGIME_GROUP_KEYS).optional(), recurringTaskId: idSchema.optional() })
+  .refine((v) => (v.key === undefined) !== (v.recurringTaskId === undefined), {
+    message: 'Informe a tarefa do catálogo ou a tarefa recorrente',
+    path: ['key'],
+  });
+export type RegimeGroupExcludeInput = z.input<typeof regimeGroupExcludeSchema>;
+
+/** POST /tasks/regime-groups/:regime/restore: a removed catalog item goes back to the group (as "Falta aplicar"). */
+export const regimeGroupRestoreSchema = z.object({ key: z.enum(REGIME_GROUP_KEYS) });
+export type RegimeGroupRestoreInput = z.input<typeof regimeGroupRestoreSchema>;
+
 // --- monthly audit ---------------------------------------------------------------------------------
 
 /**

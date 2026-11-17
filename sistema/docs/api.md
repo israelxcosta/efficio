@@ -989,6 +989,9 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) está i
 | GET | `/api/tasks/dashboard` | `taskDashboardQuerySchema` (= `taskHomeQuerySchema`) | `TaskDashboardResponse` (cards do dashboard do Effy) | todos (outro depto./`all`: admin; `fees` só `finance`, `incomplete` só `registry`) |
 | GET | `/api/tasks/regime-groups` | — | `RegimeGroupsResponse` | todos |
 | POST | `/api/tasks/regime-groups/:regime/apply` | `regimeGroupApplySchema` (`keys`, `departments`) | `RegimeGroupApplyResponse` | admin |
+| POST | `/api/tasks/regime-groups/:regime/include` | `regimeGroupIncludeSchema` (`recurringTaskId`) | `RegimeGroupChangeResponse` | admin |
+| POST | `/api/tasks/regime-groups/:regime/exclude` | `regimeGroupExcludeSchema` (`key` \| `recurringTaskId`) | `RegimeGroupChangeResponse` | admin |
+| POST | `/api/tasks/regime-groups/:regime/restore` | `regimeGroupRestoreSchema` (`key`) | `RegimeGroupChangeResponse` | admin |
 | GET | `/api/tasks/activity` | — | `TaskActivityItem[]` | todos |
 | GET | `/api/tasks/me/overview` | `taskMyOverviewQuerySchema` (`month`) | `TaskMyOverviewResponse` (área pessoal: só os seus números e o agregado do departamento) | todos |
 | GET | `/api/tasks/calendar` | `taskCalendarQuerySchema` (`from`, `to` ≤ 62 dias, escopo e filtros) | `TaskCalendarResponse` | todos |
@@ -1524,6 +1527,29 @@ item traz `state` (`applied`, `handmade` — "Já existe (feita à mão)", com `
 com nome compatível, senão é criado com o nome sugerido (`departmentsCreated`); escritório sem
 departamentos recebe recorrentes sem departamento. Depois disso as recorrentes geram todo mês para cada
 cliente ativo do regime (cliente novo entra na leitura seguinte, ver o marcador de geração).
+
+**Editar o grupo** (`registry`; auditoria `regime_group.included` / `.excluded` / `.restored`, com
+regime, chave e resultado — sem nomes). Grupo do escritório = itens do catálogo **menos os removidos** +
+**tarefas próprias** (`own`: recorrentes do cadastro ativas com o regime em `regimes` que não são item
+deste grupo — feitas à mão, ou item de outro regime incluído aqui; a gêmea feita à mão de um item aparece
+também em `own`). Tarefa nova do regime = `POST /tasks/recurring` com `regimes: [regime]`.
+- `…/include { recurringTaskId }`: acrescenta o regime a uma recorrente do cadastro ativa (já tem: `change:
+  'none'`; encerrada: 409; tarefa com recorrência ou de outro espaço: 404). Se ela veio de um item deste
+  grupo que estava removido, a remoção é desfeita.
+- `…/exclude { key } | { recurringTaskId }` (exatamente um): item do catálogo (pela chave ou pela recorrente
+  criada dele) é gravado em `regime_group_exclusions` (migração 0023, RLS FORCE); se a recorrente tem o
+  regime, ele sai de `regimes`. Recorrente que fica sem regime **e** sem clientes escolhidos é encerrada
+  ("Encerra em" = competência atual, ou o início se for depois): `change: 'ended'`; senão
+  `'regimeRemoved'`. Chave de outro grupo: 422.
+- `…/restore { key }`: apaga a remoção; o item volta como "Falta aplicar" (o "Aplicar grupo" o cria de novo
+  ou devolve o regime). Aplicar **não** recria item removido (`keys` só com removidos: 422).
+- Ocorrências: a mudança de `regimes` ressincroniza como a edição da recorrente (`syncOpenOccurrences`): da
+  competência atual em diante, as "A fazer" das empresas do regime são canceladas (motivo no histórico) ao
+  excluir, ou geradas/restauradas ao incluir; em andamento e concluídas não mudam; a partir da competência
+  seguinte não há geração para o regime.
+- Listagem: os removidos saem de `items` (não contam em `missing`/`currentMonthOverdue`) e vêm em
+  `excluded` (`RegimeGroupExcludedItem`, com `excludedAt`); `own: RegimeGroupOwnTask[]` traz dia, mês,
+  meses, período e departamento para a tabela. `state` não ganhou valor novo.
 Testes: `test/tasks-regime-groups.test.ts`, `packages/shared/test/regime-groups.test.ts`.
 
 ## Dashboard da Gestão (`GET /tasks/dashboard`)

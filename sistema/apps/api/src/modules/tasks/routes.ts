@@ -8,6 +8,7 @@
 // saving a process as a template: `registry`). Static
 // paths are registered before `/:id` (the browser demo's router takes the first match).
 
+import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
@@ -22,7 +23,11 @@ import {
   recurringTaskInputSchema,
   recurringTaskQuerySchema,
   regimeGroupApplySchema,
+  regimeGroupExcludeSchema,
+  regimeGroupIncludeSchema,
   regimeGroupParamsSchema,
+  regimeGroupRestoreSchema,
+  type RegimeGroupChangeResponse,
   subtaskInputSchema,
   subtaskUpdateSchema,
   taskAttachmentInputSchema,
@@ -44,7 +49,9 @@ import {
   taskStatusInputSchema,
   taskUpdateSchema,
 } from '@effinance/shared';
+import { audit } from '../../lib/audit';
 import { rateLimited } from '../../lib/platform';
+import { requestContext } from '../../lib/request-context';
 import { idParams } from '../common/params';
 import { requireTaskPermission, runTasks, taskGuards } from './access';
 import { addAttachment, deleteAttachment, downloadAttachment, listAttachments } from './attachments';
@@ -67,7 +74,16 @@ import { taskHome } from './home';
 import { exportTaskReport, taskCalendar, taskReport } from './insights';
 import { createNote, deleteNote, listNotes, updateNote } from './notes';
 import { myOverview } from './overview';
-import { applyRegimeGroup, listRegimeGroups } from './regime-groups';
+import {
+  applyRegimeGroup,
+  excludeFromRegimeGroup,
+  includeInRegimeGroup,
+  listRegimeGroups,
+  REGIME_GROUP_EXCLUDED_ACTION,
+  REGIME_GROUP_INCLUDED_ACTION,
+  REGIME_GROUP_RESTORED_ACTION,
+  restoreRegimeGroupItem,
+} from './regime-groups';
 import {
   createRecurring,
   deleteRecurring,
@@ -211,6 +227,37 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
     '/regime-groups/:regime/apply',
     { ...registry, schema: { params: regimeGroupParamsSchema, body: regimeGroupApplySchema } },
     async (req) => run(req, (ctx) => applyRegimeGroup(ctx, req.params.regime, req.body)),
+  );
+  // Editing a group (`registry`): ids, keys and the result only in the audit trail (no names).
+  const recordGroupChange = async (req: FastifyRequest, action: string, result: RegimeGroupChangeResponse) => {
+    await audit(app.db, {
+      ...requestContext(req),
+      action,
+      workspaceId: req.workspaceId,
+      userId: req.userId,
+      entity: 'recurring_task',
+      entityId: result.recurringTask?.id ?? null,
+      metadata: { regime: result.regime, key: result.key, change: result.change, excluded: result.excluded },
+    });
+    return result;
+  };
+  app.post(
+    '/regime-groups/:regime/include',
+    { ...registry, schema: { params: regimeGroupParamsSchema, body: regimeGroupIncludeSchema } },
+    async (req) =>
+      recordGroupChange(req, REGIME_GROUP_INCLUDED_ACTION, await runTasks(app.db, req, (ctx) => includeInRegimeGroup(ctx, req.params.regime, req.body))),
+  );
+  app.post(
+    '/regime-groups/:regime/exclude',
+    { ...registry, schema: { params: regimeGroupParamsSchema, body: regimeGroupExcludeSchema } },
+    async (req) =>
+      recordGroupChange(req, REGIME_GROUP_EXCLUDED_ACTION, await runTasks(app.db, req, (ctx) => excludeFromRegimeGroup(ctx, req.params.regime, req.body))),
+  );
+  app.post(
+    '/regime-groups/:regime/restore',
+    { ...registry, schema: { params: regimeGroupParamsSchema, body: regimeGroupRestoreSchema } },
+    async (req) =>
+      recordGroupChange(req, REGIME_GROUP_RESTORED_ACTION, await runTasks(app.db, req, (ctx) => restoreRegimeGroupItem(ctx, req.params.regime, req.body))),
   );
 
   // --- recurring tasks ---------------------------------------------------------------------------------

@@ -23,6 +23,7 @@ import {
   PAYMENT_METHODS,
   PLAN_CODES,
   RECURRENCE_KINDS,
+  REGIME_GROUP_REGIMES,
   SUBSCRIPTION_STATUSES,
   TRANSACTION_ORIGINS,
   TRANSACTION_TYPES,
@@ -371,6 +372,8 @@ describe('catalog: row level security and privileges', () => {
     expect(values('transactions_fee_kind_chk')).toEqual(sorted(FEE_ENTRY_KINDS));
     // Migration 0021.
     expect(values('fee_adjustments_chosen_index_chk')).toEqual(sorted(FEE_ADJUSTMENT_INDEXES));
+    // Migration 0023.
+    expect(values('regime_group_exclusions_regime_chk')).toEqual(sorted(REGIME_GROUP_REGIMES));
   });
 
   it('late fees and generated fee rows keep their shape (CHECKs of 0008/0009)', async () => {
