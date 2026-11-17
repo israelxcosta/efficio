@@ -24,3 +24,11 @@ overrides:
   # GHSA-67mh-4wv8-2f99 (esbuild <=0.24.2, dev server). drizzle-kit 0.31 still declares the
   # deprecated @esbuild-kit/esm-loader (unused by its CLI); reuse the esbuild 0.25 it already ships.
   '@esbuild-kit/core-utils>esbuild': ^0.25.0
+
+auditConfig:
+  ignoreGhsas:
+    # GHSA-fc5q-39xc-vjpf (picomatch <=4.0.7, ReDoS with an attacker-controlled glob), accepted by the
+    # owner on 17/11/2026 until a fix ships: no patched release exists (4.0.7 is the latest). Only
+    # reached at build time (tsup > tinyglobby) with the repository's own fixed globs; nothing in the
+    # API or the web bundle uses it at runtime. Remove this entry once picomatch publishes a fix.
+    - GHSA-fc5q-39xc-vjpf
