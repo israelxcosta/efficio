@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
 import { Info } from 'lucide-react';
 import { formatMonthKey, type TaskListSummary, type TaskScope, type TaskSituation } from '@effinance/shared';
-import { MemberAvatar } from '@/components/ui/member-avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn, pluralize } from '@/lib/utils';
-import { daysText, shortName } from '../due';
+import { daysText } from '../due';
 
 /** Label over a figure (the ClientsSummary one). */
 export function SummaryLabel({ children, info }: { children: ReactNode; info?: string }) {
@@ -33,29 +32,29 @@ interface TasksSummaryProps {
   summary: TaskListSummary | undefined;
   scope: TaskScope;
   situation: TaskSituation;
-  assignee: string;
+  department: string;
   onSituation: (s: TaskSituation) => void;
-  onAssignee: (id: string) => void;
+  onDepartment: (id: string) => void;
   onOpenTask: (id: string) => void;
 }
 
 /**
  * Head of Tarefas (spec §7.2): the overdue tasks with the oldest one, what is open, what concluded
- * in the month and who carries the open work (not in "Minhas": it would be only you; the pending work
+ * in the month and the open work per department (not in "Minhas": it would be only you; the pending work
  * per client has its own card below the list). Same filters as the list except the situation; every
  * cell toggles a filter.
  */
-export function TasksSummary({ summary, scope, situation, assignee, onSituation, onAssignee, onOpenTask }: TasksSummaryProps) {
+export function TasksSummary({ summary, scope, situation, department, onSituation, onDepartment, onOpenTask }: TasksSummaryProps) {
   const toggle = (s: TaskSituation) => onSituation(situation === s ? 'open' : s);
+  // By department, not by person: it stays readable however many people the office has.
   const byAssignee = scope !== 'mine';
   const rows = summary && byAssignee
-    ? summary.openByAssignee.slice(0, 5).map((r) => ({
-        key: r.assignee?.id ?? 'none',
-        label: r.assignee ? shortName(r.assignee.name) : 'Sem responsável',
-        muted: !r.assignee,
+    ? (summary.openByDepartment ?? []).slice(0, 6).map((r) => ({
+        key: r.department?.id ?? '',
+        label: r.department?.name ?? 'Sem departamento',
+        muted: !r.department,
         open: r.open,
         overdue: r.overdue,
-        avatar: r.assignee?.name ?? null,
       }))
     : [];
   const max = Math.max(1, ...rows.map((r) => r.open));
@@ -193,7 +192,7 @@ export function TasksSummary({ summary, scope, situation, assignee, onSituation,
         {/* 4. Open by assignee (not in "Minhas"): hidden on phones (the filter stays in the sheet). */}
         {byAssignee ? (
         <div className="hidden min-w-0 border-border px-4 pt-4 pb-4 sm:px-5 md:col-span-3 md:block md:border-t lg:col-span-1 lg:border-t-0 lg:border-l lg:pt-5">
-          <SummaryLabel>Em aberto por responsável</SummaryLabel>
+          <SummaryLabel>Em aberto por departamento</SummaryLabel>
           {!summary ? (
             <div className="mt-1.5 flex flex-col gap-2" aria-hidden>
               {['w-full', 'w-4/5', 'w-3/5'].map((w) => (
@@ -203,22 +202,21 @@ export function TasksSummary({ summary, scope, situation, assignee, onSituation,
           ) : rows.length === 0 ? (
             <p className="mt-1.5 text-body-sm text-muted">Nada em aberto.</p>
           ) : (
-            <ul className="-mx-2 mt-1 grid gap-x-4 md:grid-cols-2 lg:grid-cols-1" aria-label="Em aberto por responsável (filtra a lista)">
+            <ul className="-mx-2 mt-1 grid gap-x-4 md:grid-cols-2 lg:grid-cols-1" aria-label="Em aberto por departamento (filtra a lista)">
               {rows.map((r) => {
-                const pressed = assignee === r.key;
+                const pressed = Boolean(r.key) && department === r.key;
                 return (
-                  <li key={r.key} className="min-w-0">
+                  <li key={r.key || 'none'} className="min-w-0">
                     <button
                       type="button"
                       aria-pressed={pressed}
+                      // "Sem departamento" has no filter of its own: the row only shows the count.
+                      disabled={!r.key}
                       aria-label={`${r.label}: ${r.open} em aberto${r.overdue ? `, ${r.overdue} atrasadas` : ''}`}
-                      onClick={() => onAssignee(pressed ? '' : r.key)}
-                      className={cn('grid w-full grid-cols-[8.5rem_minmax(0,1fr)_2rem_3rem] items-center gap-x-2.5 px-2 py-1 text-left pointer-coarse:py-2', toggleClass)}
+                      onClick={() => onDepartment(pressed ? '' : r.key)}
+                      className={cn('grid w-full grid-cols-[8.5rem_minmax(0,1fr)_2rem_3rem] items-center gap-x-2.5 px-2 py-1.5 text-left disabled:cursor-default disabled:hover:bg-transparent pointer-coarse:py-2', toggleClass)}
                     >
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <MemberAvatar name={r.avatar} unassigned={!r.avatar} />
-                        <span className={cn('truncate text-body-sm', r.muted ? 'text-subtle' : 'text-fg', pressed && 'font-semibold')}>{r.label}</span>
-                      </span>
+                      <span className={cn('truncate text-body-sm', r.muted ? 'text-subtle' : 'text-fg', pressed && 'font-semibold')}>{r.label}</span>
                       <span className="block h-1.5" aria-hidden>
                         <span className="block h-full min-w-1 rounded-full bg-data" style={{ width: `${(r.open / max) * 100}%` }} />
                       </span>

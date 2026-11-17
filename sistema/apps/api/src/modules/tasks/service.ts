@@ -92,6 +92,7 @@ import {
 import {
   assertMember,
   clientRef,
+  departmentNames,
   departmentOfMember,
   getTaskCategoryOrThrow,
   getTaskClientOrThrow,
@@ -320,7 +321,7 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
   // Without a date filter, the aggregated occurrences are the open ones and those of the recent window.
   const occurrenceWindow = f.dated ? undefined : sql`(${OPEN_SQL} or ${tasks.competence} >= ${addMonthKey(current, -2)})`;
 
-  const [items, [totals], [agg], byAssigneeRows, byClientRows, [oldest], monthRows, occurrences] =
+  const [items, [totals], [agg], byAssigneeRows, byClientRows, byDepartmentRows, departments, [oldest], monthRows, occurrences] =
     await Promise.all([
       selectTasks(ctx, {
         where: pageWhere,
@@ -385,6 +386,16 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
         )
         .where(and(...f.base, OPEN_SQL))
         .groupBy(tasks.clientId, contacts.name, contacts.tradeName),
+      ctx.db
+        .select({
+          id: tasks.departmentId,
+          open: sql<number>`count(*)`.mapWith(Number),
+          overdue: count(sql`${tasks.dueDate} < ${t}`),
+        })
+        .from(tasks)
+        .where(and(...f.base, OPEN_SQL))
+        .groupBy(tasks.departmentId),
+      departmentNames(ctx.db, ctx.workspaceId),
       selectTasks(ctx, {
         where: and(...f.base, OPEN_SQL, lt(tasks.dueDate, t)),
         orderBy: [asc(tasks.dueDate), sql`${priorityRank}`],
@@ -420,6 +431,13 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
         overdue: r.overdue,
       }))
       .sort((x, y) => y.open - x.open || y.overdue - x.overdue),
+    openByDepartment: byDepartmentRows
+      .map((r) => ({
+        department: r.id && departments.has(r.id) ? { id: r.id, name: departments.get(r.id)! } : null,
+        open: r.open,
+        overdue: r.overdue,
+      }))
+      .sort((x, y) => y.open - x.open || y.overdue - x.overdue || (x.department?.name ?? '').localeCompare(y.department?.name ?? '', 'pt-BR')),
     openByClient: byClientRows
       .map((r) => ({
         client: clientRef({ id: r.id, name: r.name, tradeName: r.tradeName }),

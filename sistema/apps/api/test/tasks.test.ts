@@ -608,6 +608,8 @@ describe('tasks: list, summary and start page', () => {
       ['Ana Paula Ribeiro', 3, 1],
       ['Carla Souza', 2, 1],
     ]);
+    // The Tarefas card counts the open work per department (the department scope: only Fiscal).
+    expect(dept.summary.openByDepartment.map((r: any) => [r.department?.id ?? null, r.open, r.overdue])).toEqual([[fiscal, 5, 2]]);
 
     const filtered = (await ana.get(`/tasks?clientId=${client}`)).body;
     expect(filtered.total).toBe(1);

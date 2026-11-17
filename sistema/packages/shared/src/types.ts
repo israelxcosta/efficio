@@ -2027,6 +2027,8 @@ export interface TaskListSummary {
   monthDone: number;
   /** Open items per assignee (desc). */
   openByAssignee: { assignee: TaskMemberRef | null; open: number; overdue: number }[];
+  /** Open items per department (desc); `null` = without department. */
+  openByDepartment: { department: TaskRef | null; open: number; overdue: number }[];
   /** Open items per client (desc). */
   openByClient: { client: TaskClientRef | null; open: number; overdue: number }[];
 }

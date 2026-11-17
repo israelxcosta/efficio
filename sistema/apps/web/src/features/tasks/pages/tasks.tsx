@@ -150,9 +150,9 @@ export default function TasksPage() {
           summary={data?.summary}
           scope={filters.scope}
           situation={filters.view === 'list' ? filters.situation : 'all'}
-          assignee={filters.assignee}
+          department={filters.department}
           onSituation={(situation) => update({ situation, view: 'list' })}
-          onAssignee={(assignee) => update({ assignee })}
+          onDepartment={(department) => update({ department })}
           onOpenTask={openTask}
         />
       )}
