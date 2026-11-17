@@ -651,7 +651,7 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
                   </span>
                 </span>
                 {/* Prazo track: the target and how the deadline stands (right of the bar below @4xl) */}
-                <span className="order-last hidden w-40 shrink-0 text-right @xl:block @4xl:order-none @4xl:w-auto @4xl:min-w-0 @4xl:text-left">
+                <span className="order-last hidden w-40 shrink-0 text-right @xl:block @4xl:order-none @4xl:w-auto @4xl:min-w-0 @4xl:text-center">
                   <Tooltip content={deadlineTip(col, today)}>
                     <span className="tabular block truncate text-[13px] font-medium text-fg">{shortDate(col.targetDate, today)}</span>
                   </Tooltip>
