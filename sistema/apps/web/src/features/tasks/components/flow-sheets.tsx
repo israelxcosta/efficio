@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import { ArrowDown, ArrowUp, Building2, Ellipsis, GripVertical, ListChecks, Plus, Search, Tags, Text, Trash2, Workflow } from 'lucide-react';
+import { ArrowDown, ArrowUp, Building2, CircleAlert, Ellipsis, GripVertical, ListChecks, Plus, Search, Tags, Text, Trash2, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   TASK_PRIORITY_LABELS,
@@ -21,12 +21,14 @@ import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { SkeletonRows } from '@/components/ui/skeleton';
 import { ADMIN_ONLY_REASON, usePermissions, WriteGate } from '@/features/auth/permissions';
+import { ApiRequestError, errorMessage } from '@/lib/api';
 import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { useApplyFlowTemplate, useCreateFlow, useFlowTemplates, useSaveFlowTemplate } from '../api';
 import { daysText, firstName } from '../due';
 import {
   applyPreview,
+  flowApiErrors,
   flowInputOf,
   hasFlowErrors,
   moveStep,
@@ -229,8 +231,9 @@ export function FlowStepsEditor({ steps, onChange, options, errors, readOnly, bu
                       value={s.assigneeId || NONE}
                       onChange={(v) => patch(i, { assigneeId: v === NONE ? '' : v })}
                       members={options.members}
+                      // Every step ends with a responsible (migration 0024): left empty, who creates/applies.
                       allowNone
-                      noneLabel="Sem responsável"
+                      noneLabel={builder ? 'Você (quem cria o processo)' : 'Quem aplicar o modelo'}
                       disabled={readOnly}
                       aria-label={`Responsável da etapa ${i + 1}`}
                     />
@@ -240,15 +243,36 @@ export function FlowStepsEditor({ steps, onChange, options, errors, readOnly, bu
                     {member?.department ? (
                       <span className="flex h-9 items-center text-caption text-muted">{member.department.name} (do responsável)</span>
                     ) : (
-                      <Select size_="sm" aria-label={`Fila da etapa ${i + 1}`} value={s.departmentId} onChange={(ev) => patch(i, { departmentId: ev.target.value })}>
-                        <option value="">{options.departments.length ? 'Fila: nenhuma' : 'Nenhum departamento'}</option>
+                      <Select
+                        size_="sm"
+                        aria-label={`Departamento da etapa ${i + 1}`}
+                        aria-invalid={e.department ? true : undefined}
+                        aria-describedby={e.department ? `step-${s.key}-department` : undefined}
+                        value={s.departmentId}
+                        disabled={readOnly}
+                        onChange={(ev) => patch(i, { departmentId: ev.target.value })}
+                      >
+                        <option value="">
+                          {!options.departments.length
+                            ? 'Nenhum departamento'
+                            : member
+                              ? 'Escolha o departamento'
+                              : builder
+                                ? `O seu${options.me.department ? ` (${options.me.department.name})` : ''}`
+                                : 'O de quem aplicar'}
+                        </option>
                         {options.departments.map((d) => (
                           <option key={d.id} value={d.id}>
-                            Fila: {d.name}
+                            {d.name}
                           </option>
                         ))}
                       </Select>
                     )}
+                    {e.department ? (
+                      <p id={`step-${s.key}-department`} role="alert" className="text-xs font-medium text-danger">
+                        {e.department}
+                      </p>
+                    ) : null}
                   </div>
                   {s.showCategory || s.categoryId ? (
                     <div className="flex flex-col gap-1">
@@ -449,6 +473,11 @@ export function FlowBuilderSheet({ open, onOpenChange, options, onCreated }: Flo
         action: onCreated ? { label: 'Ver tarefa', onClick: () => onCreated(res.task.id) } : undefined,
       });
     } catch (error) {
+      // 400 `steps.N.departmentId` (a step left without department) under the step.
+      if (error instanceof ApiRequestError) {
+        const fields = error.fieldErrors();
+        if (Object.keys(fields).length) setErrors(flowApiErrors(fields, steps));
+      }
       toastError(error);
     }
   }
@@ -524,11 +553,13 @@ export function ApplyTemplateDialog({ template, options, onOpenChange, onOpenTas
   const [clientId, setClientId] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
   const today = options?.today ?? todayISO();
   useEffect(() => {
     setClientId('');
     setName('');
     setError(null);
+    setApiError(null);
   }, [template?.id]);
   if (!template) return null;
   const client = options?.clients.find((c) => c.id === clientId);
@@ -539,12 +570,15 @@ export function ApplyTemplateDialog({ template, options, onOpenChange, onOpenTas
       setError('Selecione o cliente para aplicar o modelo.');
       return;
     }
+    setApiError(null);
     try {
       const res = await apply.mutateAsync({ id: template.id, input: { clientId, title: name.trim() || null } });
       onOpenChange(false);
       toast('Modelo aplicado. A primeira tarefa já foi criada.', { action: { label: 'Ver tarefa', onClick: () => onOpenTask(res.task.id) } });
     } catch (e) {
-      toastError(e);
+      // 422: a step of the template would end without department (the message names the step).
+      if (e instanceof ApiRequestError && (e.status === 422 || e.status === 400)) setApiError(errorMessage(e));
+      else toastError(e);
     }
   }
 
@@ -591,6 +625,14 @@ export function ApplyTemplateDialog({ template, options, onOpenChange, onOpenTas
             ))}
           </ol>
         </div>
+        {apiError ? (
+          <div role="alert" className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger-soft p-3 text-body-sm text-fg">
+            <CircleAlert className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
+            <span>
+              {apiError} <span className="text-muted">Ajuste a etapa em Modelos de processo e aplique de novo.</span>
+            </span>
+          </div>
+        ) : null}
       </div>
     </Modal>
   );

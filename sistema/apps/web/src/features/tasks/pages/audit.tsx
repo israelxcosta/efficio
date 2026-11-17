@@ -645,7 +645,7 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
                     <span className="mt-0.5 block truncate text-xs text-muted">
                       {/* Narrow: the name keeps the room; the week goes to the subtitle */}
                       {col.period === 'weekly' ? <span className="@md:hidden">{periodLabel(col, today)} · </span> : null}
-                      {col.department?.name ?? 'Sem departamento'}
+                      {col.department.name}
                     </span>
                     <span className={cn('mt-0.5 block truncate text-xs @xl:hidden', DUE_TONE_CLASS[inline.tone])}>{inline.text}</span>
                   </span>

@@ -17,8 +17,8 @@ describe('who receives the occurrences of a recurring task', () => {
   };
 
   it('says the default responsible and who got one by hand, never a client responsible', () => {
-    expect(distributionText(r)).toBe('Hoje: Ana P. 12 (padrão) · Bruno C. 1 (à mão) · sem responsável 2');
-    expect(distributionTip(r)).toBe('Ana P. 12 (padrão) · Bruno C. 1 (à mão) · sem responsável 2');
+    expect(distributionText(r)).toBe('Hoje: Ana P. 12 (padrão) · Bruno C. 1 (à mão) · ex-membro 2');
+    expect(distributionTip(r)).toBe('Ana P. 12 (padrão) · Bruno C. 1 (à mão) · ex-membro 2');
     expect(distributionText({ distribution: [] })).toBe('');
   });
 

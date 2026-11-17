@@ -50,9 +50,8 @@ export function TasksSummary({ summary, scope, situation, department, onSituatio
   const byAssignee = scope !== 'mine';
   const rows = summary && byAssignee
     ? (summary.openByDepartment ?? []).slice(0, 6).map((r) => ({
-        key: r.department?.id ?? '',
-        label: r.department?.name ?? 'Sem departamento',
-        muted: !r.department,
+        key: r.department.id,
+        label: r.department.name,
         open: r.open,
         overdue: r.overdue,
       }))
@@ -204,19 +203,17 @@ export function TasksSummary({ summary, scope, situation, department, onSituatio
           ) : (
             <ul className="-mx-2 mt-1 grid grid-cols-[minmax(0,max-content)_minmax(1.5rem,1fr)_2rem_2.75rem] gap-x-2.5" aria-label="Em aberto por departamento (filtra a lista)">
               {rows.map((r) => {
-                const pressed = Boolean(r.key) && department === r.key;
+                const pressed = department === r.key;
                 return (
-                  <li key={r.key || 'none'} className="col-span-full grid grid-cols-subgrid">
+                  <li key={r.key} className="col-span-full grid grid-cols-subgrid">
                     <button
                       type="button"
                       aria-pressed={pressed}
-                      // "Sem departamento" has no filter of its own: the row only shows the count.
-                      disabled={!r.key}
                       aria-label={`${r.label}: ${r.open} em aberto${r.overdue ? `, ${r.overdue} atrasadas` : ''}`}
                       onClick={() => onDepartment(pressed ? '' : r.key)}
-                      className={cn('col-span-full grid grid-cols-subgrid items-center px-2 py-1.5 text-left disabled:cursor-default disabled:hover:bg-transparent pointer-coarse:py-2', toggleClass)}
+                      className={cn('col-span-full grid grid-cols-subgrid items-center px-2 py-1.5 text-left pointer-coarse:py-2', toggleClass)}
                     >
-                      <span title={r.label} className={cn('truncate text-body-sm', r.muted ? 'text-subtle' : 'text-fg', pressed && 'font-semibold')}>{r.label}</span>
+                      <span title={r.label} className={cn('truncate text-body-sm text-fg', pressed && 'font-semibold')}>{r.label}</span>
                       <span className="block h-1.5" aria-hidden>
                         <span className="block h-full min-w-1 rounded-full bg-data" style={{ width: `${(r.open / max) * 100}%` }} />
                       </span>

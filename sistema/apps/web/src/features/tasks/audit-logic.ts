@@ -313,7 +313,7 @@ export function cellTip(cell: OccurrenceCell, _department: string | null): strin
     const delay = conclusionDelayDays(cell);
     return `Concluída${cell.concludedBy ? ` por ${cell.concludedBy.name}` : ''}${cell.concludedAt ? ` em ${dateTimeBR(cell.concludedAt)}` : ''}${delay ? `, ${daysText(delay)} após o prazo legal` : ''}`;
   }
-  const who = cell.assignee ? cell.assignee.name : 'Sem responsável';
+  const who = cell.assignee ? cell.assignee.name : 'Ex-membro';
   const source = cell.assignee ? assigneeSourceText(cell.assigneeSource)?.toLowerCase() : null;
   return `${TASK_STATUS_LABELS[cell.status]} · ${who}${source ? ` (${source})` : ''}`;
 }

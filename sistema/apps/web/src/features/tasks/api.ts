@@ -544,9 +544,9 @@ export function recurringInputOf(r: RecurringTask, patch: Partial<RecurringTaskI
     description: r.description,
     // The registry's recurring tasks (the default `origin`): never `daily` nor `skip`.
     period: r.period as RecurrencePeriod,
-    departmentId: r.department?.id ?? null,
+    departmentId: r.department.id,
     categoryId: r.category?.id ?? null,
-    assigneeId: r.assignee?.id ?? null,
+    assigneeId: r.assignee.id,
     dueDay: r.dueDay,
     dueMonth: r.dueMonth,
     targetDaysBefore: r.targetDaysBefore,

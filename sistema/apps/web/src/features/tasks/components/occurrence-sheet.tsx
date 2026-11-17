@@ -34,7 +34,7 @@ import { withSheetParams } from '../task-links';
 import { useCellStatus } from '../use-cell-status';
 import { OccurrenceCellControl, OccurrenceStatusGlyph } from './matrix-cell';
 import { occurrenceViewFromParam, OCCURRENCE_SHEET_PARAMS, type OccurrenceView } from './occurrence-row';
-import { MemberPicker, NONE } from './pickers';
+import { MemberPicker } from './pickers';
 
 /** Clients of the sheet for a view, the search and the responsible filter. */
 export function occurrenceSheetCells(
@@ -57,7 +57,7 @@ export function occurrenceSheetCells(
   return detail.cells
     .filter((c) => (view === 'mine' ? c.assignee?.id === meId : view === 'pending' ? isPendingCell(c) : true))
     .filter((c) => !q || norm(c.client.name).includes(q) || norm(c.client.legalName).includes(q))
-    .filter((c) => !assignee || (assignee === NONE ? !c.assignee : c.assignee?.id === assignee))
+    .filter((c) => !assignee || c.assignee?.id === assignee)
     .sort((a, b) => a.client.name.localeCompare(b.client.name, 'pt-BR'));
 }
 
@@ -137,7 +137,7 @@ function RecurringOccurrenceSheet({ open, id, period, initialView, onClose, onOp
   const title = d ? occurrenceTitle(d, today) : 'Tarefa recorrente';
   const description = d ? (
     <>
-      {[d.department?.name, d.period !== 'weekly' ? referenceLabel(d.referenceMonth) : null, d.targetDate < d.legalDueDate ? `meta ${shortDate(d.targetDate, today)}` : null, `prazo legal ${shortDate(d.legalDueDate, today)}`]
+      {[d.department.name, d.period !== 'weekly' ? referenceLabel(d.referenceMonth) : null, d.targetDate < d.legalDueDate ? `meta ${shortDate(d.targetDate, today)}` : null, `prazo legal ${shortDate(d.legalDueDate, today)}`]
         .filter(Boolean)
         .join(' · ')}
       {d.pending > 0 && deadline && (deadline.tone === 'danger' || deadline.tone === 'warning-strong') ? (
@@ -178,7 +178,6 @@ function RecurringOccurrenceSheet({ open, id, period, initialView, onClose, onOp
                 members={options.data.members}
                 allowAll
                 allLabel="Todos os responsáveis"
-                allowNone
                 meFirst
                 aria-label="Responsável"
               />
@@ -246,24 +245,25 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
   const [picking, setPicking] = useState(false);
   const periodName = periodLabel(detail, today);
   const ctx = { taskName: detail.name, clientName: cell.client.name };
-  const department = detail.department?.name ?? null;
+  const department = detail.department.name;
   const canceled = cell.status === 'canceled';
 
-  async function assign(userId: string | null) {
+  async function assign(userId: string) {
     const previous = cell.assignee;
     try {
       await update.mutateAsync({ id: cell.taskId, patch: { assigneeId: userId } });
-      const who = userId ? members.find((m) => m.id === userId) : null;
-      toast(`${detail.name} de ${cell.client.name} em ${competenceName(detail.competence).split(' ')[0]}: ${who ? `agora com ${firstName(who.name)}` : 'sem responsável'}.`, {
+      const who = members.find((m) => m.id === userId);
+      toast(`${detail.name} de ${cell.client.name} em ${competenceName(detail.competence).split(' ')[0]}: agora com ${who ? firstName(who.name) : 'o novo responsável'}.`, {
         duration: 6000,
-        action: { label: 'Desfazer', onClick: () => void update.mutateAsync({ id: cell.taskId, patch: { assigneeId: previous?.id ?? null } }).catch(toastError) },
+        // A task never goes back to "no responsible" (migration 0024): undo only returns it to someone.
+        action: previous ? { label: 'Desfazer', onClick: () => void update.mutateAsync({ id: cell.taskId, patch: { assigneeId: previous.id } }).catch(toastError) } : undefined,
       });
     } catch (error) {
       toastError(error);
     }
   }
 
-  const sourceTip = (cell.assignee ? assigneeSourceText(cell.assigneeSource) : null) ?? 'Sem responsável';
+  const sourceTip = cell.assignee ? (assigneeSourceText(cell.assigneeSource) ?? cell.assignee.name) : 'Ex-membro';
 
   return (
     <li className="group flex min-h-[52px] items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-muted">
@@ -289,7 +289,7 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
         </button>
         <p className="truncate text-xs text-muted">
           {TAX_REGIME_LABELS[cell.client.taxRegime]}
-          <span className="sm:hidden"> · {cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável'}</span>
+          <span className="sm:hidden"> · {cell.assignee ? shortName(cell.assignee.name) : 'Ex-membro'}</span>
         </p>
         {cell.status === 'done' && cell.concludedAt ? (
           <p className="truncate text-mini text-muted">
@@ -301,7 +301,7 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
       <Tooltip content={sourceTip}>
         <span className="hidden w-32 min-w-0 items-center gap-2 sm:flex" tabIndex={-1}>
           <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} userId={cell.assignee?.id} />
-          <span className={cn('truncate text-[13px]', cell.assignee ? 'text-fg' : 'text-subtle')}>{cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável'}</span>
+          <span className={cn('truncate text-[13px]', cell.assignee ? 'text-fg' : 'text-subtle')}>{cell.assignee ? shortName(cell.assignee.name) : 'Ex-membro'}</span>
         </span>
       </Tooltip>
       <DropdownMenu>
@@ -337,12 +337,12 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
         <AssignOccurrenceDialog
           title={`Atribuir ${detail.name} de ${cell.client.name}`}
           members={members}
-          value={cell.assignee?.id ?? NONE}
-          departmentId={detail.department?.id}
+          value={cell.assignee?.id ?? ''}
+          departmentId={detail.department.id}
           onClose={() => setPicking(false)}
           onPick={(v) => {
             setPicking(false);
-            if ((v === NONE ? null : v) !== (cell.assignee?.id ?? null)) void assign(v === NONE ? null : v);
+            if (v && v !== cell.assignee?.id) void assign(v);
           }}
         />
       ) : null}
@@ -378,12 +378,14 @@ function AssignOccurrenceDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={() => onPick(picked)}>Atribuir</Button>
+          <Button disabled={!picked} onClick={() => onPick(picked)}>
+            Atribuir
+          </Button>
         </>
       }
     >
       <Field label="Responsável">
-        <MemberPicker value={picked} onChange={setPicked} members={members} allowNone meFirst departmentId={departmentId} />
+        <MemberPicker value={picked} onChange={setPicked} members={members} meFirst departmentId={departmentId} />
       </Field>
     </Modal>
   );

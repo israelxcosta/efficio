@@ -44,7 +44,7 @@ import {
   previewLines,
   referenceOptionLabel,
 } from '../recurring-rules';
-import { ClientPicker, MemberPicker, NONE } from './pickers';
+import { ClientPicker, MemberPicker } from './pickers';
 import { AnchorMonthField, DueDayField, NonBusinessField } from './recurrence-fields';
 
 /** Form state: numbers as strings while typing; `endCompetence` '' = no end. */
@@ -92,9 +92,9 @@ export function recurringFormOf(r: RecurringTask, copy = false): RecurringForm {
   return {
     name: copy ? `${r.name} (cópia)` : r.name,
     description: r.description ?? '',
-    departmentId: r.department?.id ?? '',
+    departmentId: r.department.id,
     categoryId: r.category?.id ?? '',
-    assigneeId: r.assignee?.id ?? '',
+    assigneeId: r.assignee.id,
     // The registry's recurring tasks: never `daily` nor `skip`.
     period: r.period as RecurrencePeriod,
     dueDay: String(r.dueDay),
@@ -117,9 +117,9 @@ export function recurringInputFromForm(f: RecurringForm): RecurringTaskInput {
     name: f.name,
     description: f.description.trim() || null,
     period: f.period,
-    departmentId: f.departmentId || null,
+    departmentId: f.departmentId,
     categoryId: f.categoryId || null,
-    assigneeId: f.assigneeId || null,
+    assigneeId: f.assigneeId,
     dueDay: num(f.dueDay) as number,
     dueMonth: num(f.dueMonth),
     targetDaysBefore: num(f.targetDaysBefore) ?? 0,
@@ -135,8 +135,11 @@ export function recurringInputFromForm(f: RecurringForm): RecurringTaskInput {
 
 export type RecurringErrors = Partial<Record<keyof RecurringForm, string>>;
 
-/** Validates with the contract's schema; the messages of the screen end with a period. */
-export function validateRecurring(f: RecurringForm, needsDepartment: boolean): RecurringErrors {
+/**
+ * Validates with the contract's schema (department and default responsible are required since migration
+ * 0024); the messages of the screen end with a period.
+ */
+export function validateRecurring(f: RecurringForm): RecurringErrors {
   const out: RecurringErrors = {};
   const parsed = recurringTaskInputSchema.safeParse(recurringInputFromForm(f));
   if (!parsed.success) {
@@ -147,7 +150,6 @@ export function validateRecurring(f: RecurringForm, needsDepartment: boolean): R
       out[key] = msg.endsWith('.') ? msg : `${msg}.`;
     }
   }
-  if (needsDepartment && !f.departmentId) out.departmentId = 'Escolha o departamento.';
   return out;
 }
 
@@ -212,7 +214,7 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
   }, [form.period, form.dueDay, form.dueMonth, form.targetDaysBefore, form.nonBusinessDayRule, form.referenceOffset]);
 
   async function submit() {
-    const next = validateRecurring(form, departments.length > 0);
+    const next = validateRecurring(form);
     setErrors(next);
     if (Object.keys(next).length) return;
     try {
@@ -223,7 +225,7 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
     } catch (error) {
       if (error instanceof ApiRequestError) {
         const fields = error.fieldErrors();
-        if (Object.keys(fields).length) setErrors(fields as RecurringErrors);
+        if (Object.keys(fields).length) setErrors(Object.fromEntries(Object.entries(fields).map(([k, m]) => [k, m.endsWith('.') ? m : `${m}.`])) as RecurringErrors);
       }
       toastError(error);
     }
@@ -292,10 +294,14 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
               <Textarea disabled={readOnly} rows={2} maxLength={5000} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Detalhes ou observações (opcional)" />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              {departments.length ? (
-                <Field label="Departamento*" error={errors.departmentId} hint="Recebe as tarefas desta obrigação. O responsável de cada cliente vem deste departamento.">
-                  <Select disabled={readOnly} value={form.departmentId} onChange={(e) => set('departmentId', e.target.value)}>
-                    <option value="">Escolha o departamento</option>
+              {/* Required (migration 0024): without departments registered, the field says how to go on. */}
+              <Field
+                  label="Departamento*"
+                  error={errors.departmentId ?? (departments.length ? undefined : 'Cadastre um departamento em Cadastros antes de criar a recorrente.')}
+                  hint="Recebe as tarefas desta obrigação. O responsável de cada cliente vem deste departamento."
+                >
+                  <Select disabled={readOnly || departments.length === 0} value={form.departmentId} onChange={(e) => set('departmentId', e.target.value)}>
+                    <option value="">{departments.length ? 'Escolha o departamento' : 'Nenhum departamento cadastrado'}</option>
                     {departments.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.name}
@@ -303,7 +309,6 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
                     ))}
                   </Select>
                 </Field>
-              ) : null}
               <Field label="Categoria">
                 <Select disabled={readOnly} value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)}>
                   <option value="">Sem categoria</option>
@@ -407,20 +412,21 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
 
           <Group title="Quem">
             <Field
-              label="Responsável padrão"
+              label="Responsável padrão*"
+              error={errors.assigneeId}
               hint={
                 <>
-                  Recebe as tarefas de todos os clientes desta recorrente, todo período. Sem responsável padrão, elas ficam na fila{department ? ` do ${department.name}` : ' do departamento'}.
+                  Recebe as tarefas de todos os clientes desta recorrente, todo período{department ? ` (de preferência alguém do ${department.name})` : ''}. Dá para atribuir outra pessoa numa competência.
                   {editing && recurring && distributionText(recurring) ? <span className="mt-1 block">{distributionText(recurring)}</span> : null}
                 </>
               }
             >
               <MemberPicker
-                value={form.assigneeId || NONE}
-                onChange={(v) => set('assigneeId', v === NONE ? '' : v)}
+                value={form.assigneeId}
+                onChange={(v) => set('assigneeId', v)}
                 members={options.members}
-                allowNone
-                noneLabel="Sem responsável padrão"
+                meFirst
+                placeholder="Escolha o responsável padrão"
                 departmentId={form.departmentId || undefined}
                 disabled={readOnly}
               />

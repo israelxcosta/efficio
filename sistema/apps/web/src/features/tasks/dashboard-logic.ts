@@ -231,17 +231,14 @@ export function agendaInsight(upcoming: readonly { name: string; legalDueDate: I
   return `${count} até ${dayMonth(until)} · próximo: ${next.name} em ${dayMonth(next.legalDueDate)}`;
 }
 
-/**
- * "Ana R. concentra 80% · 3 atrasadas" (open work = open + overdue; `open` excludes overdue). The
- * unassigned row keeps its label ("Sem responsável").
- */
-export function assigneeInsight(rows: readonly { label: string; open: number; overdue: number; unassigned?: boolean }[]): string | null {
+/** "Ana R. concentra 80% · 3 atrasadas" (open work = open + overdue; `open` excludes overdue). */
+export function assigneeInsight(rows: readonly { label: string; open: number; overdue: number }[]): string | null {
   const load = (r: { open: number; overdue: number }) => r.open + r.overdue;
   const total = rows.reduce((a, r) => a + load(r), 0);
   if (total === 0) return null;
   const top = rows.reduce((best, r) => (load(r) > load(best) ? r : best), rows[0]!);
   const late = rows.reduce((a, r) => a + r.overdue, 0);
-  const head = `${top.unassigned ? top.label : shortName(top.label)} concentra ${Math.round((load(top) / total) * 100)}%`;
+  const head = `${shortName(top.label)} concentra ${Math.round((load(top) / total) * 100)}%`;
   return late > 0 ? `${head} · ${late === 1 ? '1 atrasada' : `${late} atrasadas`}` : head;
 }
 

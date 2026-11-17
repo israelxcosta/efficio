@@ -206,7 +206,7 @@ export default function TaskReportsPage() {
             <Block className="lg:col-span-4" title="Por situação" info="Atrasadas contam à parte de Em aberto.">
               {r ? <StatusBar100 r={r} /> : <SkeletonRows rows={4} />}
             </Block>
-            <PunctualityBlock className="lg:col-span-6" title="Por departamento" rows={r?.byDepartment} active={f.department} onPick={(key) => update({ department: key ?? '' })} mutedNull="Sem departamento" />
+            <PunctualityBlock className="lg:col-span-6" title="Por departamento" rows={r?.byDepartment} active={f.department} onPick={(key) => update({ department: key ?? '' })} />
             <AssigneeBlock className="lg:col-span-6" r={r} active={f.assignee} onPick={(key) => update({ assignee: key ?? 'none' })} />
             <PunctualityBlock className="lg:col-span-6" title="Por cliente" rows={r?.byClient} max={8} active={f.client} onPick={(key) => update({ client: key ?? 'internal' })} mutedNull="Interna" />
             <PunctualityBlock
@@ -307,7 +307,7 @@ function ReportFiltersBar({ f, options, onChange }: { f: ReportFilters; options:
         ))}
       </Select>
     ),
-    assignee: <MemberPicker size_={sm ? 'sm' : 'md'} value={f.assignee} onChange={(assignee) => onChange({ assignee })} members={options?.members ?? []} allowAll allowNone meFirst aria-label="Responsável" />,
+    assignee: <MemberPicker size_={sm ? 'sm' : 'md'} value={f.assignee} onChange={(assignee) => onChange({ assignee })} members={options?.members ?? []} allowAll allowNone noneLabel="Ex-membro" meFirst aria-label="Responsável" />,
     category: (
       <Select size_={sm ? 'sm' : 'md'} aria-label="Categoria" value={f.category} onChange={(e) => onChange({ category: e.target.value })}>
         <option value="">Todas as categorias</option>
@@ -657,7 +657,8 @@ function PunctualityList({
   active,
   onPick,
   avatars,
-  mutedNull = 'Sem responsável',
+  // A null responsible is history: tasks closed by someone who left the office.
+  mutedNull = 'Ex-membro',
   reworkKeys,
 }: {
   rows: TaskBreakdownRow[];
@@ -856,9 +857,9 @@ function DetailTable({ r, f, today, label, onPage, onLastMonths }: { r: TaskRepo
                         </button>
                       </td>
                       <td className={cn('max-w-44 truncate border-b border-border px-3 py-2', row.client ? 'text-fg' : 'text-subtle')}>{row.client?.name ?? 'Interna'}</td>
-                      <td className="border-b border-border px-3 py-2 text-fg">{row.department?.name ?? '—'}</td>
+                      <td className="border-b border-border px-3 py-2 text-fg">{row.department.name}</td>
                       <td className="max-w-40 truncate border-b border-border px-3 py-2 text-fg">{row.category?.name ?? '—'}</td>
-                      <td className={cn('border-b border-border px-3 py-2', row.assignee ? 'text-fg' : 'text-subtle')}>{row.assignee ? shortName(row.assignee.name) : 'Sem responsável'}</td>
+                      <td className={cn('border-b border-border px-3 py-2', row.assignee ? 'text-fg' : 'text-subtle')}>{row.assignee ? shortName(row.assignee.name) : 'Ex-membro'}</td>
                       <td className="border-b border-border px-3 py-2 text-fg">{TASK_PRIORITY_LABELS[row.priority]}</td>
                       <td className="tabular border-b border-border px-3 py-2 text-right text-fg">{date(row.dueDate)}</td>
                       <td className="tabular border-b border-border px-3 py-2 text-right text-fg">{row.kind === 'recurring' ? date(row.targetDate) : '—'}</td>
@@ -880,7 +881,7 @@ function DetailTable({ r, f, today, label, onPage, onLastMonths }: { r: TaskRepo
                       <span className={cn('shrink-0 text-xs', row.overdue ? 'font-semibold text-danger' : row.targetMissed ? 'font-semibold text-warning' : 'text-muted')}>{rowSituation(row)}</span>
                     </span>
                     <span className="truncate text-xs text-muted">
-                      {[row.client?.name ?? 'Interna', row.assignee ? shortName(row.assignee.name) : 'Sem responsável', row.dueDate ? `vence ${shortDate(row.dueDate, today)}` : 'sem vencimento', row.completedOnTime === null ? null : row.completedOnTime ? 'no prazo' : 'com atraso']
+                      {[row.client?.name ?? 'Interna', row.assignee ? shortName(row.assignee.name) : 'Ex-membro', row.dueDate ? `vence ${shortDate(row.dueDate, today)}` : 'sem vencimento', row.completedOnTime === null ? null : row.completedOnTime ? 'no prazo' : 'com atraso']
                         .filter(Boolean)
                         .join(' · ')}
                     </span>

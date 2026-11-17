@@ -27,7 +27,7 @@ export interface TaskFilters {
   search: string;
   /** Client id or `internal`. */
   client: string;
-  /** Member id or `none`. */
+  /** Member id (open tasks always have one: no "Sem responsável" filter). */
   assignee: string;
   department: string;
   category: string;
@@ -89,7 +89,8 @@ export function parseTaskFilters(params: URLSearchParams, defaults: TaskViewPref
     situation: fromParam(SITUATION_PARAM, params.get('situacao')) ?? 'open',
     search: (params.get('busca') ?? '').slice(0, 200),
     client: client === 'interna' ? 'internal' : id(client),
-    assignee: assignee === 'nenhum' ? 'none' : id(assignee),
+    // `responsavel=nenhum` of old links is dropped: open tasks always have a responsible (migration 0024).
+    assignee: id(assignee),
     department: id(params.get('departamento')),
     category: id(params.get('categoria')),
     priority: fromParam(PRIORITY_PARAM, params.get('prioridade')) ?? '',
@@ -116,7 +117,7 @@ export function writeTaskFilters(params: URLSearchParams, patch: TaskFilterPatch
   if (patch.situation !== undefined) set('situacao', patch.situation === 'open' ? null : SITUATION_PARAM[patch.situation]);
   if (patch.search !== undefined) set('busca', patch.search.trim());
   if (patch.client !== undefined) set('cliente', patch.client === 'internal' ? 'interna' : patch.client);
-  if (patch.assignee !== undefined) set('responsavel', patch.assignee === 'none' ? 'nenhum' : patch.assignee);
+  if (patch.assignee !== undefined) set('responsavel', patch.assignee);
   if (patch.department !== undefined) set('departamento', patch.department);
   if (patch.category !== undefined) set('categoria', patch.category);
   if (patch.priority !== undefined) set('prioridade', patch.priority ? PRIORITY_PARAM[patch.priority] : null);

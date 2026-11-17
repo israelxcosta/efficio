@@ -507,19 +507,10 @@ function ByAssignee({ home, people, where, loading }: { home: TaskHomeResponse |
     if (!home) return [];
     const base = listBase(home);
     const withWork = home.byAssignee.filter((r) => r.open + r.overdue > 0);
-    const unassigned = withWork.filter((r) => !r.assignee);
+    // Open work always has a responsible (migration 0024): no "Sem responsável" row.
     const assigned = withWork.filter((r) => r.assignee).sort((a, b) => b.open + b.overdue - (a.open + a.overdue));
     const idle = people.filter((p) => !withWork.some((r) => r.assignee?.id === p.id)).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
     return [
-      ...unassigned.map((r) => ({
-        key: 'none',
-        label: 'Sem responsável',
-        muted: true,
-        leading: <MemberAvatar unassigned />,
-        open: r.open,
-        overdue: r.overdue,
-        href: tasksHref({ ...base, scope: 'all', assignee: 'none' }),
-      })),
       ...assigned.map((r) => ({
         key: r.assignee!.id,
         label: r.assignee!.name,
@@ -536,7 +527,7 @@ function ByAssignee({ home, people, where, loading }: { home: TaskHomeResponse |
   return (
     <WidgetCard
       title="Por responsável"
-      subtitle={assigneeInsight(rows.map((r) => ({ label: r.label, open: r.open, overdue: r.overdue, unassigned: r.key === 'none' }))) ?? `Em aberto ${where}`}
+      subtitle={assigneeInsight(rows) ?? `Em aberto ${where}`}
       info={`Tarefas em aberto ${where} por responsável (atrasadas em vermelho). A porcentagem é a parte de cada pessoa no total em aberto.`}
       action={
         <Button variant="ghost" size="sm" asChild>

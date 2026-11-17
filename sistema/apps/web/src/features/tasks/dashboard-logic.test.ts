@@ -252,9 +252,7 @@ describe('finding lines of the status cards', () => {
     expect(overviewInsight({ attention: 0, pending: 0, upToDate: 5 })).toBe('5 clientes em dia');
   });
 
-  it('assignees: the unassigned row keeps its name', () => {
-    expect(assigneeInsight([{ label: 'Sem responsável', open: 3, overdue: 0, unassigned: true }, { label: 'Ana Paula Ribeiro', open: 1, overdue: 0 }])).toBe(
-      'Sem responsável concentra 75%',
-    );
+  it('assignees: who concentrates the open work (no "Sem responsável" row since migration 0024)', () => {
+    expect(assigneeInsight([{ label: 'Bruno Costa', open: 3, overdue: 0 }, { label: 'Ana Paula Ribeiro', open: 1, overdue: 0 }])).toBe('Bruno C. concentra 75%');
   });
 });

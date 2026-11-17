@@ -138,7 +138,7 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
           </div>
         ) : null}
         {!mine ? (
-          <Tooltip content={assigneesTip(o) || 'Sem responsável'}>
+          <Tooltip content={assigneesTip(o) || `Padrão: ${o.defaultAssignee.name}`}>
             <div className={cn('hidden min-w-0 items-center gap-2', compact ? '@sm:flex' : 'w-36 @2xl:flex')} tabIndex={-1}>
               {names.length === 1 ? (
                 <>

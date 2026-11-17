@@ -25,7 +25,7 @@ const p = (qs: string) => new URLSearchParams(qs);
 describe('parseTaskFilters', () => {
   it('reads every filter of the URL', () => {
     const f = parseTaskFilters(
-      p(`escopo=todas&visao=quadro&situacao=atrasadas&busca=balancete&cliente=${ID}&responsavel=nenhum&departamento=${ID2}&categoria=${ID}&prioridade=urgente&mes=2026-10&vencimento=2026-10-30&tipo=recorrentes&pagina=3&atrasadas=1`),
+      p(`escopo=todas&visao=quadro&situacao=atrasadas&busca=balancete&cliente=${ID}&responsavel=${ID2}&departamento=${ID2}&categoria=${ID}&prioridade=urgente&mes=2026-10&vencimento=2026-10-30&tipo=recorrentes&pagina=3&atrasadas=1`),
     );
     expect(f).toEqual({
       scope: 'all',
@@ -33,7 +33,7 @@ describe('parseTaskFilters', () => {
       situation: 'overdue',
       search: 'balancete',
       client: ID,
-      assignee: 'none',
+      assignee: ID2,
       department: ID2,
       category: ID,
       priority: 'urgent',
@@ -66,6 +66,11 @@ describe('parseTaskFilters', () => {
     expect(parseTaskFilters(p('vencimento=2028-02-29&mes=2199-12'))).toMatchObject({ dueDate: '2028-02-29', month: '2199-12' });
   });
 
+  it('drops "Sem responsável" of old links (migration 0024: the API refuses `assigneeId=none`)', () => {
+    expect(parseTaskFilters(p('responsavel=nenhum')).assignee).toBe('');
+    expect(toTaskQuery(parseTaskFilters(p('escopo=todas&responsavel=nenhum')), '2026-10-15').assigneeId).toBeUndefined();
+  });
+
   it('understands "Internas"', () => {
     expect(parseTaskFilters(p('cliente=interna')).client).toBe('internal');
   });
@@ -73,10 +78,10 @@ describe('parseTaskFilters', () => {
 
 describe('writeTaskFilters', () => {
   it('writes Portuguese params, keeps unrelated ones and goes back to page 1', () => {
-    const next = writeTaskFilters(p(`tarefa=${ID}&pagina=4&escopo=minhas`), { client: 'internal', assignee: 'none', situation: 'done', priority: 'high' });
+    const next = writeTaskFilters(p(`tarefa=${ID}&pagina=4&escopo=minhas`), { client: 'internal', assignee: ID2, situation: 'done', priority: 'high' });
     expect(next.get('tarefa')).toBe(ID);
     expect(next.get('cliente')).toBe('interna');
-    expect(next.get('responsavel')).toBe('nenhum');
+    expect(next.get('responsavel')).toBe(ID2);
     expect(next.get('situacao')).toBe('concluidas');
     expect(next.get('prioridade')).toBe('alta');
     expect(next.has('pagina')).toBe(false);

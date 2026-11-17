@@ -165,7 +165,7 @@ export function AuditOccurrenceRow({ lead, cell, column, client, data, today, mo
   const status = useCellStatus();
   const { openTask } = useTaskSheetLinks();
   const { canWriteTasks } = usePermissions();
-  const department = column.department?.name ?? null;
+  const department = column.department.name;
   const control = canWriteTasks ? (
     <OccurrenceCellControl
       cell={cell}
@@ -201,8 +201,9 @@ export interface AuditOccurrenceRowViewProps {
 export function AuditOccurrenceRowView({ lead, cell, column, client, today, control, dimmed, onOpenTask }: AuditOccurrenceRowViewProps) {
   const done = cell.status === 'done';
   const canceled = cell.status === 'canceled';
-  const department = column.department?.name ?? null;
-  const who = cell.assignee ? shortName(cell.assignee.name) : 'Sem responsável';
+  const department = column.department.name;
+  // No responsible only on a closed task of someone who left the office (migration 0024).
+  const who = cell.assignee ? shortName(cell.assignee.name) : 'Ex-membro';
   const delay = conclusionDelayDays(cell);
   const exception = situationException(cell);
   const period = column.period === 'weekly' ? periodLabel(column, today) : column.period !== 'monthly' ? RECURRENCE_PERIOD_LABELS[column.period] : null;
@@ -234,7 +235,7 @@ export function AuditOccurrenceRowView({ lead, cell, column, client, today, cont
         {lead === 'client' ? (
           <p className="hidden truncate text-xs text-muted @4xl:block">{TAX_REGIME_LABELS[client.taxRegime]}</p>
         ) : (
-          <p className="hidden truncate text-xs text-muted @4xl:block @6xl:hidden">{department ?? 'Sem departamento'}</p>
+          <p className="hidden truncate text-xs text-muted @4xl:block @6xl:hidden">{department}</p>
         )}
         <p data-col="stacked-meta" className="truncate text-xs @4xl:hidden">
           <span className="text-muted">{meta.text}</span>
@@ -246,13 +247,13 @@ export function AuditOccurrenceRowView({ lead, cell, column, client, today, cont
       {/* Departamento (wide level) */}
       <div data-col="department" className="hidden min-w-0 @6xl:block">
         <span className="sr-only">Departamento: </span>
-        <span title={department ?? undefined} className={cn('block truncate text-body-sm', department ? 'text-fg' : 'text-subtle')}>
-          {department ?? 'Sem departamento'}
+        <span title={department} className="block truncate text-body-sm text-fg">
+          {department}
         </span>
       </div>
 
       {/* Responsável */}
-      <Tooltip content={(cell.assignee ? assigneeSourceText(cell.assigneeSource) : null) ?? 'Sem responsável'}>
+      <Tooltip content={cell.assignee ? (assigneeSourceText(cell.assigneeSource) ?? cell.assignee.name) : 'Ex-membro'}>
         <div data-col="assignee" tabIndex={-1} className="hidden min-w-0 items-center justify-center gap-2 @4xl:flex">
           <span className="sr-only">Responsável: </span>
           <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} userId={cell.assignee?.id} />

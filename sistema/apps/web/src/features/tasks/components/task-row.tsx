@@ -165,16 +165,16 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
               <div className="hidden w-36 min-w-0 items-center gap-2 @2xl:flex">
                 <MemberAvatar name={task.assignee?.name} unassigned={!task.assignee} userId={task.assignee?.id} />
                 <span className={cn('truncate text-[13px]', task.assignee ? 'text-fg' : 'text-subtle')}>
-                  {task.assignee ? shortName(task.assignee.name) : 'Sem responsável'}
+                  {task.assignee ? shortName(task.assignee.name) : 'Ex-membro'}
                 </span>
               </div>
             ) : null}
             <span
               className={cn('hidden shrink-0', compact ? '@sm:inline-flex' : '@sm:inline-flex @2xl:hidden')}
-              title={task.assignee ? task.assignee.name : 'Sem responsável'}
+              title={task.assignee ? task.assignee.name : 'Ex-membro'}
             >
               <MemberAvatar name={task.assignee?.name} unassigned={!task.assignee} userId={task.assignee?.id} />
-              <span className="sr-only">{task.assignee ? `Responsável: ${task.assignee.name}` : 'Sem responsável'}</span>
+              <span className="sr-only">{task.assignee ? `Responsável: ${task.assignee.name}` : 'Responsável: ex-membro'}</span>
             </span>
           </>
         ) : null}

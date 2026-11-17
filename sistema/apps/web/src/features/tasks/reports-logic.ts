@@ -49,7 +49,7 @@ export interface ReportFilters {
   from: ISODate | '';
   to: ISODate | '';
   department: string;
-  /** Member id or `none`. */
+  /** Member id, or `none` = "Ex-membro" (closed tasks of someone who left). */
   assignee: string;
   category: string;
   /** Client id or `internal`. */
@@ -78,7 +78,8 @@ export function parseReportFilters(params: URLSearchParams, today: ISODate): Rep
     from: isoDateSchema.safeParse(from).success ? from : '',
     to: isoDateSchema.safeParse(to).success ? to : '',
     department: id(params.get('departamento')),
-    assignee: assignee === 'nenhum' ? 'none' : id(assignee),
+    // "Ex-membro": concluded/canceled tasks of someone who left (the API's `none`; `nenhum` of old links).
+    assignee: assignee === 'ex-membro' || assignee === 'nenhum' ? 'none' : id(assignee),
     category: id(params.get('categoria')),
     client: client === 'interna' ? 'internal' : id(client),
     situation: (key(SITUATION_PARAM as Record<string, string>, params.get('situacao')) ?? '') as ReportSituation,
@@ -97,7 +98,7 @@ export function writeReportFilters(params: URLSearchParams, patch: Partial<Repor
   if (patch.from !== undefined) set('de', patch.from);
   if (patch.to !== undefined) set('ate', patch.to);
   if (patch.department !== undefined) set('departamento', patch.department);
-  if (patch.assignee !== undefined) set('responsavel', patch.assignee === 'none' ? 'nenhum' : patch.assignee);
+  if (patch.assignee !== undefined) set('responsavel', patch.assignee === 'none' ? 'ex-membro' : patch.assignee);
   if (patch.category !== undefined) set('categoria', patch.category);
   if (patch.client !== undefined) set('cliente', patch.client === 'internal' ? 'interna' : patch.client);
   if (patch.situation !== undefined) set('situacao', patch.situation ? SITUATION_PARAM[patch.situation] : null);

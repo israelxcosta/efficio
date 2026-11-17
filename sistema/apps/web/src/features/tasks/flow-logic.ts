@@ -5,6 +5,7 @@
 import {
   addDays,
   flowTemplateInputSchema,
+  TASK_DEPARTMENT_REQUIRED_MESSAGE,
   taskFlowInputSchema,
   type FlowTemplate,
   type FlowTemplateInput,
@@ -126,8 +127,8 @@ export interface FlowErrors {
   title?: string;
   steps?: string;
   saveAsTemplate?: string;
-  /** Per step key: the title or the deadline. */
-  step: Record<string, { title?: string; deadline?: string }>;
+  /** Per step key: the title, the deadline or the department (a step left without one). */
+  step: Record<string, { title?: string; deadline?: string; department?: string }>;
 }
 
 const dot = (m: string) => (m.endsWith('.') ? m : `${m}.`);
@@ -155,6 +156,7 @@ export function validateTemplate(title: string, description: string, steps: Step
 export function validateFlow(title: string, clientId: string | null, steps: StepDraft[], members: TaskMember[], saveAsTemplate: boolean): FlowErrors {
   const out: FlowErrors = { step: {} };
   for (const s of steps) if (s.mode === 'date' && !s.dueDate) (out.step[s.key] ??= {}).deadline = 'Informe a data da etapa.';
+  stepDepartmentErrors(steps, members, out);
   const parsed = taskFlowInputSchema.safeParse(flowInputOf(title, clientId, steps, members, saveAsTemplate));
   if (parsed.success) return out;
   for (const issue of parsed.error.issues) {
@@ -168,6 +170,43 @@ export function validateFlow(title: string, clientId: string | null, steps: Step
       const e = (out.step[key] ??= {});
       if (field === 'title') e.title ??= dot(issue.message);
       else e.deadline ??= dot(issue.message);
+    }
+  }
+  return out;
+}
+
+/**
+ * The department a step of a new process ends in (migration 0024, as the API resolves it): with a
+ * responsible, theirs (else the step's); without one, the step's (else the creator's). Null: none —
+ * the API refuses it (400 `steps.N.departmentId`).
+ */
+export function resolvedStepDepartment(step: Pick<StepDraft, 'assigneeId' | 'departmentId'>, members: TaskMember[]): string | null {
+  const member = members.find((m) => m.id === step.assigneeId);
+  if (member) return member.department?.id ?? (step.departmentId || null);
+  return step.departmentId || (members.find((m) => m.isYou)?.department?.id ?? null);
+}
+
+/** "Etapa 2: escolha o departamento." under each step of a new process that would end without one. */
+export function stepDepartmentErrors(steps: StepDraft[], members: TaskMember[], out: FlowErrors): FlowErrors {
+  steps.forEach((s, i) => {
+    if (!resolvedStepDepartment(s, members)) (out.step[s.key] ??= {}).department = `Etapa ${i + 1}: ${TASK_DEPARTMENT_REQUIRED_MESSAGE.toLowerCase()}.`;
+  });
+  return out;
+}
+
+/** The API's 400 `details[].path` (`steps.N.departmentId`, `title`…) on the fields of the builder. */
+export function flowApiErrors(fields: Record<string, string>, steps: StepDraft[]): FlowErrors {
+  const out: FlowErrors = { step: {} };
+  for (const [path, message] of Object.entries(fields)) {
+    const [head, index, field] = path.split('.');
+    if (head === 'title') out.title ??= dot(message);
+    else if (head === 'steps' && index !== undefined) {
+      const key = steps[Number(index)]?.key;
+      if (!key) continue;
+      const e = (out.step[key] ??= {});
+      if (field === 'departmentId') e.department ??= dot(message);
+      else if (field === 'title') e.title ??= dot(message);
+      else e.deadline ??= dot(message);
     }
   }
   return out;

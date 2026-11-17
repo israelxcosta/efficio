@@ -155,7 +155,6 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
       onChange={(assignee) => onChange({ assignee })}
       members={members}
       allowAll
-      allowNone
       meFirst
       aria-label="Responsável"
     />

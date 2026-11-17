@@ -11,6 +11,7 @@ import {
   TASK_PRIORITY_LABELS,
   TASK_STATUS_LABELS,
   TASK_STATUSES,
+  TASK_DEPARTMENT_REQUIRED_MESSAGE,
   taskInputSchema,
   todayISO,
   type ISODate,
@@ -68,7 +69,7 @@ import { assigneeSourceText, competenceName, referenceLabel } from '../occurrenc
 import { detailActions, primaryAction } from '../actions';
 import { AttachmentList } from './attachments';
 import { FlowStepper } from './flow-stepper';
-import { INTERNAL, NONE, ClientPicker, MemberPicker } from './pickers';
+import { INTERNAL, ClientPicker, MemberPicker } from './pickers';
 import { ReopenDialog } from './reopen';
 import { TaskDueLabel } from './task-status';
 import { TaskTimeline } from './task-timeline';
@@ -206,7 +207,7 @@ function TaskSheet({ open, taskId, isNew, params, onClose, onCreated }: TaskShee
  * DCTFWeb de outubro de 2026 (ref. 09/2026)".
  */
 export function taskSheetDescription(task: Pick<TaskDetail, 'client' | 'department' | 'title' | 'occurrence'>): string {
-  const head = `${task.client?.name ?? 'Interna'}${task.department ? ` · ${task.department.name}` : ''}`;
+  const head = `${task.client?.name ?? 'Interna'} · ${task.department.name}`;
   if (!task.occurrence) return head;
   return `${head} · ${task.title} de ${competenceName(task.occurrence.competence)} (${referenceLabel(task.occurrence.referenceMonth)})`;
 }
@@ -264,12 +265,12 @@ export function applyTaskPatch(task: TaskDetail, patch: TaskUpdateInput, options
   }
   if (patch.departmentId !== undefined) {
     const d = options.departments.find((x) => x.id === patch.departmentId);
-    next.department = d ?? null;
+    if (d) next.department = d;
   }
   if (patch.assigneeId !== undefined) {
     const m = options.members.find((x) => x.id === patch.assigneeId);
-    next.assignee = m ? { id: m.id, name: m.name } : null;
-    // The API places an assigned task in the assignee's department.
+    if (m) next.assignee = { id: m.id, name: m.name };
+    // The department follows the responsible (the API keeps the current one when they have none).
     if (m?.department) next.department = m.department;
   }
   const today = options.today;
@@ -394,7 +395,7 @@ function TaskDetailBody({
         values={{
           status: task.status,
           priority: task.priority,
-          departmentId: task.department?.id ?? '',
+          departmentId: task.department.id,
           assigneeId: task.assignee?.id ?? '',
           clientId: task.client?.id ?? '',
           dueDate: task.dueDate ?? '',
@@ -496,9 +497,9 @@ interface TaskPropertiesProps {
 const FROM_RECURRING = 'Vem da tarefa recorrente.';
 
 /**
- * Two-column grid of the task fields (§9.1). The department follows the assignee (the API places an
- * assigned task in the assignee's department), so it is only chosen for a task without assignee or
- * whose assignee has no department.
+ * Two-column grid of the task fields (§9.1). Every task has a responsible and a department (migration
+ * 0024): the department follows the responsible, so it is only chosen (and then required) when the
+ * responsible is in no department.
  */
 function TaskProperties({
   values,
@@ -562,42 +563,47 @@ function TaskProperties({
           ))}
         </Select>
       </Field>
-      <Field label="Responsável" hint={assigneeHint}>
+      <Field label="Responsável" hint={assigneeHint} error={errors.assigneeId}>
         <MemberPicker
-          value={values.assigneeId || NONE}
-          onChange={(v) => onChange({ assigneeId: v === NONE ? null : v })}
+          value={values.assigneeId}
+          onChange={(v) => v && v !== values.assigneeId && onChange({ assigneeId: v })}
           members={options.members}
-          allowNone
           meFirst
+          // A concluded task of someone who left the office keeps no responsible (history).
+          placeholder={values.assigneeId ? 'Responsável' : readOnly || values.status === 'done' || values.status === 'canceled' ? 'Ex-membro' : 'Escolha o responsável'}
           departmentId={values.departmentId || options.me.department?.id}
           disabled={readOnly}
         />
       </Field>
-      <Field
-        label="Departamento"
-        hint={
-          isLocked('departmentId')
-            ? lockHint('departmentId')
-            : derivedDepartment
-              ? `Vem do responsável: ${derivedDepartment.name}.`
-              : options.departments.length
-                ? 'Fila do departamento enquanto não houver responsável.'
-                : undefined
-        }
-      >
-        <Select
-          value={isLocked('departmentId') ? values.departmentId : (derivedDepartment?.id ?? values.departmentId)}
-          disabled={readOnly || isLocked('departmentId') || Boolean(derivedDepartment) || options.departments.length === 0}
-          onChange={(e) => onChange({ departmentId: e.target.value || null })}
+      {isLocked('departmentId') || derivedDepartment ? (
+        <Field label="Departamento" hint={isLocked('departmentId') ? lockHint('departmentId') : 'Segue o departamento do responsável.'}>
+          <Input
+            readOnly
+            disabled
+            className="h-10"
+            value={(isLocked('departmentId') ? options.departments.find((d) => d.id === values.departmentId)?.name : derivedDepartment?.name) ?? ''}
+          />
+        </Field>
+      ) : (
+        <Field
+          label="Departamento"
+          hint={values.assigneeId ? 'O responsável não está em nenhum departamento: escolha onde a tarefa fica.' : undefined}
+          error={errors.departmentId ?? (options.departments.length ? undefined : 'Cadastre um departamento ou escolha um responsável que esteja em um.')}
         >
-          <option value="">{options.departments.length ? 'Sem departamento' : 'Nenhum departamento cadastrado'}</option>
-          {options.departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
+          <Select
+            value={values.departmentId}
+            disabled={readOnly || options.departments.length === 0}
+            onChange={(e) => e.target.value && onChange({ departmentId: e.target.value })}
+          >
+            {values.departmentId ? null : <option value="">{options.departments.length ? 'Escolha o departamento' : 'Nenhum departamento cadastrado'}</option>}
+            {options.departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
       <Field label="Cliente" hint={hintOf('clientId')}>
         <ClientPicker
           value={values.clientId || INTERNAL}
@@ -1072,14 +1078,14 @@ export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsRes
   const dueDay = day && isoDateSchema.safeParse(day).success ? day : null;
   const dept = params.get('departamento');
   const client = params.get('para-cliente') ?? params.get('cliente');
-  const escopo = params.get('escopo');
   const base: NewTaskValues = {
     title: (params.get('titulo') ?? '').trim().slice(0, 200),
     description: '',
     status: statusFromParam(params.get('estado')),
     priority: 'medium',
     departmentId: isUuid(dept) && options?.departments.some((d) => d.id === dept) ? dept : '',
-    assigneeId: escopo === 'minhas' && options ? options.me.id : '',
+    // Every task has a responsible (migration 0024): you, unless you pick someone else.
+    assigneeId: options?.me.id ?? '',
     clientId: isUuid(client) ? client : '',
     dueDate: dueDay ?? (appointment ? today : ''),
     categoryId: '',
@@ -1095,8 +1101,8 @@ export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsRes
     title: copy.title,
     description: copy.description ?? '',
     priority: copy.priority,
-    departmentId: copy.department?.id ?? '',
-    assigneeId: copy.assignee?.id ?? '',
+    departmentId: copy.department.id,
+    assigneeId: copy.assignee?.id ?? base.assigneeId,
     clientId: copy.client?.id ?? '',
     dueDate: copy.dueDate ?? '',
     categoryId: copy.category?.id ?? '',
@@ -1117,7 +1123,7 @@ export function newTaskInput(v: NewTaskValues): TaskInput {
     description: v.description || null,
     clientId: v.clientId || null,
     categoryId: v.categoryId || null,
-    assigneeId: v.assigneeId || null,
+    assigneeId: v.assigneeId,
     departmentId: v.departmentId || null,
     priority: v.priority,
     status: v.status,
@@ -1127,6 +1133,23 @@ export function newTaskInput(v: NewTaskValues): TaskInput {
     endTime: v.endTime || null,
     recurrence: repeating ? toRecurrenceInput(v.repeat.form, v.dueDate as ISODate) : null,
   };
+}
+
+/**
+ * What stops `POST /tasks` before it is sent: the schema's issues (the responsible is required) and the
+ * department, required only when the responsible is in none (the API answers the same 400 otherwise).
+ */
+export function newTaskErrors(input: TaskInput, options: Pick<TaskOptionsResponse, 'members'> | undefined): Partial<Record<keyof NewTaskValues, string>> {
+  const out: Partial<Record<keyof NewTaskValues, string>> = {};
+  const dot = (m: string) => (m.endsWith('.') ? m : `${m}.`);
+  const parsed = taskInputSchema.safeParse(input);
+  for (const issue of parsed.error?.issues ?? []) {
+    const key = issue.path[0] as keyof NewTaskValues | undefined;
+    if (key && !out[key]) out[key] = dot(issue.message);
+  }
+  const assignee = options?.members.find((m) => m.id === input.assigneeId);
+  if (assignee && !assignee.department && !input.departmentId) out.departmentId = dot(TASK_DEPARTMENT_REQUIRED_MESSAGE);
+  return out;
 }
 
 /** "Tarefa criada." or "Tarefa criada. Repete toda segunda." */
@@ -1179,6 +1202,11 @@ function NewTaskSheet({
 
   function setField(patch: TaskUpdateInput) {
     for (const [k, v] of Object.entries(patch)) form.setValue(k as keyof NewTaskValues, (v ?? '') as never, { shouldDirty: true });
+    // A field changed: its error goes (a new responsible also settles the department's).
+    setErrors((e) => {
+      const keys = Object.keys(patch).concat(patch.assigneeId ? ['departmentId'] : []);
+      return keys.some((k) => k in e) ? Object.fromEntries(Object.entries(e).filter(([k]) => !keys.includes(k))) : e;
+    });
     // A new "Começa em" moves the weekday, day and month of the rule that were still the default.
     if (patch.dueDate) form.setValue('repeat', { ...form.getValues('repeat'), form: withStartDate(form.getValues('repeat').form, patch.dueDate) });
   }
@@ -1210,13 +1238,8 @@ function NewTaskSheet({
       }
     }
     const input = newTaskInput(v);
-    const parsed = taskInputSchema.safeParse(input);
-    if (!parsed.success) {
-      const next: typeof errors = {};
-      for (const issue of parsed.error.issues) {
-        const key = issue.path[0] as keyof NewTaskValues | undefined;
-        if (key && !next[key]) next[key] = issue.message.endsWith('.') ? issue.message : `${issue.message}.`;
-      }
+    const next = newTaskErrors(input, options);
+    if (Object.keys(next).length) {
       setErrors(next);
       return;
     }
@@ -1228,8 +1251,9 @@ function NewTaskSheet({
       onCreated(task.id);
     } catch (error) {
       if (error instanceof ApiRequestError) {
+        // 400 `details[].path`: "assigneeId", "departmentId"… under their fields.
         const fields = error.fieldErrors();
-        if (Object.keys(fields).length) setErrors(fields as typeof errors);
+        if (Object.keys(fields).length) setErrors(Object.fromEntries(Object.entries(fields).map(([k, m]) => [k, m.endsWith('.') ? m : `${m}.`])) as typeof errors);
       }
       toastError(error);
     }

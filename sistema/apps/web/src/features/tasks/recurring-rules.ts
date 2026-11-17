@@ -306,14 +306,14 @@ export function appliesToText(r: Pick<RecurringTask, 'regimes' | 'clientIds' | '
   return `${head} · ${count}${exceptions}`;
 }
 
-/** One line per receiver: "Ana P. 12 (padrão)", "Bruno C. 1 (à mão)", "sem responsável 2". */
+/** One line per receiver: "Ana P. 12 (padrão)", "Bruno C. 1 (à mão)", "ex-membro 2" (concluídas por quem saiu). */
 function distributionParts(r: Pick<RecurringTask, 'distribution'>): string {
   return r.distribution
-    .map((d) => (d.assignee ? `${shortName(d.assignee.name)} ${d.count}${d.source === 'default' ? ' (padrão)' : d.source === 'manual' ? ' (à mão)' : ''}` : `sem responsável ${d.count}`))
+    .map((d) => (d.assignee ? `${shortName(d.assignee.name)} ${d.count}${d.source === 'default' ? ' (padrão)' : d.source === 'manual' ? ' (à mão)' : ''}` : `ex-membro ${d.count}`))
     .join(' · ');
 }
 
-/** Who receives the current competence: "Hoje: Ana P. 12 (padrão) · Bruno C. 1 (à mão) · sem responsável 2". */
+/** Who receives the current competence: "Hoje: Ana P. 12 (padrão) · Bruno C. 1 (à mão) · ex-membro 2". */
 export function distributionText(r: Pick<RecurringTask, 'distribution'>): string {
   return r.distribution.length ? `Hoje: ${distributionParts(r)}` : '';
 }

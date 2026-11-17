@@ -12,6 +12,7 @@ import {
   WORKSPACE_KIND_LABELS,
   type Invite,
   type Member,
+  type MemberHandoverCounts,
   type Plan,
   type WorkspaceKind,
 } from '@effinance/shared';
@@ -31,6 +32,7 @@ import { cn } from '@/lib/utils';
 import { MemberAvatar } from '@/components/ui/member-avatar';
 import { adjustmentSummary, memberAccessLine } from '../member-access';
 import { MemberAccessSheet, useMemberAccessParam } from '../member-access-sheet';
+import { handoverCountsOf, MemberHandoverDialog } from '../member-handover';
 import { useAuth } from '@/features/auth/auth-context';
 import { ROLE_HINTS, ROLE_LABELS } from '@/features/auth/roles';
 import { usePermissions } from '@/features/auth/permissions';
@@ -159,6 +161,8 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
   const navigate = useNavigate();
   const [toRemove, setToRemove] = useState<Member | null>(null);
   const [leaving, setLeaving] = useState(false);
+  // 409 of a removal with open work: who leaves and what they still answer for ("Quem assume?").
+  const [handover, setHandover] = useState<{ person: Member; counts: MemberHandoverCounts } | null>(null);
   const max = subscription.data?.maxMembers;
   const count = subscription.data?.memberCount ?? members.data?.length;
 
@@ -171,29 +175,41 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
     }
   }
 
-  async function confirmRemove() {
-    if (!toRemove) return;
+  async function confirmRemove(person: Member | null = toRemove, replacementId?: string) {
+    if (!person) return;
     try {
-      await remove.mutateAsync(toRemove.userId);
-      toast.success(`${toRemove.name} foi removido do espaço`);
+      await remove.mutateAsync({ userId: person.userId, replacementId });
+      const to = replacementId ? members.data?.find((m) => m.userId === replacementId) : undefined;
+      toast.success(`${person.name} foi removido do espaço${to ? `. O trabalho em aberto passou para ${to.isYou ? 'você' : to.name}` : ''}`);
       setToRemove(null);
+      setHandover(null);
     } catch (error) {
-      toastError(error);
+      const counts = handoverCountsOf(error);
+      if (counts && !replacementId) {
+        setToRemove(null);
+        setHandover({ person, counts });
+      } else toastError(error);
     }
   }
 
-  async function leave() {
+  async function leave(replacementId?: string) {
     if (!user) return;
     try {
-      await remove.mutateAsync(user.id);
+      await remove.mutateAsync({ userId: user.id, replacementId });
       setLeaving(false);
+      setHandover(null);
       // The session still points at the workspace just left: move to another one.
       const next = workspaces.find((w) => w.id !== workspace?.id && w.kind === 'personal') ?? workspaces.find((w) => w.id !== workspace?.id);
       toast.success(`Você saiu de ${workspace?.name}`);
       if (next) await switchTo(next, { silent: true });
       else navigate('/', { replace: true });
     } catch (error) {
-      toastError(error);
+      const counts = handoverCountsOf(error);
+      const me = members.data?.find((m) => m.isYou);
+      if (counts && !replacementId && me) {
+        setLeaving(false);
+        setHandover({ person: me, counts });
+      } else toastError(error);
     }
   }
 
@@ -288,6 +304,19 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
         confirmLabel="Sair do espaço"
         loading={remove.isPending}
         onConfirm={() => void leave()}
+      />
+      <MemberHandoverDialog
+        open={handover !== null}
+        onOpenChange={(o) => !o && setHandover(null)}
+        person={handover?.person ?? null}
+        counts={handover?.counts ?? null}
+        members={members.data ?? []}
+        busy={remove.isPending}
+        onConfirm={(replacementId) => {
+          if (!handover) return;
+          if (handover.person.isYou) void leave(replacementId);
+          else void confirmRemove(handover.person, replacementId);
+        }}
       />
     </Card>
   );

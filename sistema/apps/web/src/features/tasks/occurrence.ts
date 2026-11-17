@@ -114,8 +114,8 @@ export function deadlineTip({ legalDueDate: legal, targetDate: target }: Deadlin
 export function assigneesTip(o: Pick<RecurringOccurrence, 'assignees' | 'defaultAssignee'>): string {
   return o.assignees
     .map((a) => {
-      if (!a.assignee) return `sem responsável ${a.count}`;
-      const isDefault = o.defaultAssignee?.id === a.assignee.id;
+      if (!a.assignee) return `ex-membro ${a.count}`;
+      const isDefault = o.defaultAssignee.id === a.assignee.id;
       return `${shortName(a.assignee.name)} ${a.count}${isDefault ? ' (padrão)' : ''}`;
     })
     .join(' · ');

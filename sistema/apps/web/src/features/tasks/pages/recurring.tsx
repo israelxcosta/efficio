@@ -464,7 +464,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
     !r.active && r.endCompetence ? null : r.startCompetence > m.competence ? `Começa em ${competenceName(r.startCompetence)}` : null,
     r.active && r.endCompetence ? `Encerra em ${competenceName(r.endCompetence)}` : null,
   ].filter(Boolean);
-  const head = [r.department?.name, r.category?.name].filter(Boolean).join(' · ');
+  const head = [r.department.name, r.category?.name].filter(Boolean).join(' · ');
   const actions = recurringActions(r, { canEdit, canDelete });
   const deadline = recurringDeadlineText(r);
 
@@ -491,7 +491,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
           </span>
         </button>
         <div className="hidden w-32 min-w-0 @3xl:block">
-          <span className={cn('block truncate text-body-sm', r.department ? 'text-fg' : 'text-subtle')}>{r.department?.name ?? 'Sem departamento'}</span>
+          <span className="block truncate text-body-sm text-fg">{r.department.name}</span>
         </div>
         <div className="hidden w-44 min-w-0 @4xl:block">
           <span className="line-clamp-2 block text-body-sm leading-snug text-fg" title={appliesToText(r)}>
@@ -499,18 +499,13 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
           </span>
         </div>
         <div className="hidden w-36 min-w-0 @2xl:block">
-          {names.length || r.assignee ? (
-            <>
-              <Tooltip content={distributionTip(r) || `Padrão: ${r.assignee?.name ?? 'ninguém'}`}>
-                <span className="inline-flex" tabIndex={-1}>
-                  {names.length ? <AvatarStack names={names} max={3} /> : <MemberAvatar name={r.assignee?.name} userId={r.assignee?.id} />}
-                </span>
-              </Tooltip>
-              {r.assignee ? <span className="mt-0.5 block truncate text-mini text-muted">Padrão: {shortName(r.assignee.name)}</span> : null}
-            </>
-          ) : (
-            <span className="text-body-sm text-subtle">Sem responsável</span>
-          )}
+          {/* The default responsible is required (migration 0024). */}
+          <Tooltip content={distributionTip(r) || `Padrão: ${r.assignee.name}`}>
+            <span className="inline-flex" tabIndex={-1}>
+              {names.length ? <AvatarStack names={names} max={3} /> : <MemberAvatar name={r.assignee.name} userId={r.assignee.id} />}
+            </span>
+          </Tooltip>
+          <span className="mt-0.5 block truncate text-mini text-muted">Padrão: {shortName(r.assignee.name)}</span>
         </div>
         <div className="hidden w-40 @xl:block">
           {m.occurs && live > 0 ? (
@@ -613,20 +608,14 @@ function RepetitionRow({ recurring: r, monthName, onOpen, onStop }: { recurring:
           </span>
         </button>
         <div className="hidden w-32 min-w-0 @3xl:block">
-          <span className={cn('block truncate text-body-sm', r.department ? 'text-fg' : 'text-subtle')}>{r.department?.name ?? 'Sem departamento'}</span>
+          <span className="block truncate text-body-sm text-fg">{r.department.name}</span>
         </div>
         <div className="hidden w-44 min-w-0 @4xl:block">
           <span className={cn('block truncate text-body-sm', r.client ? 'text-fg' : 'text-subtle')}>{client}</span>
         </div>
         <div className="hidden w-36 min-w-0 items-center gap-2 @2xl:flex">
-          {r.assignee ? (
-            <>
-              <MemberAvatar name={r.assignee.name} userId={r.assignee.id} />
-              <span className="truncate text-body-sm text-fg">{shortName(r.assignee.name)}</span>
-            </>
-          ) : (
-            <span className="text-body-sm text-subtle">Sem responsável</span>
-          )}
+          <MemberAvatar name={r.assignee.name} userId={r.assignee.id} />
+          <span className="truncate text-body-sm text-fg">{shortName(r.assignee.name)}</span>
         </div>
         <div className="hidden w-40 @xl:block">
           {m.occurs && live > 0 ? (

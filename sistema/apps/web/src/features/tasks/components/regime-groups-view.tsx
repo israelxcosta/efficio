@@ -19,12 +19,13 @@ import { Modal } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/misc';
-import { Input } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { gateFor, usePermissions, WriteGate } from '@/features/auth/permissions';
 import { toastError } from '@/lib/notify';
 import { cn, pluralize } from '@/lib/utils';
-import { useApplyRegimeGroup, useEditRegimeGroup, useRecurringTasks, useRegimeGroups } from '../api';
+import { useApplyRegimeGroup, useEditRegimeGroup, useRecurringTasks, useRegimeGroups, useTaskOptions } from '../api';
+import { MemberPicker } from './pickers';
 import { dueRuleText } from '../recurring-rules';
 import {
   applyInput,
@@ -145,6 +146,9 @@ function GroupDetail({
   const [confirming, setConfirming] = useState(false);
   const [createHandmade, setCreateHandmade] = useState(false);
   const [nextMonth, setNextMonth] = useState(false);
+  // Default responsible of the recurring tasks created ('' = you, the API's default).
+  const [assigneeId, setAssigneeId] = useState('');
+  const options = useTaskOptions();
   const [picking, setPicking] = useState(false);
   const [excluding, setExcluding] = useState<ExcludeTarget | null>(null);
   const [showRemoved, setShowRemoved] = useState(false);
@@ -159,7 +163,7 @@ function GroupDetail({
 
   async function confirm() {
     try {
-      const res = await apply.mutateAsync({ regime: g.regime, input: applyInput(g, createHandmade, nextMonth ? 'next' : 'current') });
+      const res = await apply.mutateAsync({ regime: g.regime, input: { ...applyInput(g, createHandmade, nextMonth ? 'next' : 'current'), ...(assigneeId ? { assigneeId } : {}) } });
       toast.success(applyResultText(res, g.label), { duration: 7000 });
       setConfirming(false);
     } catch (error) {
@@ -314,6 +318,11 @@ function GroupDetail({
               </p>
             ) : null}
           </div>
+        ) : null}
+        {creates > 0 && options.data ? (
+          <Field className="mt-3" label="Responsável padrão" hint="Recebe as tarefas das recorrentes criadas agora. Dá para trocar em cada uma depois.">
+            <MemberPicker value={assigneeId || options.data.me.id} onChange={setAssigneeId} members={options.data.members} meFirst />
+          </Field>
         ) : null}
         <p className="mt-3 text-caption text-muted">Prazos, metas e responsável padrão são sugestões; ajuste em cada tarefa recorrente depois de aplicar. Aplicar de novo não duplica nada.</p>
       </Modal>

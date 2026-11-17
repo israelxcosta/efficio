@@ -397,7 +397,8 @@ describe('monthly audit', () => {
     expect(occurrenceSheetCells(detail, 'pending', 'me', '', '').map((c) => c.taskId)).toEqual(['1', '3']);
     expect(occurrenceSheetCells(detail, 'all', 'me', '', '').map((c) => c.taskId)).toEqual(['2', '1', '3']);
     expect(occurrenceSheetCells(detail, 'all', 'me', 'pao', '').map((c) => c.taskId)).toEqual(['1']);
-    expect(occurrenceSheetCells(detail, 'all', 'me', '', 'none').map((c) => c.taskId)).toEqual(['3']);
+    // No "Sem responsável" filter since migration 0024: a member id only.
+    expect(occurrenceSheetCells(detail, 'all', 'me', '', 'me').map((c) => c.taskId)).toEqual(['1']);
   });
 });
 
@@ -467,6 +468,9 @@ describe('URL of the new screens', () => {
     expect(reportApiFilters(f)).toMatchObject({ situation: 'doneLate', assigneeId: 'none', clientId: 'internal', kind: 'recurring', status: undefined });
     expect(reportApiFilters(parseReportFilters(p('situacao=cancelada'), TODAY))).toMatchObject({ status: 'canceled', situation: undefined });
     expect(writeReportFilters(p('pagina=3'), { preset: 'month', month: '2026-10' }, TODAY).toString()).toBe('');
+    // "Ex-membro" (closed tasks of someone who left): `ex-membro` in the URL, `nenhum` of old links still read.
+    expect(writeReportFilters(p(''), { assignee: 'none' }, TODAY).get('responsavel')).toBe('ex-membro');
+    expect(parseReportFilters(p('responsavel=ex-membro'), TODAY).assignee).toBe('none');
     expect(reportRange(parseReportFilters(p('periodo=ano&ano=2025'), TODAY))).toEqual({ from: '2025-01-01', to: '2025-12-31' });
   });
 
@@ -703,7 +707,7 @@ describe('notes and responsibles', () => {
   it('says where the responsible of a cell comes from: the default of the recurring task, or by hand', () => {
     expect(cellTip(makeCell({ assigneeSource: 'default' }), 'Fiscal')).toBe('A fazer · Ana Paula Ribeiro (responsável padrão da recorrente)');
     expect(cellTip(makeCell({ assigneeSource: 'manual' }), 'Fiscal')).toBe('A fazer · Ana Paula Ribeiro (atribuída só nesta competência)');
-    expect(cellTip(makeCell({ assignee: null, assigneeSource: null }), 'Fiscal')).toBe('A fazer · Sem responsável');
+    expect(cellTip(makeCell({ assignee: null, assigneeSource: null }), 'Fiscal')).toBe('A fazer · Ex-membro');
   });
 });
 

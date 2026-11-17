@@ -63,12 +63,25 @@ export function useUpdateMemberRole() {
   });
 }
 
-/** Owner removes a member, or a member leaves (their own userId). */
+/** `DELETE` path of a removal; with the member who takes over the open work (`?replacementId=`). */
+export function memberRemovalPath(userId: string, replacementId?: string): string {
+  const base = `/workspaces/current/members/${encodeURIComponent(userId)}`;
+  return replacementId ? `${base}?${new URLSearchParams({ replacementId }).toString()}` : base;
+}
+
+/**
+ * Owner removes a member, or a member leaves (their own userId). Someone who still answers for open
+ * tasks, recurring tasks or waiting process steps needs `replacementId` (409 with
+ * `MemberHandoverCounts` otherwise; see `handoverCountsOf`). The hand-over moves tasks too.
+ */
 export function useRemoveMember() {
   const invalidate = useInvalidateMembers();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (userId: string) => api<void>(`/workspaces/current/members/${userId}`, { method: 'DELETE' }),
-    onSuccess: invalidate,
+    mutationFn: ({ userId, replacementId }: { userId: string; replacementId?: string }) =>
+      api<void>(memberRemovalPath(userId, replacementId), { method: 'DELETE' }),
+    // The task module's members (and, with a hand-over, its tasks) change too.
+    onSuccess: () => Promise.all([invalidate(), qc.invalidateQueries({ queryKey: ['tasks'] })]),
   });
 }
 
