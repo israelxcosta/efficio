@@ -10,6 +10,7 @@ import {
   todayISO,
   type RecurrencePeriod,
   type RecurringTask,
+  type RegimeGroupRegime,
   type TaskOptionsResponse,
   type TaxRegime,
 } from '@effinance/shared';
@@ -82,6 +83,8 @@ export default function RecurringTasksPage() {
   const [deleting, setDeleting] = useState<RecurringTask | null>(null);
   const [duplicating, setDuplicating] = useState<RecurringTask | null>(null);
   const [stopping, setStopping] = useState<RecurringTask | null>(null);
+  // "Incluir tarefa › Nova tarefa recorrente" of a regime group: the registry opens with the regime.
+  const [newInRegime, setNewInRegime] = useState<RegimeGroupRegime | null>(null);
   const { openTask } = useTaskSheetLinks();
   const updateTask = useUpdateTask();
   const save = useSaveRecurring();
@@ -128,6 +131,7 @@ export default function RecurringTasksPage() {
           regime={view.regime}
           onRegime={(r) => setParams(writeRecurringView(params, { view: 'regimes', regime: r }), { replace: true })}
           onOpenRecurring={(id) => update({ open: id })}
+          onNewRecurring={setNewInRegime}
         />
       ) : (
         <>
@@ -211,13 +215,15 @@ export default function RecurringTasksPage() {
       )}
 
       <RecurringTaskSheet
-        open={Boolean(filters.open) || duplicating !== null}
+        open={Boolean(filters.open) || duplicating !== null || newInRegime !== null}
         onOpenChange={(o) => {
           if (o) return;
           setDuplicating(null);
+          setNewInRegime(null);
           if (filters.open) update({ open: '' });
         }}
-        recurring={duplicating ?? (filters.open === 'nova' ? null : openRecurring)}
+        recurring={duplicating ?? (filters.open === 'nova' || newInRegime ? null : openRecurring)}
+        initialRegimes={newInRegime ? [newInRegime] : undefined}
         duplicate={duplicating !== null}
         loading={Boolean(openId) && !openRecurring && !duplicating}
         options={options.data}

@@ -1,8 +1,23 @@
 // Tarefas recorrentes › "Grupos por regime": the default obligations of each regime, what the office
 // already has and what applying the group does.
 import { describe, expect, it } from 'vitest';
-import type { RegimeGroup, RegimeGroupApplyResponse, RegimeGroupItemView } from '@effinance/shared';
-import { applyInput, applyPreview, applyResultText, itemState, overdueOnApply, overdueText, parseRecurringView, regimeFromParam, writeRecurringView } from './regime-groups-logic';
+import type { RecurringTask, RegimeGroup, RegimeGroupApplyResponse, RegimeGroupItemView } from '@effinance/shared';
+import {
+  applyInput,
+  applyPreview,
+  applyResultText,
+  changeResultText,
+  excludeEffect,
+  excludeInput,
+  includeCandidates,
+  itemState,
+  overdueOnApply,
+  overdueText,
+  parseRecurringView,
+  regimeFromParam,
+  writeRecurringView,
+  ownRows,
+} from './regime-groups-logic';
 
 const item = (patch: Partial<RegimeGroupItemView> = {}): RegimeGroupItemView => ({
   key: 'das',
@@ -133,5 +148,54 @@ describe('applying a group', () => {
     expect(applyResultText(res({ created: 2, fromMonth: 'next', overdueCreated: 12 }), 'MEI')).toBe(
       'MEI: 2 tarefas recorrentes criadas. Elas geram todo mês uma tarefa para cada empresa do regime. As novas começam no mês que vem. 12 ocorrências deste mês nasceram vencidas.',
     );
+  });
+});
+
+describe('editing the group: include, exclude and restore', () => {
+  const rec = (patch: Partial<RecurringTask>) => ({ id: 'x', name: 'X', origin: 'registry', active: true, regimes: [], ...patch }) as RecurringTask;
+
+  it('offers the active recurring tasks of the registry without the regime, by name, with search', () => {
+    const list = [
+      rec({ id: '1', name: 'Folha', regimes: ['mei'] }),
+      rec({ id: '2', name: 'Balancete', regimes: ['simples_nacional'] }),
+      rec({ id: '3', name: 'Ata', active: false }),
+      rec({ id: '4', name: 'Repetição', origin: 'task' }),
+      rec({ id: '5', name: 'Alvará' }),
+    ];
+    expect(includeCandidates(list, 'simples_nacional').map((r) => r.id)).toEqual(['5', '1']);
+    expect(includeCandidates(list, 'simples_nacional', 'alvara').map((r) => r.id)).toEqual(['5']);
+  });
+
+  it('excludes a catalog item by key and an own task by id', () => {
+    expect(excludeInput({ kind: 'item', item: item() })).toEqual({ key: 'das' });
+    expect(excludeInput({ kind: 'own', id: 'r9', name: 'Alvará' })).toEqual({ recurringTaskId: 'r9' });
+  });
+
+  it('says what excluding does: stops generating when it runs for the regime, else only leaves the group', () => {
+    const stops = 'Deixa de gerar para as 12 empresas do regime a partir de agora; tarefas "A fazer" deste mês são canceladas, as em andamento e concluídas ficam.';
+    expect(excludeEffect({ kind: 'item', item: item({ recurringTask: ref() }) }, 'simples_nacional', 12)).toBe(stops);
+    expect(excludeEffect({ kind: 'own', id: 'r9', name: 'Alvará' }, 'simples_nacional', 1)).toContain('para a empresa do regime');
+    expect(excludeEffect({ kind: 'item', item: item() }, 'simples_nacional', 12)).toBe('Sai do grupo e o "Aplicar grupo" não a cria mais.');
+    expect(excludeEffect({ kind: 'item', item: item({ recurringTask: ref({ regimes: ['mei'] }) }) }, 'simples_nacional', 12)).toContain('Sai do grupo');
+  });
+
+  it('tells in the toast when the recurring task was ended', () => {
+    expect(changeResultText('exclude', { change: 'ended' }, 'Alvará', 'MEI')).toBe('“Alvará” saiu do grupo MEI. A tarefa recorrente ficou sem regime nem clientes e foi encerrada.');
+    expect(changeResultText('exclude', { change: 'regimeRemoved' }, 'DAS', 'MEI')).toBe('“DAS” saiu do grupo MEI.');
+    expect(changeResultText('include', { change: 'regimeAdded' }, 'Folha', 'MEI')).toBe('“Folha” incluída no grupo MEI.');
+    expect(changeResultText('restore', { change: 'none' }, 'DAS', 'MEI')).toBe('“DAS” voltou ao grupo MEI (falta aplicar).');
+  });
+});
+
+describe('the own tasks listed as "Do escritório"', () => {
+  it('leaves out the hand-made twin already shown as "Existe (à mão)"', () => {
+    const items = [{ handmade: { id: 'twin' } }, { handmade: null }] as unknown as RegimeGroupItemView[];
+    const own = [{ id: 'twin' }, { id: 'mine' }];
+    expect(ownRows({ items, own }).map((t) => t.id)).toEqual(['mine']);
+  });
+
+  it('counts a hand-made twin in the exclusion effect', () => {
+    const item = { key: 'dctfweb', name: 'DCTFWeb', recurringTask: null, handmade: { active: true, regimes: ['simples_nacional'] } } as unknown as RegimeGroupItemView;
+    expect(excludeEffect({ kind: 'item', item }, 'simples_nacional', 4)).toContain('Deixa de gerar para as 4 empresas');
   });
 });

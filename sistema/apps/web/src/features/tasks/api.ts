@@ -13,6 +13,8 @@ import type {
   RecurringOccurrenceDetail,
   RegimeGroupApplyInput,
   RegimeGroupApplyResponse,
+  RegimeGroupChangeResponse,
+  RegimeGroupExcludeInput,
   RegimeGroupRegime,
   RegimeGroupsResponse,
   RecurringTask,
@@ -495,6 +497,24 @@ export function useApplyRegimeGroup() {
   return useMutation({
     mutationFn: ({ regime, input }: { regime: RegimeGroupRegime; input?: RegimeGroupApplyInput }) =>
       api<RegimeGroupApplyResponse>(`/tasks/regime-groups/${regime}/apply`, { method: 'POST', body: input ?? {} }),
+    onSuccess: () => void invalidateTaskRegistries(qc),
+  });
+}
+
+/**
+ * Edits a regime's group (`registry`): `include` an existing recurring task, `exclude` an item
+ * (`key`) or a recurring task, `restore` a removed item. Refreshes groups, recurring tasks and tasks.
+ */
+export type RegimeGroupEdit =
+  | { action: 'include'; regime: RegimeGroupRegime; body: { recurringTaskId: string } }
+  | { action: 'exclude'; regime: RegimeGroupRegime; body: RegimeGroupExcludeInput }
+  | { action: 'restore'; regime: RegimeGroupRegime; body: { key: string } };
+
+export function useEditRegimeGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ action, regime, body }: RegimeGroupEdit) =>
+      api<RegimeGroupChangeResponse>(`/tasks/regime-groups/${regime}/${action}`, { method: 'POST', body }),
     onSuccess: () => void invalidateTaskRegistries(qc),
   });
 }

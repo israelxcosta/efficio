@@ -53,6 +53,9 @@ export const AUDIT_LABELS: Record<string, string> = {
   'open_finance.disconnected': 'Banco desconectado (Open Finance)',
   'open_finance.synced': 'Banco sincronizado (Open Finance)',
   'union.deleted': 'Sindicato excluído',
+  'regime_group.included': 'Tarefa incluída no grupo do regime',
+  'regime_group.excluded': 'Tarefa removida do grupo do regime',
+  'regime_group.restored': 'Tarefa restaurada no grupo do regime',
 };
 
 /** pt-BR label of an audit action; an unknown one (newer API) still reads as "Outra ação (x.y)". */

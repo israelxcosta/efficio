@@ -164,6 +164,8 @@ interface RecurringTaskSheetProps {
   /** Why it is read-only (role or subscription). */
   readOnlyReason?: string;
   onSaved?: (r: RecurringTask) => void;
+  /** Regimes already checked when creating (the regime group's "Nova tarefa recorrente"). */
+  initialRegimes?: TaxRegime[];
 }
 
 /**
@@ -171,18 +173,18 @@ interface RecurringTaskSheetProps {
  * target, non-business days, reference and the preview of the next 3 periods with holidays), term,
  * who and for which clients. Read-only for collaborators.
  */
-export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, options, canEdit, loading, readOnlyReason = ADMIN_ONLY_REASON, onSaved }: RecurringTaskSheetProps) {
+export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, options, canEdit, loading, readOnlyReason = ADMIN_ONLY_REASON, onSaved, initialRegimes }: RecurringTaskSheetProps) {
   const save = useSaveRecurring();
   const current = (options?.today ?? new Date().toISOString().slice(0, 10)).slice(0, 7);
   const editing = Boolean(recurring) && !duplicate;
   const readOnly = !canEdit;
-  const [form, setForm] = useState<RecurringForm>(() => (recurring ? recurringFormOf(recurring, duplicate) : emptyRecurringForm(current)));
+  const [form, setForm] = useState<RecurringForm>(() => (recurring ? recurringFormOf(recurring, duplicate) : { ...emptyRecurringForm(current), regimes: initialRegimes ?? [] }));
   const [errors, setErrors] = useState<RecurringErrors>({});
   const [showExceptions, setShowExceptions] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setForm(recurring ? recurringFormOf(recurring, duplicate) : emptyRecurringForm(current));
+    setForm(recurring ? recurringFormOf(recurring, duplicate) : { ...emptyRecurringForm(current), regimes: initialRegimes ?? [] });
     setErrors({});
     setShowExceptions(Boolean(recurring?.excludedClientIds.length));
     // eslint-disable-next-line react-hooks/exhaustive-deps

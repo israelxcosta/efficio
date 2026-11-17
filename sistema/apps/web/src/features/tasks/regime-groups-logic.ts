@@ -1,7 +1,16 @@
 // Tarefas recorrentes › "Grupos por regime": the URL of the view, the state of each catalog item in the
 // office and the wording of applying a group. Pure functions, tested in regime-groups.test.ts.
 
-import { REGIME_GROUP_REGIMES, type RegimeGroup, type RegimeGroupApplyResponse, type RegimeGroupFromMonth, type RegimeGroupItemView, type RegimeGroupRegime } from '@effinance/shared';
+import {
+  REGIME_GROUP_REGIMES,
+  type RecurringTask,
+  type RegimeGroup,
+  type RegimeGroupApplyResponse,
+  type RegimeGroupChangeResponse,
+  type RegimeGroupFromMonth,
+  type RegimeGroupItemView,
+  type RegimeGroupRegime,
+} from '@effinance/shared';
 import { pluralize } from '@/lib/utils';
 
 export type RecurringView = 'list' | 'regimes';
@@ -128,4 +137,60 @@ export function applyResultText(
 /** "12 empresas" / "1 empresa" / "nenhuma empresa". */
 export function companiesText(n: number): string {
   return n === 0 ? 'nenhuma empresa' : pluralize(n, 'empresa', 'empresas');
+}
+
+// ---------------------------------------------------------------------------
+// Editing the group: include / exclude / restore
+// ---------------------------------------------------------------------------
+
+/** "Tarefa recorrente existente…": the registry's active recurring tasks without the regime, by name. */
+export function includeCandidates(items: readonly RecurringTask[], regime: RegimeGroupRegime, search = ''): RecurringTask[] {
+  const q = fold(search.trim());
+  return items
+    .filter((r) => r.origin === 'registry' && r.active && !r.regimes.includes(regime) && (!q || fold(r.name).includes(q)))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+/**
+ * The office's own tasks to list as "Do escritório": a hand-made twin of a catalog item is already the
+ * "Existe (à mão)" row of that item, so it is not listed twice.
+ */
+export function ownRows<T extends { id: string }>(group: { items: readonly Pick<RegimeGroupItemView, 'handmade'>[]; own: readonly T[] }): T[] {
+  const twins = new Set(group.items.map((i) => i.handmade?.id).filter(Boolean));
+  return group.own.filter((t) => !twins.has(t.id));
+}
+
+/** What the row's "Excluir do regime" acts on: a catalog item (by key) or an own recurring task. */
+export type ExcludeTarget =
+  | { kind: 'item'; item: Pick<RegimeGroupItemView, 'key' | 'name' | 'recurringTask'> & Partial<Pick<RegimeGroupItemView, 'handmade'>> }
+  | { kind: 'own'; id: string; name: string };
+
+export function excludeInput(target: ExcludeTarget): { key: string } | { recurringTaskId: string } {
+  return target.kind === 'item' ? { key: target.item.key } : { recurringTaskId: target.id };
+}
+
+/**
+ * The confirmation of "Excluir do regime". A task that generates for the regime stops (open "A fazer"
+ * of this month canceled); an item never applied just leaves the group.
+ */
+export function excludeEffect(target: ExcludeTarget, regime: RegimeGroupRegime, clientCount: number): string {
+  const generates =
+    target.kind === 'own' ||
+    Boolean(target.item.recurringTask?.active && target.item.recurringTask.regimes.includes(regime)) ||
+    Boolean(target.item.handmade?.active && target.item.handmade.regimes.includes(regime));
+  if (!generates) return 'Sai do grupo e o "Aplicar grupo" não a cria mais.';
+  const who = clientCount === 0 ? 'as empresas' : clientCount === 1 ? 'a empresa' : `as ${clientCount} empresas`;
+  return `Deixa de gerar para ${who} do regime a partir de agora; tarefas "A fazer" deste mês são canceladas, as em andamento e concluídas ficam.`;
+}
+
+/** The toast after including, excluding or restoring (`ended`: the recurring task had nothing left). */
+export function changeResultText(action: 'include' | 'exclude' | 'restore', res: Pick<RegimeGroupChangeResponse, 'change'>, name: string, label: string): string {
+  if (action === 'restore') return `“${name}” voltou ao grupo ${label} (falta aplicar).`;
+  if (action === 'include') return res.change === 'none' ? `“${name}” já estava no grupo ${label}.` : `“${name}” incluída no grupo ${label}.`;
+  if (res.change === 'ended') return `“${name}” saiu do grupo ${label}. A tarefa recorrente ficou sem regime nem clientes e foi encerrada.`;
+  return `“${name}” saiu do grupo ${label}.`;
+}
+
+function fold(text: string): string {
+  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 }
