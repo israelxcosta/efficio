@@ -62,7 +62,7 @@ export function TasksSummary({ summary, scope, situation, department, onSituatio
 
   return (
     <section aria-label="Resumo das tarefas" aria-busy={summary ? undefined : true} className="overflow-hidden rounded-xl border border-border bg-surface">
-      <div className={cn('grid grid-cols-2 md:grid-cols-3', byAssignee ? 'lg:grid-cols-[minmax(0,1.15fr)_12.5rem_15rem_minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]')}>
+      <div className={cn('grid grid-cols-2 md:grid-cols-3', byAssignee ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}>
         {/* 1. Overdue (principal) */}
         <div className="col-span-2 min-w-0 p-4 sm:p-5 md:col-span-1">
           <button
@@ -163,12 +163,12 @@ export function TasksSummary({ summary, scope, situation, department, onSituatio
           <button
             type="button"
             aria-pressed={situation === 'done'}
-            aria-label={summary ? `Resolvidas de ${month} (concluídas ou canceladas): ${summary.monthDone}. Filtrar a lista.` : 'Resolvidas'}
+            aria-label={summary ? `Concluídas de ${month} (inclui canceladas): ${summary.monthDone}. Filtrar a lista.` : 'Concluídas'}
             onClick={() => toggle('done')}
             className={cn('-m-2 block w-[calc(100%+1rem)] p-2 text-left', toggleClass)}
           >
             <SummaryLabel info={summary ? `Tarefas com vencimento em ${month} já concluídas ou canceladas.` : undefined}>
-              {summary ? `Resolvidas de ${month}` : 'Resolvidas'}
+              {summary ? `Concluídas de ${month}` : 'Concluídas'}
             </SummaryLabel>
             {summary ? (
               <span className="tabular mt-1 block text-kpi leading-10 font-semibold tracking-tight text-fg">{summary.monthDone}</span>
@@ -202,11 +202,11 @@ export function TasksSummary({ summary, scope, situation, department, onSituatio
           ) : rows.length === 0 ? (
             <p className="mt-1.5 text-body-sm text-muted">Nada em aberto.</p>
           ) : (
-            <ul className="-mx-2 mt-1 grid gap-x-4 md:grid-cols-2 lg:grid-cols-1" aria-label="Em aberto por departamento (filtra a lista)">
+            <ul className="-mx-2 mt-1 grid grid-cols-[minmax(0,max-content)_minmax(1.5rem,1fr)_2rem_2.75rem] gap-x-2.5" aria-label="Em aberto por departamento (filtra a lista)">
               {rows.map((r) => {
                 const pressed = Boolean(r.key) && department === r.key;
                 return (
-                  <li key={r.key || 'none'} className="min-w-0">
+                  <li key={r.key || 'none'} className="col-span-full grid grid-cols-subgrid">
                     <button
                       type="button"
                       aria-pressed={pressed}
@@ -214,9 +214,9 @@ export function TasksSummary({ summary, scope, situation, department, onSituatio
                       disabled={!r.key}
                       aria-label={`${r.label}: ${r.open} em aberto${r.overdue ? `, ${r.overdue} atrasadas` : ''}`}
                       onClick={() => onDepartment(pressed ? '' : r.key)}
-                      className={cn('grid w-full grid-cols-[8.5rem_minmax(0,1fr)_2rem_3rem] items-center gap-x-2.5 px-2 py-1.5 text-left disabled:cursor-default disabled:hover:bg-transparent pointer-coarse:py-2', toggleClass)}
+                      className={cn('col-span-full grid grid-cols-subgrid items-center px-2 py-1.5 text-left disabled:cursor-default disabled:hover:bg-transparent pointer-coarse:py-2', toggleClass)}
                     >
-                      <span className={cn('truncate text-body-sm', r.muted ? 'text-subtle' : 'text-fg', pressed && 'font-semibold')}>{r.label}</span>
+                      <span title={r.label} className={cn('truncate text-body-sm', r.muted ? 'text-subtle' : 'text-fg', pressed && 'font-semibold')}>{r.label}</span>
                       <span className="block h-1.5" aria-hidden>
                         <span className="block h-full min-w-1 rounded-full bg-data" style={{ width: `${(r.open / max) * 100}%` }} />
                       </span>
