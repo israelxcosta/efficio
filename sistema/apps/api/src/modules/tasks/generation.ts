@@ -8,9 +8,10 @@
 //   minus the exceptions, from its start competence to its end competence;
 // - a client is active in a competence when its contract started by then (month of the contract start
 //   ≤ competence) and it was not inactivated before the competence began;
-// - the responsible is the recurring task's default responsible, else nobody — the occurrence waits in
-//   the department's queue (`assignee_source` says which; `manual` = reassigned for that competence
-//   only, never overwritten automatically). The responsible per client and department was removed (0017);
+// - the responsible is the recurring task's default responsible — required since migration 0024, so no
+//   occurrence is born without one (`assignee_source` = 'default'; `manual` = reassigned for that
+//   competence only, never overwritten automatically). The responsible per client and department was
+//   removed (0017), so the default is the whole chain;
 // - deadlines come from the schedule (utils/tasks.ts: national holidays, non-business-day rule, target).
 // Generation is bounded: from 24 competences back to 2 ahead of the current one, and never for a
 // workspace whose subscription does not allow writing (reads keep showing what exists).
@@ -189,7 +190,7 @@ export async function loadClients(ctx: Pick<TaskContext, 'db' | 'workspaceId'>):
   return rows as GenClient[];
 }
 
-/** The default responsible of the recurring task, else nobody (the department's queue). */
+/** The default responsible of the recurring task (required since 0024; null only for rows read mid-migration). */
 export function resolveAssignee(
   def: Pick<RecurringTaskRow, 'defaultAssigneeId'>,
 ): { assigneeId: string | null; source: AssigneeSource | null } {

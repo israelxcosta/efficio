@@ -1293,10 +1293,15 @@ export const recurringTasks = pgTable(
     name: text().notNull(),
     /** Encrypted with the workspace key (`v1.<iv>.<ct>`, modules/tasks/encrypted-text.ts). */
     description: text(),
-    departmentId: uuid(),
+    /** Required since migration 0024. */
+    departmentId: uuid().notNull(),
     categoryId: uuid(),
-    /** Default responsible of every occurrence (none: the department's queue). */
-    defaultAssigneeId: uuid(),
+    /**
+     * Default responsible of every occurrence (required since migration 0024: the last resort, so no
+     * occurrence is born without one). The FK still says SET NULL: removing a member hands their
+     * recurring tasks to a replacement first (workspaces/service.ts); a slip fails on NOT NULL.
+     */
+    defaultAssigneeId: uuid().notNull(),
     /** `daily` only for tasks' recurrences (migration 0019). */
     period: text().$type<RecurrenceFrequency>().notNull().default('monthly'),
     /** Day of the month (1–31) or, weekly, the ISO weekday (1 = Monday); daily: 1 (unused). */
@@ -1413,9 +1418,16 @@ export const tasks = pgTable(
     clientKind: text()
       .$type<'client'>()
       .generatedAlwaysAs(sql`'client'`),
-    /** The assignee's department (derived by the API), or the queue of an unassigned task. */
-    departmentId: uuid(),
+    /**
+     * Required (migration 0024): the assignee's department (derived by the API), or the one chosen when
+     * the assignee has none; for occurrences, the recurring task's.
+     */
+    departmentId: uuid().notNull(),
     categoryId: uuid(),
+    /**
+     * Required on open tasks (migration 0024, `tasks_open_assignee_chk`). A concluded/canceled task may
+     * lose it when the member leaves (ON DELETE SET NULL: history and account deletion).
+     */
     assigneeId: uuid(),
     priority: text().$type<TaskPriority>().notNull().default('medium'),
     status: text().$type<TaskStatus>().notNull().default('todo'),
@@ -1508,6 +1520,8 @@ export const tasks = pgTable(
       sql`(${t.startTime} is null or ${t.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') and (${t.endTime} is null or (${t.endTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' and ${t.startTime} is not null and ${t.endTime} > ${t.startTime})) and (${t.startTime} is null or ${t.dueDate} is not null)`,
     ),
     check('tasks_dates_chk', sql`${t.startDate} is null or ${t.dueDate} is null or ${t.startDate} <= ${t.dueDate}`),
+    // Migration 0024: an open task always has a responsible (the owner's rule).
+    check('tasks_open_assignee_chk', sql`${t.assigneeId} is not null or ${t.status} in ('done', 'canceled')`),
     check(
       'tasks_completion_chk',
       sql`(${t.status} = 'done') = (${t.completedAt} is not null) and (${t.completedAt} is null or ${t.completedByName} is not null)`,

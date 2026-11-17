@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { App } from '../src/app';
 import { createTestApp, registerUser, resetDb } from './helpers';
-import { createClient, member, office } from './task-helpers';
+import { createClient, member, myTask, office } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -167,7 +167,7 @@ describe('monthly audit', () => {
     expect(history.items[2]).toMatchObject({ actor: { id: carla.userId }, note: null });
     expect(history.items[4]).toMatchObject({ kind: 'created', actor: null, origin: 'recurring' });
     // Standalone tasks reopen freely (the reason is optional and kept).
-    const plain = await carla.post('/tasks', { title: 'Avulsa', status: 'done' });
+    const plain = await myTask(carla, { title: 'Avulsa', status: 'done' });
     const freely = await dani.patch(`/tasks/${plain.body.id}/status`, { status: 'todo', reason: 'Faltou anexar' });
     expect(freely.status).toBe(200);
     void das;

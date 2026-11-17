@@ -119,9 +119,9 @@ describe('task recurrence: the input', () => {
   });
 
   it('rides on the task input and the PATCH', () => {
-    const created = taskInputSchema.parse({ title: 'Conferir caixa', recurrence: { frequency: 'daily' } });
+    const created = taskInputSchema.parse({ title: 'Conferir caixa', assigneeId: '11111111-1111-4111-8111-111111111111', recurrence: { frequency: 'daily' } });
     expect(created.recurrence).toMatchObject({ frequency: 'daily', interval: 1 });
-    expect(taskInputSchema.parse({ title: 'Sem recorrência' }).recurrence).toBeNull();
+    expect(taskInputSchema.parse({ title: 'Sem recorrência', assigneeId: '11111111-1111-4111-8111-111111111111' }).recurrence).toBeNull();
     expect(taskUpdateSchema.parse({ recurrence: null, applyTo: 'series' })).toEqual({ recurrence: null, applyTo: 'series' });
     expect(taskUpdateSchema.safeParse({ applyTo: 'all' }).success).toBe(false);
     expect(taskMyOverviewQuerySchema.parse({})).toEqual({});

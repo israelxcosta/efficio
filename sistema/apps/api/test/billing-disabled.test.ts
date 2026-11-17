@@ -66,11 +66,13 @@ describe('billing switched off', () => {
     const owner = await registerUser(app, 'Escrita Livre');
     const workspaceId = await workspaceOf(owner);
     app.platform.openFinance = { provider: new FakeOpenFinanceProvider(), webhookUrl: null, webhookSecret: OF_SECRET };
+    // Every task has a responsible and a department (migration 0024).
+    expect((await owner.post('/tasks/departments', { name: 'Geral', memberIds: [owner.userId] })).status).toBe(201);
 
     const writes = (n: number): [string, string, unknown][] => [
       ['POST', '/accounts', { name: `Caixa ${n}`, type: 'checking' }], // lib/tenant-routes.ts
       ['POST', '/open-finance/dev/connect', { institutionId: 'nubank' }], // lib/tenant-scope.ts
-      ['POST', '/tasks', { title: `Fechar o mês ${n}` }], // modules/tasks/access.ts
+      ['POST', '/tasks', { title: `Fechar o mês ${n}`, assigneeId: owner.userId }], // modules/tasks/access.ts
       ['POST', '/office/contract-template/reset', {}], // lib/scoped-context.ts
       ['POST', '/workspaces/current/invites', { email: `convite${n}@teste.com`, role: 'viewer' }], // workspace routes
     ];

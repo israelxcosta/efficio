@@ -10,6 +10,7 @@ import {
   idSchema,
   inviteInputSchema,
   memberPermissionsInputSchema,
+  memberRemovalQuerySchema,
   memberRoleSchema,
   workspaceInputSchema,
   workspaceUpdateSchema,
@@ -139,8 +140,8 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
-  app.delete('/current/members/:userId', { schema: { params: userParams } }, async (req, reply) => {
-    const result = await removeMember(app.db, req.access, req.params.userId);
+  app.delete('/current/members/:userId', { schema: { params: userParams, querystring: memberRemovalQuerySchema } }, async (req, reply) => {
+    const result = await removeMember(app.db, req.access, req.params.userId, req.query.replacementId);
     await audit(app.db, { ...requestContext(req), action: result === 'left' ? 'member.left' : 'member.removed', workspaceId: req.workspaceId, userId: req.userId, entity: 'user', entityId: req.params.userId });
     if (result === 'left') {
       const next = await resolveWorkspaceFor(app.db, req.userId);

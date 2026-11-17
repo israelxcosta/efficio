@@ -396,6 +396,24 @@ export const memberRoleSchema = z.object({
   role: z.enum(['editor', 'viewer']),
 });
 
+/**
+ * DELETE /workspaces/current/members/:userId (removing a member or leaving). `replacementId`: the member
+ * who takes over the open tasks, the recurring tasks (default responsible) and the waiting process steps
+ * of the one leaving. Required when there is any of those: without it the API answers 409 with
+ * `details: MemberHandoverCounts`.
+ */
+export const memberRemovalQuerySchema = z.object({
+  replacementId: z.uuid({ message: 'ID inválido' }).optional(),
+});
+export type MemberRemovalQuery = z.infer<typeof memberRemovalQuerySchema>;
+
+/** What a member still answers for in the task module (the 409 of a removal without replacement). */
+export interface MemberHandoverCounts {
+  openTasks: number;
+  recurringTasks: number;
+  flowSteps: number;
+}
+
 export const checkoutSchema = z.object({
   planCode: z.enum(PLAN_CODES),
 });

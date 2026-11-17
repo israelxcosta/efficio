@@ -2,8 +2,10 @@
 // reopen, move on the board, undo), subtasks, comments, the history and the recent activity.
 //
 // Rules ported from Effy's task.service:
-// - the department is derived from the assignee (an unassigned task may sit in a department's queue);
-//   a recurring occurrence belongs to its recurring task's department;
+// - every task has a responsible and a department (migration 0024): the department is derived from the
+//   assignee (the chosen one when the assignee has none); a recurring occurrence belongs to its recurring
+//   task's department; neither can be removed afterwards (reopening a closed task whose responsible left
+//   gives it to who reopens);
 // - concluding records who/when on the server, only on the transition to `done`; leaving `done`
 //   clears both; "Atrasada" is derived (open + due date before today), never stored;
 // - concluding a process step activates the next one (flow-engine.ts, idempotent);
@@ -94,11 +96,13 @@ import {
   clientRef,
   departmentNames,
   departmentOfMember,
+  getDepartmentOrThrow,
   getTaskCategoryOrThrow,
   getTaskClientOrThrow,
   memberRef,
   myName,
   personRef,
+  requiredMemberRef,
   resolveTaskDepartment,
 } from './shared';
 import {
@@ -254,7 +258,7 @@ function buildFilters(ctx: TaskContext, q: TaskQuery, myDepartment: string | nul
     base.push(q.clientId === 'internal' ? isNull(tasks.clientId) : eq(tasks.clientId, q.clientId));
   if (q.assigneeId)
     base.push(
-      q.assigneeId === 'none' ? isNull(tasks.assigneeId) : eq(tasks.assigneeId, q.assigneeId),
+      eq(tasks.assigneeId, q.assigneeId),
     );
   if (q.departmentId) base.push(eq(tasks.departmentId, q.departmentId));
   if (q.categoryId) base.push(eq(tasks.categoryId, q.categoryId));
@@ -424,20 +428,22 @@ export async function listTasks(ctx: TaskContext, q: TaskQuery): Promise<TaskLis
     waitingClient: a.waiting,
     monthDue: a.monthDue,
     monthDone: a.monthDone,
+    // Open items always have a responsible and a department (migration 0024); a null key cannot happen.
     openByAssignee: byAssigneeRows
+      .filter((r): r is typeof r & { id: string } => r.id !== null)
       .map((r) => ({
-        assignee: memberRef(ctx, r.id) as TaskMemberRef | null,
+        assignee: requiredMemberRef(ctx, r.id),
         open: r.open,
         overdue: r.overdue,
       }))
       .sort((x, y) => y.open - x.open || y.overdue - x.overdue),
     openByDepartment: byDepartmentRows
       .map((r) => ({
-        department: r.id && departments.has(r.id) ? { id: r.id, name: departments.get(r.id)! } : null,
+        department: { id: r.id, name: departments.get(r.id) ?? 'Departamento' },
         open: r.open,
         overdue: r.overdue,
       }))
-      .sort((x, y) => y.open - x.open || y.overdue - x.overdue || (x.department?.name ?? '').localeCompare(y.department?.name ?? '', 'pt-BR')),
+      .sort((x, y) => y.open - x.open || y.overdue - x.overdue || x.department.name.localeCompare(y.department.name, 'pt-BR')),
     openByClient: byClientRows
       .map((r) => ({
         client: clientRef({ id: r.id, name: r.name, tradeName: r.tradeName }),
@@ -642,7 +648,8 @@ async function seriesFieldsOf(ctx: TaskContext, row: TaskRow): Promise<SeriesFie
     description: await decryptTaskText(ctx.cipher, TASK_DESCRIPTION, row.description),
     clientId: row.clientId,
     categoryId: row.categoryId,
-    assigneeId: row.assigneeId,
+    // A closed task whose responsible left: the series goes to who repeats it.
+    assigneeId: row.assigneeId ?? ctx.userId,
     departmentId: row.departmentId,
     priority: row.priority,
     startTime: row.startTime,
@@ -721,7 +728,7 @@ async function updateSeriesFromTask(ctx: TaskContext, current: TaskRow, patch: T
       description: await encryptTaskText(ctx.cipher, TASK_DESCRIPTION, fields.description),
       categoryId: fields.categoryId,
       assigneeId: fields.assigneeId,
-      assigneeSource: fields.assigneeId ? 'default' : null,
+      assigneeSource: 'default',
       departmentId: fields.departmentId,
       priority: fields.priority,
       startTime: fields.startTime,
@@ -782,13 +789,13 @@ export async function updateTask(
   if (patch.description !== undefined)
     set.description = await encryptTaskText(ctx.cipher, TASK_DESCRIPTION, patch.description);
   if (current.recurringTaskId) {
-    if (patch.assigneeId !== undefined) set.assigneeSource = patch.assigneeId ? 'manual' : null;
+    if (patch.assigneeId !== undefined) set.assigneeSource = 'manual';
   } else if (patch.assigneeId !== undefined || patch.departmentId !== undefined) {
-    set.departmentId = await resolveTaskDepartment(
-      ctx,
-      merged.assigneeId,
-      patch.departmentId !== undefined ? patch.departmentId : current.departmentId,
-    );
+    const chosen = patch.departmentId ?? current.departmentId;
+    // A closed task whose responsible left (history) only moves department.
+    set.departmentId = merged.assigneeId
+      ? await resolveTaskDepartment(ctx, merged.assigneeId, chosen)
+      : (await getDepartmentOrThrow(ctx.db, ctx.workspaceId, chosen)).id;
   }
   if (Object.keys(set).length > 0) await ctx.db.update(tasks).set(set).where(taskKey(ctx, id));
 
@@ -836,11 +843,19 @@ export async function changeTaskStatus(
         now().getTime() - current.completedAt.getTime() <= UNDO_WINDOW_MS;
       if (!reason && !undo) throw new ValidationError('Informe o motivo da reabertura.');
     }
+    const reopened = !isOpenTaskStatus(current.status) && isOpenTaskStatus(status);
+    // An open task always has a responsible (migration 0024): a closed one whose responsible left goes
+    // to who reopens it (an occurrence: only for this competence).
+    const takeOver = reopened && !current.assigneeId;
     await ctx.db
       .update(tasks)
-      .set(statusFields(ctx, current, status))
+      .set({
+        ...statusFields(ctx, current, status),
+        ...(takeOver ? { assigneeId: ctx.userId, ...(current.recurringTaskId ? { assigneeSource: 'manual' as const } : {}) } : {}),
+      })
       .where(taskKey(ctx, id));
-    const reopened = !isOpenTaskStatus(current.status) && isOpenTaskStatus(status);
+    if (takeOver)
+      await recordEvent(ctx, { taskId: id, kind: 'assigned', data: { fromAssignee: null, toAssignee: personOf(ctx, ctx.userId) } });
     await recordEvent(ctx, {
       taskId: id,
       kind: reopened ? 'reopened' : 'status',

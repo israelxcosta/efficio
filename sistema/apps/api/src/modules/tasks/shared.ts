@@ -2,7 +2,7 @@
 // id + workspace; anything outside it is "not found") and the department rules.
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import type { TaskClientRef, TaskMemberRef, TaskPersonRef } from '@effinance/shared';
+import { TASK_DEPARTMENT_REQUIRED_MESSAGE, type TaskClientRef, type TaskMemberRef, type TaskPersonRef } from '@effinance/shared';
 import type { DbExecutor } from '../../db/client';
 import {
   contacts,
@@ -12,7 +12,7 @@ import {
   type TaskCategoryRow,
   type TaskDepartmentRow,
 } from '../../db/schema';
-import { NotFoundError, ValidationError } from '../../lib/errors';
+import { NotFoundError, RequiredFieldError, ValidationError } from '../../lib/errors';
 import { inChunks } from '../../lib/sql';
 import type { TaskContext } from './access';
 
@@ -149,18 +149,27 @@ export async function departmentOfMember(
 }
 
 /**
- * Department of a task (Effy's rule, kept): the assignee's department; a task without assignee (or
- * whose assignee has no department) stays in the queue it was given, if any.
+ * Department of a task (Effy's rule, kept): the assignee's department; when the assignee has none, the
+ * one chosen (`chosenDepartmentId`) — required then, since every task has a department (migration 0024):
+ * 400 on `field` without it.
  */
 export async function resolveTaskDepartment(
   ctx: Pick<TaskContext, 'db' | 'workspaceId'>,
-  assigneeId: string | null,
-  queueDepartmentId: string | null,
-): Promise<string | null> {
+  assigneeId: string,
+  chosenDepartmentId: string | null,
+  field = 'departmentId',
+): Promise<string> {
+  // A department sent is always checked (another workspace's is "not found"), even when ignored.
+  if (chosenDepartmentId) await getDepartmentOrThrow(ctx.db, ctx.workspaceId, chosenDepartmentId);
   const fromAssignee = await departmentOfMember(ctx.db, ctx.workspaceId, assigneeId);
   if (fromAssignee) return fromAssignee;
-  if (queueDepartmentId) await getDepartmentOrThrow(ctx.db, ctx.workspaceId, queueDepartmentId);
-  return queueDepartmentId;
+  if (!chosenDepartmentId) throw new RequiredFieldError(field, TASK_DEPARTMENT_REQUIRED_MESSAGE);
+  return chosenDepartmentId;
+}
+
+/** A member as a required responsible: the current name, else a placeholder (never null). */
+export function requiredMemberRef(ctx: Pick<TaskContext, 'members'>, id: string): TaskMemberRef {
+  return memberRef(ctx, id) ?? { id, name: 'Membro' };
 }
 
 /** Department names by id (small table: read whole). */

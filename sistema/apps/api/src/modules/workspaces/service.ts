@@ -43,6 +43,9 @@ import { randomToken, sha256Hex } from '../../lib/crypto/encoding';
 import { forgetWorkspaceKey, newWorkspaceKey } from '../../lib/crypto/keyring';
 import { ConflictError, ForbiddenError, NotFoundError, TooManyRequestsError, ValidationError } from '../../lib/errors';
 import { withTenant } from '../../lib/tenant';
+import { inTenant } from '../../lib/tenant-scope';
+import { loadMembers } from '../tasks/access';
+import { handOverMemberWork, hasWork, memberWork } from '../tasks/member-handover';
 import { maxMembersFor, summarizeSubscription } from '../billing/entitlements';
 import { seedDefaultCategories } from '../categories/service';
 import type { Access } from './access';
@@ -408,14 +411,51 @@ export async function setMemberPermissions(
 
 /**
  * Removes a member (permission `members`; by default the owner), or a member leaves. The owner cannot
- * leave (delete the workspace) nor be removed.
+ * leave (delete the workspace) nor be removed. Every open task has a responsible and every recurring
+ * task a default responsible (migration 0024): a member who still answers for any of them (or for a
+ * waiting process step) needs `replacementId` — the member who takes it all over
+ * (tasks/member-handover.ts) — else 409 with `details: MemberHandoverCounts`. The hand-over commits
+ * before the membership is deleted (two phases: the tenant role cannot touch `workspace_members`); a
+ * task assigned to them in between makes the deletion fail on the database (409, nothing removed).
  */
-export async function removeMember(db: DbExecutor, access: Access, userId: string): Promise<'removed' | 'left'> {
+export async function removeMember(
+  db: DbExecutor,
+  access: Access,
+  userId: string,
+  replacementId?: string,
+): Promise<'removed' | 'left'> {
   const leaving = userId === access.userId;
   if (leaving && access.role === 'owner') {
     throw new ValidationError('O proprietário não pode sair do espaço. Exclua o espaço se não for mais usá-lo.');
   }
   if (!leaving && !access.permissions.members) throw new ForbiddenError('Somente quem gerencia os membros do espaço pode remover membros');
+  const members = await loadMembers(db, access.workspaceId);
+  const target = members.get(userId);
+  if (!target || target.role === 'owner') throw new NotFoundError('Membro não encontrado');
+  if (replacementId !== undefined) {
+    if (replacementId === userId) throw new ValidationError('Escolha outra pessoa para assumir as tarefas.');
+    if (!members.has(replacementId)) throw new ValidationError('Quem assume as tarefas precisa ser membro deste espaço.');
+  }
+  await inTenant(db, access.workspaceId, async (tx, cipher) => {
+    const ctx = { db: tx, workspaceId: access.workspaceId, userId: access.userId, members, cipher };
+    const work = await memberWork(ctx, userId);
+    if (!hasWork(work)) return;
+    if (!replacementId) {
+      const parts = [
+        work.openTasks ? `${work.openTasks} ${work.openTasks === 1 ? 'tarefa aberta' : 'tarefas abertas'}` : null,
+        work.recurringTasks
+          ? `${work.recurringTasks} ${work.recurringTasks === 1 ? 'tarefa recorrente' : 'tarefas recorrentes'}`
+          : null,
+        work.flowSteps ? `${work.flowSteps} ${work.flowSteps === 1 ? 'etapa de processo' : 'etapas de processo'}` : null,
+      ].filter(Boolean);
+      const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts.at(-1)}` : parts[0];
+      throw new ConflictError(
+        `${leaving ? 'Você ainda é responsável' : `${target.name} ainda é responsável`} por ${list}. Escolha quem vai assumir antes de ${leaving ? 'sair' : 'remover'}.`,
+        work,
+      );
+    }
+    await handOverMemberWork(ctx, userId, replacementId);
+  });
   const rows = await db
     .delete(workspaceMembers)
     .where(
@@ -428,6 +468,26 @@ export async function removeMember(db: DbExecutor, access: Access, userId: strin
     .returning({ userId: workspaceMembers.userId });
   if (rows.length === 0) throw new NotFoundError('Membro não encontrado');
   return leaving ? 'left' : 'removed';
+}
+
+/**
+ * Account deletion: in each workspace the user does not own, their open tasks, recurring tasks and
+ * waiting process steps go to that workspace's owner (no one else can be asked), so the membership can
+ * go (migration 0024). Runs before the deletion, one tenant transaction per workspace.
+ */
+export async function handOverBeforeAccountDeletion(db: DbExecutor, userId: string): Promise<void> {
+  const memberships = await db
+    .select({ workspaceId: workspaceMembers.workspaceId })
+    .from(workspaceMembers)
+    .where(and(eq(workspaceMembers.userId, userId), sql`${workspaceMembers.role} <> 'owner'`));
+  for (const { workspaceId } of memberships) {
+    const members = await loadMembers(db, workspaceId);
+    const owner = [...members.values()].find((m) => m.role === 'owner');
+    if (!owner) continue;
+    await inTenant(db, workspaceId, (tx, cipher) =>
+      handOverMemberWork({ db: tx, workspaceId, userId, members, cipher }, userId, owner.id, { system: true }),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

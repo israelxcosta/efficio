@@ -144,10 +144,7 @@ export function toTask(ctx: Pick<TaskContext, 'members' | 'today'>, row: TaskQue
     reopenStatus: t.reopenStatus ?? 'todo',
     priority: t.priority,
     client: clientRef({ id: t.clientId, name: row.clientName, tradeName: row.clientTradeName }),
-    department:
-      t.departmentId && row.departmentName
-        ? { id: t.departmentId, name: row.departmentName }
-        : null,
+    department: { id: t.departmentId, name: row.departmentName ?? 'Departamento' },
     category:
       t.categoryId && row.categoryName
         ? {

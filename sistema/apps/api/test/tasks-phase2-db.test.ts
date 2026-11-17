@@ -106,9 +106,9 @@ describe('phase 2 tables: tenancy', () => {
     const a = await seed();
     const b = await seed();
     const attempts: [string, ReturnType<typeof sql>][] = [
-      ['recurring → foreign department', sql`insert into recurring_tasks (workspace_id, name, department_id, due_day, start_competence, created_by_name) values (${b.ws}, 'X', ${a.fiscal}, 10, '2026-10', 'B')`],
-      ['recurring → foreign category', sql`insert into recurring_tasks (workspace_id, name, category_id, due_day, start_competence, created_by_name) values (${b.ws}, 'X', ${a.category}, 10, '2026-10', 'B')`],
-      ['recurring → foreign member', sql`insert into recurring_tasks (workspace_id, name, default_assignee_id, due_day, start_competence, created_by_name) values (${b.ws}, 'X', ${a.carla.userId}, 10, '2026-10', 'B')`],
+      ['recurring → foreign department', sql`insert into recurring_tasks (workspace_id, name, department_id, default_assignee_id, due_day, start_competence, created_by_name) values (${b.ws}, 'X', ${a.fiscal}, ${b.ana.userId}, 10, '2026-10', 'B')`],
+      ['recurring → foreign category', sql`insert into recurring_tasks (workspace_id, name, category_id, department_id, default_assignee_id, due_day, start_competence, created_by_name) values (${b.ws}, 'X', ${a.category}, ${b.fiscal}, ${b.ana.userId}, 10, '2026-10', 'B')`],
+      ['recurring → foreign member', sql`insert into recurring_tasks (workspace_id, name, default_assignee_id, department_id, due_day, start_competence, created_by_name) values (${b.ws}, 'X', ${a.carla.userId}, ${b.fiscal}, 10, '2026-10', 'B')`],
       ['link → foreign client', sql`insert into recurring_task_clients (workspace_id, recurring_task_id, client_id, mode) values (${b.ws}, ${b.recurring.id}, ${a.client}, 'include')`],
       ['occurrence → foreign recurring', sql`update tasks set recurring_task_id = ${a.recurring.id} where workspace_id = ${b.ws} and recurring_task_id = ${b.recurring.id}`],
       ['step → foreign task', sql`update task_flow_steps set task_id = ${a.applied.task.id} where workspace_id = ${b.ws}`],
@@ -140,10 +140,10 @@ describe('phase 2 tables: integrity', () => {
   it('CHECKs keep the schedule, the occurrence shape, ciphertext only and the attachment size', async () => {
     const a = await seed();
     const bad: [string, ReturnType<typeof sql>][] = [
-      ['weekly on day 9', sql`insert into recurring_tasks (workspace_id, name, period, due_day, target_days_before, reference_offset, start_competence, created_by_name) values (${a.ws}, 'X', 'weekly', 9, 0, 0, '2026-10', 'A')`],
-      ['annual without month', sql`insert into recurring_tasks (workspace_id, name, period, due_day, start_competence, created_by_name) values (${a.ws}, 'X', 'annual', 10, '2026-10', 'A')`],
-      ['unknown regime', sql`insert into recurring_tasks (workspace_id, name, due_day, regimes, start_competence, created_by_name) values (${a.ws}, 'X', 10, array['bitcoin'], '2026-10', 'A')`],
-      ['end before start', sql`insert into recurring_tasks (workspace_id, name, due_day, start_competence, end_competence, created_by_name) values (${a.ws}, 'X', 10, '2026-10', '2026-09', 'A')`],
+      ['weekly on day 9', sql`insert into recurring_tasks (workspace_id, department_id, default_assignee_id, name, period, due_day, target_days_before, reference_offset, start_competence, created_by_name) values (${a.ws}, ${a.fiscal}, ${a.ana.userId}, 'X', 'weekly', 9, 0, 0, '2026-10', 'A')`],
+      ['annual without month', sql`insert into recurring_tasks (workspace_id, department_id, default_assignee_id, name, period, due_day, start_competence, created_by_name) values (${a.ws}, ${a.fiscal}, ${a.ana.userId}, 'X', 'annual', 10, '2026-10', 'A')`],
+      ['unknown regime', sql`insert into recurring_tasks (workspace_id, department_id, default_assignee_id, name, due_day, regimes, start_competence, created_by_name) values (${a.ws}, ${a.fiscal}, ${a.ana.userId}, 'X', 10, array['bitcoin'], '2026-10', 'A')`],
+      ['end before start', sql`insert into recurring_tasks (workspace_id, department_id, default_assignee_id, name, due_day, start_competence, end_competence, created_by_name) values (${a.ws}, ${a.fiscal}, ${a.ana.userId}, 'X', 10, '2026-10', '2026-09', 'A')`],
       ['clear description', sql`update recurring_tasks set description = 'texto' where workspace_id = ${a.ws}`],
       ['occurrence without target', sql`update tasks set target_date = null where workspace_id = ${a.ws} and recurring_task_id is not null`],
       ['target after legal', sql`update tasks set target_date = due_date + 1 where workspace_id = ${a.ws} and recurring_task_id is not null`],
@@ -161,8 +161,8 @@ describe('phase 2 tables: integrity', () => {
     // One occurrence per recurring task, client and period.
     const dup = await failure(
       withTenant(app.db, a.ws, (tx) =>
-        tx.execute(sql`insert into tasks (workspace_id, title, client_id, recurring_task_id, competence, period_key, reference_month, due_date, target_date, created_by_name)
-                       select workspace_id, title, client_id, recurring_task_id, competence, period_key, reference_month, due_date, target_date, created_by_name
+        tx.execute(sql`insert into tasks (workspace_id, title, client_id, recurring_task_id, competence, period_key, reference_month, due_date, target_date, created_by_name, department_id, assignee_id)
+                       select workspace_id, title, client_id, recurring_task_id, competence, period_key, reference_month, due_date, target_date, created_by_name, department_id, assignee_id
                          from tasks where workspace_id = ${a.ws} and recurring_task_id is not null limit 1`),
       ),
     );
@@ -179,10 +179,12 @@ describe('phase 2 tables: integrity', () => {
     expect((await a.ana.del(`/clients/${a.client}`)).status).toBe(409);
     // The department has a recurring task: refused.
     expect((await a.ana.del(`/tasks/departments/${a.fiscal}`)).status).toBe(409);
-    // Carla leaves: the default responsible, the template step and her notes go; the history keeps her name.
-    expect((await a.ana.del(`/workspaces/current/members/${a.carla.userId}`)).status).toBe(204);
+    // Carla leaves: the default responsible goes to who takes over (required since 0024: without one,
+    // 409), the template step and her notes go; the history keeps her name.
+    expect((await a.ana.del(`/workspaces/current/members/${a.carla.userId}`)).status).toBe(409);
+    expect((await a.ana.del(`/workspaces/current/members/${a.carla.userId}?replacementId=${a.ana.userId}`)).status).toBe(204);
     const [after] = await rows<{ default_assignee_id: string | null }>(sql`select default_assignee_id from recurring_tasks where id = ${a.recurring.id}`);
-    expect(after!.default_assignee_id).toBeNull();
+    expect(after!.default_assignee_id).toBe(a.ana.userId);
     expect((await rows<{ n: number }>(sql`select count(*)::int as n from task_notes where workspace_id = ${a.ws}`))[0]!.n).toBe(0);
     const names = await rows<{ actor_name: string }>(sql`select distinct actor_name from task_events where workspace_id = ${a.ws} and actor_id = ${a.carla.userId}`);
     expect(names.map((n) => n.actor_name)).toEqual(['Carla Souza']);
@@ -212,7 +214,7 @@ describe('phase 2 tables: integrity', () => {
     expect((await a.ana.post(`/invites/${invite.body.inviteUrl.split('/convite/')[1]}/accept`)).status).toBe(200);
     const template = await a.ana.post('/tasks/flow-templates', { title: 'Da Ana no B', steps: [{ title: 'E1' }] });
     expect(template.status).toBe(201);
-    const recurring = await a.ana.post('/tasks/recurring', { name: 'Da Ana no B', departmentId: b.fiscal, dueDay: 10, clientIds: [b.client] });
+    const recurring = await a.ana.post('/tasks/recurring', { assigneeId: a.ana.userId, name: 'Da Ana no B', departmentId: b.fiscal, dueDay: 10, clientIds: [b.client] });
     expect(recurring.status).toBe(201);
     expect((await a.ana.post(`/tasks/${b.applied.task.id}/comments`, { text: 'Comentário da Ana no B' })).status).toBe(201);
     expect((await a.ana.del('/auth/me', { password: TEST_PASSWORD })).status).toBe(204);

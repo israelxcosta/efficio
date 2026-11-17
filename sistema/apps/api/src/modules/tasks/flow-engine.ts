@@ -7,9 +7,12 @@
 //   reopening it once the next one started is refused (`beforeStepReopens`);
 // - a relative deadline counts calendar days from the day the previous step was concluded (step 1: the
 //   day the process was created), in the office time zone; an absolute one is kept as built;
-// - the step's task is created by the process's author, as a fresh "A fazer", in the department of its
-//   assignee (else the step's department); references removed meanwhile were cleared by the foreign
-//   keys (category, assignee, department) or block their own deletion (client).
+// - the step's task is created by the process's author, as a fresh "A fazer", always with a responsible
+//   and a department (migration 0024; both resolved when the process was created, flows.ts
+//   `placeSteps`). References removed meanwhile were cleared by the foreign keys (category, assignee,
+//   department) or block their own deletion (client); then the responsible falls back to the process's
+//   author (else who concluded the previous step) and the department to the responsible's, else the
+//   previous step's.
 // Internal to the module: services/flows call it inside their tenant transaction.
 
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
@@ -35,7 +38,7 @@ import {
   type TaskFlowStepRow,
 } from '../../db/schema';
 import { now } from '../../lib/clock';
-import { ConflictError } from '../../lib/errors';
+import { ConflictError, ValidationError } from '../../lib/errors';
 import type { TaskContext } from './access';
 import { decryptTaskText, encryptTaskText, FLOW_STEP_DESCRIPTION, TASK_DESCRIPTION } from './encrypted-text';
 import { recordEvents } from './events';
@@ -60,7 +63,8 @@ export async function activateStep(ctx: TaskContext, flowId: string, position: n
   if (!flow) return null;
   const dueDate = step.relativeDays !== null ? dueFromRelativeDays(base, step.relativeDays) : step.dueDate;
   const description = await decryptTaskText(ctx.cipher, FLOW_STEP_DESCRIPTION, step.description);
-  const departmentId = (await departmentOfMember(ctx.db, ctx.workspaceId, step.assigneeId)) ?? step.departmentId;
+  const assigneeId = stepAssignee(ctx, step.assigneeId, flow.createdBy);
+  const departmentId = step.departmentId ?? (await fallbackDepartment(ctx, flowId, position, assigneeId));
   const [task] = await ctx.db
     .insert(tasks)
     .values({
@@ -69,7 +73,7 @@ export async function activateStep(ctx: TaskContext, flowId: string, position: n
       description: await encryptTaskText(ctx.cipher, TASK_DESCRIPTION, description),
       clientId: step.clientId,
       categoryId: step.categoryId,
-      assigneeId: step.assigneeId,
+      assigneeId,
       departmentId,
       priority: step.priority,
       status: 'todo',
@@ -89,6 +93,28 @@ export async function activateStep(ctx: TaskContext, flowId: string, position: n
     { taskId: task!.id, kind: 'flow_step', data: { flow: { id: flowId, title: flow.title, position, event: 'activated' } } },
   ]);
   return task!.id;
+}
+
+/** The step's responsible while a member, else the process's author, else who is activating it. */
+function stepAssignee(ctx: Pick<TaskContext, 'members' | 'userId'>, assigneeId: string | null, authorId: string | null): string {
+  if (assigneeId && ctx.members.has(assigneeId)) return assigneeId;
+  if (authorId && ctx.members.has(authorId)) return authorId;
+  return ctx.userId;
+}
+
+/** A step whose department was cleared (deleted): the responsible's, else the previous step's task's. */
+async function fallbackDepartment(ctx: TaskContext, flowId: string, position: number, assigneeId: string): Promise<string> {
+  const own = await departmentOfMember(ctx.db, ctx.workspaceId, assigneeId);
+  if (own) return own;
+  const [previous] = await ctx.db
+    .select({ departmentId: tasks.departmentId })
+    .from(taskFlowSteps)
+    .innerJoin(tasks, and(eq(tasks.workspaceId, taskFlowSteps.workspaceId), eq(tasks.id, taskFlowSteps.taskId)))
+    .where(and(eq(taskFlowSteps.workspaceId, ctx.workspaceId), eq(taskFlowSteps.flowId, flowId), sql`${taskFlowSteps.position} < ${position}`))
+    .orderBy(sql`${taskFlowSteps.position} desc`)
+    .limit(1);
+  if (previous) return previous.departmentId;
+  throw new ValidationError('Esta etapa ficou sem departamento. Defina o departamento do responsável e tente novamente.');
 }
 
 /**

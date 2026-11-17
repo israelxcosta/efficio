@@ -9,6 +9,7 @@ import { tasks } from '../src/db/schema';
 import { executeRows } from '../src/lib/sql';
 import { withTenant } from '../src/lib/tenant';
 import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
+import { myTask } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -98,7 +99,7 @@ describe('tasks: database', () => {
 
     const a = await registerUser(app, 'Escritório A');
     const b = await registerUser(app, 'Escritório B');
-    expect((await a.post('/tasks', { title: 'Balancete de setembro' })).status).toBe(201);
+    expect((await myTask(a, { title: 'Balancete de setembro' })).status).toBe(201);
     const [wa, wb] = [await workspaceOf(a), await workspaceOf(b)];
     const seen = (ws: string) =>
       withTenant(
@@ -131,7 +132,7 @@ describe('tasks: isolation between workspaces (IDOR)', () => {
       icon: 'shield',
       color: '#3F64BE',
     });
-    const task = await a.ana.post('/tasks', {
+    const task = await myTask(a.ana, {
       title: 'Certidão negativa',
       clientId: clientA,
       categoryId: cat.body.id,
@@ -147,9 +148,9 @@ describe('tasks: isolation between workspaces (IDOR)', () => {
     expect((await other.del(`/tasks/${id}`)).status).toBe(404);
     expect((await other.get('/tasks')).body.total).toBe(0);
     // References to another workspace's client, category, department or member.
-    expect((await other.post('/tasks', { title: 'x', clientId: clientA })).status).toBe(404);
-    expect((await other.post('/tasks', { title: 'x', categoryId: cat.body.id })).status).toBe(404);
-    expect((await other.post('/tasks', { title: 'x', departmentId: a.fiscal })).status).toBe(404);
+    expect((await myTask(other, { title: 'x', clientId: clientA })).status).toBe(404);
+    expect((await myTask(other, { title: 'x', categoryId: cat.body.id })).status).toBe(404);
+    expect((await myTask(other, { title: 'x', departmentId: a.fiscal })).status).toBe(404);
     expect((await other.post('/tasks', { title: 'x', assigneeId: a.ana.userId })).status).toBe(422);
     expect(
       (await other.put(`/tasks/members/${a.bruno.userId}/department`, { departmentId: null }))
@@ -204,11 +205,11 @@ describe('tasks: permissions', () => {
 
   it('writes need a subscription that allows writing (402), reads keep working', async () => {
     const ana = await registerUser(app, 'Ana');
-    const task = await ana.post('/tasks', { title: 'x' });
+    const task = await myTask(ana, { title: 'x' });
     await admin().execute(
       sql`update subscriptions set trial_ends_at = now() - interval '1 day' where workspace_id = ${await workspaceOf(ana)}`,
     );
-    expect((await ana.post('/tasks', { title: 'y' })).status).toBe(402);
+    expect((await myTask(ana, { title: 'y' })).status).toBe(402);
     expect((await ana.patch(`/tasks/${task.body.id}/status`, { status: 'done' })).status).toBe(402);
     expect((await ana.get('/tasks')).status).toBe(200);
     expect((await ana.get('/tasks/options')).body.me).toMatchObject({
@@ -228,19 +229,14 @@ describe('tasks: department, conclusion and overdue', () => {
       departmentId: contabil,
     });
     expect(t1.body.department).toEqual({ id: fiscal, name: 'Fiscal' });
-    // Without assignee the task waits in the queue it was given.
-    const t2 = await ana.post('/tasks', { title: 'Triagem', departmentId: contabil });
-    expect(t2.body).toMatchObject({ assignee: null, department: { id: contabil } });
-    const t3 = await ana.post('/tasks', { title: 'Sem fila' });
-    expect(t3.body.department).toBeNull();
+    // Every task has a responsible and a department (migration 0024): no queue without responsible.
+    expect((await ana.post('/tasks', { title: 'Triagem', departmentId: contabil })).status).toBe(400);
 
-    // Changing the assignee moves the task; unassigning keeps it in the department it was in.
+    // Changing the assignee moves the task; removing the assignee is refused.
     expect(
       (await ana.patch(`/tasks/${t1.body.id}`, { assigneeId: bruno.userId })).body.department.id,
     ).toBe(contabil);
-    expect((await ana.patch(`/tasks/${t1.body.id}`, { assigneeId: null })).body.department.id).toBe(
-      contabil,
-    );
+    expect((await ana.patch(`/tasks/${t1.body.id}`, { assigneeId: null })).status).toBe(400);
 
     // Carla moves to Contábil: her open tasks follow her, concluded ones stay where they were done.
     const open = await ana.post('/tasks', { title: 'Aberta', assigneeId: carla.userId });
@@ -316,9 +312,9 @@ describe('tasks: department, conclusion and overdue', () => {
     });
 
     // Overdue is never stored: due today is not overdue; canceled never is.
-    const today = await ana.post('/tasks', { title: 'Hoje', dueDate: '2026-10-20' });
+    const today = await myTask(ana, { title: 'Hoje', dueDate: '2026-10-20' });
     expect(today.body.overdue).toBe(false);
-    const canceled = await ana.post('/tasks', {
+    const canceled = await myTask(ana, {
       title: 'Cancelada',
       dueDate: '2026-10-01',
       status: 'canceled',
@@ -343,9 +339,9 @@ describe('tasks: department, conclusion and overdue', () => {
   it('validates references, dates and the appointment time', async () => {
     const { ana } = await office();
     expect(
-      (await ana.post('/tasks', { title: 'x', startTime: '14:00', endTime: '15:00' })).status,
+      (await myTask(ana, { title: 'x', startTime: '14:00', endTime: '15:00' })).status,
     ).toBe(400);
-    const task = await ana.post('/tasks', {
+    const task = await myTask(ana, {
       title: 'Reunião',
       dueDate: '2026-10-30',
       startTime: '14:00',
@@ -363,7 +359,7 @@ describe('tasks: department, conclusion and overdue', () => {
         .startTime,
     ).toBeNull();
     const supplier = await ana.post('/contacts', { name: 'Fornecedor' });
-    expect((await ana.post('/tasks', { title: 'x', clientId: supplier.body.id })).status).toBe(404);
+    expect((await myTask(ana, { title: 'x', clientId: supplier.body.id })).status).toBe(404);
   });
 });
 
@@ -411,7 +407,7 @@ describe('tasks: subtasks, comments and activity', () => {
     expect(after.comments[0].author).toEqual({ id: carla.userId, name: 'Carla Souza' });
   });
 
-  it('removing a member unassigns their tasks and drops their department', async () => {
+  it('removing a member hands their open tasks to a replacement and drops their department', async () => {
     const { ana, bruno, contabil } = await office();
     const client = await createClient(ana);
     const task = await ana.post('/tasks', {
@@ -419,11 +415,13 @@ describe('tasks: subtasks, comments and activity', () => {
       assigneeId: bruno.userId,
       clientId: client,
     });
-    expect((await ana.del(`/workspaces/current/members/${bruno.userId}`)).status).toBe(204);
+    // Every open task has a responsible (migration 0024): without a replacement, 409.
+    expect((await ana.del(`/workspaces/current/members/${bruno.userId}`)).status).toBe(409);
+    expect((await ana.del(`/workspaces/current/members/${bruno.userId}?replacementId=${ana.userId}`)).status).toBe(204);
     const after = (await ana.get(`/tasks/${task.body.id}`)).body;
-    expect(after.assignee).toBeNull();
-    // The task stays in the department it was in.
-    expect(after.department.id).toBe(contabil);
+    expect(after.assignee).toEqual({ id: ana.userId, name: 'Ana Paula Ribeiro' });
+    // The task follows the replacement's department (Ana: Fiscal), like any reassignment.
+    expect(after.department.id).not.toBe(contabil);
     expect(
       (await ana.get('/tasks/departments')).body.find((d: any) => d.id === contabil).members,
     ).toEqual([]);
@@ -455,7 +453,7 @@ describe('tasks: registries', () => {
       color: '#0EA5E9',
       taskCount: 0,
     });
-    const task = await carla.post('/tasks', { title: 'Abrir filial', categoryId: cat.body.id });
+    const task = await myTask(carla, { title: 'Abrir filial', categoryId: cat.body.id });
     expect((await ana.get('/tasks/categories')).body[0].taskCount).toBe(1);
     expect((await ana.del(`/tasks/categories/${cat.body.id}`)).status).toBe(204);
     expect((await ana.get(`/tasks/${task.body.id}`)).body.category).toBeNull();
@@ -480,7 +478,7 @@ describe('tasks: registries', () => {
       'Carla Souza',
     ]);
 
-    await carla.post('/tasks', { title: 'Parcelamento', clientId: client });
+    await myTask(carla, { title: 'Parcelamento', clientId: client });
     const refused = await ana.del(`/clients/${client}`);
     expect(refused.status).toBe(409);
     expect(refused.body.message).toMatch(/tarefas vinculadas/);
@@ -614,7 +612,8 @@ describe('tasks: list, summary and start page', () => {
     const filtered = (await ana.get(`/tasks?clientId=${client}`)).body;
     expect(filtered.total).toBe(1);
     expect((await ana.get('/tasks?clientId=internal')).body.total).toBe(8);
-    expect((await ana.get('/tasks?assigneeId=none')).body.total).toBe(0);
+    // `none` left the filters with migration 0024 (open tasks always have a responsible).
+    expect((await ana.get('/tasks?assigneeId=none')).status).toBe(400);
     expect((await ana.get('/tasks?priority=urgent')).body.total).toBe(1);
     expect((await ana.get('/tasks?search=atrasada')).body.total).toBe(2);
     expect((await ana.get('/tasks?month=2026-11')).body.items.map((x: any) => x.title)).toEqual([

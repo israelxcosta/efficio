@@ -18,7 +18,7 @@ import * as reworkModule from '../src/modules/reports/rework';
 import { ADMIN_URL } from './db-roles';
 import { admin, createAccount, createTestApp, registerUser, resetDb, type Client } from './helpers';
 import { exportedFunctions, tracked, unscopedReferences, type Statement } from './scope-checker';
-import { createClient, workspaceOf } from './task-helpers';
+import { createClient, myTask, workspaceOf } from './task-helpers';
 
 let app: App;
 let traced: ReturnType<typeof drizzle<typeof schema>>;
@@ -75,7 +75,7 @@ async function office(owner: Client, name: string) {
   });
   expect(fixed.status, JSON.stringify(fixed.body)).toBe(201);
   const category = await owner.post('/tasks/categories', { name: 'Retrabalho', isRework: true });
-  expect((await owner.post('/tasks', { title: 'Refazer DCTFWeb', clientId: client, categoryId: category.body.id })).status).toBe(201);
+  expect((await myTask(owner, { title: 'Refazer DCTFWeb', clientId: client, categoryId: category.body.id })).status).toBe(201);
   return client;
 }
 

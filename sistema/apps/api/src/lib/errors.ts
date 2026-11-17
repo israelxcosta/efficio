@@ -30,6 +30,17 @@ export class ValidationError extends AppError {
   }
 }
 
+/**
+ * A required field the API checks itself (it depends on stored data, e.g. the department of a task whose
+ * responsible has none): the same 400 as a schema error, `details: [{ path, message }]`, so a form shows
+ * it on the field.
+ */
+export class RequiredFieldError extends AppError {
+  constructor(path: string, message: string) {
+    super(400, 'validation_error', message, [{ path, message }]);
+  }
+}
+
 export class UnauthorizedError extends AppError {
   constructor(message = 'Sessão expirada. Faça login novamente.') {
     super(401, 'unauthorized', message);
@@ -110,6 +121,15 @@ export function fromDatabaseError(error: unknown): AppError | null {
       return new ConflictError(
         UNIQUE_CONFLICTS[constraint] ?? 'Este registro já existe ou foi alterado ao mesmo tempo. Atualize e tente novamente.',
       );
+    }
+    // Migration 0024: an open task without responsible / a recurring task without default responsible
+    // (a member removed meanwhile without handing their work over).
+    const column = String((e as { column_name?: unknown; column?: unknown }).column_name ?? (e as { column?: unknown }).column ?? '');
+    if (
+      (e.code === '23514' && constraint === 'tasks_open_assignee_chk') ||
+      (e.code === '23502' && (column === 'default_assignee_id' || column === 'department_id'))
+    ) {
+      return new ConflictError('Toda tarefa precisa de responsável e departamento. Atualize a página e tente novamente.');
     }
     if (e.code === '23503') {
       return new ConflictError('Um registro relacionado foi alterado ou excluído. Atualize e tente novamente.');

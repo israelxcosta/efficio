@@ -70,9 +70,9 @@ describe('recurring tasks: registry and generation', () => {
     // Collaborators read the registry but do not change it.
     expect((await carla.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId }))).status).toBe(403);
     // Without a legal deadline nothing could be generated; with departments, one must be chosen.
-    expect((await ana.post('/tasks/recurring', { ...das(fiscal), dueDay: undefined })).status).toBe(400);
-    const noDepartment = await ana.post('/tasks/recurring', { ...das(fiscal), departmentId: null });
-    expect(noDepartment).toMatchObject({ status: 422, body: { message: 'Escolha o departamento.' } });
+    expect((await ana.post('/tasks/recurring', { assigneeId: ana.userId, ...das(fiscal, { assigneeId: ana.userId }), dueDay: undefined })).status).toBe(400);
+    const noDepartment = await ana.post('/tasks/recurring', { assigneeId: ana.userId, ...das(fiscal, { assigneeId: ana.userId }), departmentId: null });
+    expect(noDepartment).toMatchObject({ status: 400, body: { message: 'Escolha o departamento' } });
 
     const created = await ana.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId, clientIds: [chosen], excludedClientIds: [excluded] }));
     expect(created.status, JSON.stringify(created.body)).toBe(201);
@@ -172,7 +172,7 @@ describe('recurring tasks: registry and generation', () => {
     const { ana, fiscal } = await office(app);
     const ws = await workspaceOf(ana);
     for (let i = 0; i < 3; i++) await createClient(ana);
-    const created = await ana.post('/tasks/recurring', das(fiscal, { startCompetence: '2026-07' }));
+    const created = await ana.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId, startCompetence: '2026-07' }));
     expect(created.status).toBe(201);
     // The registry generated from two competences back (August) to two ahead.
     expect(new Set((await occurrenceRows(ws, created.body.id)).map((o) => o.competence))).toEqual(
@@ -192,7 +192,7 @@ describe('recurring tasks: registry and generation', () => {
     const { ana, fiscal } = await office(app);
     const ws = await workspaceOf(ana);
     await createClient(ana);
-    const created = await ana.post('/tasks/recurring', das(fiscal));
+    const created = await ana.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId }));
     await admin().execute(sql`update subscriptions set status = 'canceled', current_period_end = now() - interval '1 day', trial_ends_at = now() - interval '30 days' where workspace_id = ${ws}`);
     await admin().execute(sql`delete from tasks where workspace_id = ${ws} and competence = '2026-12'`);
     expect((await ana.get('/tasks')).status).toBe(200);
@@ -282,22 +282,22 @@ describe('recurring tasks: deadlines, situations and holidays', () => {
 });
 
 describe('recurring tasks: who receives the occurrences', () => {
-  it('without a default responsible the occurrences wait in the department queue; by hand only for that competence', async () => {
+  it('the default responsible (required since 0024) receives them; by hand only for that competence', async () => {
     const { ana, bruno, carla, fiscal } = await office(app);
     const ws = await workspaceOf(ana);
     const a = await createClient(ana, { tradeName: 'A' });
     const b = await createClient(ana, { tradeName: 'B' });
-    const created = await ana.post('/tasks/recurring', das(fiscal));
+    const created = await ana.post('/tasks/recurring', das(fiscal, { assigneeId: carla.userId }));
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     const id = created.body.id;
-    expect(created.body.distribution).toEqual([{ assignee: null, source: null, count: 2 }]);
+    expect(created.body.distribution).toEqual([{ assignee: { id: carla.userId, name: 'Carla Souza' }, source: 'default', count: 2 }]);
     const generated = await occurrenceRows(ws, id);
     expect(generated).toHaveLength(6);
-    expect(generated.every((o) => o.assignee_id === null && o.assignee_source === null)).toBe(true);
-    // The department queue shows them (unassigned, in the recurring task's department).
+    expect(generated.every((o) => o.assignee_id === carla.userId && o.assignee_source === 'default')).toBe(true);
+    // The department shows them (in the recurring task's department, with the default responsible).
     const queue = (await carla.get('/tasks?scope=department&month=2026-10')).body;
     expect(queue.occurrences).toHaveLength(1);
-    expect(queue.occurrences[0]).toMatchObject({ name: 'DAS', department: { id: fiscal }, total: 2, assignees: [{ assignee: null, count: 2 }] });
+    expect(queue.occurrences[0]).toMatchObject({ name: 'DAS', department: { id: fiscal }, total: 2, assignees: [{ assignee: { id: carla.userId }, count: 2 }] });
 
     // Assigned by hand: that competence only; the registry's default reaches the others, never that one.
     const october = await cellsOf(carla, id, '2026-10');
@@ -392,7 +392,7 @@ describe('recurring tasks: editing and deleting', () => {
     const refused = await ana.del(`/tasks/recurring/${id}`);
     expect(refused.status).toBe(409);
     expect(refused.body.message).toMatch(/Encerra em/);
-    const ended = await ana.put(`/tasks/recurring/${id}`, das(fiscal, { endCompetence: '2026-10' }));
+    const ended = await ana.put(`/tasks/recurring/${id}`, das(fiscal, { assigneeId: ana.userId, endCompetence: '2026-10' }));
     expect(ended.body).toMatchObject({ endCompetence: '2026-10', active: true });
     after = await state();
     expect(
@@ -410,7 +410,7 @@ describe('recurring tasks: editing and deleting', () => {
     expect((await carla.get('/tasks/recurring?status=active')).body.items).toHaveLength(1);
 
     // An untouched one goes away with its occurrences.
-    const spare = await ana.post('/tasks/recurring', das(fiscal, { name: 'Sem uso' }));
+    const spare = await ana.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId, name: 'Sem uso' }));
     expect((await carla.del(`/tasks/recurring/${spare.body.id}`)).status).toBe(403);
     expect((await ana.del(`/tasks/recurring/${spare.body.id}`)).status).toBe(204);
     expect(await occurrenceRows(ws, spare.body.id)).toHaveLength(0);
@@ -419,8 +419,8 @@ describe('recurring tasks: editing and deleting', () => {
   it('lists with the month progress and filters; departments count and keep their recurring tasks', async () => {
     const { ana, carla, fiscal, pessoal } = await office(app);
     await createClient(ana);
-    await ana.post('/tasks/recurring', das(fiscal));
-    await ana.post('/tasks/recurring', { name: 'Folha de pagamento', departmentId: pessoal, dueDay: 5, regimes: ['simples_nacional'] });
+    await ana.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId }));
+    await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'Folha de pagamento', departmentId: pessoal, dueDay: 5, regimes: ['simples_nacional'] });
     const list = (await carla.get('/tasks/recurring')).body;
     expect(list.month).toBe('2026-10');
     expect(list.items.map((i: any) => i.name)).toEqual(['DAS', 'Folha de pagamento']);
@@ -439,15 +439,15 @@ describe('recurring tasks: editing and deleting', () => {
   it('ids of another workspace are "not found" (registry, occurrences, clients)', async () => {
     const { ana, fiscal } = await office(app);
     await createClient(ana);
-    const mine = await ana.post('/tasks/recurring', das(fiscal));
+    const mine = await ana.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId }));
     const other = await registerUser(app, 'Outro Escritório');
     const foreignClient = await createClient(other);
     expect((await other.get(`/tasks/recurring/${mine.body.id}`)).status).toBe(404);
     expect((await other.get(`/tasks/recurring/${mine.body.id}/occurrences/2026-10`)).status).toBe(404);
-    expect((await other.put(`/tasks/recurring/${mine.body.id}`, das(fiscal))).status).toBe(404);
+    expect((await other.put(`/tasks/recurring/${mine.body.id}`, das(fiscal, { assigneeId: ana.userId }))).status).toBe(404);
     expect((await other.del(`/tasks/recurring/${mine.body.id}`)).status).toBe(404);
-    expect((await ana.post('/tasks/recurring', das(fiscal, { clientIds: [foreignClient] }))).status).toBe(404);
-    expect((await ana.post('/tasks/recurring', das(fiscal, { excludedClientIds: [foreignClient] }))).status).toBe(404);
+    expect((await ana.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId, clientIds: [foreignClient] }))).status).toBe(404);
+    expect((await ana.post('/tasks/recurring', das(fiscal, { assigneeId: ana.userId, excludedClientIds: [foreignClient] }))).status).toBe(404);
     expect((await other.get('/tasks/recurring')).body.items).toEqual([]);
   });
 });

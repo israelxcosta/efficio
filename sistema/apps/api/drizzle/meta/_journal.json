@@ -169,6 +169,13 @@
       "when": 1794935771397,
       "tag": "0023_regime_group_exclusions",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794941679885,
+      "tag": "0024_task_assignment_required",
+      "breakpoints": true
     }
   ]
 }

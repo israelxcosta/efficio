@@ -54,21 +54,18 @@ describe('migration 0017: no responsible per client and department', () => {
     const client = await createClient(ana, { tradeName: 'Padaria' });
     const created = await ana.post('/tasks/recurring', { name: 'DAS', departmentId: fiscal, assigneeId: ana.userId, dueDay: 20, regimes: ['simples_nacional'] });
     expect(created.status).toBe(201);
-    const noDefault = await ana.post('/tasks/recurring', { name: 'DCTFWeb', departmentId: fiscal, dueDay: 15, regimes: ['simples_nacional'] });
-    expect(noDefault.status).toBe(201);
+    // (A recurring task without default responsible no longer exists: migration 0024.)
     const occurrences = await rows<{ id: string; recurring_task_id: string; competence: string }>(sql`
       select id, recurring_task_id, competence from tasks where workspace_id = ${ws} and client_id = ${client} order by recurring_task_id, competence`);
     const das = occurrences.filter((o) => o.recurring_task_id === created.body.id);
-    const dctf = occurrences.filter((o) => o.recurring_task_id === noDefault.body.id);
     // Rows as before 0017: Carla came from the "carteira". Competences far from today on purpose (the
     // migration uses the database clock): one ahead and not started, one ahead and done, one in the past.
     const ahead = das[0]!.id;
     const aheadDone = das[1]!.id;
     const past = das[2]!.id;
-    const aheadNoDefault = dctf[0]!.id;
     await admin().transaction(async (tx) => {
       await tx.execute(sql`alter table tasks drop constraint tasks_occurrence_chk`);
-      await tx.execute(sql`update tasks set assignee_id = ${carla.userId}, assignee_source = 'client', competence = '2999-12' where id in (${ahead}, ${aheadDone}, ${aheadNoDefault})`);
+      await tx.execute(sql`update tasks set assignee_id = ${carla.userId}, assignee_source = 'client', competence = '2999-12' where id in (${ahead}, ${aheadDone})`);
       await tx.execute(sql`update tasks set status = 'done', completed_at = now(), completed_by_name = 'Carla Souza' where id = ${aheadDone}`);
       await tx.execute(sql`update tasks set assignee_id = ${carla.userId}, assignee_source = 'client', competence = '2000-01' where id = ${past}`);
     });
@@ -76,10 +73,9 @@ describe('migration 0017: no responsible per client and department', () => {
     await runMigration('0017_drop_client_responsibles.sql');
     const state = () =>
       rows<{ id: string; assignee_id: string | null; assignee_source: string | null }>(sql`
-        select id, assignee_id, assignee_source from tasks where id in (${ahead}, ${aheadDone}, ${past}, ${aheadNoDefault}) order by id`);
+        select id, assignee_id, assignee_source from tasks where id in (${ahead}, ${aheadDone}, ${past}) order by id`);
     const after = new Map((await state()).map((r) => [r.id, r]));
     expect(after.get(ahead)).toMatchObject({ assignee_id: ana.userId, assignee_source: 'default' });
-    expect(after.get(aheadNoDefault)).toMatchObject({ assignee_id: null, assignee_source: null });
     expect(after.get(aheadDone)).toMatchObject({ assignee_id: carla.userId, assignee_source: 'manual' });
     expect(after.get(past)).toMatchObject({ assignee_id: carla.userId, assignee_source: 'manual' });
 

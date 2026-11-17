@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { App } from '../src/app';
 import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
-import { createClient, office } from './task-helpers';
+import { createClient, myTask, office } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -98,8 +98,8 @@ describe('tasks insights', () => {
   it('productivity counts conclusions by the office day, at the edges of the period', async () => {
     const { ana } = await scenario();
     const ws = (await ana.get('/auth/me')).body.workspace.id;
-    const late = await ana.post('/tasks', { title: 'Concluída tarde da noite', status: 'done' });
-    const early = await ana.post('/tasks', { title: 'Concluída de madrugada', status: 'done' });
+    const late = await myTask(ana, { title: 'Concluída tarde da noite', status: 'done' });
+    const early = await myTask(ana, { title: 'Concluída de madrugada', status: 'done' });
     // 2026-11-01 02:30 UTC is still October 31st in São Paulo; 2026-10-01 03:00 UTC is October 1st.
     await admin().execute(sql`update tasks set completed_at = '2026-11-01T02:30:00Z', created_at = '2026-10-31T12:00:00Z' where id = ${late.body.id} and workspace_id = ${ws}`);
     await admin().execute(sql`update tasks set completed_at = '2026-10-01T03:00:00Z', created_at = '2026-10-01T03:00:00Z' where id = ${early.body.id} and workspace_id = ${ws}`);

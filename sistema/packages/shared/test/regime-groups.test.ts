@@ -17,7 +17,7 @@ describe('regime groups catalog', () => {
       keys.add(item.key);
       expect(item.regimes.length, item.key).toBeGreaterThan(0);
       for (const r of item.regimes) expect(REGIME_GROUP_REGIMES).toContain(r);
-      const parsed = recurringTaskInputSchema.safeParse({ ...item, regimes: item.regimes, description: item.description });
+      const parsed = recurringTaskInputSchema.safeParse({ ...item, regimes: item.regimes, description: item.description, departmentId: '11111111-1111-4111-8111-111111111111', assigneeId: '22222222-2222-4222-8222-222222222222' });
       expect(parsed.success, `${item.key}: ${JSON.stringify(parsed.error?.issues)}`).toBe(true);
     }
   });

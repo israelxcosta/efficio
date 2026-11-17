@@ -64,9 +64,10 @@ export interface SeriesFields {
   description: string | null;
   clientId: string | null;
   categoryId: string | null;
-  assigneeId: string | null;
-  /** Already resolved (the responsible's department, else the queue). */
-  departmentId: string | null;
+  /** Required (migration 0024): the series' default responsible. */
+  assigneeId: string;
+  /** Already resolved (the responsible's department, else the chosen one): required. */
+  departmentId: string;
   priority: TaskPriority;
   startTime: string | null;
   endTime: string | null;

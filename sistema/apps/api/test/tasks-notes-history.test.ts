@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { App } from '../src/app';
 import { taskNotes } from '../src/db/schema';
 import { admin, createTestApp, resetDb } from './helpers';
-import { createClient, office, workspaceOf } from './task-helpers';
+import { createClient, myTask, office, workspaceOf } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -60,7 +60,7 @@ describe('task history', () => {
     const { ana, carla, fiscal } = await office(app);
     const client = await createClient(ana, { tradeName: 'Padaria' });
     const category = (await ana.post('/tasks/categories', { name: 'Certidões' })).body.id;
-    const task = (await ana.post('/tasks', { title: 'Certidão', dueDate: '2026-10-25', departmentId: fiscal })).body;
+    const task = (await myTask(ana, { title: 'Certidão', dueDate: '2026-10-25', departmentId: fiscal })).body;
 
     // Autosave within minutes merges; a field back to its start drops out; the description has no values.
     await ana.patch(`/tasks/${task.id}`, { dueDate: '2026-10-30' });
@@ -106,7 +106,7 @@ describe('task history', () => {
     expect(reopened).toMatchObject({ actor: { id: carla.userId }, fromStatus: 'done', toStatus: 'in_progress', note: 'Faltou a certidão estadual' });
     expect(done).toMatchObject({ fromStatus: 'in_progress', toStatus: 'done' });
     expect(started).toMatchObject({ fromStatus: 'todo', toStatus: 'in_progress' });
-    expect(assigned).toMatchObject({ actor: { id: carla.userId }, fromAssignee: null, toAssignee: { id: carla.userId, name: 'Carla Souza' } });
+    expect(assigned).toMatchObject({ actor: { id: carla.userId }, fromAssignee: { id: ana.userId }, toAssignee: { id: carla.userId, name: 'Carla Souza' } });
     expect(later).toMatchObject({ fields: ['clientId'], changes: [{ field: 'clientId', from: 'Padaria', to: null }] });
     expect(merged.fields.sort()).toEqual(['categoryId', 'clientId', 'description', 'dueDate', 'priority', 'title']);
     expect(merged.changes).toEqual([

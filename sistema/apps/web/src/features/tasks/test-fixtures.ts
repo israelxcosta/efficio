@@ -11,7 +11,8 @@ export function makeTask(patch: Partial<Task>): Task {
     reopenStatus: 'todo',
     priority: 'medium',
     client: null,
-    department: null,
+    // Every task has a department since migration 0024.
+    department: { id: 'd-fiscal', name: 'Fiscal' },
     category: null,
     assignee: null,
     startDate: null,

@@ -238,7 +238,9 @@ sequenceDiagram
   tarefa (`recurring_tasks.origin`/`internal`/regra por data, `tasks.occurrence_origin`, índice das internas) · 0020
   categoria de retrabalho (`task_categories.is_rework`) · 0021 juros/multa em categoria própria
   (reclassificação), reajuste em lote (`fee_adjustments`/`_items`) e procuração e-CAC · 0023 itens removidos dos grupos por
-  regime (`regime_group_exclusions`). Escritas
+  regime (`regime_group_exclusions`) · 0024 responsável e departamento obrigatórios (preenche os vazios:
+  dono do espaço / departamento do responsável / "Geral"; `tasks.department_id` e
+  `recurring_tasks.department_id`/`default_assignee_id` NOT NULL, `tasks_open_assignee_chk`). Escritas
   para rodar duas vezes e também no PGlite.
 - **Relógio:** `lib/clock.today()` respeita `EFFINANCE_TODAY` fora de produção; os testes fixam
   2026-10-20. Tarefas usam `todayIn('America/Sao_Paulo')` (o dia do escritório, não o do servidor

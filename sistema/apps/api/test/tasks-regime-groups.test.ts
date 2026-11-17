@@ -33,7 +33,7 @@ describe('regime groups', () => {
     await createClient(ana, { tradeName: 'Clínica' });
     const construtora = await createClient(ana, { tradeName: 'Construtora', taxRegime: 'presumed_profit' });
     // A recurring task made by hand for the regime shows up among the regime's recurring tasks.
-    const handmade = await ana.post('/tasks/recurring', { name: 'Conferência de notas', departmentId: fiscal, dueDay: 10, regimes: ['simples_nacional'] });
+    const handmade = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'Conferência de notas', departmentId: fiscal, dueDay: 10, regimes: ['simples_nacional'] });
     expect(handmade.status).toBe(201);
 
     const listed = await carla.get('/tasks/regime-groups');
@@ -70,14 +70,15 @@ describe('regime groups', () => {
     const created = await rows<{ id: string; catalog_key: string; regimes: string[]; department_id: string; default_assignee_id: string | null }>(sql`
       select id, catalog_key, regimes, department_id, default_assignee_id from recurring_tasks where workspace_id = ${ws} and catalog_key is not null order by catalog_key`);
     expect(created.map((r) => r.catalog_key).sort()).toEqual(regimeGroupItems('simples_nacional').map((i) => i.key).sort());
-    expect(created.find((r) => r.catalog_key === 'pgdas_das')).toMatchObject({ regimes: ['simples_nacional'], department_id: fiscal, default_assignee_id: null });
+    // Default responsible: who applied (required since migration 0024).
+    expect(created.find((r) => r.catalog_key === 'pgdas_das')).toMatchObject({ regimes: ['simples_nacional'], department_id: fiscal, default_assignee_id: ana.userId });
     expect(created.find((r) => r.catalog_key === 'fgts_digital')!.department_id).toBe(pessoal);
-    // The occurrences were generated for each Simples client (department queue: no default responsible).
+    // The occurrences were generated for each Simples client, for the default responsible.
     const dasId = created.find((r) => r.catalog_key === 'pgdas_das')!.id;
     const dasOccurrences = await rows<{ client_id: string; assignee_id: string | null }>(sql`
       select client_id, assignee_id from tasks where workspace_id = ${ws} and recurring_task_id = ${dasId} and competence = '2026-10'`);
     expect(dasOccurrences).toHaveLength(2);
-    expect(dasOccurrences.every((o) => o.assignee_id === null)).toBe(true);
+    expect(dasOccurrences.every((o) => o.assignee_id === ana.userId)).toBe(true);
     expect(dasOccurrences.map((o) => o.client_id)).toContain(padaria);
 
     // Applying again changes nothing.
@@ -129,10 +130,10 @@ describe('regime groups', () => {
     const ws = await workspaceOf(ana);
     await createClient(ana, { tradeName: 'MEI do João', taxRegime: 'mei' });
     // Made by hand before the catalog: "das mei" (case, accents and punctuation do not matter).
-    const handmade = await ana.post('/tasks/recurring', { name: 'das mei', departmentId: fiscal, dueDay: 20, regimes: ['mei'] });
+    const handmade = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'das mei', departmentId: fiscal, dueDay: 20, regimes: ['mei'] });
     expect(handmade.status).toBe(201);
     // Same name but ended, or of another regime: does not count.
-    await ana.post('/tasks/recurring', { name: 'DASN-SIMEI', departmentId: fiscal, dueDay: 31, dueMonth: 5, period: 'annual', regimes: ['simples_nacional'] });
+    await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'DASN-SIMEI', departmentId: fiscal, dueDay: 31, dueMonth: 5, period: 'annual', regimes: ['simples_nacional'] });
 
     const listed = (await ana.get('/tasks/regime-groups')).body.groups.find((g: any) => g.regime === 'mei');
     const dasMei = listed.items.find((i: any) => i.key === 'das_mei');
@@ -158,16 +159,18 @@ describe('regime groups', () => {
     expect(after.items.find((i: any) => i.key === 'das_mei')).toMatchObject({ state: 'applied', applied: true });
   });
 
-  it('an office without departments gets recurring tasks without one', async () => {
+  it('an office without departments gets the suggested ones (every recurring task has one since 0024)', async () => {
     const ana = await registerUser(app, 'Ana Sem Departamentos');
     const ws = await workspaceOf(ana);
     await createClient(ana, { tradeName: 'Padaria' });
     expect((await ana.get('/tasks/regime-groups')).body.usesDepartments).toBe(false);
     const res = await ana.post('/tasks/regime-groups/simples_nacional/apply', {});
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body.departmentsCreated).toEqual([]);
-    const created = await rows<{ department_id: string | null }>(sql`select department_id from recurring_tasks where workspace_id = ${ws}`);
-    expect(created.every((r) => r.department_id === null)).toBe(true);
+    expect(res.body.departmentsCreated.length).toBeGreaterThan(0);
+    const created = await rows<{ department_id: string | null; default_assignee_id: string }>(
+      sql`select department_id, default_assignee_id from recurring_tasks where workspace_id = ${ws}`,
+    );
+    expect(created.every((r) => r.department_id !== null && r.default_assignee_id === ana.userId)).toBe(true);
   });
 
   it('warns how many occurrences of the current month are born overdue and can start next month (QA #4)', async () => {
@@ -337,7 +340,7 @@ describe('editing regime groups (include / exclude / restore)', () => {
     const mei = await createClient(ana, { tradeName: 'MEI do João', taxRegime: 'mei' });
     const padaria = await createClient(ana, { tradeName: 'Padaria' });
     // A new task of the regime is a plain recurring task of the registry (POST /tasks/recurring).
-    const folha = await ana.post('/tasks/recurring', { name: 'Folha própria', departmentId: pessoal, dueDay: 25, regimes: ['simples_nacional'] });
+    const folha = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'Folha própria', departmentId: pessoal, dueDay: 25, regimes: ['simples_nacional'] });
     expect(folha.status).toBe(201);
     expect((await groupOf(ana, 'simples_nacional')).own).toEqual([
       expect.objectContaining({ id: folha.body.id, name: 'Folha própria', dueDay: 25, period: 'monthly', department: { id: pessoal, name: 'Pessoal' }, catalogKey: null }),
@@ -382,7 +385,7 @@ describe('editing regime groups (include / exclude / restore)', () => {
   it('needs `registry` to edit (listing is for every member) and stays inside the office (RLS)', async () => {
     const { ana, carla, fiscal } = await office(app);
     const ws = await workspaceOf(ana);
-    const own = await ana.post('/tasks/recurring', { name: 'Conferência', departmentId: fiscal, dueDay: 10, regimes: ['simples_nacional'] });
+    const own = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'Conferência', departmentId: fiscal, dueDay: 10, regimes: ['simples_nacional'] });
     expect((await carla.post('/tasks/regime-groups/simples_nacional/exclude', { key: 'pgdas_das' })).status).toBe(403);
     expect((await carla.post('/tasks/regime-groups/simples_nacional/restore', { key: 'pgdas_das' })).status).toBe(403);
     expect((await carla.post('/tasks/regime-groups/mei/include', { recurringTaskId: own.body.id })).status).toBe(403);

@@ -200,7 +200,7 @@ describe('task rules', () => {
 
 describe('task schemas', () => {
   it('validates the appointment and the dates', () => {
-    const base = { title: 'Reunião', dueDate: '2026-10-30' };
+    const base = { title: 'Reunião', dueDate: '2026-10-30', assigneeId: '11111111-1111-4111-8111-111111111111' };
     expect(taskInputSchema.parse(base)).toMatchObject({
       priority: 'medium',
       status: 'todo',
@@ -211,7 +211,11 @@ describe('task schemas', () => {
       taskInputSchema.safeParse({ ...base, startTime: '14:00', endTime: '13:00' }).success,
     ).toBe(false);
     expect(taskInputSchema.safeParse({ ...base, startTime: '25:00' }).success).toBe(false);
-    expect(taskInputSchema.safeParse({ title: 'x', startTime: '09:00' }).success).toBe(false);
+    expect(taskInputSchema.safeParse({ title: 'x', assigneeId: '11111111-1111-4111-8111-111111111111', startTime: '09:00' }).success).toBe(false);
+    // Responsible required (migration 0024); never removed by a PATCH.
+    expect(taskInputSchema.safeParse({ title: 'x' }).error!.issues[0]).toMatchObject({ path: ['assigneeId'], message: 'Escolha o responsável' });
+    expect(taskUpdateSchema.safeParse({ assigneeId: null }).success).toBe(false);
+    expect(taskUpdateSchema.safeParse({ departmentId: null }).error!.issues[0]!.message).toBe('Escolha o departamento');
     expect(taskInputSchema.safeParse({ ...base, startDate: '2026-10-31' }).success).toBe(false);
     expect(taskInputSchema.safeParse({ title: '  ' }).success).toBe(false);
     // Autosave sends one field and gets no defaults back.
@@ -220,10 +224,13 @@ describe('task schemas', () => {
   });
 
   it('requires the legal deadline, a regime or client, and the anchor month of longer periods', () => {
-    const base = { name: 'DCTFWeb', dueDay: 15 };
+    const base = { name: 'DCTFWeb', dueDay: 15, departmentId: '11111111-1111-4111-8111-111111111111', assigneeId: '22222222-2222-4222-8222-222222222222' };
     expect(recurringTaskInputSchema.safeParse(base).success).toBe(false);
+    // Department and default responsible are required (migration 0024).
+    expect(recurringTaskInputSchema.safeParse({ ...base, regimes: ['mei'], departmentId: null }).success).toBe(false);
+    expect(recurringTaskInputSchema.safeParse({ ...base, regimes: ['mei'], assigneeId: undefined }).success).toBe(false);
     // Without a legal deadline nothing could be generated.
-    const noDeadline = recurringTaskInputSchema.safeParse({ name: 'DCTFWeb', regimes: ['mei'] });
+    const noDeadline = recurringTaskInputSchema.safeParse({ name: 'DCTFWeb', departmentId: '11111111-1111-4111-8111-111111111111', assigneeId: '22222222-2222-4222-8222-222222222222', regimes: ['mei'] });
     expect(noDeadline.success).toBe(false);
     expect(noDeadline.error!.issues[0]!.message).toBe('Informe o prazo legal');
     expect(

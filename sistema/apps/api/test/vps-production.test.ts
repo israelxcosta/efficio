@@ -297,7 +297,7 @@ describe('daily jobs', () => {
     const { ana, fiscal } = await office(app);
     const ws = await workspaceOf(ana);
     await createClient(ana, { tradeName: 'Padaria' });
-    const created = await ana.post('/tasks/recurring', { name: 'DAS', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] });
+    const created = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'DAS', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] });
     expect(created.status).toBe(201);
     // Start from nothing generated (as if nobody had opened a task screen).
     await admin().execute(sql`delete from tasks where workspace_id = ${ws} and recurring_task_id is not null`);

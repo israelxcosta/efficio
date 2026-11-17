@@ -14,6 +14,7 @@ import { TASK_ADMIN_MESSAGE } from '../src/modules/tasks/access';
 import { encryptTaskText, TASK_COMMENT_TEXT } from '../src/modules/tasks/encrypted-text';
 import { MAX_COMMENTS_PER_TASK, MAX_SUBTASKS_PER_TASK } from '../src/modules/tasks/service';
 import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
+import { myTask, ownDepartment } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -278,8 +279,8 @@ describe('tasks security: permission keys (phase 3)', () => {
 describe('tasks security: ids outside their scope', () => {
   it('a subtask is only reachable through its own task', async () => {
     const { ana, carla } = await office();
-    const t1 = await ana.post('/tasks', { title: 'Admissão' });
-    const t2 = await carla.post('/tasks', { title: 'Rescisão' });
+    const t1 = await myTask(ana, { title: 'Admissão' });
+    const t2 = await myTask(carla, { title: 'Rescisão' });
     const sub = await ana.post(`/tasks/${t1.body.id}/subtasks`, { title: 'Exame admissional' });
     expect(sub.status).toBe(201);
 
@@ -299,7 +300,7 @@ describe('tasks security: ids outside their scope', () => {
     const b = await registerUser(app, 'Outro Escritório');
     const clientA = (await a.ana.post('/clients', CLIENT)).body.id as string;
     const catA = (await a.ana.post('/tasks/categories', { name: 'Certidões' })).body.id as string;
-    const task = await a.ana.post('/tasks', { title: 'Certidão', clientId: clientA });
+    const task = await myTask(a.ana, { title: 'Certidão', clientId: clientA });
     const sub = await a.ana.post(`/tasks/${task.body.id}/subtasks`, { title: 'Emitir' });
 
     expect(
@@ -320,7 +321,7 @@ describe('tasks security: ids outside their scope', () => {
       expect((await b.get(`/tasks?${filter}`)).body.total, filter).toBe(0);
     }
     // A foreign task cannot be moved into a department/category of this workspace and vice versa.
-    const own = await b.post('/tasks', { title: 'Própria' });
+    const own = await myTask(b, { title: 'Própria' });
     expect((await b.patch(`/tasks/${own.body.id}`, { departmentId: a.fiscal })).status).toBe(404);
     expect((await b.patch(`/tasks/${own.body.id}`, { categoryId: catA })).status).toBe(404);
     expect((await b.patch(`/tasks/${own.body.id}`, { clientId: clientA })).status).toBe(404);
@@ -356,7 +357,7 @@ describe('tasks security: server-owned fields', () => {
     const { ana, carla } = await office();
     const other = await registerUser(app, 'Outro Escritório');
     const otherWs = await workspaceOf(other);
-    const created = await carla.post('/tasks', {
+    const created = await myTask(carla, {
       title: 'Conferir notas',
       createdBy: ana.userId,
       createdByName: 'Diretoria',
@@ -420,7 +421,7 @@ describe('tasks security: server-owned fields', () => {
     expect(seenByAna).toMatchObject({ author: { id: carla.userId }, isYours: false });
 
     // A subtask cannot be moved to another task through its body.
-    const t2 = await ana.post('/tasks', { title: 'Outra' });
+    const t2 = await myTask(ana, { title: 'Outra' });
     const sub = await carla.post(`/tasks/${id}/subtasks`, { title: 'Baixar XMLs' });
     const subPatch = await carla.patch(`/tasks/${id}/subtasks/${sub.body.id}`, {
       done: true,
@@ -440,19 +441,19 @@ describe('tasks security: server-owned fields', () => {
 describe('tasks security: input limits', () => {
   it('rejects oversized text, pages and malformed filters with 400', async () => {
     const { ana } = await office();
-    const task = await ana.post('/tasks', { title: 'Base' });
+    const task = await myTask(ana, { title: 'Base' });
     const id = task.body.id as string;
     const bad = [
-      await ana.post('/tasks', { title: 'x'.repeat(201) }),
-      await ana.post('/tasks', { title: '   ' }),
-      await ana.post('/tasks', { title: 'x', description: 'x'.repeat(5001) }),
+      await myTask(ana, { title: 'x'.repeat(201) }),
+      await myTask(ana, { title: '   ' }),
+      await myTask(ana, { title: 'x', description: 'x'.repeat(5001) }),
       await ana.patch(`/tasks/${id}`, { description: 'x'.repeat(5001) }),
       await ana.post(`/tasks/${id}/comments`, { text: 'x'.repeat(5001) }),
       await ana.post(`/tasks/${id}/comments`, { text: '   ' }),
       await ana.post(`/tasks/${id}/subtasks`, { title: 'x'.repeat(201) }),
-      await ana.post('/tasks', { title: 'x', dueDate: '2026-10-10', startTime: '24:00' }),
-      await ana.post('/tasks', { title: 'x', dueDate: '2026-02-30' }),
-      await ana.post('/tasks', { title: 'x', dueDate: '0001-01-01' }),
+      await myTask(ana, { title: 'x', dueDate: '2026-10-10', startTime: '24:00' }),
+      await myTask(ana, { title: 'x', dueDate: '2026-02-30' }),
+      await myTask(ana, { title: 'x', dueDate: '0001-01-01' }),
       await ana.post('/tasks/departments', { name: 'x'.repeat(81) }),
       await ana.post('/tasks/categories', { name: 'x'.repeat(61) }),
       await ana.post('/tasks/categories', { name: 'Cor', color: 'red;}' }),
@@ -469,9 +470,9 @@ describe('tasks security: input limits', () => {
 
   it('text with a NUL character is a 400, not an unexpected error', async () => {
     const { ana } = await office();
-    const task = await ana.post('/tasks', { title: 'Base' });
+    const task = await myTask(ana, { title: 'Base' });
     const cases = [
-      await ana.post('/tasks', { title: 'Balancete\u0000' }),
+      await myTask(ana, { title: 'Balancete\u0000' }),
       await ana.patch(`/tasks/${task.body.id}`, { description: 'a\u0000b' }),
       await ana.post(`/tasks/${task.body.id}/comments`, { text: 'oi\u0000' }),
       await ana.post(`/tasks/${task.body.id}/subtasks`, { title: '\u0000x' }),
@@ -487,7 +488,7 @@ describe('tasks security: input limits', () => {
 
   it('a task holds a bounded number of subtasks and comments (the detail returns all of them)', async () => {
     const { ana, carla } = await office();
-    const task = await ana.post('/tasks', { title: 'Admissão' });
+    const task = await myTask(ana, { title: 'Admissão' });
     const id = task.body.id as string;
     const ws = await workspaceOf(ana);
     await admin().execute(
@@ -524,8 +525,8 @@ describe('tasks security: input limits', () => {
     const ws = await workspaceOf(ana);
     // 30 open tasks for Carla: 10 overdue, 5 due today, 10 later, 5 without due date; 3 done.
     await admin().execute(
-      sql`insert into tasks (workspace_id, title, assignee_id, created_by_name, due_date, status, completed_at, completed_by_name)
-          select ${ws}::uuid, 'Tarefa ' || lpad(g::text, 2, '0'), ${carla.userId}::uuid, 'Ana',
+      sql`insert into tasks (workspace_id, title, assignee_id, department_id, created_by_name, due_date, status, completed_at, completed_by_name)
+          select ${ws}::uuid, 'Tarefa ' || lpad(g::text, 2, '0'), ${carla.userId}::uuid, ${await ownDepartment(carla)}::uuid, 'Ana',
             case when g <= 10 then date '2026-10-01' + g
                  when g <= 15 then date '2026-10-20'
                  when g <= 25 then date '2026-11-01' + g

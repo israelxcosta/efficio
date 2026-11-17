@@ -83,7 +83,8 @@ describe('process templates and processes', () => {
       title: 'Contrato social',
       dueDate: '2026-10-22',
       priority: 'high',
-      assignee: null,
+      // No responsible in the template: who applied it (migration 0024); the step's department stays.
+      assignee: { id: carla.userId },
       department: { id: pessoal },
       flow: { position: 2, stepCount: 3 },
       createdBy: { id: carla.userId },

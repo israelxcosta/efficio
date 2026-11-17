@@ -14,7 +14,7 @@ import { attachmentLimits } from '../src/modules/tasks/attachments';
 import { csvCell } from '../src/modules/tasks/csv';
 import { attachmentProblem, contentDisposition, MAX_UNCOMPRESSED_BYTES, readZipDirectory } from '../src/modules/tasks/file-check';
 import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
-import { member, office, PDF_BASE64 } from './task-helpers';
+import { member, myTask, office, PDF_BASE64 } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -146,7 +146,7 @@ describe('task attachments', () => {
   it('stores the file encrypted, serves it as a download and keeps the history', async () => {
     const { ana, carla } = await office(app);
     const dani = await member(app, ana, 'viewer', 'Daniela Lima');
-    const task = (await carla.post('/tasks', { title: 'Guia do DAS' })).body;
+    const task = (await myTask(carla, { title: 'Guia do DAS' })).body;
 
     const res = await upload(carla, task.id, '../../Guia DAS outubro.pdf', 'application/pdf', PDF_BASE64);
     expect(res.status, JSON.stringify(res.body)).toBe(201);
@@ -210,7 +210,7 @@ describe('task attachments', () => {
 
   it('refuses disguised, oversized and unknown files', async () => {
     const { carla } = await office(app);
-    const task = (await carla.post('/tasks', { title: 'Documentos' })).body;
+    const task = (await myTask(carla, { title: 'Documentos' })).body;
     const html = b64(bytes('<html><body><script>alert(document.cookie)</script></body></html>'));
     expect((await upload(carla, task.id, 'guia.pdf', 'application/pdf', html)).body.message).toBe('O conteúdo do arquivo não corresponde ao tipo informado.');
     expect((await upload(carla, task.id, 'imagem.svg', 'image/svg+xml', b64(bytes('<svg/>')))).status).toBe(400);
@@ -232,7 +232,7 @@ describe('task attachments', () => {
     // Security review: characters of the alphabet with an impossible length passed the contract and
     // made `atob` throw, answered as an unexpected error (500, logged as one).
     const { carla } = await office(app);
-    const task = (await carla.post('/tasks', { title: 'Documentos' })).body;
+    const task = (await myTask(carla, { title: 'Documentos' })).body;
     for (const content of ['AAAAA', 'JVBERi0tA', 'AB=']) {
       const res = await upload(carla, task.id, 'guia.pdf', 'application/pdf', content);
       expect([400, 422], `${content}: ${res.status} ${JSON.stringify(res.body)}`).toContain(res.status);
@@ -244,7 +244,7 @@ describe('task attachments', () => {
 
   it('a task holds up to 50 MB of attachments', async () => {
     const { carla } = await office(app);
-    const task = (await carla.post('/tasks', { title: 'Muitos arquivos' })).body;
+    const task = (await myTask(carla, { title: 'Muitos arquivos' })).body;
     const file = Buffer.alloc(MAX_ATTACHMENT_BYTES, 0x41);
     file.write('%PDF-', 0);
     const content = file.toString('base64');
@@ -255,7 +255,7 @@ describe('task attachments', () => {
 
   it('concurrent uploads never pass the per-task limit (serialized in the transaction)', async () => {
     const { carla } = await office(app);
-    const task = (await carla.post('/tasks', { title: 'Corrida' })).body;
+    const task = (await myTask(carla, { title: 'Corrida' })).body;
     for (let i = 0; i < MAX_ATTACHMENTS_PER_TASK - 2; i++) {
       expect((await upload(carla, task.id, `guia-${i}.pdf`, 'application/pdf', PDF_BASE64)).status).toBe(201);
     }
@@ -270,7 +270,7 @@ describe('task attachments', () => {
     expect(MAX_WORKSPACE_ATTACHMENT_BYTES).toBe(2 * 1024 ** 3);
     const { carla } = await office(app);
     const size = Buffer.from(PDF_BASE64, 'base64').length;
-    const tasks = await Promise.all(Array.from({ length: 5 }, (_, i) => carla.post('/tasks', { title: `T${i}` }).then((r) => r.body.id as string)));
+    const tasks = await Promise.all(Array.from({ length: 5 }, (_, i) => myTask(carla, { title: `T${i}` }).then((r) => r.body.id as string)));
     const previous = attachmentLimits.workspaceBytes;
     attachmentLimits.workspaceBytes = size * 3;
     try {
@@ -286,8 +286,8 @@ describe('task attachments', () => {
 
   it('ids of another workspace or of another task are "not found"', async () => {
     const { carla } = await office(app);
-    const task = (await carla.post('/tasks', { title: 'A' })).body;
-    const otherTask = (await carla.post('/tasks', { title: 'B' })).body;
+    const task = (await myTask(carla, { title: 'A' })).body;
+    const otherTask = (await myTask(carla, { title: 'B' })).body;
     const file = (await upload(carla, task.id, 'guia.pdf', 'application/pdf', PDF_BASE64)).body;
     const stranger = await registerUser(app, 'Outro Escritório');
     expect((await stranger.get(`/tasks/${task.id}/attachments`)).status).toBe(404);

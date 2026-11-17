@@ -4,6 +4,7 @@
 // processes already applied. The activation engine lives in flow-engine.ts.
 
 import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { TASK_DEPARTMENT_REQUIRED_MESSAGE } from '@effinance/shared';
 import type {
   applyFlowTemplateSchema,
   FlowTemplate,
@@ -17,7 +18,7 @@ import type {
 } from '@effinance/shared';
 import type { z } from 'zod';
 import { taskFlowSteps, taskFlowTemplateSteps, taskFlowTemplates, taskFlows, type TaskFlowRow, type TaskFlowTemplateRow } from '../../db/schema';
-import { ForbiddenError, NotFoundError } from '../../lib/errors';
+import { ForbiddenError, NotFoundError, RequiredFieldError, ValidationError } from '../../lib/errors';
 import { groupBy } from '../../lib/collections';
 import { TASK_ADMIN_MESSAGE, type TaskContext } from './access';
 import { decryptTaskText, encryptTaskText, FLOW_STEP_DESCRIPTION, TEMPLATE_DESCRIPTION, TEMPLATE_STEP_DESCRIPTION } from './encrypted-text';
@@ -26,6 +27,7 @@ import {
   assertMember,
   clientDisplayName,
   departmentNames,
+  departmentOfMember,
   getDepartmentOrThrow,
   getTaskCategoryOrThrow,
   getTaskClientOrThrow,
@@ -87,6 +89,32 @@ async function validateSteps(
   for (const s of steps) assertMember(ctx, s.assigneeId);
 }
 
+/**
+ * Responsible and department of each step of a new process (migration 0024: every step's task has
+ * both). Responsible: the step's, else who creates the process. Department: with a responsible chosen,
+ * theirs (else the step's); without one, the step's (else the creator's) — a step chosen for a
+ * department stays there even when the creator is elsewhere. `missing` builds the error of a step
+ * left without department.
+ */
+async function placeSteps<S extends { departmentId: string | null; assigneeId: string | null }>(
+  ctx: TaskContext,
+  steps: readonly S[],
+  missing: (index: number, step: S) => Error,
+): Promise<(S & { departmentId: string; assigneeId: string })[]> {
+  const mine = await departmentOfMember(ctx.db, ctx.workspaceId, ctx.userId);
+  const placed: (S & { departmentId: string; assigneeId: string })[] = [];
+  for (const [index, step] of steps.entries()) {
+    // A template step whose responsible left the office (FK cleared) falls back like an empty one.
+    const chosen = step.assigneeId && ctx.members.has(step.assigneeId) ? step.assigneeId : null;
+    const departmentId = chosen
+      ? ((await departmentOfMember(ctx.db, ctx.workspaceId, chosen)) ?? step.departmentId)
+      : (step.departmentId ?? mine);
+    if (!departmentId) throw missing(index, step);
+    placed.push({ ...step, assigneeId: chosen ?? ctx.userId, departmentId });
+  }
+  return placed;
+}
+
 async function createdResponse(ctx: TaskContext, flowId: string, taskId: string | null, template: FlowTemplate | null): Promise<TaskFlowCreatedResponse> {
   const flow = await getFlow(ctx, flowId);
   const task = taskId ? await selectTask(ctx, taskId) : null;
@@ -101,13 +129,18 @@ export async function createFlow(ctx: TaskContext, input: FlowInput): Promise<Ta
   if (input.saveAsTemplate && !ctx.permissions.registry) throw new ForbiddenError(TASK_ADMIN_MESSAGE);
   if (input.clientId) await getTaskClientOrThrow(ctx.db, ctx.workspaceId, input.clientId);
   await validateSteps(ctx, input.steps);
+  const placed = await placeSteps(
+    ctx,
+    input.steps,
+    (index) => new RequiredFieldError(`steps.${index}.departmentId`, `Etapa ${index + 1}: ${TASK_DEPARTMENT_REQUIRED_MESSAGE.toLowerCase()}`),
+  );
   const [flow] = await ctx.db
     .insert(taskFlows)
     .values({ workspaceId: ctx.workspaceId, title: input.title, clientId: input.clientId, createdBy: ctx.userId, createdByName: myName(ctx) })
     .returning({ id: taskFlows.id });
   await ctx.db.insert(taskFlowSteps).values(
     await Promise.all(
-      input.steps.map(async (step, index) => ({
+      placed.map(async (step, index) => ({
         workspaceId: ctx.workspaceId,
         flowId: flow!.id,
         position: index + 1,
@@ -304,6 +337,15 @@ export async function applyTemplate(ctx: TaskContext, id: string, input: ApplyIn
     .from(taskFlowTemplateSteps)
     .where(and(eq(taskFlowTemplateSteps.workspaceId, ctx.workspaceId), eq(taskFlowTemplateSteps.templateId, id)))
     .orderBy(asc(taskFlowTemplateSteps.position));
+  const placed = await placeSteps(
+    ctx,
+    steps,
+    (index, step) =>
+      new ValidationError(
+        `A etapa ${index + 1} do modelo (“${step.title}”) ficou sem departamento: defina o departamento ou o responsável dela no modelo.`,
+        { step: index + 1 },
+      ),
+  );
   const [flow] = await ctx.db
     .insert(taskFlows)
     .values({
@@ -315,10 +357,10 @@ export async function applyTemplate(ctx: TaskContext, id: string, input: ApplyIn
       createdByName: myName(ctx),
     })
     .returning({ id: taskFlows.id });
-  if (steps.length > 0) {
+  if (placed.length > 0) {
     await ctx.db.insert(taskFlowSteps).values(
       await Promise.all(
-        steps.map(async (s, index) => ({
+        placed.map(async (s, index) => ({
           workspaceId: ctx.workspaceId,
           flowId: flow!.id,
           position: index + 1,

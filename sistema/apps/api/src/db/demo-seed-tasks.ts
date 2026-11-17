@@ -139,14 +139,16 @@ export async function seedTasks(
     const withStaff = new Set(['Pão Quente', 'Rota Sul', 'Sorriso Pleno', 'Tecnova']);
 
     // --- tasks -------------------------------------------------------------------------------------
-    const task = async (who: Who, input: TaskInput & { by?: Who }) => {
+    // Every task has a responsible and a department (migration 0024): `who` is the responsible unless
+    // `assigneeId` says otherwise; the department follows them (all demo members are in one).
+    type DemoTaskInput = Omit<TaskInput, 'assigneeId'> & { assigneeId?: string };
+    const task = async (who: Who, input: DemoTaskInput & { by?: Who }) => {
       const { by, ...rest } = input;
       return createTask(
         as(by ?? 'owner'),
         taskInputSchema.parse({ ...rest, assigneeId: rest.assigneeId ?? ids[who] }),
       );
     };
-    const unassigned = (input: TaskInput) => createTask(admin, taskInputSchema.parse(input));
 
     // Fiscal (Israel and Ana).
     const icms = await task('ana', {
@@ -340,14 +342,13 @@ export async function seedTasks(
     });
 
     // Internal (no client).
-    await unassigned({
+    await task('rafael', {
       title: 'Renovar o certificado digital do escritório',
-      departmentId: societario.id,
       dueDate: day(15),
       categoryId: cat.certidoes,
     });
     await task('owner', { title: 'Treinamento da equipe: novo leiaute do eSocial' });
-    await unassigned({ title: 'Organizar o arquivo físico de 2024', priority: 'low' });
+    await task('owner', { title: 'Organizar o arquivo físico de 2024', priority: 'low' });
 
     // Concluded by someone other than the assignee: Ana closes one of Israel's.
     const nota = await task('owner', {
@@ -362,7 +363,7 @@ export async function seedTasks(
     const retrabalho = (
       await createCategory(admin, taskCategoryInputSchema.parse({ name: 'Retrabalho', icon: 'wrench', color: '#DC2626', isRework: true }))
     ).id;
-    const rework = async (who: Who, input: TaskInput, openedDaysAgo: number, doneAfterDays?: number) => {
+    const rework = async (who: Who, input: DemoTaskInput, openedDaysAgo: number, doneAfterDays?: number) => {
       const created = await task(who, { ...input, categoryId: retrabalho });
       // 13:00 UTC is 10:00 in São Paulo: the same office day as `day(-n)`.
       const openedAt = new Date(`${day(-openedDaysAgo)}T13:00:00Z`);

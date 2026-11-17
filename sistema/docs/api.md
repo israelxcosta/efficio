@@ -588,7 +588,7 @@ Uma instância da API com PostgreSQL e Caddy na mesma máquina (kit em `deploy/`
 | PATCH | `/api/workspaces/current/members/:userId` | `memberRoleSchema` | `Member` (`members`; ninguém concede o que não tem) |
 | GET | `/api/workspaces/current/members/:userId/permissions` | — | `MemberPermissions` (`members`; fase 3) |
 | PUT | `/api/workspaces/current/members/:userId/permissions` | `memberPermissionsInputSchema` (`role?`, `overrides`) | `MemberPermissions` (`members`; 402 sem assinatura; fase 3) |
-| DELETE | `/api/workspaces/current/members/:userId` | — | 204 (`members` remove; membro pode sair) |
+| DELETE | `/api/workspaces/current/members/:userId` | `memberRemovalQuerySchema` (`?replacementId=`) | 204 (`members` remove; membro pode sair). Com tarefas abertas/recorrentes/etapas no nome dele e sem `replacementId`: 409 `details: MemberHandoverCounts` (migração 0024) |
 | GET | `/api/workspaces/current/invites` | — | `Invite[]` (`members`) |
 | POST | `/api/workspaces/current/invites` | `inviteInputSchema` | `Invite` (201, `members`; o papel convidado não pode dar o que quem convida não tem) |
 | DELETE | `/api/workspaces/current/invites/:id` | — | 204 (`members`) |
@@ -988,7 +988,7 @@ cliente, escritório e contrato, permissões por pessoa, foto do perfil) está i
 | GET | `/api/tasks/home` | `taskHomeQuerySchema` (`departmentId` = id ou `all`, `month`) | `TaskHomeResponse` | todos (outro depto./`all`: admin) |
 | GET | `/api/tasks/dashboard` | `taskDashboardQuerySchema` (= `taskHomeQuerySchema`) | `TaskDashboardResponse` (cards do dashboard do Effy) | todos (outro depto./`all`: admin; `fees` só `finance`, `incomplete` só `registry`) |
 | GET | `/api/tasks/regime-groups` | — | `RegimeGroupsResponse` | todos |
-| POST | `/api/tasks/regime-groups/:regime/apply` | `regimeGroupApplySchema` (`keys`, `departments`) | `RegimeGroupApplyResponse` | admin |
+| POST | `/api/tasks/regime-groups/:regime/apply` | `regimeGroupApplySchema` (`keys`, `departments`, `assigneeId` = responsável padrão das criadas, padrão: quem aplica) | `RegimeGroupApplyResponse` (departamentos sugeridos são criados mesmo num escritório sem departamentos: 0024) | admin |
 | POST | `/api/tasks/regime-groups/:regime/include` | `regimeGroupIncludeSchema` (`recurringTaskId`) | `RegimeGroupChangeResponse` | admin |
 | POST | `/api/tasks/regime-groups/:regime/exclude` | `regimeGroupExcludeSchema` (`key` \| `recurringTaskId`) | `RegimeGroupChangeResponse` | admin |
 | POST | `/api/tasks/regime-groups/:regime/restore` | `regimeGroupRestoreSchema` (`key`) | `RegimeGroupChangeResponse` | admin |
@@ -1048,14 +1048,23 @@ membro do espaço → 422.
   vencimento antes de hoje. `Task.overdue` e `daysOverdue` vêm prontos. "Hoje" é a data no fuso do
   escritório (`America/Sao_Paulo`, `lib/clock.todayIn`), não a do servidor (UTC); `EFFINANCE_TODAY`
   fixa a data nos testes e `EFFINANCE_NOW` fixa o instante gravado nas conclusões (nunca em produção).
-- **Departamento derivado do responsável** (Effy): o servidor grava o departamento do responsável;
-  um `departmentId` enviado junto é ignorado. Sem responsável (ou responsável sem departamento), a
-  tarefa fica na fila do `departmentId` enviado; tirar o responsável mantém o departamento em que
-  estava. **Diferença deliberada**: quando um membro muda de departamento, as tarefas **abertas** dele
+- **Responsável e departamento obrigatórios** (migração 0024, regra do dono: "toda tarefa deve estar
+  alocada a uma pessoa e um departamento"): `assigneeId` é obrigatório ao criar (400 `Escolha o
+  responsável`, sem nulo nem `none`) e não pode ser removido no PATCH (`assigneeId`/`departmentId: null`
+  → 400). Não existe mais tarefa "na fila" sem responsável, nem "Sem departamento". No banco:
+  `tasks.department_id NOT NULL` e `tasks_open_assignee_chk` (tarefa **aberta** sempre tem
+  responsável; encerrada pode perdê-lo quando o membro sai — histórico, a FK `SET NULL` continua).
+- **Departamento derivado do responsável** (Effy, mantido): o servidor grava o departamento do
+  responsável; um `departmentId` enviado junto é validado (404 se de outro espaço) e ignorado. Quando o
+  responsável **não tem** departamento, o `departmentId` é obrigatório (400 com `details: [{ path:
+  'departmentId', message: 'Escolha o departamento' }]`, o mesmo formato do erro de schema). Trocar o
+  responsável leva a tarefa ao departamento dele (sem departamento, ela fica onde estava; aí
+  `departmentId` a move). Reabrir uma tarefa encerrada cujo responsável saiu do espaço a entrega a quem
+  reabriu (evento `assigned`). **Diferença deliberada**: quando um membro muda de departamento, as tarefas **abertas** dele
   vão junto (no Effy o departamento congelava ao salvar); as concluídas/canceladas ficam onde foram
   feitas. A **ocorrência** de uma recorrente pertence sempre ao departamento da recorrente (não segue
-  o responsável nem a mudança de departamento do membro). Etapa de processo segue a regra da tarefa
-  (departamento do responsável; sem responsável, o da etapa).
+  o responsável nem a mudança de departamento do membro). Etapa de processo: responsável e
+  departamento resolvidos ao **criar** o processo (ver Processos).
 - **Um departamento por membro** (spec §1 e §13.4: "cada membro está em no máximo um departamento";
   marcar um membro num departamento o tira do atual). `PUT /tasks/departments/:id` com `memberIds` é a lista completa.
 - **Conclusão** (`PATCH /tasks/:id/status`): na transição para `done` o servidor grava `completedAt`
@@ -1091,9 +1100,18 @@ membro do espaço → 422.
   listagem não carrega a descrição. Título de tarefa e de subtarefa continuam em claro (busca e
   listas). Um texto cifrado copiado para outro espaço, tabela ou coluna não decifra (erro 500
   genérico, sem o conteúdo). Testes: `test/tasks-db.test.ts` ("encrypted (migration 0013)").
-- **Membro removido do espaço**: as tarefas dele ficam sem responsável (`ON DELETE SET NULL
-  (assignee_id)`, mantendo o departamento) e saem o departamento do membro e as responsabilidades por
-  cliente (cascata).
+- **Membro removido do espaço / saindo** (migração 0024): se ele ainda responde por tarefas **abertas**,
+  tarefas recorrentes (responsável padrão, inclusive encerradas) ou etapas de processo aguardando,
+  `DELETE /workspaces/current/members/:userId` sem `?replacementId=` responde **409** com `details:
+  MemberHandoverCounts` (`{ openTasks, recurringTasks, flowSteps }`) e a mensagem "Bruno ainda é
+  responsável por 1 tarefa aberta e 1 tarefa recorrente. Escolha quem vai assumir antes de remover.".
+  Com `replacementId` (membro atual, diferente do removido; senão 422) tudo passa a ele antes da remoção
+  (`tasks/member-handover.ts`): avulsas e etapas seguem o departamento do substituto (se ele tiver um),
+  ocorrências ficam no departamento da recorrente; cada tarefa ganha um evento `assigned` com a nota
+  "Reatribuída porque Fulano saiu do espaço". As **encerradas** perdem o responsável pela FK (histórico;
+  relatórios mostram "Ex-membro"). **Exclusão da conta** (LGPD): em cada espaço de que a pessoa não é
+  dona, o que estava com ela vai para o **dono** daquele espaço (eventos sem ator). Saem também o
+  departamento do membro (cascata) e os modelos de processo perdem o responsável da etapa (FK).
 - **Exclusões**: tarefa avulsa ou etapa (admin) leva subtarefas, comentários, anexos e histórico;
   ocorrência de recorrente não se exclui (409: cancela-se, ou ajusta-se a recorrente). Departamento só
   sem membros, recorrentes e tarefas (409 com `details: { members, recurring, tasks }`, mensagem "2
@@ -1102,8 +1120,8 @@ membro do espaço → 422.
   409). Cliente com tarefas não é excluído (409).
 - **Sem responsável por cliente** (migração 0017): a "carteira" (um membro por cliente × departamento,
   `task_client_responsibles`, rotas `/tasks/client-responsibles`) foi removida a pedido do escritório. A
-  ocorrência de uma recorrente vai para o **responsável padrão** da recorrente (`assigneeSource: default`)
-  ou, sem ele, fica na **fila do departamento** (sem responsável); atribuir à mão vale só naquela
+  ocorrência de uma recorrente vai para o **responsável padrão** da recorrente (`assigneeSource: default`;
+  obrigatório desde a migração 0024, então nenhuma ocorrência nasce sem responsável); atribuir à mão vale só naquela
   competência (`manual`). Na migração, as ocorrências que vinham da carteira e ainda estavam "A fazer"
   da competência atual em diante passaram ao responsável padrão (ou à fila); as demais mantiveram a
   pessoa, agora como `manual` (nada já trabalhado trocou de mãos; sem registro no histórico).
@@ -1112,8 +1130,8 @@ membro do espaço → 422.
 
 - Filtros (`taskQuerySchema`): `scope` (`mine` = responsável sou eu; `department` = departamento do
   meu membro, vazio sem departamento; `all`), `situation` (`open`, `overdue`, `waiting`, `done` =
-  concluídas + canceladas, `all`), `status` exato, `clientId` (id ou `internal`), `assigneeId` (id ou
-  `none`), `departmentId`, `categoryId`, `priority`, `kind` (`standalone`, `flow` = etapas de
+  concluídas + canceladas, `all`), `status` exato, `clientId` (id ou `internal`), `assigneeId` (id; `none`
+  saiu na 0024 — 400 — e só existe nos relatórios, para encerradas de ex-membros), `departmentId`, `categoryId`, `priority`, `kind` (`standalone`, `flow` = etapas de
   processo, `recurring` = ocorrências), `month` (mês de vencimento; prazo legal nas ocorrências),
   `dueDate`, `dueFrom`/`dueTo`, `dueBucket` (um grupo de prazo das abertas, pela **data de trabalho** —
   o vencimento, ou a meta na ocorrência: `overdue | targetMissed | today | next7Days | later |
@@ -1170,8 +1188,10 @@ tarefa, com subtarefas, comentários, anexos e histórico. Serviços: `modules/t
 células).
 
 - **Cadastro** (`recurringTaskInputSchema`, administradores): nome, descrição (cifrada), departamento
-  (obrigatório quando o espaço tem departamentos: 422 "Escolha o departamento."), categoria,
-  responsável padrão, periodicidade (`weekly | monthly | bimonthly | quarterly | semiannual | annual`),
+  (**obrigatório**: 400 "Escolha o departamento"), categoria, **responsável padrão obrigatório** (400
+  "Escolha o responsável padrão"; último recurso da cadeia de responsável das ocorrências — hoje a
+  cadeia é só ele, pois a carteira por cliente saiu na 0017; pode ser de outro departamento: a ocorrência
+  fica no departamento da recorrente), periodicidade (`weekly | monthly | bimonthly | quarterly | semiannual | annual`),
   **prazo legal obrigatório** (`dueDay`: dia 1–31, onde 31 vira o último dia dos meses curtos; na
   semanal, o dia da semana ISO 1–7, a spec usa segunda a sexta) e, de bimestral a anual, o mês-âncora
   `dueMonth`; meta interna `targetDaysBefore` (0–30; semanal 0–6); regra de dia não útil
@@ -1403,8 +1423,14 @@ Porte de `TaskFlow`/`TaskFlowStep`/`TaskFlowTemplate`/`TaskFlowTemplateStep` (`f
 - **Motor**: só a etapa ativa é tarefa (as demais não aparecem em lista nenhuma). Concluir a tarefa da
   etapa N grava a conclusão da etapa uma vez e **ativa a N+1** (idempotente: a etapa é travada
   `FOR UPDATE` e ativada uma vez), com vencimento = dia da conclusão no fuso do escritório + N dias; a
-  resposta do PATCH traz `activated`. A tarefa da etapa é criada pelo autor do processo, "A fazer", no
-  departamento do responsável (sem responsável, o da etapa). `Task.flow` = "Etapa 2/4";
+  resposta do PATCH traz `activated`. A tarefa da etapa é criada pelo autor do processo, "A fazer".
+  **Responsável e departamento de cada etapa** (migração 0024) são resolvidos ao criar/aplicar o
+  processo e gravados na etapa: responsável = o da etapa, senão **quem criou/aplicou o processo**;
+  departamento = com responsável escolhido, o dele (senão o da etapa); sem responsável escolhido, o da
+  etapa (senão o de quem criou). Etapa sem departamento → 400 `steps.N.departmentId` (montado à mão) ou
+  422 "A etapa N do modelo … ficou sem departamento" (modelo). Se depois o responsável sair (FK) ou o
+  departamento for excluído, a ativação usa o autor do processo (senão quem concluiu a anterior) e o
+  departamento do responsável (senão o da etapa anterior). `Task.flow` = "Etapa 2/4";
   `TaskDetail.flowProgress` = o processo inteiro.
 - **Reabrir uma etapa concluída** (qualquer saída de `done`, inclusive o desfazer): se a etapa seguinte
   **não foi iniciada** (tarefa "A fazer", sem comentários, anexos ou subtarefas), ela **volta a

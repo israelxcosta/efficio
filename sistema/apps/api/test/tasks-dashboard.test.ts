@@ -31,9 +31,9 @@ async function seed() {
   const padaria = await createClient(ana, { tradeName: 'Padaria' });
   const clinica = await createClient(ana, { tradeName: 'Clínica', contractStartDate: '2024-11-15' });
   const construtora = await createClient(ana, { tradeName: 'Construtora', taxRegime: 'presumed_profit', contractStartDate: '2024-12-10' });
-  const das = await ana.post('/tasks/recurring', { name: 'DAS', departmentId: fiscal, dueDay: 20, targetDaysBefore: 3, regimes: ['simples_nacional'] });
-  const dctf = await ana.post('/tasks/recurring', { name: 'DCTFWeb', departmentId: fiscal, dueDay: 15, regimes: ['simples_nacional', 'presumed_profit'] });
-  const folha = await ana.post('/tasks/recurring', { name: 'Folha', departmentId: pessoal, dueDay: 30, targetDaysBefore: 8, regimes: ['presumed_profit'] });
+  const das = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'DAS', departmentId: fiscal, dueDay: 20, targetDaysBefore: 3, regimes: ['simples_nacional'] });
+  const dctf = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'DCTFWeb', departmentId: fiscal, dueDay: 15, regimes: ['simples_nacional', 'presumed_profit'] });
+  const folha = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'Folha', departmentId: pessoal, dueDay: 30, targetDaysBefore: 8, regimes: ['presumed_profit'] });
   expect([das.status, dctf.status, folha.status]).toEqual([201, 201, 201]);
   // Padaria's DCTFWeb is done; the other two are overdue (legal deadline on the 15th).
   const cells = (await ana.get(`/tasks/recurring/${dctf.body.id}/occurrences/2026-10`)).body.cells;

@@ -1383,9 +1383,13 @@ export interface Task {
   priority: TaskPriority;
   /** null = internal ("Interna"). */
   client: TaskClientRef | null;
-  /** The assignee's department (or the queue chosen for an unassigned task); for occurrences, the recurring task's. */
-  department: TaskRef | null;
+  /** Always set (migration 0024): the responsible's department (or the one chosen when they have none); for occurrences, the recurring task's. */
+  department: TaskRef;
   category: TaskCategoryRef | null;
+  /**
+   * Always set on open tasks (migration 0024). Null only on a concluded/canceled task whose responsible
+   * left the office (or one closed before 0024 without responsible): history.
+   */
   assignee: TaskMemberRef | null;
   startDate: ISODate | null;
   /** Due date; the legal deadline for occurrences. */
@@ -1573,10 +1577,10 @@ export interface RecurringOccurrence {
   legalDueDate: ISODate;
   /** Internal target (on or before the legal deadline): the work date. */
   targetDate: ISODate;
-  department: TaskRef | null;
+  department: TaskRef;
   category: TaskCategoryRef | null;
-  /** Default responsible of the recurring task. */
-  defaultAssignee: TaskMemberRef | null;
+  /** Default responsible of the recurring task (required since migration 0024). */
+  defaultAssignee: TaskMemberRef;
   /** Effective responsibles in the group (desc). */
   assignees: OccurrenceAssigneeCount[];
   total: number;
@@ -1655,10 +1659,11 @@ export interface RecurringTask {
   nonBusinessDayRule: RecurrenceNonBusinessDayRule;
   /** Reference month = competence − this many months. */
   referenceOffset: number;
-  department: TaskRef | null;
+  /** Required since migration 0024. */
+  department: TaskRef;
   category: TaskCategoryRef | null;
-  /** Default responsible. */
-  assignee: TaskMemberRef | null;
+  /** Default responsible (required since migration 0024: the last resort of every occurrence). */
+  assignee: TaskMemberRef;
   /** A task's recurrence: its client (null = internal). Always null for the registry's. */
   client: TaskClientRef | null;
   /** A task's recurrence: the rule as the task shows it (with `canEdit`). Null for the registry's. */
@@ -2025,10 +2030,10 @@ export interface TaskListSummary {
   /** Items due in `month` and those of them concluded or canceled ("Concluídas em outubro · de 25 …"). */
   monthDue: number;
   monthDone: number;
-  /** Open items per assignee (desc). */
-  openByAssignee: { assignee: TaskMemberRef | null; open: number; overdue: number }[];
-  /** Open items per department (desc); `null` = without department. */
-  openByDepartment: { department: TaskRef | null; open: number; overdue: number }[];
+  /** Open items per assignee (desc). Open items always have one (migration 0024): no "Sem responsável" row. */
+  openByAssignee: { assignee: TaskMemberRef; open: number; overdue: number }[];
+  /** Open items per department (desc). Every task has one (migration 0024): no "Sem departamento" row. */
+  openByDepartment: { department: TaskRef; open: number; overdue: number }[];
   /** Open items per client (desc). */
   openByClient: { client: TaskClientRef | null; open: number; overdue: number }[];
 }
@@ -2346,7 +2351,7 @@ export interface TaskReportRow {
   referenceMonth: MonthKey | null;
   title: string;
   client: TaskClientRef | null;
-  department: TaskRef | null;
+  department: TaskRef;
   category: TaskCategoryRef | null;
   assignee: TaskMemberRef | null;
   priority: TaskPriority;

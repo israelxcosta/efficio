@@ -58,6 +58,7 @@ import {
   memberRef,
   myName,
   personRef,
+  requiredMemberRef,
 } from './shared';
 import { OPEN_SQL } from './task-rows';
 
@@ -139,7 +140,6 @@ function toRecurringTask(ctx: TaskContext, def: GenDef, month: MonthKey, shared:
   const scheduled = defActiveIn(row, month) ? occurrencesInCompetence(scheduleOf(row), month) : [];
   const upcoming = scheduled.find((s) => s.legalDueDate >= ctx.today) ?? scheduled.at(-1);
   const stats = shared.stats.get(row.id);
-  const departmentName = row.departmentId ? shared.departments.get(row.departmentId) : undefined;
   const clientId = row.origin === 'task' && !row.internal ? ([...def.included][0] ?? null) : null;
   const client = clientId ? shared.clients.find((c) => c.id === clientId) : undefined;
   return {
@@ -154,9 +154,9 @@ function toRecurringTask(ctx: TaskContext, def: GenDef, month: MonthKey, shared:
     targetDaysBefore: row.targetDaysBefore,
     nonBusinessDayRule: row.nonBusinessDayRule,
     referenceOffset: row.referenceOffset,
-    department: row.departmentId && departmentName ? { id: row.departmentId, name: departmentName } : null,
+    department: { id: row.departmentId, name: shared.departments.get(row.departmentId) ?? 'Departamento' },
     category: row.categoryId ? (shared.categories.get(row.categoryId) ?? null) : null,
-    assignee: memberRef(ctx, row.defaultAssigneeId),
+    assignee: requiredMemberRef(ctx, row.defaultAssigneeId),
     client: client ? clientRef(client) : null,
     recurrence: shared.recurrences.get(row.id) ?? null,
     nextTaskId: shared.nextTasks.get(row.id) ?? null,
@@ -280,16 +280,8 @@ export async function getRecurring(ctx: TaskContext, id: string, month?: MonthKe
 }
 
 async function validate(ctx: TaskContext, input: RecurringInput) {
-  if (input.departmentId) await getDepartmentOrThrow(ctx.db, ctx.workspaceId, input.departmentId);
-  else {
-    const [any] = await ctx.db
-      .select({ id: taskDepartments.id })
-      .from(taskDepartments)
-      .where(eq(taskDepartments.workspaceId, ctx.workspaceId))
-      .limit(1);
-    // With departments, the occurrences must belong to one (the start page and "carteira" need it).
-    if (any) throw new ValidationError('Escolha o departamento.');
-  }
+  // Both required by the contract (migration 0024): the occurrences' department and last-resort responsible.
+  await getDepartmentOrThrow(ctx.db, ctx.workspaceId, input.departmentId);
   if (input.categoryId) await getTaskCategoryOrThrow(ctx.db, ctx.workspaceId, input.categoryId);
   assertMember(ctx, input.assigneeId);
   await assertClients(ctx.db, ctx.workspaceId, [...input.clientIds, ...input.excludedClientIds]);

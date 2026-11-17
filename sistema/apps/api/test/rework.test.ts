@@ -14,7 +14,7 @@ import { executeRows } from '../src/lib/sql';
 import { withTenant } from '../src/lib/tenant';
 import { clientRework } from '../src/modules/reports/rework';
 import { admin, createAccount, createTestApp, registerUser, resetDb, type Client } from './helpers';
-import { createClient, member } from './task-helpers';
+import { createClient, member, myTask } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -39,7 +39,7 @@ async function task(
   input: { title: string; clientId?: string | null; categoryId?: string; status?: string; recurrence?: unknown; dueDate?: string },
   openedAt: string,
 ): Promise<string> {
-  const res = await as.post('/tasks', input);
+  const res = await myTask(as, input);
   expect(res.status, JSON.stringify(res.body)).toBe(201);
   await admin().execute(sql`update tasks set created_at = (${openedAt}::timestamp at time zone 'America/Sao_Paulo') where id = ${res.body.id}`);
   return res.body.id;

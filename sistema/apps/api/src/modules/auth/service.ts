@@ -23,6 +23,7 @@ import {
   createWorkspace,
   deleteWorkspaceRow,
   getUserRow,
+  handOverBeforeAccountDeletion,
   joinByInvite,
   photoUpdatedAtOf,
   toMeUser,
@@ -223,6 +224,8 @@ export async function deleteAccount(
     .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
     .where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.role, 'owner')));
   await beforeDelete?.(owned.map((w) => w.id));
+  // Offices of others: their open work goes to each owner first (every open task has a responsible).
+  await handOverBeforeAccountDeletion(db, userId);
   await db.transaction(async (tx) => {
     for (const w of owned) await deleteWorkspaceRow(tx, w.id);
     await tx.delete(users).where(eq(users.id, userId));

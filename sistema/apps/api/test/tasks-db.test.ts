@@ -35,6 +35,7 @@ import { encryptTaskText, TASK_COMMENT_TEXT, TASK_DESCRIPTION } from '../src/mod
 import { OPEN_SQL } from '../src/modules/tasks/task-rows';
 import { TENANT_TABLES } from './db-roles';
 import { admin, createTestApp, registerUser, resetDb, TEST_PASSWORD } from './helpers';
+import { myTask, ownDepartment } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -198,7 +199,7 @@ describe('task tables: row level security', () => {
     const attempts: [string, (tx: DbExecutor) => Promise<unknown>][] = [
       ['task_departments', (tx) => tx.insert(taskDepartments).values({ workspaceId: a.ws, name: 'Intrusa' })],
       ['task_categories', (tx) => tx.insert(taskCategories).values({ workspaceId: a.ws, name: 'Intrusa' })],
-      ['tasks', (tx) => tx.insert(tasks).values({ workspaceId: a.ws, title: 'Intrusa', createdByName: 'X' })],
+      ['tasks', (tx) => tx.insert(tasks).values({ workspaceId: a.ws, title: 'Intrusa', createdByName: 'X', departmentId: a.department, assigneeId: a.staff })],
       ['task_subtasks', (tx) => tx.insert(taskSubtasks).values({ workspaceId: a.ws, taskId: a.task, title: 'Intrusa' })],
       ['task_comments', (tx) => tx.insert(taskComments).values({ workspaceId: a.ws, taskId: a.task, authorName: 'X', text: CIPHERTEXT_SHAPED })],
       [
@@ -225,7 +226,8 @@ describe('task tables: references never cross workspaces', () => {
   it('client, department, category, member and task of another workspace are refused like unknown ids', async () => {
     const a = await seedOffice('A');
     const b = await seedOffice('B');
-    const task = { workspaceId: b.ws, title: 'x', createdByName: 'X' };
+    // Every task has a department and an open one a responsible (migration 0024).
+    const task = { workspaceId: b.ws, title: 'x', createdByName: 'X', departmentId: b.department, assigneeId: b.staff };
     const attempts: [string, (tx: DbExecutor, id: string) => Promise<unknown>, string][] = [
       ['tasks.client_id', (tx, id) => tx.insert(tasks).values({ ...task, clientId: id }), a.client],
       ['tasks.department_id', (tx, id) => tx.insert(tasks).values({ ...task, departmentId: id }), a.department],
@@ -270,20 +272,20 @@ describe('task tables: only clients (migration 0012)', () => {
     const a = await seedOffice('A');
     const inA = (fn: (tx: DbExecutor) => Promise<unknown>) => pgFailure(withTenant(app.db, a.ws, fn));
     const attempts: [string, (tx: DbExecutor) => Promise<unknown>][] = [
-      ['new task', (tx) => tx.insert(tasks).values({ workspaceId: a.ws, title: 'x', createdByName: 'X', clientId: a.supplier })],
+      ['new task', (tx) => tx.insert(tasks).values({ workspaceId: a.ws, title: 'x', createdByName: 'X', clientId: a.supplier, departmentId: a.department, assigneeId: a.staff })],
       ['re-pointed task', (tx) => tx.update(tasks).set({ clientId: a.supplier }).where(eq(tasks.id, a.task))],
       ['client turned into a supplier', (tx) => tx.update(contacts).set({ kind: 'supplier' }).where(eq(contacts.id, a.client))],
     ];
     for (const [label, attempt] of attempts) expect((await inA(attempt))?.code, label).toBe('23503');
     // The generated column cannot be written to dodge the rule.
     const forged = await inA((tx) =>
-      tx.execute(sql`insert into tasks (workspace_id, title, created_by_name, client_id, client_kind)
-                     values (${a.ws}, 'x', 'X', ${a.supplier}, 'supplier')`),
+      tx.execute(sql`insert into tasks (workspace_id, title, created_by_name, client_id, client_kind, department_id, assignee_id)
+                     values (${a.ws}, 'x', 'X', ${a.supplier}, 'supplier', ${a.department}, ${a.staff})`),
     );
     expect(forged?.code).toBe('428C9');
     expect(await taskRow(a.task)).toMatchObject({ clientId: a.client, clientKind: 'client' });
     // Internal tasks (no client) are unaffected.
-    expect(await inA((tx) => tx.insert(tasks).values({ workspaceId: a.ws, title: 'Interna', createdByName: 'X' }))).toBeNull();
+    expect(await inA((tx) => tx.insert(tasks).values({ workspaceId: a.ws, title: 'Interna', createdByName: 'X', departmentId: a.department, assigneeId: a.staff }))).toBeNull();
   });
 });
 
@@ -501,7 +503,7 @@ describe('task data and LGPD', () => {
   it('the workspace export carries every task table of the workspace, and only of it', async () => {
     const owner = await registerUser(app, 'Ana Titular');
     const other = await registerUser(app, 'Outro Escritório');
-    expect((await other.post('/tasks', { title: 'Tarefa de outro espaço' })).status).toBe(201);
+    expect((await myTask(other, { title: 'Tarefa de outro espaço' })).status).toBe(201);
 
     const client = await owner.post('/clients', {
       name: 'Padaria Pão Dourado Ltda',
@@ -550,13 +552,13 @@ describe('task data and LGPD', () => {
     const ana = await registerUser(app, 'Ana Titular');
     const bruno = await registerUser(app, 'Bruno Colaborador', `bruno-${randomUUID()}@teste.com`);
     const brunoOffice = (await bruno.get('/auth/me')).body.workspace.id as string;
-    expect((await bruno.post('/tasks', { title: 'Tarefa no próprio escritório' })).status).toBe(201);
+    expect((await myTask(bruno, { title: 'Tarefa no próprio escritório' })).status).toBe(201);
 
     // Bruno joins Ana's office (the session switches to it), creates, comments and concludes a task.
     const created = await ana.post('/workspaces/current/invites', { email: bruno.email, role: 'viewer' });
     expect(created.status).toBe(201);
     expect((await bruno.post(`/invites/${created.body.inviteUrl.split('/convite/')[1]}/accept`)).status).toBe(200);
-    const task = await bruno.post('/tasks', { title: 'Folha de outubro', assigneeId: bruno.userId });
+    const task = await bruno.post('/tasks', { title: 'Folha de outubro', assigneeId: bruno.userId, departmentId: await ownDepartment(ana) });
     expect(task.status).toBe(201);
     expect((await bruno.post(`/tasks/${task.body.id}/comments`, { text: 'Holerites conferidos' })).status).toBe(201);
     expect((await bruno.patch(`/tasks/${task.body.id}/status`, { status: 'done' })).status).toBe(200);
@@ -618,7 +620,12 @@ describe('task descriptions and comments encrypted (migration 0013)', () => {
     const ws = (await ana.get('/auth/me')).body.workspace.id as string;
     const cipher = await getCipher(ws);
 
-    const created = await ana.post('/tasks', { title: 'Certidão negativa', description: 'Pedir a CND na Receita', assigneeId: carla.userId });
+    const created = await ana.post('/tasks', {
+      title: 'Certidão negativa',
+      description: 'Pedir a CND na Receita',
+      assigneeId: carla.userId,
+      departmentId: await ownDepartment(ana),
+    });
     expect(created.status).toBe(201);
     expect(created.body.description).toBe('Pedir a CND na Receita');
     const id = created.body.id as string;
@@ -666,8 +673,8 @@ describe('task descriptions and comments encrypted (migration 0013)', () => {
     const bruno = await registerUser(app, 'Bruno Outro');
     const wsA = (await ana.get('/auth/me')).body.workspace.id as string;
     const wsB = (await bruno.get('/auth/me')).body.workspace.id as string;
-    const taskA = await ana.post('/tasks', { title: 'Folha', description: 'Salário do diretor: confidencial' });
-    const taskB = await bruno.post('/tasks', { title: 'Balancete', description: 'Do Bruno' });
+    const taskA = await myTask(ana, { title: 'Folha', description: 'Salário do diretor: confidencial' });
+    const taskB = await myTask(bruno, { title: 'Balancete', description: 'Do Bruno' });
     expect(taskB.status).toBe(201);
     const stolen = (await storedDescription(taskA.body.id))!;
 
@@ -693,9 +700,9 @@ describe('task descriptions and comments encrypted (migration 0013)', () => {
 
   it('text with a NUL character is refused before encrypting (the database never sees it)', async () => {
     const ana = await registerUser(app, 'Ana Titular');
-    const task = await ana.post('/tasks', { title: 'Base' });
+    const task = await myTask(ana, { title: 'Base' });
     for (const res of [
-      await ana.post('/tasks', { title: 'Com descrição', description: 'a\u0000b' }),
+      await myTask(ana, { title: 'Com descrição', description: 'a\u0000b' }),
       await ana.patch(`/tasks/${task.body.id}`, { description: 'a\u0000b' }),
       await ana.post(`/tasks/${task.body.id}/comments`, { text: 'oi\u0000' }),
     ]) {
@@ -708,7 +715,7 @@ describe('task descriptions and comments encrypted (migration 0013)', () => {
   it('the backfill encrypts rows written before 0013, and the migration runs again over them', async () => {
     const ana = await registerUser(app, 'Ana Titular');
     const ws = (await ana.get('/auth/me')).body.workspace.id as string;
-    const current = await ana.post('/tasks', { title: 'Já cifrada', description: 'Escrita depois da 0013' });
+    const current = await myTask(ana, { title: 'Já cifrada', description: 'Escrita depois da 0013' });
     const currentComment = await ana.post(`/tasks/${current.body.id}/comments`, { text: 'Também cifrado' });
     const keptDescription = await storedDescription(current.body.id);
     const keptComment = await storedComment(currentComment.body.id);
@@ -722,7 +729,7 @@ describe('task descriptions and comments encrypted (migration 0013)', () => {
     try {
       const [legacy] = await admin()
         .insert(tasks)
-        .values({ workspaceId: ws, title: 'Antiga', description: 'Contrato social antigo', createdByName: 'Ana Titular' })
+        .values({ workspaceId: ws, title: 'Antiga', description: 'Contrato social antigo', createdByName: 'Ana Titular', departmentId: await ownDepartment(ana), assigneeId: ana.userId })
         .returning();
       const [legacyComment] = await admin()
         .insert(taskComments)

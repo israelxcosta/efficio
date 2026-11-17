@@ -12,7 +12,7 @@ import { occurrencesInCompetence, type RecurringSchedule } from '@effinance/shar
 import type { App } from '../src/app';
 import { executeRows } from '../src/lib/sql';
 import { admin, createTestApp, resetDb, type Client } from './helpers';
-import { createClient, office, workspaceOf } from './task-helpers';
+import { createClient, myTask, office, workspaceOf } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -110,8 +110,9 @@ describe('task recurrence: creating and listing', () => {
     await carla.get('/tasks?scope=mine');
     expect(await seriesRows(seriesId)).toHaveLength(generated.length);
     const duplicate = await admin()
-      .execute(sql`insert into tasks (workspace_id, title, recurring_task_id, occurrence_origin, competence, period_key, reference_month, due_date, target_date, created_by_name)
-        values (${ws}, 'Dup', ${seriesId}, 'task', '2026-10', '2026-10-22', '2026-10', '2026-10-22', '2026-10-22', 'X')`)
+      .execute(sql`insert into tasks (workspace_id, title, recurring_task_id, occurrence_origin, competence, period_key, reference_month, due_date, target_date, created_by_name, department_id, assignee_id)
+        select ${ws}, 'Dup', ${seriesId}, 'task', '2026-10', '2026-10-22', '2026-10', '2026-10-22', '2026-10-22', 'X', department_id, default_assignee_id
+          from recurring_tasks where id = ${seriesId}`)
       .then(() => null, (e: { cause?: { code?: string; constraint_name?: string } }) => e.cause);
     expect(duplicate).toMatchObject({ code: '23505', constraint_name: 'tasks_internal_occurrence_uq' });
 
@@ -148,7 +149,7 @@ describe('task recurrence: creating and listing', () => {
     expect(audit.body.summary.total).toBe(0);
     expect((await carla.get('/tasks/recurring?status=all')).body.items).toEqual([]);
     expect((await ana.get(`/tasks/recurring/${seriesId}`)).status).toBe(404);
-    expect((await ana.put(`/tasks/recurring/${seriesId}`, { name: 'X', departmentId: fiscal, dueDay: 5, regimes: ['mei'] })).status).toBe(404);
+    expect((await ana.put(`/tasks/recurring/${seriesId}`, { assigneeId: ana.userId, name: 'X', departmentId: fiscal, dueDay: 5, regimes: ['mei'] })).status).toBe(404);
     // Search: only the next open occurrence of the series.
     const search = await carla.get('/search?q=conferir');
     expect(search.body.tasks).toEqual([expect.objectContaining({ id: task.id, kind: 'recurring' })]);
@@ -305,9 +306,10 @@ describe('task recurrence: who may repeat what', () => {
     const forbidden = 'Você só pode repetir tarefas suas ou do seu departamento.';
     const daily = { frequency: 'daily' };
     expect(await carla.post('/tasks', { title: 'Para o Bruno', assigneeId: bruno.userId, recurrence: daily })).toMatchObject({ status: 403, body: { message: forbidden } });
-    expect(await carla.post('/tasks', { title: 'Fila do Pessoal', departmentId: pessoal, recurrence: daily })).toMatchObject({ status: 403, body: { message: forbidden } });
+    // (A department queue without responsible no longer exists: migration 0024.)
+    expect(await carla.post('/tasks', { title: 'Do Pessoal', assigneeId: bruno.userId, departmentId: pessoal, recurrence: daily })).toMatchObject({ status: 403, body: { message: forbidden } });
     await create(carla, { title: 'Para a Ana', assigneeId: ana.userId, recurrence: daily });
-    await create(carla, { title: 'Fila do Fiscal', departmentId: fiscal, recurrence: daily });
+    await create(carla, { title: 'Fila do Fiscal', assigneeId: carla.userId, departmentId: fiscal, recurrence: daily });
     const byEditor = await create(bruno, { title: 'Do Bruno para a Carla', assigneeId: carla.userId, recurrence: daily });
     expect(byEditor.recurrence.canEdit).toBe(true);
     const ofBruno = await create(ana, { title: 'Folha do Pessoal', assigneeId: bruno.userId, dueDate: '2026-10-21', recurrence: { frequency: 'weekly', weekdays: [3] } });
@@ -341,7 +343,7 @@ describe('task recurrence: in the recurring list', () => {
   it('the registry by default; tasks\' recurrences on request, with their target, rule and next open task', async () => {
     const { ana, carla, fiscal } = await office(app);
     const padaria = await createClient(ana, { tradeName: 'Padaria' });
-    expect((await ana.post('/tasks/recurring', { name: 'DAS', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] })).status).toBe(201);
+    expect((await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'DAS', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] })).status).toBe(201);
     const weekly = await create(carla, { title: 'Ligar para a Padaria', clientId: padaria, assigneeId: carla.userId, dueDate: '2026-10-21', recurrence: { frequency: 'weekly', weekdays: [3] } });
     expect((await carla.patch(`/tasks/${weekly.id}/status`, { status: 'done' })).status).toBe(200);
 

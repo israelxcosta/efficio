@@ -70,3 +70,22 @@ export async function office(app: App) {
 
 /** A tiny but real PDF (the signature check needs `%PDF-`). */
 export const PDF_BASE64 = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n').toString('base64');
+
+/**
+ * Puts `c` in a department when they are in none ("Geral", created by them: owners/editors), so their
+ * tasks can be created without choosing one — every task has a responsible and a department
+ * (migration 0024). Returns the department.
+ */
+export async function ownDepartment(c: Client): Promise<string> {
+  const me = (await c.get('/tasks/options')).body.me;
+  if (me.department) return me.department.id;
+  const res = await c.post('/tasks/departments', { name: 'Geral', memberIds: [c.userId] });
+  expect(res.status, JSON.stringify(res.body)).toBe(201);
+  return res.body.id;
+}
+
+/** POST /tasks as `c`, assigned to them by default (in their department, created if needed). */
+export async function myTask(c: Client, body: Record<string, unknown>) {
+  await ownDepartment(c);
+  return c.post('/tasks', { assigneeId: c.userId, ...body });
+}

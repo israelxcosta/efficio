@@ -123,7 +123,7 @@ describe('permissions: adjustments change what the API accepts', () => {
     // A page key hides the page in the web; the data keeps coming.
     expect((await carla.get('/tasks/reports?from=2026-10-01&to=2026-10-31')).status).toBe(200);
 
-    const task = await ana.post('/tasks', { title: 'Balancete', departmentId: fiscal });
+    const task = await ana.post('/tasks', { title: 'Balancete', assigneeId: ana.userId, departmentId: fiscal });
     const comment = await ana.post(`/tasks/${task.body.id}/comments`, { text: 'Comentário da Ana' });
     expect((await carla.del(`/tasks/${task.body.id}/comments/${comment.body.id}`)).status).toBe(403);
     expect((await carla.del(`/tasks/${task.body.id}`)).status).toBe(403);

@@ -976,6 +976,17 @@ export const searchQuerySchema = z.object({
 
 const nullableId = () => idSchema.nullish().transform((v) => v ?? null);
 
+/**
+ * A required reference (responsible, department): absent, null or empty answers `message` (400 on the
+ * field), anything else that is not a UUID answers "ID inválido".
+ */
+const requiredId = (message: string) =>
+  z.uuid({ error: (issue) => (issue.input === undefined || issue.input === null || issue.input === '' ? message : 'ID inválido') });
+
+/** Messages of the required responsible/department (the API answers the same ones when it derives them). */
+export const TASK_ASSIGNEE_REQUIRED_MESSAGE = 'Escolha o responsável';
+export const TASK_DEPARTMENT_REQUIRED_MESSAGE = 'Escolha o departamento';
+
 const taskTitleSchema = z
   .string()
   .trim()
@@ -1088,9 +1099,11 @@ export const taskRecurrenceInputSchema = z
 export type TaskRecurrenceInput = z.input<typeof taskRecurrenceInputSchema>;
 
 /**
- * New task. The department is never chosen for an assigned task: it is the assignee's department
- * (derived by the API). `departmentId` only places a task without assignee (or whose assignee has no
- * department) in a department's queue. Creating it already `done` records who/when like concluding.
+ * New task. Every task has a responsible and a department (migration 0024). `assigneeId` is required (a
+ * current member). The department follows the responsible: when the responsible is in a department,
+ * that one is used (a `departmentId` sent along is ignored); when they are not in any, `departmentId` is
+ * required (400 `{ path: 'departmentId' }` otherwise). Creating it already `done` records who/when like
+ * concluding.
  */
 export const taskInputSchema = z
   .object({
@@ -1099,7 +1112,8 @@ export const taskInputSchema = z
     /** null = "Interna" (no client). */
     clientId: nullableId(),
     categoryId: nullableId(),
-    assigneeId: nullableId(),
+    assigneeId: requiredId(TASK_ASSIGNEE_REQUIRED_MESSAGE),
+    /** Required only when the responsible has no department (else the responsible's is used). */
     departmentId: nullableId(),
     priority: z.enum(TASK_PRIORITIES).default('medium'),
     status: z.enum(TASK_STATUSES).default('todo'),
@@ -1120,7 +1134,9 @@ export type TaskInput = z.input<typeof taskInputSchema>;
 /**
  * Field-by-field autosave (PATCH): only the fields sent change (no defaults here — an omitted field
  * keeps its value). The status changes through `PATCH /tasks/:id/status`. Cross-field rules (dates,
- * time range) are checked again by the API on the merged task.
+ * time range) are checked again by the API on the merged task. The responsible and the department can
+ * be changed, never removed (`null` → 400). A new responsible brings their department; `departmentId`
+ * only changes the department of a task whose responsible has none.
  */
 export const taskUpdateSchema = z
   .object({
@@ -1128,8 +1144,8 @@ export const taskUpdateSchema = z
     description: optionalText(5000),
     clientId: idSchema.nullable(),
     categoryId: idSchema.nullable(),
-    assigneeId: idSchema.nullable(),
-    departmentId: idSchema.nullable(),
+    assigneeId: requiredId(TASK_ASSIGNEE_REQUIRED_MESSAGE),
+    departmentId: requiredId(TASK_DEPARTMENT_REQUIRED_MESSAGE),
     priority: z.enum(TASK_PRIORITIES),
     startDate: isoDateSchema.nullable(),
     dueDate: isoDateSchema.nullable(),
@@ -1171,8 +1187,8 @@ export const taskQuerySchema = paginationQuerySchema.extend({
   status: z.enum(TASK_STATUSES).optional(),
   /** A client id, or `internal` for tasks without client. */
   clientId: z.union([idSchema, z.literal('internal')]).optional(),
-  /** A member id, or `none` for unassigned. */
-  assigneeId: z.union([idSchema, z.literal('none')]).optional(),
+  /** A member id (`none` was removed with migration 0024: open tasks always have a responsible). */
+  assigneeId: idSchema.optional(),
   departmentId: idSchema.optional(),
   categoryId: idSchema.optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
@@ -1266,11 +1282,11 @@ export const recurringTaskInputSchema = z
     name: recurringNameSchema,
     description: optionalText(5000),
     period: z.enum(RECURRENCE_PERIODS).default('monthly'),
-    /** Chosen in the registry (not derived): the occurrences belong to this department. */
-    departmentId: nullableId(),
+    /** Chosen in the registry (not derived, required): the occurrences belong to this department. */
+    departmentId: requiredId(TASK_DEPARTMENT_REQUIRED_MESSAGE),
     categoryId: nullableId(),
-    /** Default responsible of every occurrence (none: the department's queue). */
-    assigneeId: nullableId(),
+    /** Default responsible of every occurrence (required: no occurrence is born without one). */
+    assigneeId: requiredId('Escolha o responsável padrão'),
     dueDay: z
       .int({ message: 'Informe o prazo legal' })
       .min(1, { message: 'Dia inválido' })
@@ -1368,6 +1384,8 @@ export const regimeGroupApplySchema = z.object({
     .default({}),
   /** Items to create even when a recurring task made by hand with the same name covers them. */
   force: z.array(z.enum(REGIME_GROUP_KEYS)).max(REGIME_GROUP_KEYS.length).default([]),
+  /** Default responsible of the recurring tasks created (a current member; default: who applies). */
+  assigneeId: idSchema.optional(),
   /**
    * First competence of the recurring tasks created: `current` (default; occurrences whose deadline
    * already passed are born overdue, see `currentOverdue`) or `next` (nothing in the current month).
@@ -1432,8 +1450,11 @@ const stepTitleSchema = z
 
 /**
  * Step of a process built by hand. Deadline: absolute `dueDate` or `relativeDays` after the previous
- * step is concluded (step 1: after the process is created), computed when the step is activated. The
- * department follows the assignee (like a task); `departmentId` places a step without assignee.
+ * step is concluded (step 1: after the process is created), computed when the step is activated.
+ * Every step ends with a responsible and a department (resolved when the process is created): the
+ * responsible is `assigneeId`, else who creates the process; the department is the responsible's when
+ * `assigneeId` is set (else `departmentId`), and `departmentId` (else the creator's) when it is not.
+ * A step left without department → 400 `{ path: 'steps.N.departmentId' }`.
  */
 export const flowStepInputSchema = z
   .object({
@@ -1476,7 +1497,12 @@ export const taskFlowQuerySchema = z.object({
 });
 export type TaskFlowQuery = z.input<typeof taskFlowQuerySchema>;
 
-/** Step of a template: relative deadline only (a template never ages), no client (chosen when applying). */
+/**
+ * Step of a template: relative deadline only (a template never ages), no client (chosen when applying).
+ * Responsible and department stay optional here: applying resolves them like a step built by hand (no
+ * responsible → who applies; no department → the responsible's), and refuses (422) a step that would
+ * end without department.
+ */
 export const flowTemplateStepInputSchema = z.object({
   title: stepTitleSchema,
   description: optionalText(5000),
@@ -1536,7 +1562,7 @@ export const taskCalendarQuerySchema = z
     from: isoDateSchema,
     to: isoDateSchema,
     scope: z.enum(TASK_SCOPES).default('all'),
-    assigneeId: z.union([idSchema, z.literal('none')]).optional(),
+    assigneeId: idSchema.optional(),
     departmentId: idSchema.optional(),
     clientId: z.union([idSchema, z.literal('internal')]).optional(),
     categoryId: idSchema.optional(),
@@ -1553,6 +1579,10 @@ const reportFilters = {
   from: isoDateSchema,
   to: isoDateSchema,
   departmentId: idSchema.optional(),
+  /**
+   * A member id, or `none`: only history — concluded/canceled tasks whose responsible left the office
+   * (the foreign key clears it; open tasks always have one since migration 0024).
+   */
   assigneeId: z.union([idSchema, z.literal('none')]).optional(),
   categoryId: idSchema.optional(),
   clientId: z.union([idSchema, z.literal('internal')]).optional(),

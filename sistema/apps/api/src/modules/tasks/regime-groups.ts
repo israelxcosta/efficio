@@ -59,7 +59,7 @@ import type { TaskContext } from './access';
 import { clientActiveIn, defaultWindow, ensureOccurrences, loadClients, loadDefs, syncOpenOccurrences, type GenDef } from './generation';
 import { insertRecurring } from './recurring';
 import { createDepartment } from './registry';
-import { departmentNames, getDepartmentOrThrow } from './shared';
+import { assertMember, departmentNames, getDepartmentOrThrow } from './shared';
 
 type ApplyInput = z.output<typeof regimeGroupApplySchema>;
 type IncludeInput = z.output<typeof regimeGroupIncludeSchema>;
@@ -230,9 +230,10 @@ export async function listRegimeGroups(ctx: TaskContext): Promise<RegimeGroupsRe
 
 /**
  * POST /tasks/regime-groups/:regime/apply (`registry`). Creates the missing items (from the current
- * competence or the next one, `fromMonth`; no default responsible: the department's queue), adds the regime to the existing ones of
- * the catalog and leaves the ended ones ended. Departments: the chosen one, else a match by name, else
- * created with the suggested name — only in offices that use departments.
+ * competence or the next one, `fromMonth`; default responsible: `assigneeId`, else who applies — every
+ * recurring task has one since migration 0024), adds the regime to the existing ones of the catalog and
+ * leaves the ended ones ended. Departments (required too): the chosen one, else a match by name, else
+ * created with the suggested name.
  */
 export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegime, input: ApplyInput): Promise<RegimeGroupApplyResponse> {
   const removed = (await loadExclusions(ctx)).get(regime) ?? new Map<string, Date>();
@@ -245,6 +246,8 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
   const startCompetence = input.fromMonth === 'next' ? addMonthKey(current, 1) : current;
   const departments = await departmentNames(ctx.db, ctx.workspaceId);
   for (const id of Object.values(input.departments)) if (id) await getDepartmentOrThrow(ctx.db, ctx.workspaceId, id);
+  const assigneeId = input.assigneeId ?? ctx.userId;
+  assertMember(ctx, assigneeId);
   const matched = matchedDepartments(departments);
   const defs = await loadDefs(ctx, undefined, { origin: 'registry' });
   const byKey = new Map(defs.filter((d) => d.row.catalogKey).map((d) => [d.row.catalogKey!, d]));
@@ -252,9 +255,8 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
   const skipped: RegimeGroupApplyResponse['skipped'] = [];
 
   const departmentsCreated: TaskRef[] = [];
-  const chosen = new Map<SuggestedDepartment, string | null>();
-  async function departmentFor(key: SuggestedDepartment): Promise<string | null> {
-    if (departments.size === 0) return null;
+  const chosen = new Map<SuggestedDepartment, string>();
+  async function departmentFor(key: SuggestedDepartment): Promise<string> {
     const known = chosen.get(key);
     if (known !== undefined) return known;
     let id = input.departments[key] ?? matched.get(key)?.id ?? null;
@@ -307,6 +309,7 @@ export async function applyRegimeGroup(ctx: TaskContext, regime: RegimeGroupRegi
         description: item.description,
         period: item.period,
         departmentId: await departmentFor(item.department),
+        assigneeId,
         dueDay: item.dueDay,
         dueMonth: item.dueMonth,
         targetDaysBefore: item.targetDaysBefore,

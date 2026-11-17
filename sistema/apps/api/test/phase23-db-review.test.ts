@@ -16,7 +16,7 @@ import type { App } from '../src/app';
 import { executeRows } from '../src/lib/sql';
 import { withTenant } from '../src/lib/tenant';
 import { admin, createTestApp, registerUser, resetDb, TEST_PASSWORD } from './helpers';
-import { createClient, office, workspaceOf } from './task-helpers';
+import { createClient, office, ownDepartment, workspaceOf } from './task-helpers';
 
 let app: App;
 beforeAll(async () => {
@@ -71,7 +71,7 @@ describe('LGPD: assignees named in the history', () => {
     const owner = await registerUser(app, 'Dona do B');
     const invite = await owner.post('/workspaces/current/invites', { email: a.carla.email, role: 'editor' });
     expect((await a.carla.post(`/invites/${invite.body.inviteUrl.split('/convite/')[1]}/accept`)).status).toBe(200);
-    const taskB = await owner.post('/tasks', { title: 'Folha', assigneeId: a.carla.userId });
+    const taskB = await owner.post('/tasks', { title: 'Folha', assigneeId: a.carla.userId, departmentId: await ownDepartment(owner) });
     expect(taskB.status).toBe(201);
     expect((await owner.patch(`/tasks/${taskB.body.id}`, { assigneeId: owner.userId })).status).toBe(200);
     // Back to A (her session would point to a workspace she no longer belongs to), then she is removed from B.
@@ -104,7 +104,7 @@ describe('LGPD: assignees named in the history', () => {
   it('the backfill pseudonymizes rows written before 0016 and re-runs without changes', async () => {
     const a = await office(app);
     const ws = await workspaceOf(a.ana);
-    const task = await a.ana.post('/tasks', { title: 'Legada' });
+    const task = await a.ana.post('/tasks', { title: 'Legada', assigneeId: a.ana.userId });
     const gone = randomUUID();
     const legacy = [
       { fromAssignee: { id: gone, name: 'Conta Já Excluída' }, toAssignee: { id: a.bruno.userId, name: 'Bruno Carvalho' } },
@@ -189,11 +189,11 @@ describe('heavy reads use their indexes', () => {
     const ws = await workspaceOf(a.ana);
     // Some history: one recurring task, three clients, 25 years of monthly occurrences.
     const clients = await Promise.all([1, 2, 3].map((n) => createClient(a.ana, { tradeName: `Cliente ${n}` })));
-    const recurring = await a.ana.post('/tasks/recurring', { name: 'DAS', departmentId: a.fiscal, dueDay: 20, clientIds: clients });
+    const recurring = await a.ana.post('/tasks/recurring', { name: 'DAS', departmentId: a.fiscal, assigneeId: a.ana.userId, dueDay: 20, clientIds: clients });
     expect(recurring.status).toBe(201);
     await admin().execute(sql`
-      insert into tasks (workspace_id, title, client_id, recurring_task_id, competence, period_key, reference_month, due_date, target_date, created_by_name)
-      select ${ws}, 'DAS', c.id, ${recurring.body.id}, to_char(m, 'YYYY-MM'), to_char(m, 'YYYY-MM'), to_char(m, 'YYYY-MM'), (m + interval '19 days')::date, (m + interval '14 days')::date, 'Tarefa recorrente'
+      insert into tasks (workspace_id, title, client_id, recurring_task_id, competence, period_key, reference_month, due_date, target_date, created_by_name, department_id, assignee_id)
+      select ${ws}, 'DAS', c.id, ${recurring.body.id}, to_char(m, 'YYYY-MM'), to_char(m, 'YYYY-MM'), to_char(m, 'YYYY-MM'), (m + interval '19 days')::date, (m + interval '14 days')::date, 'Tarefa recorrente', ${a.fiscal}::uuid, ${a.ana.userId}::uuid
         from unnest(${sql.raw(`array[${clients.map((c) => `'${c}'`).join(',')}]::uuid[]`)}) as c(id),
              generate_series(date '2000-01-01', date '2024-12-01', interval '1 month') as m`);
     await admin().execute(sql`analyze tasks`);

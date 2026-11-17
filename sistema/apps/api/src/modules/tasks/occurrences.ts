@@ -25,7 +25,7 @@ import { contacts, recurringTasks, taskCategories, tasks } from '../../db/schema
 import { appendTo } from '../../lib/collections';
 import { inChunks } from '../../lib/sql';
 import type { TaskContext } from './access';
-import { clientDisplayName, departmentNames, memberRef, personRef } from './shared';
+import { clientDisplayName, departmentNames, memberRef, personRef, requiredMemberRef } from './shared';
 import { AGGREGATED_SQL, COMPLETED_DAY, OPEN_SQL } from './task-rows';
 
 const count = (cond?: SQL) =>
@@ -112,7 +112,6 @@ export async function aggregateOccurrences(
     const category: TaskCategoryRef | null =
       def.categoryId && def.categoryName ? { id: def.categoryId, name: def.categoryName, icon: def.categoryIcon!, color: def.categoryColor! } : null;
     const overdue = g.overduePending > 0;
-    const departmentName = def.departmentId ? departments.get(def.departmentId) : undefined;
     return [
       {
         recurringTaskId: def.id,
@@ -124,9 +123,9 @@ export async function aggregateOccurrences(
         referenceMonth: g.referenceMonth,
         legalDueDate: g.legal,
         targetDate: g.target,
-        department: def.departmentId && departmentName ? { id: def.departmentId, name: departmentName } : null,
+        department: { id: def.departmentId, name: departments.get(def.departmentId) ?? 'Departamento' },
         category,
-        defaultAssignee: memberRef(ctx, def.defaultAssigneeId),
+        defaultAssignee: requiredMemberRef(ctx, def.defaultAssigneeId),
         assignees: (people.get(`${g.recurringTaskId}:${g.periodKey}`) ?? []).sort(
           (a, b) => b.count - a.count || (a.assignee?.name ?? '~').localeCompare(b.assignee?.name ?? '~', 'pt-BR'),
         ),

@@ -97,6 +97,7 @@ const byTotal = (a: TaskBreakdownRow, b: TaskBreakdownRow) =>
 function filtersOf(ctx: TaskContext, q: ExportQuery): SQL[] {
   const out: SQL[] = [];
   if (q.departmentId) out.push(eq(tasks.departmentId, q.departmentId));
+  // `none`: history only (closed tasks whose responsible left the office).
   if (q.assigneeId) out.push(q.assigneeId === 'none' ? isNull(tasks.assigneeId) : eq(tasks.assigneeId, q.assigneeId));
   if (q.categoryId) out.push(eq(tasks.categoryId, q.categoryId));
   if (q.clientId) out.push(q.clientId === 'internal' ? isNull(tasks.clientId) : eq(tasks.clientId, q.clientId));
@@ -245,7 +246,8 @@ export async function taskReport(ctx: TaskContext, q: ReportQuery): Promise<Task
     byDepartment: departmentRows
       .map((r) => toBreakdown(r.key, (r.key ? departments.get(r.key) : undefined) ?? 'Sem departamento', r))
       .sort(byTotal),
-    byAssignee: assigneeRows.map((r) => toBreakdown(r.key, memberRef(ctx, r.key)?.name ?? 'Sem responsável', r)).sort(byTotal),
+    // Without a current member: closed tasks whose responsible left (open ones always have one, 0024).
+    byAssignee: assigneeRows.map((r) => toBreakdown(r.key, memberRef(ctx, r.key)?.name ?? 'Ex-membro', r)).sort(byTotal),
     byCategory: categoryRows.map((r) => toBreakdown(r.key, r.name ?? 'Sem categoria', r)).sort(byTotal),
     byClient: clientRows
       .map((r) => toBreakdown(r.key, clientRef({ id: r.key, name: r.name, tradeName: r.tradeName })?.name ?? 'Interna', r))
@@ -359,7 +361,7 @@ export async function taskCalendar(ctx: TaskContext, q: CalendarQuery): Promise<
     const own = await departmentOfMember(ctx.db, ctx.workspaceId, ctx.userId);
     filters.push(own ? eq(tasks.departmentId, own) : sql`false`);
   }
-  if (q.assigneeId) filters.push(q.assigneeId === 'none' ? isNull(tasks.assigneeId) : eq(tasks.assigneeId, q.assigneeId));
+  if (q.assigneeId) filters.push(eq(tasks.assigneeId, q.assigneeId));
   if (q.departmentId) filters.push(eq(tasks.departmentId, q.departmentId));
   if (q.clientId) filters.push(q.clientId === 'internal' ? isNull(tasks.clientId) : eq(tasks.clientId, q.clientId));
   if (q.categoryId) filters.push(eq(tasks.categoryId, q.categoryId));

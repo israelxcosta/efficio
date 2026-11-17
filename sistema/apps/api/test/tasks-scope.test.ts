@@ -57,6 +57,7 @@ import * as dashboardModule from '../src/modules/tasks/dashboard';
 import * as flowsModule from '../src/modules/tasks/flows';
 import * as homeModule from '../src/modules/tasks/home';
 import * as insightsModule from '../src/modules/tasks/insights';
+import * as handoverModule from '../src/modules/tasks/member-handover';
 import * as notesModule from '../src/modules/tasks/notes';
 import * as overviewModule from '../src/modules/tasks/overview';
 import * as recurringModule from '../src/modules/tasks/recurring';
@@ -310,6 +311,7 @@ describe('tasks: every query filters by the workspace', () => {
     const attachments = tracked(attachmentsModule, called);
     const notes = tracked(notesModule, called);
     const overview = tracked(overviewModule, called);
+    const handover = tracked(handoverModule, called);
     statements.length = 0;
 
     // Registries.
@@ -364,7 +366,7 @@ describe('tasks: every query filters by the workspace', () => {
     const queued = await run(anaCtx, (c) =>
       service.createTask(
         c,
-        taskInputSchema.parse({ title: 'Na fila', departmentId: contabil.id, status: 'done' }),
+        taskInputSchema.parse({ title: 'Na fila', assigneeId: ana.userId, departmentId: contabil.id, status: 'done' }),
       ),
     );
     await run(carlaCtx, (c) => service.getTaskRowOrThrow(c, task.id));
@@ -380,7 +382,7 @@ describe('tasks: every query filters by the workspace', () => {
       service.updateTask(
         c,
         queued.id,
-        taskUpdateSchema.parse({ assigneeId: null, departmentId: fiscal.id }),
+        taskUpdateSchema.parse({ assigneeId: carla.userId, departmentId: fiscal.id }),
       ),
     );
     await run(carlaCtx, (c) => service.changeTaskStatus(c, task.id, 'done'));
@@ -408,7 +410,7 @@ describe('tasks: every query filters by the workspace', () => {
       {
         situation: 'done',
         clientId: 'internal',
-        assigneeId: 'none',
+        assigneeId: ana.userId,
         closedFrom: '2026-10-01',
         categoryId: category.id,
       },
@@ -446,7 +448,7 @@ describe('tasks: every query filters by the workspace', () => {
     const weekly = await run(anaCtx, (c) =>
       recurring.createRecurring(
         c,
-        recurringTaskInputSchema.parse({ name: 'Conferência semanal', departmentId: fiscal.id, period: 'weekly', dueDay: 5, clientIds: [aClient.body.id] }),
+        recurringTaskInputSchema.parse({ name: 'Conferência semanal', departmentId: fiscal.id, assigneeId: ana.userId, period: 'weekly', dueDay: 5, clientIds: [aClient.body.id] }),
       ),
     );
     await run(anaCtx, (c) =>
@@ -513,7 +515,7 @@ describe('tasks: every query filters by the workspace', () => {
     await run(anaCtx, (c) => regimeGroups.applyRegimeGroup(c, 'simples_nacional', regimeGroupApplySchema.parse({ keys: ['fgts_digital', 'pgdas_das'] })));
     await run(anaCtx, (c) => regimeGroups.applyRegimeGroup(c, 'presumed_profit', regimeGroupApplySchema.parse({ keys: ['fgts_digital', 'ecd'] })));
     const inserted = await run(anaCtx, (c) =>
-      recurring.insertRecurring(c, recurringTaskInputSchema.parse({ name: 'Inserida', departmentId: fiscal.id, dueDay: 8, regimes: ['mei'] })),
+      recurring.insertRecurring(c, recurringTaskInputSchema.parse({ name: 'Inserida', departmentId: fiscal.id, assigneeId: ana.userId, dueDay: 8, regimes: ['mei'] })),
     );
     // Editing a group: include an own task, exclude it (ends), remove/restore a catalog item.
     await run(anaCtx, (c) => regimeGroups.includeInRegimeGroup(c, 'simples_nacional', regimeGroupIncludeSchema.parse({ recurringTaskId: inserted })));
@@ -598,6 +600,9 @@ describe('tasks: every query filters by the workspace', () => {
     await run(anaCtx, (c) => registry.deleteDepartment(c, empty.id));
     await run(anaCtx, (c) => registry.deleteCategory(c, category.id));
     await run(anaCtx, (c) => service.deleteTask(c, queued.id));
+    // Removing a member hands their work over (migration 0024).
+    expect(handover.hasWork(await run(anaCtx, (c) => handover.memberWork(c, carla.userId)))).toBe(true);
+    await run(anaCtx, (c) => handover.handOverMemberWork(c, carla.userId, ana.userId));
 
     // 2. Every service entry point ran.
     expect([...called].sort()).toEqual(
@@ -614,6 +619,7 @@ describe('tasks: every query filters by the workspace', () => {
         attachmentsModule,
         notesModule,
         overviewModule,
+        handoverModule,
       ),
     );
 

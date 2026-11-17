@@ -39,7 +39,7 @@ describe('generation marker', () => {
     const { ana, carla, fiscal } = await office(app);
     const ws = await workspaceOf(ana);
     const padaria = await createClient(ana, { tradeName: 'Padaria' });
-    const created = await ana.post('/tasks/recurring', { name: 'DAS', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] });
+    const created = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'DAS', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] });
     expect(created.status).toBe(201);
     const id = created.body.id as string;
     await carla.get('/tasks/home');
@@ -80,7 +80,7 @@ describe('generation marker', () => {
     await dropOccurrence(ws, id, padaria, '2026-12');
     await carla.get('/tasks/home');
     expect(await occurrences(ws, id)).toHaveLength(2);
-    expect((await ana.put(`/tasks/recurring/${id}`, { name: 'DAS mensal', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] })).status).toBe(200);
+    expect((await ana.put(`/tasks/recurring/${id}`, { assigneeId: ana.userId, name: 'DAS mensal', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] })).status).toBe(200);
     expect(await occurrences(ws, id)).toHaveLength(3);
   });
 
@@ -88,7 +88,7 @@ describe('generation marker', () => {
     const { ana, carla, fiscal } = await office(app);
     const ws = await workspaceOf(ana);
     await createClient(ana, { tradeName: 'Padaria' });
-    const created = await ana.post('/tasks/recurring', { name: 'DAS', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] });
+    const created = await ana.post('/tasks/recurring', { assigneeId: ana.userId, name: 'DAS', departmentId: fiscal, dueDay: 20, regimes: ['simples_nacional'] });
     const id = created.body.id as string;
     await carla.get('/tasks/home');
     expect(await occurrences(ws, id)).toHaveLength(3);
