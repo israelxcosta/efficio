@@ -150,7 +150,7 @@ describe('onboarding template and client adjustment', () => {
 
     const p = await doc(presumed);
     expect(tableNames(p, 'fiscal')).toEqual(expect.arrayContaining(['PIS/COFINS', 'IRPJ e CSLL trimestrais', 'EFD-Contribuições']));
-    expect(tableNames(p, 'accounting')).toEqual(['ECD', 'ECF', 'Conciliação e balancete', 'Pró-labore', 'Lucros dos sócios']);
+    expect(tableNames(p, 'accounting')).toEqual(['ECD', 'ECF', 'Conciliação e balancete mensal', 'Pró-labore', 'Lucros dos sócios']);
     const r = await doc(real);
     expect(tableNames(r, 'fiscal')).toContain('IRPJ e CSLL — estimativa mensal');
     expect(tableNames(r, 'fiscal')).not.toContain('IRPJ e CSLL trimestrais');

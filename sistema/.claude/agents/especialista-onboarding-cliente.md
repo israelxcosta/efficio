@@ -18,9 +18,11 @@ sindicato/CCT) e das tarefas recorrentes que valem para ele (`packages/shared/sr
 ## Como escrever
 - Público: dono de pequena empresa, sem formação contábil. Frases curtas, voz ativa, "você"/"sua empresa".
   Nada de juridiquês; quando citar lei, uma referência curta (ex.: "art. 477 da CLT").
-- Cada obrigação diz três coisas: **o que é**, **prazo legal** e **o que precisamos de você e até quando**.
-- Separe sempre **prazo legal** (governo) de **prazo interno** (escritório, configurável); marque os internos
-  como sugestão a confirmar quando o dono ainda não definiu.
+- Cada obrigação diz: **o que o escritório faz**, **o que precisamos de você** e **até quando** (prazo
+  interno, dos Parâmetros do onboarding). **Não mostre vencimentos de obrigações acessórias** (DCTFWeb,
+  EFD-Reinf, eSocial, DEFIS, DASN, ECD/ECF etc.): isso é assunto do escritório (decisão do dono, 18/11/2026).
+  Prazos trabalhistas que o próprio cliente cumpre (salário até o 5º dia útil, aviso e pagamento de férias,
+  verbas rescisórias em 10 dias) e o pagamento das guias continuam.
 - Conteúdo condicional: seção de pessoal/eSocial só se a empresa tem empregados; DEFIS/DASN/ECD/ECF conforme
   o regime; texto do sindicato vem da CCT cadastrada (genérico quando não houver).
 - Pensado para slides: títulos de até ~6 palavras, no máximo 5 itens por bloco, números grandes quando
