@@ -276,5 +276,5 @@ export function maskCpf(cpf: string): string {
 
 /** Message of the WhatsApp/e-mail with the link. */
 export function onboardingMessage(params: { clientName: string; officeName: string; url: string; days: number }): string {
-  return `Olá! Este é o onboarding da ${params.clientName} com a ${params.officeName}: como trabalhamos, suas obrigações, prazos e como enviar documentos. Leva uns 10 minutos. No fim, confirme a leitura. O link vale por ${params.days} dias: ${params.url}`;
+  return `Olá! Este é o onboarding da empresa ${params.clientName} com a ${params.officeName}: como trabalhamos, suas obrigações, prazos e como enviar documentos. Leva uns 10 minutos. No fim, confirme a leitura. O link vale por ${params.days} dias: ${params.url}`;
 }

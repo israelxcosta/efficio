@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router';
-import { CreditCard, Plug, ShieldCheck, ShieldEllipsis, Stamp, UserRound, Users } from 'lucide-react';
+import { CreditCard, Plug, Presentation, ShieldCheck, ShieldEllipsis, Stamp, UserRound, Users } from 'lucide-react';
 import { BILLING_ENABLED, WORKSPACE_KIND_LABELS } from '@effinance/shared';
 import { PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -13,20 +13,21 @@ import { SubscriptionTab } from '../tabs/subscription-tab';
 import { PrivacyTab } from '../tabs/privacy-tab';
 import { IntegrationsTab } from '../tabs/integrations-tab';
 import { OfficeTab } from '@/features/office/components/office-tab';
+import { OnboardingSettingsTab } from '@/features/onboarding/components/onboarding-settings-tab';
 
-const TABS = ['perfil', 'seguranca', 'membros', 'escritorio', 'assinatura', 'integracoes', 'privacidade'] as const;
+const TABS = ['perfil', 'seguranca', 'membros', 'escritorio', 'onboarding', 'assinatura', 'integracoes', 'privacidade'] as const;
 type Tab = (typeof TABS)[number];
 /** Collaborators (no finance access) see Perfil, Segurança, Membros and Privacidade (spec §2.6). */
 const ADMIN_TABS: readonly Tab[] = ['assinatura', 'integracoes'];
 
 /**
- * Escritório (phase 3) only for whoever has `office`; Assinatura and Integrações with the finances.
+ * Escritório (phase 3) and Onboarding (the client onboarding template) only for whoever has `office`; Assinatura and Integrações with the finances.
  * Assinatura only while paid subscriptions are on (`BILLING_ENABLED`, a future rollout).
  */
 export function settingsTabsFor(canAccessFinance: boolean, canOffice = false): readonly Tab[] {
   return TABS.filter((t) => {
     if (t === 'assinatura' && !BILLING_ENABLED) return false;
-    return t === 'escritorio' ? canOffice : canAccessFinance || !ADMIN_TABS.includes(t);
+    return t === 'escritorio' || t === 'onboarding' ? canOffice : canAccessFinance || !ADMIN_TABS.includes(t);
   });
 }
 
@@ -88,6 +89,7 @@ export default function SettingsPage() {
             { value: 'seguranca' as const, label: 'Segurança', icon: <ShieldCheck /> },
             { value: 'membros' as const, label: 'Membros', icon: <Users /> },
             { value: 'escritorio' as const, label: 'Escritório', icon: <Stamp /> },
+            { value: 'onboarding' as const, label: 'Onboarding', icon: <Presentation /> },
             { value: 'assinatura' as const, label: 'Assinatura', icon: <CreditCard /> },
             { value: 'integracoes' as const, label: 'Integrações', icon: <Plug /> },
             { value: 'privacidade' as const, label: 'Privacidade', icon: <ShieldEllipsis /> },
@@ -98,6 +100,7 @@ export default function SettingsPage() {
       {tab === 'seguranca' ? <SecurityTab /> : null}
       {tab === 'membros' ? <MembersTab /> : null}
       {tab === 'escritorio' ? <OfficeTab /> : null}
+      {tab === 'onboarding' ? <OnboardingSettingsTab /> : null}
       {tab === 'assinatura' ? <SubscriptionTab /> : null}
       {tab === 'integracoes' ? <IntegrationsTab /> : null}
       {tab === 'privacidade' ? <PrivacyTab /> : null}

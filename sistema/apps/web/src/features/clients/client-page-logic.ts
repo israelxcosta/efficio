@@ -56,6 +56,17 @@ export function clientPagePath(area: ClientPageArea, id: string, section?: Clien
   return section && section !== 'dados' ? `${base}?aba=${section}` : base;
 }
 
+/** `?onboarding=enviar|ver` on the client page opens "Enviar onboarding" or "Ver onboarding" (menu of the list). */
+export type OnboardingIntent = 'enviar' | 'ver';
+
+export function clientOnboardingPath(area: ClientPageArea, id: string, intent: OnboardingIntent): string {
+  return `${clientPagePath(area, id)}?onboarding=${intent}`;
+}
+
+export function onboardingIntent(value: string | null): OnboardingIntent | null {
+  return value === 'enviar' || value === 'ver' ? value : null;
+}
+
 export function clientListPath(area: ClientPageArea): string {
   return area === 'financeiro' ? '/clientes' : '/tarefas/clientes';
 }

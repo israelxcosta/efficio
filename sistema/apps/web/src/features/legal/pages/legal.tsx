@@ -7,7 +7,9 @@ interface Section {
   paragraphs: string[];
 }
 
-const UPDATED_AT = '20/10/2026';
+const TERMS_UPDATED_AT = '20/10/2026';
+/** The onboarding paragraph (18/11/2026). */
+const PRIVACY_UPDATED_AT = '18/11/2026';
 
 const TERMS: Section[] = [
   {
@@ -72,6 +74,7 @@ const PRIVACY: Section[] = [
     paragraphs: [
       'Cadastro: nome, e-mail e senha (guardada apenas como hash). Dados financeiros que você registra: contas, cartões, lançamentos, metas, categorias e observações.',
       'Contatos que você cadastra: nome, CPF/CNPJ, e-mail, telefone e endereço. Dados técnicos de segurança: IP, navegador e datas de acesso das sessões.',
+      'Quando o escritório envia o onboarding, guardamos o nome e o telefone ou e-mail de quem recebeu o link. Cada abertura do link registra data e hora, o tipo de aparelho, o navegador e o sistema (resumidos a partir do identificador do navegador) e o endereço IP truncado (os últimos dígitos são descartados). A cidade aproximada poderá ser registrada no futuro. Ao confirmar a leitura, guardamos o nome e o CPF informados (cifrados) e a data e hora da confirmação, para comprovar a ciência das orientações. O link expira em 30 dias e pode ser revogado pelo escritório; esses registros seguem a guarda dos dados do cliente e são excluídos com ele.',
     ],
   },
   {
@@ -113,7 +116,7 @@ const PRIVACY: Section[] = [
   },
 ];
 
-function LegalPage({ title, sections }: { title: string; sections: Section[] }) {
+function LegalPage({ title, sections, updatedAt }: { title: string; sections: Section[]; updatedAt: string }) {
   return (
     <div className="min-h-dvh bg-bg">
       <header className="border-b border-border bg-surface">
@@ -129,7 +132,7 @@ function LegalPage({ title, sections }: { title: string; sections: Section[] }) 
       <main className="mx-auto max-w-3xl px-6 py-10">
         <p className="eyebrow text-brand-text">Documentos legais</p>
         <h1 className="mt-2 text-[28px] font-semibold tracking-tight">{title}</h1>
-        <p className="mt-1 text-sm text-muted">Última atualização: {UPDATED_AT}</p>
+        <p className="mt-1 text-sm text-muted">Última atualização: {updatedAt}</p>
         <div role="note" className="mt-6 flex gap-3 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-[13px] text-fg">
           <Scale className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
           <p>
@@ -167,9 +170,9 @@ function LegalPage({ title, sections }: { title: string; sections: Section[] }) 
 }
 
 export function TermsPage() {
-  return <LegalPage title="Termos de uso" sections={TERMS} />;
+  return <LegalPage title="Termos de uso" sections={TERMS} updatedAt={TERMS_UPDATED_AT} />;
 }
 
 export function PrivacyPage() {
-  return <LegalPage title="Política de privacidade" sections={PRIVACY} />;
+  return <LegalPage title="Política de privacidade" sections={PRIVACY} updatedAt={PRIVACY_UPDATED_AT} />;
 }

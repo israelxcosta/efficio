@@ -76,6 +76,12 @@ export const qk = {
   contractTemplate: ['office', 'contract-template'] as const,
   /** Under `clients`: a client or fee change makes it stale. */
   clientContract: (id: string) => ['clients', 'contract', id] as const,
+  // Client onboarding: the office's template, and per client (under `clients`) the adjustment, the preview and the history.
+  onboardingTemplate: ['onboarding', 'template'] as const,
+  onboardingOverrides: (id: string) => ['clients', 'onboarding', 'overrides', id] as const,
+  onboardingDocument: (id: string) => ['clients', 'onboarding', 'document', id] as const,
+  onboardingHistory: (id: string) => ['clients', 'onboarding', 'history', id] as const,
+  publicOnboarding: (token: string) => ['public-onboarding', token] as const,
   /** Yearly fee adjustment in batch: under `clients` too (a fee period change moves the preview and the letters). */
   feeAdjustmentPreview: (month: string) => ['clients', 'fee-adjustments', 'preview', month] as const,
   feeAdjustments: (params?: Params) => ['clients', 'fee-adjustments', 'list', params ?? {}] as const,

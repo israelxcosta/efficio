@@ -56,6 +56,11 @@ export const AUDIT_LABELS: Record<string, string> = {
   'regime_group.included': 'Tarefa incluída no grupo do regime',
   'regime_group.excluded': 'Tarefa removida do grupo do regime',
   'regime_group.restored': 'Tarefa restaurada no grupo do regime',
+  'onboarding.template_updated': 'Modelo de onboarding alterado',
+  'onboarding.overrides_updated': 'Onboarding do cliente ajustado',
+  'onboarding.link_created': 'Link de onboarding enviado',
+  'onboarding.link_revoked': 'Link de onboarding revogado',
+  'onboarding.confirmed': 'Leitura do onboarding confirmada pelo cliente',
 };
 
 /** pt-BR label of an audit action; an unknown one (newer API) still reads as "Outra ação (x.y)". */

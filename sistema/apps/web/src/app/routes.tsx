@@ -13,6 +13,8 @@ const ForgotPasswordPage = lazy(() => import('@/features/auth/pages/forgot-passw
 const ResetPasswordPage = lazy(() => import('@/features/auth/pages/reset-password'));
 const MfaEnrollmentPage = lazy(() => import('@/features/auth/pages/mfa-enrollment'));
 const InvitePage = lazy(() => import('@/features/workspaces/pages/invite'));
+// Client onboarding sent by the office (no login; `#/o/<token>` in the demo).
+const PublicOnboardingPage = lazy(() => import('@/features/onboarding/pages/public-onboarding'));
 const TermsPage = lazy(() => import('@/features/legal/pages/legal').then((m) => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import('@/features/legal/pages/legal').then((m) => ({ default: m.PrivacyPage })));
 const DashboardPage = lazy(() => import('@/features/dashboard/pages/dashboard'));
@@ -81,6 +83,7 @@ export const routes: RouteObject[] = [
   { path: '/convite', element: <InvitePage /> },
   { path: '/termos', element: <TermsPage /> },
   { path: '/privacidade', element: <PrivacyPage /> },
+  { path: '/o/:token', element: <PublicOnboardingPage /> },
   // The office's public site, signed in or not (visitors also get it at `/`, see AppShell).
   { path: SITE_PATH, element: <SitePage /> },
   {

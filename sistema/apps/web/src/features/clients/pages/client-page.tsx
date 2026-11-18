@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   ArrowLeft,
@@ -16,7 +16,9 @@ import {
   Lock,
   Pencil,
   Plus,
+  Presentation,
   ReceiptText,
+  Send,
   UserCheck,
   UserX,
   Wallet,
@@ -70,6 +72,7 @@ import {
   clientPageActions,
   clientPageArea,
   clientSections,
+  onboardingIntent,
   sectionFromParam,
   type ClientSection,
 } from '../client-page-logic';
@@ -78,6 +81,10 @@ import { ClientAccesses, ClientDocumentsList, ClientUnionsList, RegistrationItem
 import { ClientSheet } from '../client-sheet';
 import { FeesDialog } from '../fees-dialog';
 import { InactivateDialog } from '../inactivate-dialog';
+import { OnboardingCard } from '@/features/onboarding/components/onboarding-card';
+import { OnboardingOverridesSheet } from '@/features/onboarding/components/onboarding-overrides-sheet';
+import { OnboardingPreviewSheet } from '@/features/onboarding/components/onboarding-preview-sheet';
+import { SendOnboardingDialog } from '@/features/onboarding/components/send-onboarding-dialog';
 
 const SECTION_ICONS: Record<ClientSection, ReactNode> = {
   dados: <IdCard />,
@@ -176,6 +183,23 @@ function ClientRecord({ client: c, back }: { client: Client; back: ReactNode }) 
   const [inactivating, setInactivating] = useState(false);
   const [reactivating, setReactivating] = useState(false);
   const reactivate = useReactivateClient();
+  const canSendOnboarding = can('clients');
+  const canAdjustOnboarding = can('office');
+  const [onboarding, setOnboarding] = useState<'send' | 'view' | 'adjust' | null>(null);
+  // `?onboarding=enviar|ver` (menu of the clients list): open it once and clean the address.
+  const intent = onboardingIntent(params.get('onboarding'));
+  useEffect(() => {
+    if (!intent) return;
+    setOnboarding(intent === 'enviar' && canSendOnboarding ? 'send' : 'view');
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('onboarding');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [intent, canSendOnboarding, setParams]);
   const contract = useGenerateContract({ onEdit: () => setEditing(true), onFees: () => setFeesOpen(true) });
   const display = c.tradeName || c.name;
   const fullEdit = actions.editData === 'full';
@@ -237,40 +261,51 @@ function ClientRecord({ client: c, back }: { client: Client; back: ReactNode }) 
               </Button>
             </WriteGate>
           ) : null}
-          {actions.finance ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Mais ações do cliente">
-                  <Ellipsis />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem icon={<ChartColumn />} className="sm:hidden" onSelect={() => navigate(`/relatorios/cliente/${c.id}`)}>
-                  Relatório financeiro
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Mais ações do cliente">
+                <Ellipsis />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canSendOnboarding ? (
+                <DropdownMenuItem icon={<Send />} onSelect={() => setOnboarding('send')}>
+                  Enviar onboarding
                 </DropdownMenuItem>
-                <DropdownMenuItem icon={<FileSignature />} className="sm:hidden" onSelect={() => void contract.start(c)}>
-                  Contrato
-                </DropdownMenuItem>
-                <DropdownMenuItem icon={<HandCoins />} onSelect={() => setFeesOpen(true)}>
-                  Honorários e vigências
-                </DropdownMenuItem>
-                <DropdownMenuItem icon={<ReceiptText />} onSelect={() => navigate(`/contas-a-receber?contato=${c.id}&modo=year`)}>
-                  Contas a receber
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {actions.inactivate ? (
-                  <DropdownMenuItem icon={<UserX />} tone="danger" onSelect={() => setInactivating(true)}>
-                    Inativar cliente
+              ) : null}
+              <DropdownMenuItem icon={<Presentation />} onSelect={() => setOnboarding('view')}>
+                Ver onboarding
+              </DropdownMenuItem>
+              {actions.finance ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem icon={<ChartColumn />} className="sm:hidden" onSelect={() => navigate(`/relatorios/cliente/${c.id}`)}>
+                    Relatório financeiro
                   </DropdownMenuItem>
-                ) : null}
-                {actions.reactivate ? (
-                  <DropdownMenuItem icon={<UserCheck />} onSelect={() => setReactivating(true)}>
-                    Reativar cliente
+                  <DropdownMenuItem icon={<FileSignature />} className="sm:hidden" onSelect={() => void contract.start(c)}>
+                    Contrato
                   </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
+                  <DropdownMenuItem icon={<HandCoins />} onSelect={() => setFeesOpen(true)}>
+                    Honorários e vigências
+                  </DropdownMenuItem>
+                  <DropdownMenuItem icon={<ReceiptText />} onSelect={() => navigate(`/contas-a-receber?contato=${c.id}&modo=year`)}>
+                    Contas a receber
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+              {actions.inactivate || actions.reactivate ? <DropdownMenuSeparator /> : null}
+              {actions.inactivate ? (
+                <DropdownMenuItem icon={<UserX />} tone="danger" onSelect={() => setInactivating(true)}>
+                  Inativar cliente
+                </DropdownMenuItem>
+              ) : null}
+              {actions.reactivate ? (
+                <DropdownMenuItem icon={<UserCheck />} onSelect={() => setReactivating(true)}>
+                  Reativar cliente
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -304,6 +339,7 @@ function ClientRecord({ client: c, back }: { client: Client; back: ReactNode }) 
             <Card className="p-5 sm:p-6">
               <ClientUnionsList client={c} />
             </Card>
+            <OnboardingCard clientId={c.id} onView={() => setOnboarding('view')} onSend={() => setOnboarding('send')} />
           </>
         ) : section === 'documentos' ? (
           <Card className="p-5 sm:p-6">
@@ -340,6 +376,17 @@ function ClientRecord({ client: c, back }: { client: Client; back: ReactNode }) 
         )}
       </section>
 
+      <OnboardingPreviewSheet
+        client={c}
+        open={onboarding === 'view'}
+        onOpenChange={(open) => !open && setOnboarding(null)}
+        onAdjust={canAdjustOnboarding ? () => setOnboarding('adjust') : undefined}
+        onSend={canSendOnboarding ? () => setOnboarding('send') : undefined}
+      />
+      {canSendOnboarding ? <SendOnboardingDialog client={c} open={onboarding === 'send'} onOpenChange={(open) => !open && setOnboarding(null)} /> : null}
+      {canAdjustOnboarding ? (
+        <OnboardingOverridesSheet client={c} open={onboarding === 'adjust'} onOpenChange={(open) => setOnboarding(open ? 'adjust' : 'view')} />
+      ) : null}
       {actions.editData ? <ClientSheet open={editing} onOpenChange={setEditing} client={c} mode={actions.editData} /> : null}
       {actions.editDocuments ? <ClientDocumentsSheet client={c} open={editingDocs} onOpenChange={setEditingDocs} /> : null}
       {actions.finance ? (

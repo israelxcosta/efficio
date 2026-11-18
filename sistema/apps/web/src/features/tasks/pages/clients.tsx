@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
-import { Building2, ChevronLeft, ChevronRight, ClipboardCheck, Ellipsis, ExternalLink, ListChecks, Search } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, ClipboardCheck, Ellipsis, ExternalLink, ListChecks, Presentation, Search, Send } from 'lucide-react';
 import { formatCNPJ, formatDateBR, TAX_REGIME_LABELS, TAX_REGIMES, type Client, type ClientDocumentAlert, type TaxRegime } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePermissions } from '@/features/auth/permissions';
 import { Card } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
@@ -20,7 +20,7 @@ import { tasksHref } from '../url-state';
 import { activeByRegime, filterClients, type ClientFilters, type ClientSituation } from '../client-filters';
 import { useClientDocumentAlerts } from '@/features/deadlines/api';
 import { mostUrgentText } from '@/features/deadlines/deadline-logic';
-import { clientPagePath } from '@/features/clients/client-page-logic';
+import { clientOnboardingPath, clientPagePath } from '@/features/clients/client-page-logic';
 import { isUuid } from '@/lib/safe-url';
 
 const PAGE_SIZE = 50;
@@ -303,6 +303,7 @@ function ClientRow({ client: c, docAlert }: ClientRowProps) {
   const navigate = useNavigate();
   const name = c.tradeName || c.name;
   const href = clientPagePath('gestao', c.id);
+  const canSendOnboarding = usePermissions().can('clients');
   const inactive = c.status === 'inactive';
 
   return (
@@ -355,6 +356,15 @@ function ClientRow({ client: c, docAlert }: ClientRowProps) {
           </DropdownMenuItem>
           <DropdownMenuItem icon={<ClipboardCheck />} onSelect={() => navigate(`/tarefas/auditoria?busca=${encodeURIComponent(name)}`)}>
             Ver na auditoria
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {canSendOnboarding ? (
+            <DropdownMenuItem icon={<Send />} onSelect={() => navigate(clientOnboardingPath('gestao', c.id, 'enviar'))}>
+              Enviar onboarding
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem icon={<Presentation />} onSelect={() => navigate(clientOnboardingPath('gestao', c.id, 'ver'))}>
+            Ver onboarding
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

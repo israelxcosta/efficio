@@ -89,7 +89,7 @@ describe('write blocks (WriteGate, permissions)', () => {
 describe('Configurações › Assinatura', () => {
   it('has no Assinatura tab with billing off, for anyone', () => {
     for (const office of [false, true]) expect(settingsTabsFor(true, office)).not.toContain('assinatura');
-    expect(settingsTabsFor(true, true)).toEqual(['perfil', 'seguranca', 'membros', 'escritorio', 'integracoes', 'privacidade']);
+    expect(settingsTabsFor(true, true)).toEqual(['perfil', 'seguranca', 'membros', 'escritorio', 'onboarding', 'integracoes', 'privacidade']);
   });
 
   it('keeps the Assinatura tab for administrators with billing on', () => {
