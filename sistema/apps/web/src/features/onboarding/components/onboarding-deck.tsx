@@ -76,24 +76,35 @@ export function OnboardingDeck({ doc, confirm, className }: OnboardingDeckProps)
   );
 }
 
-function Logo({ doc }: { doc: OnboardingDocument }) {
+/**
+ * The office's logo from its registry (Configurações › Escritório), in a white rounded seal (readable
+ * on the purple slides). Without one, the Efficio wordmark of the system (never a generic placeholder).
+ */
+export function Logo({ doc, size = 'md' }: { doc: OnboardingDocument; size?: 'lg' | 'md' | 'sm' }) {
   const logo = safeLogo(doc.office.logo);
-  if (logo) {
-    return (
-      <div className="ob-logo">
-        <img src={logo} alt={doc.office.name} />
-      </div>
-    );
-  }
-  const [first, ...rest] = doc.office.name.split(' ');
   return (
-    <div className="ob-logo">
-      <svg viewBox="0 0 40 40" aria-hidden="true">
-        <rect width="40" height="40" rx="11" className="ob-lm" />
-        <path d="M12 12h16M12 20h11M12 28h16" strokeWidth="3.6" strokeLinecap="round" />
-      </svg>
-      <b>{first}</b>
-      {rest.length ? <span>{rest.join(' ')}</span> : null}
+    <div className={cn('ob-logo', `ob-logo-${size}`)}>
+      {logo ? (
+        <img src={logo} alt={doc.office.name} />
+      ) : (
+        <span className="ob-wordmark" role="img" aria-label="Efficio">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <rect width="64" height="64" rx="14" fill="var(--ob-brand)" />
+            <text
+              x="32"
+              y="46"
+              textAnchor="middle"
+              fontFamily="'Plus Jakarta Sans Variable', Poppins, Arial, sans-serif"
+              fontWeight="800"
+              fontSize="44"
+              fill="var(--ob-white)"
+            >
+              e
+            </text>
+          </svg>
+          <b>efficio</b>
+        </span>
+      )}
     </div>
   );
 }
@@ -143,7 +154,7 @@ function Slide({
         </svg>
       )}
       <header className="ob-top">
-        <Logo doc={doc} />
+        <Logo doc={doc} size={slide.key === 'cover' ? 'lg' : 'md'} />
         {section ? (
           <span className="ob-sec">
             <b>{p2(section)}</b>
@@ -153,7 +164,10 @@ function Slide({
       </header>
       <div className="ob-body">{children}</div>
       <footer className="ob-foot">
-        <span>{doc.client.name} · Onboarding do cliente</span>
+        <span className="ob-foot-id">
+          {slide.key === 'cover' ? null : <Logo doc={doc} size="sm" />}
+          <span>{doc.client.name} · Onboarding do cliente</span>
+        </span>
         <span className="ob-pg">
           <b>{p2(slide.number)}</b> / {total}
         </span>
@@ -193,6 +207,7 @@ function ItemList({ items }: { items: OnboardingSlideItem[] }) {
             {item.label ? <b>{item.label}</b> : null}
             {item.text ? <span>{item.text}</span> : null}
             {item.detail ? <span>{item.detail}</span> : null}
+            {item.code ? <code className="ob-code">{item.code}</code> : null}
           </div>
         </li>
       ))}
@@ -397,7 +412,11 @@ function SlideBody({
       return (
         <>
           <Head slide={slide} />
-          <div className="ob-tbl ob-tdocs" role="table" aria-label={slide.title}>
+          <div
+            className={cn('ob-tbl ob-tdocs', items.length > 6 && 'ob-dense')}
+            role="table"
+            aria-label={slide.title}
+          >
             <div className="ob-tr ob-th" role="row">
               <span />
               <span role="columnheader">Documento</span>
@@ -427,7 +446,7 @@ function SlideBody({
       return (
         <>
           <Head slide={slide} />
-          <ul className="ob-mails">
+          <ul className={cn('ob-mails', items.length > 5 && 'ob-mails-dense')}>
             {items.map((item) => (
               <li key={item.id} className={item.code ? undefined : 'ob-note'}>
                 {item.label ? <b>{item.label}</b> : null}
@@ -478,6 +497,7 @@ function SlideBody({
                     )}
                   </span>
                   <span>{item.text}</span>
+                  {item.code ? <code className="ob-code">{item.code}</code> : null}
                 </li>
               );
             })}

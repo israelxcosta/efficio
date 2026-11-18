@@ -8,14 +8,15 @@
 import { and, asc, count, desc, eq, inArray, max, min, sql } from 'drizzle-orm';
 import {
   buildOnboardingDocument,
-  effectiveOnboardingOffice,
+  formatOfficeAddress,
   maskCpf,
+  normalizeOnboardingParams,
   monthKey,
   onboardingFactoryText,
+  onboardingHideableKeys,
   onboardingMessage,
   onlyDigits,
   ONBOARDING_FACTORY_VERSION,
-  ONBOARDING_LINK_DAYS,
   type OnboardingAccessView,
   type OnboardingDocument,
   type OnboardingHistoryResponse,
@@ -67,6 +68,19 @@ type Ctx = ScopedContext;
 
 // --- template --------------------------------------------------------------------------------------
 
+let knownHideable: Set<string> | null = null;
+/**
+ * Saved texts and hidden keys the current template still has: a block removed from the factory content
+ * (e.g. the MEI rows "with employees", now rows for everyone) is dropped, so the editor can save again.
+ */
+function known(content: { texts?: Record<string, string>; hidden?: string[] } | null | undefined) {
+  knownHideable ??= new Set(onboardingHideableKeys());
+  return {
+    texts: Object.fromEntries(Object.entries(content?.texts ?? {}).filter(([key]) => onboardingFactoryText(key) !== undefined)),
+    hidden: (content?.hidden ?? []).filter((key) => knownHideable!.has(key)),
+  };
+}
+
 /** Keeps only the texts that differ from the factory (an unchanged text follows future factory updates). */
 function onlyChanged(texts: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(texts).filter(([key, value]) => onboardingFactoryText(key) !== value));
@@ -80,16 +94,15 @@ async function templateRow(db: DbExecutor, workspaceId: string) {
 export async function getTemplate(ctx: Pick<Ctx, 'db' | 'workspaceId'>): Promise<OnboardingTemplateResponse> {
   const row = await templateRow(ctx.db, ctx.workspaceId);
   return {
-    office: effectiveOnboardingOffice(row?.content.office),
-    texts: row?.content.texts ?? {},
-    hidden: row?.content.hidden ?? [],
+    params: normalizeOnboardingParams(row?.content),
+    ...known(row?.content),
     updatedAt: row?.updatedAt.toISOString() ?? null,
     updatedByName: row?.updatedByName ?? null,
   };
 }
 
 export async function saveTemplate(ctx: Ctx, input: z.output<typeof onboardingTemplateInputSchema>): Promise<OnboardingTemplateResponse> {
-  const content: OnboardingTemplateStored = { office: input.office, texts: onlyChanged(input.texts), hidden: input.hidden };
+  const content: OnboardingTemplateStored = { params: input.params, texts: onlyChanged(input.texts), hidden: input.hidden };
   await ctx.db
     .insert(onboardingTemplates)
     .values({ workspaceId: ctx.workspaceId, content, updatedBy: ctx.userId, updatedByName: ctx.userName })
@@ -114,8 +127,7 @@ export async function getOverrides(ctx: Pick<Ctx, 'db' | 'workspaceId'>, clientI
   await getClientOrThrow(ctx.db, ctx.workspaceId, clientId);
   const row = await overridesRow(ctx.db, ctx.workspaceId, clientId);
   return {
-    texts: row?.content.texts ?? {},
-    hidden: row?.content.hidden ?? [],
+    ...known(row?.content),
     employees: row?.content.employees ?? null,
     updatedAt: row?.updatedAt.toISOString() ?? null,
     updatedByName: row?.updatedByName ?? null,
@@ -223,11 +235,25 @@ async function employeesOf(db: DbExecutor, workspaceId: string, clientId: string
 /** The current document of a client (computed on every read). */
 export async function loadDocument(ctx: DocumentContext, clientId: string): Promise<OnboardingDocument> {
   const client = await getClientOrThrow(ctx.db, ctx.workspaceId, clientId);
-  const [template, overrides, branding, officeDates, unionsOf, unionDates, linkDates, applicable, employees, cnpj] = await Promise.all([
+  const [template, overrides, branding, officeRows, unionsOf, unionDates, linkDates, applicable, employees, cnpj] = await Promise.all([
     templateRow(ctx.db, ctx.workspaceId),
     overridesRow(ctx.db, ctx.workspaceId, clientId),
     getBranding(ctx),
-    ctx.db.select({ updatedAt: offices.updatedAt }).from(offices).where(eq(offices.workspaceId, ctx.workspaceId)),
+    ctx.db
+      .select({
+        updatedAt: offices.updatedAt,
+        phone: offices.phone,
+        email: offices.email,
+        website: offices.website,
+        street: offices.street,
+        number: offices.number,
+        complement: offices.complement,
+        district: offices.district,
+        city: offices.city,
+        state: offices.state,
+      })
+      .from(offices)
+      .where(eq(offices.workspaceId, ctx.workspaceId)),
     loadClientUnions(ctx.db, ctx.workspaceId, [clientId], ctx.today),
     ctx.db
       .select({ updatedAt: max(unions.updatedAt), linkedAt: max(unionClients.createdAt) })
@@ -246,7 +272,7 @@ export async function loadDocument(ctx: DocumentContext, clientId: string): Prom
     template?.updatedAt,
     overrides?.updatedAt,
     client.updatedAt ?? client.createdAt,
-    officeDates[0]?.updatedAt,
+    officeRows[0]?.updatedAt,
     unionDates[0]?.updatedAt,
     unionDates[0]?.linkedAt,
     linkDates[0]?.at,
@@ -256,7 +282,15 @@ export async function loadDocument(ctx: DocumentContext, clientId: string): Prom
   return buildOnboardingDocument({
     template: template?.content ?? null,
     overrides: overrides?.content ?? null,
-    office: { name: branding.name, logo: branding.logo },
+    // The logo is only the office registry's (Configurações › Escritório).
+    office: {
+      name: branding.name,
+      logo: branding.logo,
+      phone: officeRows[0]?.phone ?? null,
+      email: officeRows[0]?.email ?? null,
+      website: officeRows[0]?.website ?? null,
+      address: officeRows[0] ? formatOfficeAddress(officeRows[0]) : null,
+    },
     client: {
       name: client.name,
       tradeName: client.tradeName,
@@ -326,10 +360,12 @@ export async function createLink(
     to = input.channel === 'whatsapp' ? whatsappNumber(input.to!) : input.to!.trim().toLowerCase();
     if (!to) throw new ValidationError('Telefone inválido: informe DDD e número.');
   }
+  const template = await templateRow(ctx.db, ctx.workspaceId);
+  const days = normalizeOnboardingParams(template?.content).deadlines.linkDays;
   const token = randomToken(32);
   const tokenHash = await sha256Hex(token);
   const createdAt = new Date();
-  const expiresAt = new Date(createdAt.getTime() + ONBOARDING_LINK_DAYS * 86_400_000);
+  const expiresAt = new Date(createdAt.getTime() + days * 86_400_000);
   const [row] = await ctx.db
     .insert(onboardingLinks)
     .values({
@@ -349,8 +385,7 @@ export async function createLink(
   const path = `/o/${token}`;
   const url = `${appUrl.replace(/\/+$/, '')}${path}`;
   const branding = await getBranding(ctx);
-  const template = await templateRow(ctx.db, ctx.workspaceId);
-  const officeName = template?.content.office.name ?? branding.name ?? 'Efficio Contabilidade';
+  const officeName = branding.name?.trim() ? branding.name : 'Efficio Contabilidade';
   return {
     id: row!.id,
     path,
@@ -359,7 +394,7 @@ export async function createLink(
     expiresAt: expiresAt.toISOString(),
     to,
     recipientName,
-    message: onboardingMessage({ clientName: client.tradeName?.trim() ? client.tradeName : client.name, officeName, url, days: ONBOARDING_LINK_DAYS }),
+    message: onboardingMessage({ clientName: client.tradeName?.trim() ? client.tradeName : client.name, officeName, url, days }),
   };
 }
 

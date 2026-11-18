@@ -7,22 +7,25 @@ import {
   type OnboardingArea,
   type OnboardingCondition,
   type OnboardingDocument,
+  ONBOARDING_DEPARTMENT_LABELS,
   type OnboardingObligationRow,
-  type OnboardingOfficeData,
   type OnboardingOverridesStored,
+  type OnboardingParams,
   type OnboardingRecurringInput,
   type OnboardingSlide,
+  type OnboardingRuleKey,
   type OnboardingTemplateStored,
 } from '../onboarding';
 import {
   ONBOARDING_DEFAULT_NEED,
-  ONBOARDING_DEFAULT_OFFICE,
+  ONBOARDING_DEFAULT_PARAMS,
   ONBOARDING_OBLIGATION_TEXTS,
+  ONBOARDING_PLACEHOLDER_ALIASES,
   ONBOARDING_TEMPLATE_SLIDES,
 } from '../onboarding-template';
 import { matchSuggestedDepartment, REGIME_GROUP_ITEMS, type SuggestedDepartment } from '../regime-groups';
 import { addMonthKey, formatDateBR, monthKey, type ISODate } from './dates';
-import { formatCNPJ, onlyDigits } from './documents';
+import { formatCNPJ, formatPhone, onlyDigits } from './documents';
 import { dateInTimeZone } from './tasks';
 
 export interface OnboardingClientInput {
@@ -38,11 +41,23 @@ export interface OnboardingClientInput {
   unions: string[];
 }
 
+export interface OnboardingRegistryOffice {
+  name: string | null;
+  logo: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  address?: string | null;
+}
+
 export interface OnboardingBuildInput {
   template: OnboardingTemplateStored | null;
   overrides: OnboardingOverridesStored | null;
-  /** From the office registry (Escritório): the name used when the template has none, and the logo. */
-  office: { name: string | null; logo: string | null };
+  /**
+   * From the office registry (Configurações › Escritório): name, logo and contact data. The logo comes
+   * only from here (the onboarding has no logo of its own).
+   */
+  office: OnboardingRegistryOffice;
   client: OnboardingClientInput;
   /** Recurring tasks of the registry that apply to the client (any order). */
   recurring: OnboardingRecurringInput[];
@@ -62,18 +77,57 @@ const AREA_OF_DEPARTMENT: Record<SuggestedDepartment, Exclude<OnboardingArea, 'o
   personnel: 'personnel',
 };
 
-/** The office data with the factory values where nothing was saved. */
-export function effectiveOnboardingOffice(saved: Partial<OnboardingOfficeData> | null | undefined): OnboardingOfficeData {
+type Saved = Pick<OnboardingTemplateStored, 'params' | 'office'> | null | undefined;
+
+/**
+ * The effective parameters: what was saved over the factory values (field by field). A template saved
+ * before the parameters has `office` (WhatsApp, hours, CRC, e-mails and four deadlines): it is converted;
+ * its name and general e-mail are dropped (the office registry is the source now).
+ */
+export function normalizeOnboardingParams(saved: Saved): OnboardingParams {
+  const d = ONBOARDING_DEFAULT_PARAMS;
+  const p = saved?.params;
+  if (p) {
+    return {
+      contact: { ...d.contact, ...(p.contact ?? {}) },
+      emails: { ...d.emails, ...(p.emails ?? {}) },
+      subjects: { ...d.subjects, ...(p.subjects ?? {}) },
+      deadlines: { ...d.deadlines, ...(p.deadlines ?? {}) },
+      rules: { ...d.rules, ...(p.rules ?? {}) },
+    };
+  }
+  const o = saved?.office;
+  if (!o) return structuredClone(d);
+  const days = o.deadlines ?? {};
   return {
-    ...ONBOARDING_DEFAULT_OFFICE,
-    ...(saved ?? {}),
-    emails: { ...ONBOARDING_DEFAULT_OFFICE.emails, ...(saved?.emails ?? {}) },
-    deadlines: { ...ONBOARDING_DEFAULT_OFFICE.deadlines, ...(saved?.deadlines ?? {}) },
+    contact: {
+      whatsapp: o.whatsapp ?? d.contact.whatsapp,
+      hours: o.hours ?? d.contact.hours,
+      crc: o.crc ?? d.contact.crc,
+    },
+    emails: { ...d.emails, ...(o.emails ?? {}) },
+    subjects: { ...d.subjects },
+    deadlines: {
+      ...d.deadlines,
+      ...(days.documentsDay ? { documentsDay: days.documentsDay, cardsDay: days.documentsDay } : {}),
+      ...(days.payrollVariablesDay ? { payrollVariablesDay: days.payrollVariablesDay, proLaboreDay: days.payrollVariablesDay } : {}),
+      ...(days.admissionBusinessDays !== undefined ? { admissionBusinessDays: days.admissionBusinessDays } : {}),
+      ...(days.vacationDaysBefore !== undefined ? { vacationDaysBefore: days.vacationDaysBefore } : {}),
+    },
+    rules: { ...d.rules },
   };
 }
 
-export function conditionHolds(when: OnboardingCondition | undefined, regime: TaxRegime | null, employees: number): boolean {
+export function conditionHolds(
+  when: OnboardingCondition | undefined,
+  regime: TaxRegime | null,
+  employees: number,
+  rules: Record<OnboardingRuleKey, boolean> = ONBOARDING_DEFAULT_PARAMS.rules,
+): boolean {
   if (!when) return true;
+  if (when.rules) {
+    for (const [key, value] of Object.entries(when.rules)) if (rules[key as OnboardingRuleKey] !== value) return false;
+  }
   if (when.regimes && (!regime || !when.regimes.includes(regime))) return false;
   if (when.notRegimes && regime && when.notRegimes.includes(regime)) return false;
   if (when.employees === 'some' && employees <= 0) return false;
@@ -82,6 +136,51 @@ export function conditionHolds(when: OnboardingCondition | undefined, regime: Ta
 }
 
 const ordinalDay = (day: number) => (day === 1 ? 'dia 1º' : `dia ${day}`);
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** "Rua X, 123, sala 4 - Centro, Campinas/SP" from the registry fields (null when nothing is filled). */
+export function formatOfficeAddress(o: {
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  district: string | null;
+  city: string | null;
+  state: string | null;
+}): string | null {
+  const street = [o.street, o.number, o.complement].filter((v) => v?.trim()).join(', ');
+  const city = [o.city, o.state].filter((v) => v?.trim()).join('/');
+  const district = o.district?.trim() ?? '';
+  const head = [street, district].filter(Boolean).join(' - ');
+  const out = [head, city].filter(Boolean).join(', ');
+  return out || null;
+}
+
+const DEPARTMENT_EMAIL_KEY = { fiscal: 'fiscal', accounting: 'accounting', personnel: 'personnel' } as const;
+
+/** Values of the parameters' placeholders (`prazos.*`, `emails.*`, `escritorio.whatsapp|horario|crc`…), subjects not filled. */
+export function onboardingParamValues(params: OnboardingParams): Record<string, string | null> {
+  const d = params.deadlines;
+  return {
+    'escritorio.whatsapp': params.contact.whatsapp,
+    'escritorio.horario': params.contact.hours,
+    'escritorio.crc': params.contact.crc,
+    'emails.fiscal': params.emails.fiscal,
+    'emails.pessoal': params.emails.personnel,
+    'emails.contabil': params.emails.accounting,
+    'emails.maquininhas': params.emails[DEPARTMENT_EMAIL_KEY[d.cardsDepartment]],
+    'departamentos.maquininhas': ONBOARDING_DEPARTMENT_LABELS[d.cardsDepartment],
+    'prazos.notas': ordinalDay(d.documentsDay),
+    'prazos.extratos': ordinalDay(d.documentsDay),
+    'prazos.maquininhas': ordinalDay(d.cardsDay),
+    'prazos.folha': ordinalDay(d.payrollVariablesDay),
+    'prazos.proLabore': ordinalDay(d.proLaboreDay),
+    'prazos.admissao': plural(d.admissionBusinessDays, 'dia útil', 'dias úteis'),
+    'prazos.ferias': plural(d.vacationDaysBefore, 'dia', 'dias'),
+    'prazos.defis': `${pad2(d.defisDay)}/${pad2(d.defisMonth)}`,
+    'prazos.link': plural(d.linkDays, 'dia', 'dias'),
+  };
+}
 
 export function employeesText(n: number): string {
   if (n <= 0) return 'Sem empregados';
@@ -114,13 +213,15 @@ const CATALOG_ORDER = new Map(REGIME_GROUP_ITEMS.map((item, i) => [item.key, i])
 const CATALOG_DEPARTMENT = new Map(REGIME_GROUP_ITEMS.map((item) => [item.key, item.department]));
 
 export function buildOnboardingDocument(input: OnboardingBuildInput): OnboardingDocument {
-  const office = effectiveOnboardingOffice(input.template?.office);
+  const params = normalizeOnboardingParams(input.template);
   const texts: Record<string, string> = { ...(input.template?.texts ?? {}), ...(input.overrides?.texts ?? {}) };
   const hidden = new Set([...(input.template?.hidden ?? []), ...(input.overrides?.hidden ?? [])]);
   const { client } = input;
   const employees = Math.max(0, input.overrides?.employees ?? client.employees ?? 0);
   const regime = client.taxRegime;
-  const officeName = office.name ?? input.office.name ?? FALLBACK_OFFICE_NAME;
+  const registry = input.office;
+  const officeName = registry.name?.trim() ? registry.name : FALLBACK_OFFICE_NAME;
+  const blank = (v: string | null | undefined) => (v?.trim() ? v : null);
   const cnpj = client.cnpj ? formatCNPJ(onlyDigits(client.cnpj)) : '';
   const union = client.unions.length > 0 ? client.unions.join(' · ') : null;
   const updatedDate = dateInTimeZone(new Date(input.updatedAt), TASK_TIME_ZONE);
@@ -136,23 +237,18 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
     empregadosTexto: employeesText(employees),
     sindicato: union ?? NO_UNION,
     atualizadoEm: formatDateBR(updatedDate),
-    mesExemplo: `${example.slice(5, 7)}/${example.slice(0, 4)}`,
+    competencia: `${example.slice(5, 7)}/${example.slice(0, 4)}`,
     'escritorio.nome': officeName,
-    'escritorio.whatsapp': office.whatsapp,
-    'escritorio.email': office.email,
-    'escritorio.horario': office.hours,
-    'escritorio.crc': office.crc,
-    'escritorio.emailFiscal': office.emails.fiscal,
-    'escritorio.emailPessoal': office.emails.personnel,
-    'escritorio.emailContabil': office.emails.accounting,
-    'prazo.documentos': ordinalDay(office.deadlines.documentsDay),
-    'prazo.variaveisFolha': ordinalDay(office.deadlines.payrollVariablesDay),
-    'prazo.admissao': office.deadlines.admissionBusinessDays === 1 ? '1 dia útil' : `${office.deadlines.admissionBusinessDays} dias úteis`,
-    'prazo.ferias': office.deadlines.vacationDaysBefore === 1 ? '1 dia' : `${office.deadlines.vacationDaysBefore} dias`,
+    'escritorio.telefone': registry.phone?.trim() ? formatPhone(registry.phone) : null,
+    'escritorio.email': blank(registry.email),
+    'escritorio.site': blank(registry.website),
+    'escritorio.endereco': blank(registry.address),
+    ...onboardingParamValues(params),
   };
   const missing = new Set<string>();
   const fill = (raw: string): string =>
-    raw.replace(/\{\{\s*([a-zA-Z.]+)\s*\}\}/g, (match, name: string) => {
+    raw.replace(/\{\{\s*([a-zA-Z.]+)\s*\}\}/g, (match, found: string) => {
+      const name = ONBOARDING_PLACEHOLDER_ALIASES[found] ?? found;
       if (!(name in values)) return match;
       const value = values[name];
       if (value === null || value === undefined || value === '') {
@@ -161,6 +257,16 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
       }
       return value;
     });
+  // Standard subjects: filled with the client's data (`{{competencia}}`, `{{razaoSocial}}`…).
+  const subjects = params.subjects;
+  Object.assign(values, {
+    'assuntos.extratos': fill(subjects.statements),
+    'assuntos.notas': fill(subjects.invoices),
+    'assuntos.folha': fill(subjects.payrollVariables),
+    'assuntos.admissao': fill(subjects.admission),
+    'assuntos.ferias': fill(subjects.vacation),
+    'assuntos.rescisao': fill(subjects.termination),
+  });
   /** The text of a key (adjustment → office → factory), filled; null when absent or blank. */
   const resolve = (key: string, factory: string | undefined): string | null => {
     const raw = texts[key] ?? factory;
@@ -168,7 +274,7 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
     const out = fill(raw).trim();
     return out === '' ? null : out;
   };
-  const holds = (when: OnboardingCondition | undefined) => conditionHolds(when, regime, employees);
+  const holds = (when: OnboardingCondition | undefined) => conditionHolds(when, regime, employees, params.rules);
 
   // --- obligation rows from the recurring tasks ---
   const obligations: Record<OnboardingArea, OnboardingObligationRow[]> = { fiscal: [], accounting: [], personnel: [], other: [] };
@@ -181,8 +287,9 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
   const seen = new Set<string>();
   for (const r of sorted) {
     const catalog = r.catalogKey && ONBOARDING_OBLIGATION_TEXTS[r.catalogKey] ? r.catalogKey : null;
-    if (catalog && (hidden.has(`obligations.${catalog}`) || seen.has(catalog))) continue;
+    if (catalog && seen.has(catalog)) continue;
     if (catalog) seen.add(catalog);
+    if (catalog && hidden.has(`obligations.${catalog}`)) continue;
     const byName = r.department ? matchSuggestedDepartment(r.department) : null;
     const byCatalog = r.catalogKey ? CATALOG_DEPARTMENT.get(r.catalogKey) : undefined;
     const suggested = byName ?? byCatalog ?? null;
@@ -204,6 +311,8 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
     const subtitle = slide.subtitles.find((s) => holds(s.when));
     const items = slide.items
       .filter((item) => holds(item.when) && !hidden.has(`${slide.key}.items.${item.id}`))
+      // A fixed row standing for a catalog task: only when that task's row is not there (or was hidden).
+      .filter((item) => !item.covers || !seen.has(item.covers))
       .map((item) => {
         const base = `${slide.key}.items.${item.id}`;
         return {
@@ -254,12 +363,15 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
     },
     office: {
       name: officeName,
-      logo: input.office.logo,
-      whatsapp: office.whatsapp,
-      email: office.email,
-      hours: office.hours,
-      crc: office.crc,
-      emails: office.emails,
+      logo: blank(registry.logo),
+      phone: registry.phone?.trim() ? formatPhone(registry.phone) : null,
+      email: blank(registry.email),
+      website: blank(registry.website),
+      address: blank(registry.address),
+      whatsapp: params.contact.whatsapp,
+      hours: params.contact.hours,
+      crc: params.contact.crc,
+      emails: params.emails,
     },
     slides,
     obligations,

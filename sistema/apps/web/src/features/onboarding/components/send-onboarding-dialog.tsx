@@ -30,7 +30,7 @@ import { ApiRequestError } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
-import { useCreateOnboardingLink, useOnboardingDocument } from '../api';
+import { useCreateOnboardingLink, useOnboardingDocument, useOnboardingTemplate } from '../api';
 import {
   LINK_PLACEHOLDER,
   defaultLinkMessage,
@@ -74,6 +74,7 @@ interface SendOnboardingDialogProps {
 /** "Enviar onboarding": creates a 30-day link and opens WhatsApp or the e-mail with the message. */
 export function SendOnboardingDialog({ client, open, onOpenChange }: SendOnboardingDialogProps) {
   const doc = useOnboardingDocument(client.id, open);
+  const template = useOnboardingTemplate(open);
   const create = useCreateOnboardingLink(client.id);
   const [contact, setContact] = useState<OnboardingContact>(
     client.responsiblePhone || client.responsibleEmail ? 'responsible' : 'company',
@@ -95,12 +96,13 @@ export function SendOnboardingDialog({ client, open, onOpenChange }: SendOnboard
   }, [open]);
 
   const officeName = doc.data?.office.name ?? 'Efficio Contabilidade';
-  const text = message ?? defaultLinkMessage(display, officeName);
+  const days = template.data?.params.deadlines.linkDays ?? ONBOARDING_LINK_DAYS;
+  const text = message ?? defaultLinkMessage(display, officeName, days);
   const destination = registryContact(client, contact, channel);
   const what = channel === 'whatsapp' ? 'o WhatsApp' : 'o e-mail';
   const whose = contact === 'company' ? 'da empresa' : 'do responsável';
   const subject = `Onboarding · ${display} · ${officeName}`;
-  const expires = new Date(Date.now() + ONBOARDING_LINK_DAYS * 86_400_000)
+  const expires = new Date(Date.now() + days * 86_400_000)
     .toISOString()
     .slice(0, 10);
 
@@ -279,7 +281,7 @@ export function SendOnboardingDialog({ client, open, onOpenChange }: SendOnboard
           )}
         </Field>
         <p className="text-sm text-muted">
-          Validade: {ONBOARDING_LINK_DAYS} dias (até {formatDateBR(expires)})
+          Validade: {days} {days === 1 ? 'dia' : 'dias'} (até {formatDateBR(expires)})
           <HelpTip label="Sobre a validade" className="ml-1 align-middle">
             Reenviar gera um link novo; os anteriores continuam valendo até expirar ou ser revogados
             no cartão Onboarding.

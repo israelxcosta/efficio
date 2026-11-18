@@ -1,10 +1,10 @@
-// Client onboarding in the demo: the office's template with its contact data and an example link of the
+// Client onboarding in the demo: the office's template with its parameters (WhatsApp and CRC filled) and an example link of the
 // Padaria Pão Quente sent by WhatsApp a few days ago, opened three times (phone and computer) and with
 // the reading confirmed. The token is fixed and public (demo only), so `/o/<token>` opens in the demo.
 // Dates relative to now. Free of Node-only imports.
 
 import { and, eq } from 'drizzle-orm';
-import { ONBOARDING_DEFAULT_OFFICE, ONBOARDING_LINK_DAYS, type OnboardingTemplateStored } from '@effinance/shared';
+import { ONBOARDING_DEFAULT_PARAMS, ONBOARDING_LINK_DAYS, type OnboardingTemplateStored } from '@effinance/shared';
 import type { DbExecutor } from './client';
 import { contacts, onboardingAccesses, onboardingLinks, onboardingTemplates } from './schema';
 import { sha256Hex, toBase64Url, utf8 } from '../lib/crypto/encoding';
@@ -25,7 +25,7 @@ export async function seedOnboarding(db: DbExecutor, workspaceId: string, ownerI
   const now = Date.now();
   await withTenant(db, workspaceId, async (tx) => {
     const content: OnboardingTemplateStored = {
-      office: { ...ONBOARDING_DEFAULT_OFFICE, whatsapp: '(19) 99876-5432', email: 'atendimento@efficio.com.br', hours: 'Segunda a sexta, das 8h às 18h', crc: 'SP-012345/O-6' },
+      params: { ...ONBOARDING_DEFAULT_PARAMS, contact: { whatsapp: '(19) 99876-5432', hours: 'Segunda a sexta, das 8h às 18h', crc: 'SP-012345/O-6' } },
       texts: {},
       hidden: [],
     };

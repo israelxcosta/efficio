@@ -2095,8 +2095,8 @@ no lugar das marcações `[se …]`); montagem pura e testável: `buildOnboardin
 
 | Rota | Permissão | O quê |
 |---|---|---|
-| `GET /onboarding/template` | membro | Dados do escritório efetivos (fábrica onde nada foi salvo), textos alterados, itens ocultos |
-| `PUT /onboarding/template` | `office` | Substitui `{ office, texts, hidden }`; textos iguais aos de fábrica não são gravados |
+| `GET /onboarding/template` | membro | Parâmetros efetivos (fábrica onde nada foi salvo), textos alterados, itens ocultos |
+| `PUT /onboarding/template` | `office` | Substitui `{ params, texts, hidden }`; textos iguais aos de fábrica não são gravados |
 | `GET /clients/:id/onboarding/document` | membro | "Ver onboarding": o documento atual (não registra acesso) |
 | `GET/PUT /clients/:id/onboarding/overrides` | `office` | Ajuste do cliente `{ texts, hidden, employees }`; vazio remove |
 | `POST /clients/:id/onboarding/links` | `clients` | `{ channel: 'whatsapp'\|'email', contact?: 'company'\|'responsible', to? }` → 201 `OnboardingLinkCreated` |
@@ -2105,10 +2105,26 @@ no lugar das marcações `[se …]`); montagem pura e testável: `buildOnboardin
 | `GET /public/onboarding/:token` | sem sessão | Documento + `expiresAt` + `confirmedAt`; registra o acesso |
 | `POST /public/onboarding/:token/confirm` | sem sessão | `{ name, cpf }` → `{ confirmedAt }`; 409 se o link já foi confirmado |
 
-- **Modelo do escritório** (`onboarding_templates`, um por espaço): `office` (`name` — nulo usa o nome do
-  Escritório, senão "Efficio Contabilidade" —, `whatsapp`, `email`, `hours`, `crc`, `emails.fiscal/
-  personnel/accounting`, `deadlines.documentsDay` 10, `payrollVariablesDay` 1, `admissionBusinessDays` 3,
-  `vacationDaysBefore` 5), `texts` (chave → texto; chaves em `onboardingTextKeys()`: `<slide>.title`,
+- **Modelo do escritório** (`onboarding_templates`, um por espaço): `params` — os **Parâmetros do
+  onboarding** (`OnboardingParams`, fábrica = respostas do dono em `ONBOARDING_DEFAULT_PARAMS`):
+  `contact` (`whatsapp`, `hours`, `crc`), `emails` (`fiscal`/`personnel`/`accounting`), `subjects`
+  (`statements`, `invoices`, `payrollVariables`, `admission`, `vacation`, `termination`; texto com
+  `{{competencia}}`/`{{razaoSocial}}`, 1–150), `deadlines` (`documentsDay` 10, `cardsDay` 10,
+  `cardsDepartment` fiscal, `payrollVariablesDay` 1, `proLaboreDay` 1 — dias 1–31 —,
+  `admissionBusinessDays` 3 (0–30), `vacationDaysBefore` 5 (0–60), `defisDay`/`defisMonth` 15/02 (data
+  existente), `linkDays` 30 (1–90, validade dos links novos)) e `rules` (sim/não: `admissionExamByClient`,
+  `terminationRequestFirst`, `unionAssistance`, `payrollAdvance`). `ONBOARDING_SUGGESTED_PARAMS` marca
+  os valores ainda não confirmados pelo dono (selo "sugestão" no editor). Os textos usam os parâmetros
+  por marcadores (`{{prazos.notas|extratos|maquininhas|folha|proLabore|admissao|ferias|defis|link}}`,
+  `{{emails.fiscal|pessoal|contabil|maquininhas}}`, `{{assuntos.extratos|notas|folha|admissao|ferias|
+  rescisao}}`, `{{departamentos.maquininhas}}`) e as regras por condição (`when.rules`, ex. a linha
+  "Sindicato" muda conforme `unionAssistance`). **Nome, telefone, e-mail, site, endereço e logo vêm do
+  cadastro do escritório** (`{{escritorio.nome|telefone|email|site|endereco}}`; sem nome: "Efficio
+  Contabilidade"; sem logo o web mostra a marca Efficio). Modelos da primeira versão (`office` com
+  WhatsApp, e-mails e 4 prazos) são convertidos na leitura (`normalizeOnboardingParams`; nome e e-mail
+  próprios são descartados) e os marcadores antigos (`prazo.*`, `escritorio.emailFiscal`…, `mesExemplo`)
+  continuam valendo (`ONBOARDING_PLACEHOLDER_ALIASES`); textos/ocultos de blocos que saíram da fábrica são
+  descartados na leitura. `texts` (chave → texto; chaves em `onboardingTextKeys()`: `<slide>.title`,
   `<slide>.kicker`, `<slide>.subtitle.<id>`, `<slide>.items.<id>.label|text|detail|code`,
   `obligations.<catalogKey>.deadline|need`, `obligations.default.need`) e `hidden`
   (`onboardingHideableKeys()`: `<slide>.items.<id>` e `obligations.<catalogKey>`). Chave desconhecida = 400.
@@ -2123,7 +2139,11 @@ no lugar das marcações `[se …]`); montagem pura e testável: `buildOnboardin
   exceções; não internas, não encerradas antes da competência atual) —, na ordem do catálogo, com prazo
   legal e "o que precisamos de você" de `ONBOARDING_OBLIGATION_TEXTS` (por `catalog_key`; fora do
   catálogo: prazo descrito a partir da agenda e o texto `obligations.default.need`), seguidas das linhas
-  fixas do modelo (pró-labore, balanço, maquininhas…). Área pelo nome do departamento
+  fixas do modelo (pró-labore, balanço, maquininhas…). Linhas fixas com `covers: <catalogKey>` (Pessoal:
+  folha, eSocial, FGTS Digital, DCTFWeb) só aparecem quando a tarefa do catálogo não vale para o cliente
+  (ou foi ocultada), sem repetir. **Pessoal para todos**: o conteúdo de empregados (tabela de Pessoal,
+  Registro, Férias, Rescisão, eSocial e itens de pessoal dos demais slides) é igual com 0 ou mais
+  empregados; só a frase de apoio do slide Pessoal muda. Área pelo nome do departamento
   (`matchSuggestedDepartment`), senão pelo catálogo; departamento não reconhecido = `other`, mostrado na
   tabela do slide Fiscal. Empregados: o ajuste, senão o "+ Empregados" da última competência de
   honorários gerada (0 sem ele). Sindicato: os sindicatos ativos do cliente (sigla ou nome), senão
@@ -2131,7 +2151,7 @@ no lugar das marcações `[se …]`); montagem pura e testável: `buildOnboardin
   ajuste, cadastro do cliente (`contacts.updated_at`, nova), escritório, sindicatos e vínculo, exceções/
   inclusões das recorrentes, recorrentes que valem e cobrança de empregados.
 - **Links** (`onboarding_links`): token de 32 bytes aleatórios (base64url, 43 caracteres); no banco só o
-  SHA-256 (`token_hash`, único). Validade de 30 dias (`ONBOARDING_LINK_DAYS`, relógio real). Destinatário
+  SHA-256 (`token_hash`, único). Validade de `params.deadlines.linkDays` dias (fábrica 30, `ONBOARDING_LINK_DAYS`; relógio real). Destinatário
   do cadastro (`company`: telefone/e-mail da empresa; `responsible`: do responsável) ou digitado (`to`);
   nome e destino **cifrados**; quem enviou e quando. **Reenviar cria um link novo e não revoga os
   anteriores**: cada um vale até expirar ou ser revogado (o histórico mostra todos). A resposta traz

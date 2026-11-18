@@ -50,3 +50,11 @@ registra data e hora de cada acesso. Esboço aprovado para discussão (prints no
 - "Confirmar leitura" pede **nome e CPF**.
 - Registrar data, hora, aparelho e cidade aproximada de cada acesso; citar na política de privacidade.
 - O link mostra **sempre a versão atual**, com a data de atualização.
+
+## Parâmetros do onboarding (19/11/2026)
+- Configurações → Onboarding → **Parâmetros do onboarding** (exige `office`): contato (dados do cadastro do
+  escritório só leitura + WhatsApp, horário e CRC), e-mails por departamento, assuntos padrão, prazos internos
+  e regras sim/não. Fábrica = respostas do dono; selo "sugestão" em: assuntos de Notas fiscais, Variáveis da
+  folha, Férias e Rescisão; maquininhas → Fiscal; pró-labore no dia 1º; adiantamento = não.
+- Logo: só o do cadastro do escritório (capa e rodapé); sem logo, a marca Efficio.
+- Conteúdo de pessoal igual para todos os clientes, com ou sem empregados.

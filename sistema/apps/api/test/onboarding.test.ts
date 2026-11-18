@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ONBOARDING_DEFAULT_OFFICE, type OnboardingDocument } from '@effinance/shared';
+import { ONBOARDING_DEFAULT_PARAMS, type OnboardingDocument } from '@effinance/shared';
 import type { App } from '../src/app';
 import { executeRows } from '../src/lib/sql';
 import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
@@ -73,20 +73,27 @@ describe('onboarding template and client adjustment', () => {
 
     const initial = await viewer.get('/onboarding/template');
     expect(initial.status).toBe(200);
-    expect(initial.body).toMatchObject({ office: ONBOARDING_DEFAULT_OFFICE, texts: {}, hidden: [], updatedAt: null });
+    expect(initial.body).toMatchObject({ params: ONBOARDING_DEFAULT_PARAMS, texts: {}, hidden: [], updatedAt: null });
 
     const body = {
-      office: { ...ONBOARDING_DEFAULT_OFFICE, whatsapp: '(19) 99999-0000', email: 'Contato@Efficio.com.br', hours: 'Seg. a sex., 8h às 18h', crc: 'SP-1/O' },
+      params: {
+        ...ONBOARDING_DEFAULT_PARAMS,
+        contact: { whatsapp: '(19) 99999-0000', hours: 'Seg. a sex., 8h às 18h', crc: 'SP-1/O' },
+        emails: { ...ONBOARDING_DEFAULT_PARAMS.emails, fiscal: 'Fiscal@Efficio.com.br' },
+      },
       texts: { 'howWeWork.title': 'Como funciona', 'summary.title': 'Sumário', 'team.title': 'Sua equipe' },
       hidden: ['fiscal.items.simples-cards'],
     };
     expect((await viewer.put('/onboarding/template', body)).status).toBe(403);
     expect((await owner.put('/onboarding/template', { ...body, texts: { 'cover.bogus': 'x' } })).status).toBe(400);
+    const badDays = { ...body.params, deadlines: { ...body.params.deadlines, documentsDay: 32, defisDay: 30, defisMonth: 2 } };
+    expect((await owner.put('/onboarding/template', { ...body, params: badDays })).status).toBe(400);
     const saved = await owner.put('/onboarding/template', body);
     expect(saved.status).toBe(200);
     // Texts equal to the factory are not stored (they follow future factory updates).
     expect(saved.body.texts).toEqual({ 'howWeWork.title': 'Como funciona', 'team.title': 'Sua equipe' });
-    expect(saved.body.office.email).toBe('contato@efficio.com.br');
+    expect(saved.body.params.emails.fiscal).toBe('fiscal@efficio.com.br');
+    expect(saved.body.params.contact.crc).toBe('SP-1/O');
     expect(saved.body.updatedByName).toBe('Israel Dono');
 
     expect((await viewer.put(`/clients/${clientId}/onboarding/overrides`, { texts: {} })).status).toBe(403);
@@ -101,7 +108,9 @@ describe('onboarding template and client adjustment', () => {
     expect(doc.client.employees).toBe(4);
     expect(doc.office).toMatchObject({ whatsapp: '(19) 99999-0000', crc: 'SP-1/O' });
     expect(tableNames(doc, 'fiscal')).not.toContain('Vendas no cartão e PIX');
-    expect(doc.missing).toEqual([]);
+    // The office registry is empty: name falls back to Efficio, no logo, its e-mail is missing.
+    expect(doc.office).toMatchObject({ name: 'Efficio Contabilidade', logo: null });
+    expect(doc.missing).toEqual(['escritorio.email']);
     expect(new Date(doc.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(overrides.body.updatedAt).getTime());
 
     // Empty adjustment = none.
@@ -133,7 +142,10 @@ describe('onboarding template and client adjustment', () => {
     expect(tableNames(m, 'fiscal')).toEqual(['DAS-MEI', 'DASN-SIMEI']);
     await owner.put(`/clients/${mei}/onboarding/overrides`, { employees: 1 });
     const m1 = await doc(mei);
-    expect(tableNames(m1, 'fiscal')).toEqual(['DAS-MEI', 'DASN-SIMEI', 'FGTS Digital (MEI pode ter 1 empregado)', 'DCTFWeb e DARF (INSS do empregado + 3% patronal)']);
+    expect(tableNames(m1, 'fiscal')).toEqual(['DAS-MEI', 'DASN-SIMEI']);
+    // Personnel content is the same with or without employees (owner's decision): fixed rows for MEI.
+    expect(tableNames(m1, 'personnel')).toEqual(tableNames(m, 'personnel'));
+    expect(tableNames(m, 'personnel')).toEqual(['Folha e salários', 'eSocial', 'FGTS Digital', 'DCTFWeb (INSS e IRRF da folha)', '13º e informe de rendimentos']);
     expect(slide(m1, 'personnel').subtitle).toMatch(/1 empregado,/);
 
     const p = await doc(presumed);
@@ -148,6 +160,55 @@ describe('onboarding template and client adjustment', () => {
     await admin().execute(sql`insert into recurring_task_clients (workspace_id, recurring_task_id, client_id, mode)
       select workspace_id, id, ${simples}, 'exclude' from recurring_tasks where workspace_id = ${ws} and catalog_key = 'defis'`);
     expect(tableNames(await doc(simples), 'fiscal')).not.toContain('DEFIS');
+  });
+
+  it('logo and contact come from the office registry; parameters reach the slides; legacy templates are converted', async () => {
+    const owner = await registerUser(app, 'Israel Dono');
+    const ws = await workspaceOf(owner);
+    const clientId = await newClient(owner, 'simples_nacional');
+    const doc = async () => (await owner.get(`/clients/${clientId}/onboarding/document`)).body as OnboardingDocument;
+
+    const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    expect((await owner.put('/office/logo', { logo })).status).toBe(200);
+    await admin().execute(sql`update offices set trade_name = 'Contábil Alfa', phone = '(19) 3333-4444', email = 'oi@alfa.com.br',
+      website = 'alfa.com.br', street = 'Rua A', number = '10', district = 'Centro', city = 'Campinas', state = 'SP' where workspace_id = ${ws}`);
+    let d = await doc();
+    expect(d.office).toMatchObject({ name: 'Contábil Alfa', logo, phone: '(19) 3333-4444', email: 'oi@alfa.com.br', website: 'alfa.com.br', address: 'Rua A, 10 - Centro, Campinas/SP' });
+    expect(slide(d, 'cover').kicker).toBe('Contábil Alfa · Onboarding do cliente');
+
+    // A template of the first version (office data, four deadlines): converted on read.
+    await admin().execute(sql`insert into onboarding_templates (workspace_id, content, updated_by, updated_by_name)
+      select ${ws}, ${JSON.stringify({ office: { name: 'Antigo', whatsapp: '(19) 90000-0000', email: 'x@y.com', hours: null, crc: 'SP-9', emails: { fiscal: 'f@alfa.com.br', personnel: 'p@alfa.com.br', accounting: 'c@alfa.com.br' }, deadlines: { documentsDay: 7, payrollVariablesDay: 2, admissionBusinessDays: 4, vacationDaysBefore: 6 } }, texts: { 'fiscal.items.mei-fgts.label': 'velho', 'howWeWork.title': 'Como é' }, hidden: ['fiscal.items.mei-fgts'] })}::jsonb, null, 'Israel Dono'`);
+    const legacy = (await owner.get('/onboarding/template')).body;
+    expect(legacy.params.contact).toEqual({ whatsapp: '(19) 90000-0000', hours: ONBOARDING_DEFAULT_PARAMS.contact.hours, crc: 'SP-9' });
+    expect(legacy.params.deadlines).toMatchObject({ documentsDay: 7, cardsDay: 7, payrollVariablesDay: 2, proLaboreDay: 2, admissionBusinessDays: 4, vacationDaysBefore: 6, linkDays: 30 });
+    // Blocks removed from the factory content are dropped, so the editor can save again.
+    expect(legacy.texts).toEqual({ 'howWeWork.title': 'Como é' });
+    expect(legacy.hidden).toEqual([]);
+    d = await doc();
+    expect(d.office.name).toBe('Contábil Alfa');
+    expect(slide(d, 'month').items.find((i) => i.id === 'documents')!.label).toBe('Até o dia 7');
+    expect((await owner.put('/onboarding/template', legacy)).status).toBe(200);
+
+    // A changed parameter changes the slides (no text rewritten), and the link validity.
+    const params = {
+      ...legacy.params,
+      emails: { ...legacy.params.emails, personnel: 'dp@alfa.com.br' },
+      subjects: { ...legacy.params.subjects, statements: 'Extrato {{competencia}} - {{razaoSocial}}' },
+      deadlines: { ...legacy.params.deadlines, documentsDay: 12, admissionBusinessDays: 5, linkDays: 15 },
+      rules: { ...legacy.params.rules, unionAssistance: false },
+    };
+    expect((await owner.put('/onboarding/template', { params, texts: legacy.texts, hidden: [] })).status).toBe(200);
+    d = await doc();
+    expect(slide(d, 'documents').items.find((i) => i.id === 'invoices')!.detail).toBe('dia 12');
+    expect(slide(d, 'admission').items[0]).toMatchObject({ label: '5 dias úteis antes', text: 'envie dados e documentos para dp@alfa.com.br' });
+    expect(slide(d, 'sending').items.find((i) => i.id === 'accounting')!.code).toMatch(/^Extrato \d{2}\/\d{4} - Padaria Pão Quente \d+ Ltda$/);
+    expect(slide(d, 'termination').items.map((i) => i.id)).toContain('union-client');
+    const link = await owner.post(`/clients/${clientId}/onboarding/links`, { channel: 'whatsapp', contact: 'company' });
+    const days = (new Date(link.body.expiresAt).getTime() - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(14.9);
+    expect(days).toBeLessThan(15.1);
+    expect(link.body.message).toContain('vale por 15 dias');
   });
 });
 

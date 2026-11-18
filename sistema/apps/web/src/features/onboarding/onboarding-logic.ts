@@ -9,6 +9,7 @@ import {
   type OnboardingAccessView,
   type OnboardingCondition,
   type OnboardingHistoryResponse,
+  type OnboardingRuleKey,
   type OnboardingSlideKey,
   TAX_REGIME_LABELS,
 } from '@effinance/shared';
@@ -20,13 +21,12 @@ import {
 /** Where the link goes in the editable message (replaced by the URL once the link exists). */
 export const LINK_PLACEHOLDER = '{{link}}';
 
-export function defaultLinkMessage(clientName: string, officeName: string): string {
-  return onboardingMessage({
-    clientName,
-    officeName,
-    url: LINK_PLACEHOLDER,
-    days: ONBOARDING_LINK_DAYS,
-  });
+export function defaultLinkMessage(
+  clientName: string,
+  officeName: string,
+  days: number = ONBOARDING_LINK_DAYS,
+): string {
+  return onboardingMessage({ clientName, officeName, url: LINK_PLACEHOLDER, days });
 }
 
 /** The edited message with the link: in place of `{{link}}`, else at the end. */
@@ -153,7 +153,6 @@ export function numberBlock(
       big: String(text.split(/,\s*|\s+e\s+/).filter((p) => p.trim()).length),
       label: label ?? '',
     };
-  if (id === 'personnel-none') return { big: '0', label: label ?? '' };
   return { big: null, label: label ?? '' };
 }
 
@@ -228,6 +227,17 @@ const OBLIGATION_FIELD_LABELS = {
   code: 'Assunto (e-mail)',
 } as const;
 
+/** Condition of a yes/no parameter: [when on, when off]. */
+const RULE_CONDITION_LABELS: Record<OnboardingRuleKey, [string, string]> = {
+  admissionExamByClient: ['se o cliente agenda o exame', 'se o escritório agenda o exame'],
+  terminationRequestFirst: [
+    'se o cliente pede a rescisão antes de comunicar',
+    'se o cliente avisa no dia do aviso',
+  ],
+  unionAssistance: ['se o escritório faz a homologação', 'se o cliente agenda a homologação'],
+  payrollAdvance: ['com adiantamento quinzenal', 'sem adiantamento quinzenal'],
+};
+
 export function describeCondition(when: OnboardingCondition | undefined): string | null {
   if (!when) return null;
   const parts: string[] = [];
@@ -236,6 +246,8 @@ export function describeCondition(when: OnboardingCondition | undefined): string
     parts.push(`exceto ${when.notRegimes.map((r) => TAX_REGIME_LABELS[r]).join(' e ')}`);
   if (when.employees === 'some') parts.push('com empregados');
   if (when.employees === 'none') parts.push('sem empregados');
+  for (const [key, value] of Object.entries(when.rules ?? {}))
+    parts.push(RULE_CONDITION_LABELS[key as OnboardingRuleKey][value ? 0 : 1]);
   return parts.length ? `Só ${parts.join(', ')}` : null;
 }
 

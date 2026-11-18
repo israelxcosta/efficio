@@ -15,6 +15,8 @@
   --ob-ink: #1d1438;
   --ob-gray: #564e72;
   --ob-navy: #152b61;
+  /* Efficio mark (favicon), for the wordmark when the office has no logo. */
+  --ob-brand: #004aad;
   --ob-red: #cc3333;
   --ob-red-soft: #fdeeee;
   --ob-on-dark: #ece6ff;
@@ -118,48 +120,79 @@
 .ob-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 26px;
-  letter-spacing: -0.01em;
-}
-.ob-logo svg {
-  width: 40px;
-  height: 40px;
+  flex: none;
+  background: var(--ob-white);
+  border-radius: 18px;
+  padding: 8px 16px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ob-navy) 8%, transparent);
 }
 .ob-logo img {
-  height: 48px;
-  max-width: 260px;
+  display: block;
+  height: 56px;
+  max-width: 300px;
   object-fit: contain;
-  border-radius: 10px;
 }
-.ob-dk .ob-logo img {
-  background: var(--ob-white);
-  padding: 4px 8px;
+.ob-logo-lg {
+  border-radius: 24px;
+  padding: 12px 22px;
 }
-.ob-lm {
-  fill: var(--ob-navy);
+/* The cover's logo needs air above it. */
+.ob-cover .ob-top {
+  height: 176px;
 }
-.ob-dk .ob-lm {
-  fill: var(--ob-white);
+.ob-logo-lg img {
+  height: 84px;
+  max-width: 420px;
 }
-.ob-logo path {
-  stroke: var(--ob-white);
+.ob-logo-sm {
+  border-radius: 12px;
+  padding: 5px 10px;
 }
-.ob-dk .ob-logo path {
-  stroke: var(--ob-p7);
+.ob-logo-sm img {
+  height: 40px;
+  max-width: 200px;
 }
-.ob-logo b {
-  font-weight: 800;
+/* On the light slides the header logo goes to the footer (the cover keeps the big one on top). */
+.ob-slide:not(.ob-cover) .ob-top .ob-logo {
+  display: none;
+}
+.ob-foot-id {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.ob-slide:not(.ob-dk) .ob-foot .ob-logo {
+  box-shadow: 0 0 0 1px var(--ob-p1);
+}
+.ob-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: var(--ob-navy);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1;
 }
-.ob-logo span {
-  color: var(--ob-gray);
+.ob-wordmark svg {
+  width: 44px;
+  height: 44px;
 }
-.ob-dk .ob-logo b {
-  color: var(--ob-white);
+.ob-logo-lg .ob-wordmark {
+  font-size: 58px;
+  gap: 14px;
 }
-.ob-dk .ob-logo span {
-  color: var(--ob-on-dark);
+.ob-logo-lg .ob-wordmark svg {
+  width: 72px;
+  height: 72px;
+}
+.ob-logo-sm .ob-wordmark {
+  font-size: 26px;
+  gap: 8px;
+}
+.ob-logo-sm .ob-wordmark svg {
+  width: 32px;
+  height: 32px;
 }
 .ob-sec {
   display: flex;
@@ -639,6 +672,32 @@
 .ob-mails .ob-note b {
   color: var(--ob-ink);
 }
+/* Six or more blocks (e.g. a separate e-mail for the card machines): tighter, the note in one line. */
+.ob-mails-dense {
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.ob-mails-dense li {
+  border-radius: 26px;
+  padding: 18px 28px;
+  gap: 4px;
+}
+.ob-mails-dense b {
+  font-size: 26px;
+}
+.ob-mails-dense span {
+  font-size: 21px;
+}
+.ob-mails-dense .ob-code {
+  font-size: 19px;
+  padding: 6px 14px;
+  margin-top: 4px;
+}
+.ob-mails-dense .ob-note {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 12px;
+}
 
 /* month */
 .ob-month {
@@ -1032,20 +1091,42 @@
     height: 64px;
     gap: 10px;
   }
-  .ob-logo {
-    font-size: 16px;
-    gap: 8px;
+  .ob-cover .ob-top {
+    height: 80px;
   }
-  .ob-logo svg {
-    width: 26px;
-    height: 26px;
+  /* Phone: no footer, so every slide shows the logo on top (smaller). */
+  .ob-slide:not(.ob-cover) .ob-top .ob-logo {
+    display: flex;
+  }
+  .ob-logo,
+  .ob-logo-lg {
+    border-radius: 12px;
+    padding: 5px 10px;
   }
   .ob-logo img {
-    height: 30px;
-    max-width: 140px;
+    height: 34px;
+    max-width: 150px;
   }
-  .ob-logo span {
-    display: none;
+  .ob-logo-lg img {
+    height: 52px;
+    max-width: 210px;
+  }
+  .ob-wordmark,
+  .ob-logo-lg .ob-wordmark {
+    font-size: 22px;
+    gap: 6px;
+  }
+  .ob-wordmark svg,
+  .ob-logo-lg .ob-wordmark svg {
+    width: 28px;
+    height: 28px;
+  }
+  .ob-logo-lg .ob-wordmark {
+    font-size: 30px;
+  }
+  .ob-logo-lg .ob-wordmark svg {
+    width: 38px;
+    height: 38px;
   }
   .ob-sec {
     font-size: 11px;

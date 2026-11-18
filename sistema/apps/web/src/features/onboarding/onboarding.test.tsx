@@ -2,11 +2,16 @@
 // confirmation never sends an invalid CPF, the sending builds the wa.me/mailto addresses, and the audit
 // actions have pt-BR labels.
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createFormControl } from 'react-hook-form';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router';
+import { createFormControl, useForm } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ONBOARDING_AUDIT_ACTIONS,
+  ONBOARDING_DEFAULT_PARAMS,
   buildOnboardingDocument,
+  onboardingParamsSchema,
+  type Office,
   type Client,
   type OnboardingConfirmInput,
   type OnboardingLinkCreated,
@@ -18,6 +23,13 @@ import {
   confirmFormOptions,
 } from './components/confirm-reading';
 import { OnboardingDeck } from './components/onboarding-deck';
+import {
+  OnboardingParamsCard,
+  type ParamsIn,
+  type ParamsOut,
+} from './components/onboarding-params-card';
+import { paramsDefaults } from './components/onboarding-settings-tab';
+import { qk } from '@/lib/query-keys';
 import { openTarget, registryContact } from './components/send-onboarding-dialog';
 import {
   changedTexts,
@@ -127,6 +139,45 @@ describe('OnboardingDeck', () => {
       />,
     );
     expect(html).not.toContain('evil.example');
+  });
+
+  it('shows the office registry logo on the cover and in the footers; without it, the Efficio wordmark', () => {
+    const logo = 'data:image/png;base64,AAAA';
+    const withLogo = renderToStaticMarkup(
+      <OnboardingDeck doc={{ ...doc(), office: { ...doc().office, logo } }} />,
+    );
+    expect(withLogo).toContain('ob-logo ob-logo-lg');
+    // Cover on top (big) + every other slide: hidden copy on top (phone) and the footer one.
+    expect(withLogo.split(`src="${logo}"`).length - 1).toBe(1 + 17 * 2);
+    expect(withLogo).not.toContain('ob-wordmark');
+    const without = renderToStaticMarkup(<OnboardingDeck doc={doc()} />);
+    expect(without).not.toContain('<img');
+    expect(without).toContain('aria-label="Efficio"');
+    expect(without).toContain('<b>efficio</b>');
+  });
+
+  it('a changed parameter reaches the deck without rewriting texts', () => {
+    const d = buildOnboardingDocument({
+      template: {
+        params: {
+          ...ONBOARDING_DEFAULT_PARAMS,
+          emails: { ...ONBOARDING_DEFAULT_PARAMS.emails, personnel: 'dp@alfa.com.br' },
+          deadlines: { ...ONBOARDING_DEFAULT_PARAMS.deadlines, documentsDay: 12 },
+        },
+        texts: {},
+        hidden: [],
+      },
+      overrides: null,
+      office: { name: 'Efficio Contabilidade', logo: null },
+      client: { ...doc().client, cnpj: '11222333000181', taxRegime: 'simples_nacional', unions: [] },
+      recurring: [],
+      updatedAt: '2026-11-18T15:00:00.000Z',
+      today: '2026-11-18',
+    });
+    const html = renderToStaticMarkup(<OnboardingDeck doc={d} />);
+    expect(html).toContain('>dia 12<');
+    expect(html).toContain('dp@alfa.com.br');
+    expect(html).toContain('Extratos bancários 10/2026 | Padaria Pão Quente Ltda');
   });
 
   it('reads the blocks of the numbers, month and eSocial slides', () => {
@@ -280,5 +331,67 @@ describe('audit labels', () => {
       'Leitura do onboarding confirmada pelo cliente',
     );
     expect(auditLabel('onboarding.link_created')).toBe('Link de onboarding enviado');
+  });
+});
+
+describe('Parâmetros do onboarding', () => {
+  const office = {
+    registered: true,
+    legalName: 'Efficio Contabilidade Ltda',
+    tradeName: 'Efficio Contabilidade',
+    phone: '(19) 3818-1200',
+    email: 'contato@efficio.app',
+    website: 'efficio.app',
+    street: 'Rua A',
+    number: '10',
+    complement: null,
+    district: 'Centro',
+    city: 'Campinas',
+    state: 'SP',
+    logo: 'data:image/png;base64,AAAA',
+  } as unknown as Office;
+
+  function Harness({ readOnly = false }: { readOnly?: boolean }) {
+    const form = useForm<ParamsIn, unknown, ParamsOut>({
+      defaultValues: paramsDefaults(ONBOARDING_DEFAULT_PARAMS),
+    });
+    return <OnboardingParamsCard form={form} readOnly={readOnly} />;
+  }
+  const render = (readOnly = false) => {
+    const client = new QueryClient();
+    client.setQueryData(qk.office, office);
+    return renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <Harness readOnly={readOnly} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  };
+
+  it('shows the registry contact read only, the owner answers and the suggestion badges', () => {
+    const html = render();
+    expect(html).toContain('Parâmetros do onboarding');
+    expect(html).toContain('Rua A, 10 - Centro, Campinas/SP');
+    expect(html).toContain('href="/configuracoes?aba=escritorio"');
+    for (const label of ['WhatsApp de atendimento', 'Horário de atendimento', 'CRC', 'Extratos bancários', 'Rescisão', 'Pró-labore', 'Validade do link (dias)'])
+      expect(html).toContain(`>${label}</label>`);
+    // Rules render from the factory values (the owner's answers).
+    expect(html).toMatch(/aria-checked="true"[^>]*aria-label="Exame admissional agendado pelo cliente"/);
+    expect(html).toMatch(/aria-checked="false"[^>]*aria-label="Adiantamento quinzenal na folha"/);
+    expect(html.match(/>sugestão</g)).toHaveLength(7);
+    expect(render(true)).toContain('<fieldset disabled=""');
+  });
+
+  it('saves what the form holds and restores it (round trip), refusing invalid values', () => {
+    const values = paramsDefaults(ONBOARDING_DEFAULT_PARAMS);
+    expect(onboardingParamsSchema.parse(values)).toEqual(ONBOARDING_DEFAULT_PARAMS);
+    const edited = { ...values, contact: { ...values.contact, whatsapp: '(19) 90000-0000' } };
+    const saved = onboardingParamsSchema.parse(edited);
+    expect(paramsDefaults(saved)).toEqual(edited);
+    expect(
+      onboardingParamsSchema.safeParse({ ...values, deadlines: { ...values.deadlines, documentsDay: 40 } })
+        .success,
+    ).toBe(false);
   });
 });

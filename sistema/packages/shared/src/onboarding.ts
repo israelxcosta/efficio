@@ -43,14 +43,23 @@ export const ONBOARDING_AREA_LABELS: Record<OnboardingArea, string> = {
   other: 'Outros',
 };
 
+/** Yes/no rules of the office's onboarding parameters (`OnboardingParams.rules`). */
+export const ONBOARDING_RULE_KEYS = ['admissionExamByClient', 'terminationRequestFirst', 'unionAssistance', 'payrollAdvance'] as const;
+export type OnboardingRuleKey = (typeof ONBOARDING_RULE_KEYS)[number];
+
 /** When a block shows: every listed rule must hold (no rule = always). */
 export interface OnboardingCondition {
   /** The client's regime is one of these. */
   regimes?: TaxRegime[];
   /** The client's regime is none of these. */
   notRegimes?: TaxRegime[];
-  /** `some`: at least one employee; `none`: no employee. */
+  /**
+   * `some`: at least one employee; `none`: no employee. Only for supporting sentences (subtitles): the
+   * personnel content shows for every client, with or without employees (owner's decision).
+   */
   employees?: 'some' | 'none';
+  /** The office's yes/no parameters (e.g. `{ unionAssistance: true }`). */
+  rules?: Partial<Record<OnboardingRuleKey, boolean>>;
 }
 
 /** A text line of a slide. In the obligation slides: label = obligation, text = legal deadline, detail = what we need. */
@@ -62,6 +71,11 @@ export interface OnboardingTemplateItem {
   /** Monospaced text (e-mail subject). */
   code?: string;
   when?: OnboardingCondition;
+  /**
+   * Obligation slides: a fixed row that stands for this catalog recurring task. It shows only when the
+   * task does not apply to the client (or its row is hidden), so the table never repeats it.
+   */
+  covers?: string;
 }
 
 export interface OnboardingTemplateSubtitle {
@@ -88,31 +102,73 @@ export interface OnboardingObligationText {
   need: string;
 }
 
-/** The office's own data used by the document (`{{escritorio.*}}` and `{{prazo.*}}`). */
-export interface OnboardingOfficeData {
-  /** null: the office registry name (Escritório), else "Efficio Contabilidade". */
-  name: string | null;
-  whatsapp: string | null;
-  email: string | null;
-  /** "Segunda a sexta, das 8h às 18h". */
-  hours: string | null;
-  crc: string | null;
-  emails: { fiscal: string; personnel: string; accounting: string };
+/** Departments of the onboarding (e-mails, who receives each document). */
+export const ONBOARDING_DEPARTMENTS = ['fiscal', 'accounting', 'personnel'] as const;
+export type OnboardingDepartment = (typeof ONBOARDING_DEPARTMENTS)[number];
+export const ONBOARDING_DEPARTMENT_LABELS: Record<OnboardingDepartment, string> = { fiscal: 'Fiscal', accounting: 'Contábil', personnel: 'Pessoal' };
+
+/** Standard e-mail subjects (`{{assuntos.*}}`; may use `{{competencia}}` and `{{razaoSocial}}`). */
+export const ONBOARDING_SUBJECT_KEYS = ['statements', 'invoices', 'payrollVariables', 'admission', 'vacation', 'termination'] as const;
+export type OnboardingSubjectKey = (typeof ONBOARDING_SUBJECT_KEYS)[number];
+
+/**
+ * Onboarding parameters of the office (Configurações › Onboarding): its own contact data, e-mails by
+ * department, standard subjects, internal deadlines and yes/no rules. The texts use them through
+ * placeholders (`{{prazos.notas}}`, `{{emails.fiscal}}`, `{{assuntos.extratos}}`…) and the yes/no rules
+ * through conditions (`when.rules`). Name, phone, e-mail, site, address and logo come from the office
+ * registry (Configurações › Escritório), never from here.
+ */
+export interface OnboardingParams {
+  contact: {
+    /** Customer service WhatsApp. */
+    whatsapp: string | null;
+    /** "Segunda a sexta, das 8h às 18h". */
+    hours: string | null;
+    crc: string | null;
+  };
+  emails: Record<OnboardingDepartment, string>;
+  subjects: Record<OnboardingSubjectKey, string>;
   deadlines: {
     /** Invoices and bank statements: day of the following month. */
     documentsDay: number;
+    /** Card machines/PIX sales report: day of the following month. */
+    cardsDay: number;
+    /** Department that receives the card machines/PIX report. */
+    cardsDepartment: OnboardingDepartment;
     /** Payroll variables (absences, overtime, commissions): day of the following month. */
     payrollVariablesDay: number;
-    /** Admission data: business days before the first day. */
+    /** Partners' pro-labore amounts: day of the following month. */
+    proLaboreDay: number;
+    /** Admission data: business days before the first day (0 = up to the day before). */
     admissionBusinessDays: number;
     /** Vacation request to the office: days before it starts. */
     vacationDaysBefore: number;
+    /** DEFIS data (Simples Nacional): day/month of the year. */
+    defisDay: number;
+    defisMonth: number;
+    /** Validity of the links sent to the client, in days. */
+    linkDays: number;
   };
+  rules: Record<OnboardingRuleKey, boolean>;
+}
+
+/** The office data of the first version (before the parameters): still read from saved templates. */
+export interface OnboardingLegacyOfficeData {
+  name?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  hours?: string | null;
+  crc?: string | null;
+  emails?: Partial<Record<OnboardingDepartment, string>>;
+  deadlines?: Partial<{ documentsDay: number; payrollVariablesDay: number; admissionBusinessDays: number; vacationDaysBefore: number }>;
 }
 
 /** What the office saved (stored as is; absent text = factory text). */
 export interface OnboardingTemplateStored {
-  office: OnboardingOfficeData;
+  /** Absent in templates saved before the parameters: `office` is converted (`normalizeOnboardingParams`). */
+  params?: Partial<OnboardingParams>;
+  /** First version (read only). */
+  office?: OnboardingLegacyOfficeData;
   /** Text key → text (`onboardingTextKeys()`). Only what differs from the factory. */
   texts: Record<string, string>;
   /** Items and task rows hidden (`onboardingHideableKeys()`). */
@@ -130,8 +186,10 @@ export interface OnboardingOverridesStored {
 // --- input -----------------------------------------------------------------------------------------
 
 export const MAX_ONBOARDING_TEXT_CHARS = 1000;
-/** Link validity (owner's decision, 18/11/2026). */
+/** Factory link validity (owner's decision, 18/11/2026); the office may change it (`params.deadlines.linkDays`). */
 export const ONBOARDING_LINK_DAYS = 30;
+export const MAX_ONBOARDING_LINK_DAYS = 90;
+export const MAX_ONBOARDING_SUBJECT_CHARS = 150;
 export const ONBOARDING_LINK_CHANNELS = ['whatsapp', 'email'] as const;
 export type OnboardingLinkChannel = (typeof ONBOARDING_LINK_CHANNELS)[number];
 export const ONBOARDING_LINK_CHANNEL_LABELS: Record<OnboardingLinkChannel, string> = { whatsapp: 'WhatsApp', email: 'E-mail' };
@@ -164,23 +222,49 @@ const optionalLine = (max: number) =>
 const email = z.string().trim().toLowerCase().pipe(z.email({ message: 'E-mail inválido' }).max(200));
 const day = z.int({ message: 'Informe um dia' }).min(1, { message: 'Dia de 1 a 31' }).max(31, { message: 'Dia de 1 a 31' });
 
-export const onboardingOfficeSchema = z.object({
-  name: optionalLine(120),
-  whatsapp: optionalLine(40),
-  email: z
-    .string()
-    .trim()
-    .nullish()
-    .transform((v) => (v ? v.toLowerCase() : null))
-    .refine((v) => v === null || z.email().safeParse(v).success, { message: 'E-mail inválido' }),
-  hours: optionalLine(120),
-  crc: optionalLine(40),
+const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const range = (min: number, max: number, unit: string) =>
+  z
+    .int({ message: 'Informe um número inteiro' })
+    .min(min, { message: `De ${min} a ${max} ${unit}` })
+    .max(max, { message: `De ${min} a ${max} ${unit}` });
+const subject = z
+  .string()
+  .trim()
+  .min(1, { message: 'Informe o assunto' })
+  .max(MAX_ONBOARDING_SUBJECT_CHARS, { message: `Use no máximo ${MAX_ONBOARDING_SUBJECT_CHARS} caracteres` })
+  .refine((v) => !/[\u0000-\u001f]/.test(v), { message: 'Assunto inválido' });
+
+export const onboardingParamsSchema = z.object({
+  contact: z.object({ whatsapp: optionalLine(40), hours: optionalLine(120), crc: optionalLine(40) }),
   emails: z.object({ fiscal: email, personnel: email, accounting: email }),
-  deadlines: z.object({
-    documentsDay: day,
-    payrollVariablesDay: day,
-    admissionBusinessDays: z.int().min(1, { message: 'De 1 a 30 dias' }).max(30, { message: 'De 1 a 30 dias' }),
-    vacationDaysBefore: z.int().min(1, { message: 'De 1 a 60 dias' }).max(60, { message: 'De 1 a 60 dias' }),
+  subjects: z.object({
+    statements: subject,
+    invoices: subject,
+    payrollVariables: subject,
+    admission: subject,
+    vacation: subject,
+    termination: subject,
+  }),
+  deadlines: z
+    .object({
+      documentsDay: day,
+      cardsDay: day,
+      cardsDepartment: z.enum(ONBOARDING_DEPARTMENTS, { message: 'Escolha o departamento' }),
+      payrollVariablesDay: day,
+      proLaboreDay: day,
+      admissionBusinessDays: range(0, 30, 'dias úteis'),
+      vacationDaysBefore: range(0, 60, 'dias'),
+      defisDay: day,
+      defisMonth: z.int({ message: 'Informe o mês' }).min(1, { message: 'Mês de 1 a 12' }).max(12, { message: 'Mês de 1 a 12' }),
+      linkDays: range(1, MAX_ONBOARDING_LINK_DAYS, 'dias'),
+    })
+    .refine((d) => d.defisDay <= (MONTH_DAYS[d.defisMonth - 1] ?? 31), { message: 'Data inexistente', path: ['defisDay'] }),
+  rules: z.object({
+    admissionExamByClient: z.boolean(),
+    terminationRequestFirst: z.boolean(),
+    unionAssistance: z.boolean(),
+    payrollAdvance: z.boolean(),
   }),
 });
 
@@ -210,7 +294,7 @@ const hiddenSchema = z
 
 /** PUT /onboarding/template: replaces what the office saved (send everything; texts only where they differ). */
 export const onboardingTemplateInputSchema = z.object({
-  office: onboardingOfficeSchema,
+  params: onboardingParamsSchema,
   texts: textsSchema,
   hidden: hiddenSchema,
 });
@@ -319,14 +403,20 @@ export interface OnboardingDocument {
     union: string | null;
   };
   office: {
+    /** From the office registry (trade name, else legal name), else "Efficio Contabilidade". */
     name: string;
-    /** `data:image/...;base64,…` or null. */
+    /** The office registry's logo (Configurações › Escritório), `data:image/...;base64,…`, or null (the deck shows the Efficio wordmark). */
     logo: string | null;
-    whatsapp: string | null;
+    /** Registry phone, e-mail, site and address. */
+    phone: string | null;
     email: string | null;
+    website: string | null;
+    address: string | null;
+    /** Onboarding parameters. */
+    whatsapp: string | null;
     hours: string | null;
     crc: string | null;
-    emails: OnboardingOfficeData['emails'];
+    emails: OnboardingParams['emails'];
   };
   slides: OnboardingSlide[];
   /** Rows of every area (the obligation slides carry fiscal/accounting/personnel; `other` goes on the fiscal slide). */
@@ -336,8 +426,8 @@ export interface OnboardingDocument {
 }
 
 export interface OnboardingTemplateResponse {
-  /** Effective office data (factory values where nothing was saved). */
-  office: OnboardingOfficeData;
+  /** Effective parameters (factory values where nothing was saved). */
+  params: OnboardingParams;
   /** Only the texts the office changed. */
   texts: Record<string, string>;
   hidden: string[];
