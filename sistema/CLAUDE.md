@@ -32,6 +32,9 @@ Mapa detalhado (módulos, fluxo de uma requisição, armadilhas e onde mexer par
 - `ui-saas-designer` — tokens, componentes e revisão visual (estilo Graniq em azul-marinho).
 - `especialista-escritorio-contabil` — produto e domínio contábil: rotina do escritório, legislação e
   prazos, concorrentes e priorização do roteiro (só analisa; não edita código).
+- `especialista-onboarding-cliente` — conteúdo do onboarding do cliente: obrigações por regime, prazos
+  legais e internos, DP/eSocial, CCT e multas, em linguagem simples.
+- `designer-apresentacoes` — diagramação de apresentações/onboarding em slides 16:9, celular e PDF.
 
 Segurança (auditoria + correção com teste de regressão, um por linguagem/camada):
 
