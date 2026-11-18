@@ -28,5 +28,25 @@ registra data e hora de cada acesso. Esboço aprovado para discussão (prints no
 - Registro: cada abertura grava data/hora, aparelho (celular/computador) e IP truncado; "Confirmar leitura"
   grava nome informado e data/hora. Entra no registro de auditoria.
 
-## Decisões pendentes (perguntas ao dono)
-Ver a mensagem do chat de 17/11/2026; respostas serão anotadas aqui antes de implementar.
+## Decisões do dono (18/11/2026)
+- **Visual**: variação B (roxo moderno) — `docs/onboarding-esboco/slides-b.html`.
+- Notas fiscais e extratos: até o **dia 10** do mês seguinte.
+- Variáveis da folha (faltas, horas extras, comissões): até o **dia 1º** do mês seguinte; sem adiantamento.
+- Admissão: dados **3 dias úteis** antes; o **cliente** agenda o exame admissional.
+- Férias: o cliente pede ao escritório **5 dias antes** da saída do empregado (o aviso ao empregado continua
+  sendo de 30 dias por lei, art. 135; pagamento até 2 dias antes, art. 145).
+- Rescisão: o cliente **solicita ao escritório antes de comunicar** o empregado; o escritório faz a
+  homologação/assistência sindical quando a CCT exige.
+- Canal de documentos: **sempre e-mail** — fiscal@efficio.com.br, pessoal@efficio.com.br,
+  contabilidade@efficio.com.br — com assunto padrão `Extratos bancários 10/2026 | EMPRESA` e
+  `Registro de empregado | EMPRESA`.
+- Equipe: só o departamento (sem nomes), com o WhatsApp do escritório. Dados do escritório (WhatsApp,
+  e-mail, horário, CRC, logo) ainda a informar: ficam editáveis no modelo.
+- Multa do sindicato: texto **genérico**.
+- **Modelo único** editável pelo escritório, com ajuste por cliente.
+- Mostrar **todas** as seções mesmo sem empregados (o cliente pode registrar no futuro).
+- Envio: contatos do cadastro do cliente (e-mail e WhatsApp).
+- Link válido por **30 dias**, com **download em PDF**; reenviar gera link novo.
+- "Confirmar leitura" pede **nome e CPF**.
+- Registrar data, hora, aparelho e cidade aproximada de cada acesso; citar na política de privacidade.
+- O link mostra **sempre a versão atual**, com a data de atualização.
