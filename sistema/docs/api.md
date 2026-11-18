@@ -2085,3 +2085,84 @@ Revisão de segurança das fases 2 e 3, reexecutável e compatível com o PGlite
   (`clients`).
 - O demo do navegador só ganha os dados da fase 3 num banco novo: o marcador `SEED_VERSION` de
   `apps/web/src/demo/server.ts` precisa subir para reaplicar o seed em quem já tem o demo.
+
+## Onboarding do cliente (migração 0025)
+
+Projeto: `docs/onboarding-cliente.md`; conteúdo de fábrica: `packages/shared/src/onboarding-template.ts`
+(18 slides do `conteudo.md`, por bloco, com `when: { regimes?, notRegimes?, employees?: 'some'|'none' }`
+no lugar das marcações `[se …]`); montagem pura e testável: `buildOnboardingDocument`
+(`packages/shared/src/utils/onboarding.ts`), usada pela API, pelo demo e pela prévia do web.
+
+| Rota | Permissão | O quê |
+|---|---|---|
+| `GET /onboarding/template` | membro | Dados do escritório efetivos (fábrica onde nada foi salvo), textos alterados, itens ocultos |
+| `PUT /onboarding/template` | `office` | Substitui `{ office, texts, hidden }`; textos iguais aos de fábrica não são gravados |
+| `GET /clients/:id/onboarding/document` | membro | "Ver onboarding": o documento atual (não registra acesso) |
+| `GET/PUT /clients/:id/onboarding/overrides` | `office` | Ajuste do cliente `{ texts, hidden, employees }`; vazio remove |
+| `POST /clients/:id/onboarding/links` | `clients` | `{ channel: 'whatsapp'\|'email', contact?: 'company'\|'responsible', to? }` → 201 `OnboardingLinkCreated` |
+| `DELETE /clients/:id/onboarding/links/:linkId` | `clients` | Revoga (204; idempotente) |
+| `GET /clients/:id/onboarding` | membro | Histórico: links, acessos (lista dos 200 mais recentes + contagem, primeiro/último), confirmação |
+| `GET /public/onboarding/:token` | sem sessão | Documento + `expiresAt` + `confirmedAt`; registra o acesso |
+| `POST /public/onboarding/:token/confirm` | sem sessão | `{ name, cpf }` → `{ confirmedAt }`; 409 se o link já foi confirmado |
+
+- **Modelo do escritório** (`onboarding_templates`, um por espaço): `office` (`name` — nulo usa o nome do
+  Escritório, senão "Efficio Contabilidade" —, `whatsapp`, `email`, `hours`, `crc`, `emails.fiscal/
+  personnel/accounting`, `deadlines.documentsDay` 10, `payrollVariablesDay` 1, `admissionBusinessDays` 3,
+  `vacationDaysBefore` 5), `texts` (chave → texto; chaves em `onboardingTextKeys()`: `<slide>.title`,
+  `<slide>.kicker`, `<slide>.subtitle.<id>`, `<slide>.items.<id>.label|text|detail|code`,
+  `obligations.<catalogKey>.deadline|need`, `obligations.default.need`) e `hidden`
+  (`onboardingHideableKeys()`: `<slide>.items.<id>` e `obligations.<catalogKey>`). Chave desconhecida = 400.
+  Salvar exige `office` porque o modelo carrega a identidade do escritório (WhatsApp, e-mails, CRC) e vai
+  para todos os clientes, como o modelo de contrato; `registry` é dos cadastros da Gestão.
+- **Ajuste do cliente** (`onboarding_client_overrides`): `texts` sobrescrevem o modelo só para ele,
+  `hidden` soma ao do modelo, `employees` substitui o número de empregados.
+- **Montagem** (a cada leitura, sempre a versão atual): fábrica ← modelo ← ajuste; marcadores `{{…}}`
+  (`ONBOARDING_PLACEHOLDERS`); campo sem valor vira "—" e entra em `missing` (ex. `escritorio.whatsapp`).
+  As tabelas dos slides Fiscal, Contábil e Pessoal recebem as **tarefas recorrentes do cadastro que valem
+  para o cliente** — a mesma regra das ocorrências (`appliesTo`: regime ou cliente escolhido, menos as
+  exceções; não internas, não encerradas antes da competência atual) —, na ordem do catálogo, com prazo
+  legal e "o que precisamos de você" de `ONBOARDING_OBLIGATION_TEXTS` (por `catalog_key`; fora do
+  catálogo: prazo descrito a partir da agenda e o texto `obligations.default.need`), seguidas das linhas
+  fixas do modelo (pró-labore, balanço, maquininhas…). Área pelo nome do departamento
+  (`matchSuggestedDepartment`), senão pelo catálogo; departamento não reconhecido = `other`, mostrado na
+  tabela do slide Fiscal. Empregados: o ajuste, senão o "+ Empregados" da última competência de
+  honorários gerada (0 sem ele). Sindicato: os sindicatos ativos do cliente (sigla ou nome), senão
+  "convenção coletiva da sua categoria". `updatedAt` = o mais recente entre versão de fábrica, modelo,
+  ajuste, cadastro do cliente (`contacts.updated_at`, nova), escritório, sindicatos e vínculo, exceções/
+  inclusões das recorrentes, recorrentes que valem e cobrança de empregados.
+- **Links** (`onboarding_links`): token de 32 bytes aleatórios (base64url, 43 caracteres); no banco só o
+  SHA-256 (`token_hash`, único). Validade de 30 dias (`ONBOARDING_LINK_DAYS`, relógio real). Destinatário
+  do cadastro (`company`: telefone/e-mail da empresa; `responsible`: do responsável) ou digitado (`to`);
+  nome e destino **cifrados**; quem enviou e quando. **Reenviar cria um link novo e não revoga os
+  anteriores**: cada um vale até expirar ou ser revogado (o histórico mostra todos). A resposta traz
+  `path` (`/o/<token>`, relativo à origem do web), `url` (`APP_URL` + path; no demo com `#`), `to`
+  (WhatsApp: dígitos com 55 para `wa.me/<to>`; e-mail: o endereço), `recipientName` e `message` (texto
+  pronto com a URL). O token só aparece nessa resposta.
+- **Página pública**: o espaço é achado pelo hash numa transação curta como `effinance_app` sem espaço e
+  com `app.onboarding_token` = hash; a política `onboarding_links_public_token` (só SELECT, só esse papel)
+  mostra apenas a linha desse hash — sem tabela de identidade, sem grant novo ao login da API e sem
+  SECURITY DEFINER (o dono é NOBYPASSRLS com RLS forçado). O resto roda na transação de tenant do espaço.
+  Token inexistente, malformado, expirado ou revogado: o mesmo 404 `not_found` "Link inválido ou expirado.
+  Peça um novo link ao escritório.". Limite por IP: 30/min na leitura e 10/min na confirmação (429).
+  Cabeçalhos: `Cache-Control: no-store`, `X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: no-referrer`
+  (inclusive em erros). O documento não tem senhas, honorários, documentos, CPFs, telefones ou e-mails do
+  cadastro (só os do escritório).
+- **Acessos** (`onboarding_accesses`): data/hora, aparelho (`mobile|tablet|desktop|unknown`), navegador e
+  sistema resumidos do user-agent (o texto completo não é gravado), IP truncado (/24 ou /48, `189.6.12.x`);
+  `city` sempre nulo por enquanto. O mesmo visitante (IP truncado + aparelho + navegador) em 30 minutos
+  conta uma vez; no máximo 1.000 acessos por link.
+- **Confirmação**: nome (3–120) e CPF válido; nome e CPF **cifrados**, IP truncado; uma por link. No
+  histórico o CPF sai mascarado (`•••.982.247-••`).
+- **Auditoria** (depois do COMMIT; sem textos, nomes ou CPF): `onboarding.template_updated`,
+  `onboarding.overrides_updated`, `onboarding.link_created` (`linkId`, `channel`, `contact`),
+  `onboarding.link_revoked`, `onboarding.confirmed` (sem usuário; `linkId`).
+- **Banco**: quatro tabelas de tenant (RLS ENABLE + FORCE, FKs compostas, cliente por
+  `(workspace_id, client_id, client_kind)` com cascata); nomes de autores viram "Usuário excluído" na
+  exclusão da conta; `contacts.updated_at` (nula nas linhas antigas = `created_at`) mantida por gatilho
+  quando nome, fantasia, CNPJ, regime, início do contrato ou situação mudam.
+- **Demo**: as rotas públicas entram por `publicRoutes` (`src/routes.ts`), registradas também em
+  `apps/web/src/demo/server.ts`; o seed (`db/demo-seed-onboarding.ts`) preenche os dados do escritório
+  no modelo e cria um link da Padaria Pão Quente por WhatsApp com 3 acessos e leitura confirmada, de
+  token fixo e público (`demoOnboardingToken()`).
+- **Lacunas**: cidade aproximada do acesso; PDF (gerado no web); envio automático (o sistema só monta a
+  mensagem/`wa.me`); o link antigo não pode ser exibido de novo (só o hash existe).

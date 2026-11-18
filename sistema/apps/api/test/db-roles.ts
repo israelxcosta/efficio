@@ -79,4 +79,9 @@ export const TENANT_TABLES = [
   'fee_adjustment_items',
   // Catalog items an office removed from a regime's group (migration 0023).
   'regime_group_exclusions',
+  // Client onboarding (migration 0025).
+  'onboarding_templates',
+  'onboarding_client_overrides',
+  'onboarding_links',
+  'onboarding_accesses',
 ] as const;

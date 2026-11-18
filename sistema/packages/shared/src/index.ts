@@ -21,3 +21,6 @@ export * from './utils/contract';
 export * from './contract-template';
 export * from './contract-watermark';
 export * from './regime-groups';
+export * from './onboarding';
+export * from './onboarding-template';
+export * from './utils/onboarding';

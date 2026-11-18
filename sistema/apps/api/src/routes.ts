@@ -3,6 +3,7 @@ import { accountRoutes } from './modules/accounts/routes';
 import { clientRecordRoutes } from './modules/client-records/routes';
 import { deadlineRoutes } from './modules/deadlines/routes';
 import { officeRoutes } from './modules/office/routes';
+import { clientOnboardingRoutes, onboardingTemplateRoutes, publicOnboardingRoutes } from './modules/onboarding/routes';
 import { profileRoutes } from './modules/profile/routes';
 import { unionRoutes } from './modules/unions/routes';
 import { categoryRoutes } from './modules/categories/routes';
@@ -62,4 +63,15 @@ export const scopedRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] =
   { prefix: '/office', plugin: officeRoutes },
   { prefix: '/clients', plugin: clientRecordRoutes },
   { prefix: '/profile', plugin: profileRoutes },
+  // Client onboarding: the template (`office` to save) and, per client, preview, adjustment, links, history.
+  { prefix: '/onboarding', plugin: onboardingTemplateRoutes },
+  { prefix: '/clients', plugin: clientOnboardingRoutes },
+];
+
+/**
+ * Public routes without a session (the secret token in the path is the credential), mounted under `/api`
+ * by the server and by the browser demo: the client onboarding page (`/o/<token>` on the web).
+ */
+export const publicRoutes: { prefix: string; plugin: FastifyPluginAsyncZod }[] = [
+  { prefix: '/public/onboarding', plugin: publicOnboardingRoutes },
 ];

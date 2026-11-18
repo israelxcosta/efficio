@@ -54,11 +54,14 @@ const OPEN_MODULES = new Set([
   'deadlines',
   'office',
   'profile',
+  // Client onboarding: template (`office` to save), public page (no session).
+  'onboarding',
+  'public',
 ]);
 /** Financial routes inside open modules (the fee periods, the contract of a client and its issues). */
 const FINANCE_ROUTES_IN_OPEN_MODULES = [/^\/api\/clients\/:id\/fees(\/|$)/, /^\/api\/clients\/:id\/contract(\/|$)/];
 /** Public, authenticated by the secret in the path (never by a session). */
-const PUBLIC_ROUTES = [/^\/api\/open-finance\/webhooks\//];
+const PUBLIC_ROUTES = [/^\/api\/open-finance\/webhooks\//, /^\/api\/public\//];
 
 interface Route {
   method: string;

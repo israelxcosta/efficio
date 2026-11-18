@@ -4,6 +4,7 @@ import { addMonthKey, addMonths, adjustToBusinessDay, BILLING_ENABLED, daysInMon
 import { demoFetch } from './fetch';
 import { DEMO_LOGIN } from '@/lib/demo';
 import { DEMO_EMAIL, DEMO_PASSWORD, getDemoServer } from './server';
+import { demoOnboardingToken } from '@api/db/demo-seed-onboarding';
 
 async function call(method: string, path: string, body?: unknown) {
   const res = await demoFetch(`/api${path}`, { method, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -504,5 +505,36 @@ describe('demo api (PGlite)', () => {
     expect([...raw.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     expect(new TextDecoder().decode(raw.slice(3)).startsWith('Tarefa;Tipo;')).toBe(true);
     expect((await call('POST', '/auth/logout')).status).toBe(204);
+  });
+
+  it('runs the client onboarding: preview, history of the seeded link, public page and confirmation', async () => {
+    expect((await call('POST', '/auth/login', { email: DEMO_EMAIL, password: DEMO_PASSWORD })).status).toBe(200);
+    await switchTo(OFFICE);
+    const clients = (await call('GET', '/clients?search=Pão Quente')).body;
+    const padaria = (clients.items ?? clients).find((c: { tradeName: string }) => c.tradeName === 'Pão Quente');
+    const history = await call('GET', `/clients/${padaria.id}/onboarding`);
+    expect(history.status).toBe(200);
+    expect(history.body.links).toHaveLength(1);
+    expect(history.body.accesses.count).toBe(3);
+    expect(history.body.confirmation).toMatchObject({ name: 'Marina Albuquerque', cpf: '•••.982.247-••' });
+    const preview = await call('GET', `/clients/${padaria.id}/onboarding/document`);
+    expect(preview.body.slides).toHaveLength(18);
+    expect(preview.body.missing).toEqual([]);
+    // The seeded example link opens publicly (fixed demo token).
+    const seeded = await call('GET', `/public/onboarding/${await demoOnboardingToken()}`);
+    expect(seeded.status).toBe(200);
+    expect(seeded.body.confirmedAt).toBeTruthy();
+
+    const created = await call('POST', `/clients/${padaria.id}/onboarding/links`, { channel: 'whatsapp', contact: 'responsible' });
+    expect(created.status).toBe(201);
+    expect(created.body.url).toContain('#/o/');
+    const token = created.body.path.replace('/o/', '');
+    const opened = await call('GET', `/public/onboarding/${token}`);
+    expect(opened.status).toBe(200);
+    expect(opened.body.document.client.name).toBe('Padaria Pão Quente Ltda');
+    expect((await call('POST', `/public/onboarding/${token}/confirm`, { name: 'Marina Albuquerque', cpf: '529.982.247-25' })).status).toBe(200);
+    expect((await call('GET', `/public/onboarding/${'Z'.repeat(43)}`)).status).toBe(404);
+    expect((await call('DELETE', `/clients/${padaria.id}/onboarding/links/${created.body.id}`)).status).toBe(204);
+    expect((await call('GET', `/public/onboarding/${token}`)).status).toBe(404);
   });
 });

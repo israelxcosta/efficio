@@ -28,7 +28,7 @@ import { openFinanceWebhookRoutes } from './modules/open-finance/routes';
 import { settleOpenFinanceJobs } from './modules/open-finance/webhooks';
 import { isMutation } from './modules/workspaces/access';
 import { inviteRoutes, workspaceRoutes } from './modules/workspaces/routes';
-import { domainRoutes, scopedRoutes } from './routes';
+import { domainRoutes, publicRoutes, scopedRoutes } from './routes';
 import { createKeyProvider, createPlatform } from './setup';
 
 declare module 'fastify' {
@@ -232,6 +232,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
       for (const { prefix, plugin } of scopedRoutes) await api.register(plugin, { prefix });
       // Public: authenticated by the secret in the path (never by a session).
       await api.register(openFinanceWebhookRoutes, { prefix: '/open-finance/webhooks' });
+      for (const { prefix, plugin } of publicRoutes) await api.register(plugin, { prefix });
     },
     { prefix: '/api' },
   );

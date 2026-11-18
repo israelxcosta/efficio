@@ -242,10 +242,27 @@ describe('catalog: row level security and privileges', () => {
     for (const name of TENANT_TABLES) {
       const t = tables.find((x) => x.name === name);
       expect(t, name).toMatchObject({ rls: true, force: true, has_ws: true });
-      const policies = await rows<{ cmd: string; permissive: boolean; qual: string; check: string }>(sql`
-        select polcmd as cmd, polpermissive as permissive,
-               pg_get_expr(polqual, polrelid) as qual, pg_get_expr(polwithcheck, polrelid) as check
+      const all = await rows<{ name: string; cmd: string; permissive: boolean; qual: string; check: string; roles: string }>(sql`
+        select polname as name, polcmd as cmd, polpermissive as permissive,
+               pg_get_expr(polqual, polrelid) as qual, pg_get_expr(polwithcheck, polrelid) as check,
+               (select string_agg(rolname, ',') from pg_roles where oid = any(polroles)) as roles
           from pg_policy where polrelid = ${`public.${name}`}::regclass`);
+      // The one exception (migration 0025): the public onboarding page finds its link by the token's hash,
+      // read-only, for the tenant role, only with the transaction setting that route alone sets.
+      const extra = all.filter((p) => p.name === 'onboarding_links_public_token');
+      if (name === 'onboarding_links') {
+        expect(extra).toEqual([
+          {
+            name: 'onboarding_links_public_token',
+            cmd: 'r',
+            permissive: true,
+            qual: "(token_hash = NULLIF(current_setting('app.onboarding_token'::text, true), ''::text))",
+            check: null,
+            roles: 'effinance_app',
+          },
+        ]);
+      }
+      const policies = all.filter((p) => !extra.includes(p));
       expect(policies, name).toHaveLength(1);
       const [p] = policies;
       expect(p!.cmd).toBe('*');

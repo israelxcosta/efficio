@@ -63,6 +63,11 @@ import type {
   TransactionType,
   TransferKind,
   WorkspaceKind,
+  OnboardingAccessView,
+  OnboardingContact,
+  OnboardingLinkChannel,
+  OnboardingOverridesStored,
+  OnboardingTemplateStored,
 } from '@effinance/shared';
 
 const id = () => uuid().primaryKey().defaultRandom();
@@ -510,6 +515,12 @@ export const contacts = pgTable(
     /** Encrypted: the office's password in this client's portals. */
     accountantPassword: text(),
     createdAt: createdAt(),
+    /**
+     * Migration 0025: last change of what the client onboarding shows (name, trade name, CNPJ, regime,
+     * contract start, status), kept by the trigger `contacts_touch_updated_at` (not by the app). Null on
+     * rows older than 0025 (read as `created_at`).
+     */
+    updatedAt: timestamptz().defaultNow(),
   },
   (t) => [
     index('contacts_workspace_idx').on(t.workspaceId, t.name),
@@ -2260,6 +2271,163 @@ export const userPhotos = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Client onboarding (migration 0025, docs/onboarding-cliente.md). Tenant tables (RLS, composite keys).
+// The public page finds its link by the SHA-256 of the token through a second, SELECT-only policy of
+// `onboarding_links` (`onboarding_links_public_token`, in the SQL file): the tenant role sees the one row
+// whose hash equals `app.onboarding_token`, set only by that route.
+// ---------------------------------------------------------------------------
+
+/** The office's onboarding template (one per workspace): what differs from the factory content. */
+export const onboardingTemplates = pgTable(
+  'onboarding_templates',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    content: jsonb().$type<OnboardingTemplateStored>().notNull(),
+    updatedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    updatedByName: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('onboarding_templates', t),
+    uniqueIndex('onboarding_templates_workspace_uq').on(t.workspaceId),
+    index('onboarding_templates_updated_by_idx').on(t.updatedBy).where(sql`${t.updatedBy} is not null`),
+    check('onboarding_templates_content_chk', sql`jsonb_typeof(${t.content}) = 'object' and length(${t.content}::text) <= 400000`),
+    check('onboarding_templates_name_chk', sql`length(${t.updatedByName}) between 1 and 120`),
+  ],
+);
+
+/** A client's adjustment of the onboarding (texts, hidden items, number of employees). */
+export const onboardingClientOverrides = pgTable(
+  'onboarding_client_overrides',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    clientId: uuid().notNull(),
+    clientKind: text()
+      .$type<'client'>()
+      .generatedAlwaysAs(sql`'client'`),
+    content: jsonb().$type<OnboardingOverridesStored>().notNull(),
+    updatedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    updatedByName: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    tenantUnique('onboarding_client_overrides', t),
+    uniqueIndex('onboarding_client_overrides_client_uq').on(t.workspaceId, t.clientId),
+    index('onboarding_client_overrides_updated_by_idx').on(t.updatedBy).where(sql`${t.updatedBy} is not null`),
+    check('onboarding_client_overrides_content_chk', sql`jsonb_typeof(${t.content}) = 'object' and length(${t.content}::text) <= 400000`),
+    check('onboarding_client_overrides_name_chk', sql`length(${t.updatedByName}) between 1 and 120`),
+    foreignKey({
+      name: 'onboarding_client_overrides_client_fk',
+      columns: [t.workspaceId, t.clientId, t.clientKind],
+      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
+    }).onDelete('cascade'),
+  ],
+);
+
+/**
+ * A link sent to the client (valid 30 days). The token is never stored, only its SHA-256. Recipient and
+ * confirmation (name, CPF) are encrypted with the workspace key.
+ */
+export const onboardingLinks = pgTable(
+  'onboarding_links',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    clientId: uuid().notNull(),
+    clientKind: text()
+      .$type<'client'>()
+      .generatedAlwaysAs(sql`'client'`),
+    /** SHA-256 (hex) of the token in the public URL. */
+    tokenHash: text().notNull(),
+    channel: text().$type<OnboardingLinkChannel>().notNull(),
+    /** Which contact of the registry (`company`/`responsible`), null when typed. */
+    recipientContact: text().$type<OnboardingContact>(),
+    /** Encrypted. */
+    recipientName: text(),
+    /** Encrypted: phone digits (WhatsApp) or e-mail. */
+    recipientTo: text().notNull(),
+    createdBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    createdByName: text().notNull(),
+    createdAt: createdAt(),
+    expiresAt: timestamptz().notNull(),
+    revokedAt: timestamptz(),
+    revokedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    revokedByName: text(),
+    confirmedAt: timestamptz(),
+    /** Encrypted. */
+    confirmedName: text(),
+    /** Encrypted (digits). */
+    confirmedCpf: text(),
+    /** Truncated (/24 or /48). */
+    confirmedIp: text(),
+  },
+  (t) => [
+    tenantUnique('onboarding_links', t),
+    uniqueIndex('onboarding_links_token_hash_uq').on(t.tokenHash),
+    check('onboarding_links_token_hash_chk', sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    index('onboarding_links_client_idx').on(t.workspaceId, t.clientId, t.createdAt),
+    index('onboarding_links_created_by_idx').on(t.createdBy).where(sql`${t.createdBy} is not null`),
+    index('onboarding_links_revoked_by_idx').on(t.revokedBy).where(sql`${t.revokedBy} is not null`),
+    check('onboarding_links_channel_chk', sql`${t.channel} in ('whatsapp', 'email')`),
+    check('onboarding_links_contact_chk', sql`${t.recipientContact} in ('company', 'responsible')`),
+    check('onboarding_links_expiry_chk', sql`${t.expiresAt} > ${t.createdAt}`),
+    check(
+      'onboarding_links_names_chk',
+      sql`length(${t.createdByName}) between 1 and 120 and length(${t.revokedByName}) between 1 and 120 and (${t.revokedAt} is not null or ${t.revokedByName} is null)`,
+    ),
+    check(
+      'onboarding_links_confirmation_chk',
+      sql`(${t.confirmedAt} is null) = (${t.confirmedName} is null) and (${t.confirmedAt} is null) = (${t.confirmedCpf} is null) and length(${t.confirmedIp}) <= 60`,
+    ),
+    encryptedCheck('onboarding_links_recipient_name_chk', t.recipientName, 2000),
+    encryptedCheck('onboarding_links_recipient_to_chk', t.recipientTo, 2000),
+    encryptedCheck('onboarding_links_confirmed_name_chk', t.confirmedName, 2000),
+    encryptedCheck('onboarding_links_confirmed_cpf_chk', t.confirmedCpf, 2000),
+    foreignKey({
+      name: 'onboarding_links_client_fk',
+      columns: [t.workspaceId, t.clientId, t.clientKind],
+      foreignColumns: [contacts.workspaceId, contacts.id, contacts.kind],
+    }).onDelete('cascade'),
+  ],
+);
+
+/** Each opening of a link: when, device/browser (from the user agent) and the truncated IP. */
+export const onboardingAccesses = pgTable(
+  'onboarding_accesses',
+  {
+    id: id(),
+    workspaceId: workspaceRef().notNull(),
+    linkId: uuid().notNull(),
+    accessedAt: timestamptz().notNull().defaultNow(),
+    device: text().$type<OnboardingAccessView['device']>().notNull(),
+    browser: text(),
+    os: text(),
+    /** Truncated (/24 or /48), e.g. `189.6.12.x`. */
+    ip: text(),
+    /** Approximate city: not collected yet. */
+    city: text(),
+  },
+  (t) => [
+    tenantUnique('onboarding_accesses', t),
+    index('onboarding_accesses_link_idx').on(t.workspaceId, t.linkId, t.accessedAt),
+    check('onboarding_accesses_device_chk', sql`${t.device} in ('mobile', 'tablet', 'desktop', 'unknown')`),
+    check(
+      'onboarding_accesses_lengths_chk',
+      sql`length(${t.browser}) <= 40 and length(${t.os}) <= 40 and length(${t.ip}) <= 60 and length(${t.city}) <= 120`,
+    ),
+    foreignKey({
+      name: 'onboarding_accesses_link_fk',
+      columns: [t.workspaceId, t.linkId],
+      foreignColumns: [onboardingLinks.workspaceId, onboardingLinks.id],
+    }).onDelete('cascade'),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type CategoryRow = typeof categories.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
@@ -2290,3 +2458,4 @@ export type ClientDocumentRow = typeof clientDocuments.$inferSelect;
 export type UnionRow = typeof unions.$inferSelect;
 export type UnionConventionRow = typeof unionConventions.$inferSelect;
 export type OfficeRow = typeof offices.$inferSelect;
+export type OnboardingLinkRow = typeof onboardingLinks.$inferSelect;

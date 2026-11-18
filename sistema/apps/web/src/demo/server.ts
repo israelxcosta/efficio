@@ -21,7 +21,7 @@ import { BrasilApiCnpjProvider } from '@api/modules/clients/providers/brasilapi'
 import { FakeOpenFinanceProvider } from '@api/modules/open-finance/providers/fake';
 import { loadAccess } from '@api/modules/workspaces/access';
 import { inviteRoutes, workspaceRoutes } from '@api/modules/workspaces/routes';
-import { domainRoutes, scopedRoutes } from '@api/routes';
+import { domainRoutes, publicRoutes, scopedRoutes } from '@api/routes';
 import { demoAuthRoutes } from './auth-routes';
 import { DemoRouter, type DemoReply, type DemoRequest } from './fake-fastify';
 import { getSession, setSession } from './session';
@@ -31,7 +31,7 @@ export { DEMO_EMAIL, DEMO_PASSWORD };
 const DATA_DIR = 'idb://effinance-demo';
 const IDB_NAME = '/pglite/effinance-demo';
 /** Bump to reseed browsers that hold demo data from an older version. */
-const SEED_VERSION = 'seed:office-v10-dctfweb';
+const SEED_VERSION = 'seed:office-v11-onboarding';
 
 // Drizzle migrations, applied in order and tracked in a local table.
 const migrations = import.meta.glob('../../../api/drizzle/*.sql', {
@@ -153,6 +153,8 @@ async function boot() {
       await api.register(billingRoutes, { prefix: '/billing' });
       await api.register(tenantRoutes, { routes: domainRoutes });
       for (const { prefix, plugin } of scopedRoutes) await api.register(plugin, { prefix });
+      // Public (no session): the client onboarding page.
+      for (const { prefix, plugin } of publicRoutes) await api.register(plugin, { prefix });
     },
     { prefix: '/api' },
   );
