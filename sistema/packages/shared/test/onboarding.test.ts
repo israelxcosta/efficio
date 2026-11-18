@@ -334,3 +334,12 @@ describe('buildOnboardingDocument', () => {
     expect(maskCpf('52998224725')).toBe('•••.982.247-••');
   });
 });
+
+describe('"Como enviar" with the same e-mail', () => {
+  it('joins invoices and the card-machine report when both go to the Fiscal (default)', () => {
+    const items = slide(build('simples_nacional', 3), 'sending').items;
+    expect(items.find((i) => i.id === 'cards')).toBeUndefined();
+    expect(items.find((i) => i.id === 'fiscal')!.text).toBe('notas fiscais e relatório das maquininhas e PIX');
+    expect(items.filter((i) => i.label === 'fiscal@efficio.com.br')).toHaveLength(1);
+  });
+});

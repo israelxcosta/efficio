@@ -310,6 +310,7 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
         };
       })
       .filter((item) => item.label !== null || item.text !== null || item.detail !== null || item.code !== null);
+    if (slide.key === 'sending') mergeSameAddress(items);
     let table: OnboardingObligationRow[] | null = null;
     if (slide.area) {
       const fixed: OnboardingObligationRow[] = items.map((item) => ({
@@ -375,4 +376,18 @@ export function maskCpf(cpf: string): string {
 /** Message of the WhatsApp/e-mail with the link. */
 export function onboardingMessage(params: { clientName: string; officeName: string; url: string; days: number }): string {
   return `Olá! Este é o onboarding da empresa ${params.clientName} com a ${params.officeName}: como trabalhamos, suas obrigações, prazos e como enviar documentos. Leva uns 10 minutos. No fim, confirme a leitura. O link vale por ${params.days} dias: ${params.url}`;
+}
+
+/**
+ * "Como enviar": when the card-machine report goes to the same e-mail as the invoices (the default, both
+ * to the Fiscal), the two blocks become one ("notas fiscais e relatório das maquininhas e PIX").
+ */
+function mergeSameAddress(items: { id: string; label: string | null; text: string | null }[]): void {
+  const fiscal = items.find((i) => i.id === 'fiscal');
+  const cards = items.findIndex((i) => i.id === 'cards');
+  if (!fiscal || cards < 0) return;
+  const other = items[cards]!;
+  if (!fiscal.label || fiscal.label !== other.label) return;
+  if (other.text) fiscal.text = fiscal.text ? `${fiscal.text} e ${other.text}` : other.text;
+  items.splice(cards, 1);
 }
