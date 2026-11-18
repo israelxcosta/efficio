@@ -121,10 +121,6 @@
   display: flex;
   align-items: center;
   flex: none;
-  background: var(--ob-white);
-  border-radius: 18px;
-  padding: 8px 16px;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--ob-navy) 8%, transparent);
 }
 .ob-logo img {
   display: block;
@@ -132,21 +128,13 @@
   max-width: 300px;
   object-fit: contain;
 }
-.ob-logo-lg {
-  border-radius: 24px;
-  padding: 12px 22px;
-}
 /* The cover's logo needs air above it. */
 .ob-cover .ob-top {
   height: 176px;
 }
 .ob-logo-lg img {
-  height: 84px;
-  max-width: 420px;
-}
-.ob-logo-sm {
-  border-radius: 12px;
-  padding: 5px 10px;
+  height: 104px;
+  max-width: 460px;
 }
 .ob-logo-sm img {
   height: 40px;
@@ -161,8 +149,13 @@
   align-items: center;
   gap: 18px;
 }
-.ob-slide:not(.ob-dk) .ob-foot .ob-logo {
-  box-shadow: 0 0 0 1px var(--ob-p1);
+/* No seal: the logo sits straight on the slide. On the purple slides it turns white (a monochrome
+   silhouette of the office's logo); on the light ones it keeps its own colors. */
+.ob-dk .ob-logo img {
+  filter: brightness(0) invert(1);
+}
+.ob-dk .ob-wordmark {
+  color: var(--ob-white);
 }
 .ob-wordmark {
   display: flex;
@@ -1098,18 +1091,13 @@
   .ob-slide:not(.ob-cover) .ob-top .ob-logo {
     display: flex;
   }
-  .ob-logo,
-  .ob-logo-lg {
-    border-radius: 12px;
-    padding: 5px 10px;
-  }
   .ob-logo img {
     height: 34px;
     max-width: 150px;
   }
   .ob-logo-lg img {
-    height: 52px;
-    max-width: 210px;
+    height: 60px;
+    max-width: 220px;
   }
   .ob-wordmark,
   .ob-logo-lg .ob-wordmark {

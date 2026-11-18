@@ -77,8 +77,8 @@ export function OnboardingDeck({ doc, confirm, className }: OnboardingDeckProps)
 }
 
 /**
- * The office's logo from its registry (Configurações › Escritório), in a white rounded seal (readable
- * on the purple slides). Without one, the Efficio wordmark of the system (never a generic placeholder).
+ * The office's logo from its registry (Configurações › Escritório), straight on the slide (white on the
+ * purple slides, its own colors on the light ones). Without one, the Efficio wordmark of the system (never a generic placeholder).
  */
 export function Logo({ doc, size = 'md' }: { doc: OnboardingDocument; size?: 'lg' | 'md' | 'sm' }) {
   const logo = safeLogo(doc.office.logo);

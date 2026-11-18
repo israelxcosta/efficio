@@ -216,7 +216,7 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
       },
       { id: 'real-fiscal', label: '4 · Fiscal', text: 'PIS/COFINS, IRPJ/CSLL por estimativa, DCTFWeb e EFD-Contribuições', when: when(REAL) },
       { id: 'profit-accounting', label: '3 · Contábil', text: 'balancete mensal, ECD e ECF anuais', when: when(PROFIT) },
-      { id: 'personnel', label: '5 · Pessoal', text: 'folha, eSocial, FGTS, DCTFWeb e obrigações anuais (quando houver empregados)' },
+      { id: 'personnel', label: '5 · Pessoal', text: 'folha, eSocial, FGTS, DCTFWeb e obrigações anuais' },
       {
         id: 'dates',
         label: 'Suas datas no mês',
