@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding · Padaria Pão Quente Ltda · Efficio Contabilidade</title>
+<!-- Variação A · minimalista branco/preto com azul acinzentado e mostarda. Campos do cliente: span.var[data-campo]; linhas condicionais: [data-cond]. Fontes locais: Barlow Condensed (OFL) e Plus Jakarta Sans (OFL). -->
+<style>
+@font-face{font-family:BC;src:url(fonts/barlow-condensed-latin-300-normal.woff2) format('woff2');font-weight:300;font-display:block}@font-face{font-family:BC;src:url(fonts/barlow-condensed-latin-400-normal.woff2) format('woff2');font-weight:400;font-display:block}@font-face{font-family:BC;src:url(fonts/barlow-condensed-latin-600-normal.woff2) format('woff2');font-weight:600;font-display:block}@font-face{font-family:BC;src:url(fonts/barlow-condensed-latin-700-normal.woff2) format('woff2');font-weight:700;font-display:block}@font-face{font-family:BC;src:url(fonts/barlow-condensed-latin-800-normal.woff2) format('woff2');font-weight:800;font-display:block}@font-face{font-family:BC;src:url(fonts/barlow-condensed-latin-900-normal.woff2) format('woff2');font-weight:900;font-display:block}
+@font-face{font-family:PJS;src:url(fonts/plus-jakarta-sans-latin-wght-normal.woff2) format('woff2');font-weight:200 800;font-display:block}
+:root{--ink:#111;--g:#474c55;--bl:#7aa6bf;--bar:#2f6f94;--mu:#f3d488;--line:#8d9096;--red:#cc3333;--navy:#152b61}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#d9dbdf}
+body{font-family:PJS,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+.deck{width:1920px;zoom:var(--z,1)}
+.slide{position:relative;width:1920px;height:1080px;overflow:hidden;background:#fff;padding:104px 260px 120px 120px;margin-bottom:24px}
+ul,ol{list-style:none}
+.d{font-family:BC,sans-serif;font-weight:800;text-transform:uppercase;line-height:.9;letter-spacing:0}
+.cap{font-family:BC,sans-serif;font-weight:300;text-transform:uppercase;letter-spacing:.02em;line-height:1.28;font-size:30px;color:#1d1f23}
+h2.d{font-size:112px}
+strong{white-space:nowrap;font-weight:700;background:linear-gradient(transparent 58%,var(--mu) 58%);padding:0 2px}
+.chev{position:absolute;right:52px;top:480px;width:156px;height:120px}
+.chev text{font:800 34px BC,sans-serif}
+.brand{position:absolute;left:120px;bottom:44px;font:400 19px BC,sans-serif;text-transform:uppercase;letter-spacing:.14em;color:var(--g)}
+.logo{display:flex;align-items:center;gap:12px;font-size:26px;letter-spacing:-.01em}
+.logo svg{width:40px;height:40px}.logo b{font-weight:800;color:var(--navy)}.logo span{color:var(--g)}
+.g2{display:grid;grid-template-columns:620px 1fr;column-gap:100px;align-items:center}
+.lead{margin-top:28px}
+.var{}
+/* quadrados sobrepostos + ícone */
+.sq{position:relative;width:600px;height:640px}
+.sq .b{position:absolute;left:0;top:0;width:410px;height:410px;background:var(--bl)}
+.sq .b span{position:absolute;left:34px;top:30px;font-size:60px}
+.sq .ic{position:absolute;left:120px;top:150px;width:330px;height:330px;fill:none;stroke:var(--ink);stroke-width:22;stroke-linecap:round;color:var(--ink)}
+.sq .ic text{font:800 92px BC,sans-serif;fill:var(--ink);stroke:none}
+.sq .m{position:absolute;left:220px;top:300px;width:340px;height:340px;background:var(--mu);opacity:.85;mix-blend-mode:multiply}
+.sq.alert{width:420px;height:400px;margin-top:56px}
+.sq.alert .b{display:none}.sq.alert .ic{left:0;top:30px;width:300px;height:300px;stroke:var(--red);color:var(--red)}.sq.alert .m{left:150px;top:120px;width:250px;height:250px}
+.duo{position:relative;width:560px;height:460px}
+.duo .b{position:absolute;left:0;top:0;width:420px;height:400px;background:var(--bl)}
+.duo .m{position:absolute;left:280px;top:220px;width:280px;height:240px;background:var(--mu);opacity:.85;mix-blend-mode:multiply}
+.duo.sm{width:360px;height:250px;margin-top:70px}.duo.sm .b{width:220px;height:200px}.duo.sm .m{left:140px;top:100px;width:200px;height:150px}
+/* 1 capa */
+.s1{padding:0;display:grid;grid-template-columns:960px 960px}
+.s1 .l{position:relative;padding:76px 80px 0 120px;display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+.s1 .logo{align-self:flex-start}
+.s1 h1{font-size:200px;line-height:.84;margin-top:46px}
+.s1 .bar{align-self:stretch;height:9px;background:var(--bar);margin:40px -80px 0 -120px;width:auto}
+.s1 .who{font-size:54px;margin-top:40px}
+.s1 ul{margin-top:18px;font-size:29px;line-height:1.36}
+.s1 .art svg{display:block;width:960px;height:1080px}
+/* 2 sumário */
+.s2 .duo{margin-bottom:-170px}
+.s2 .over{position:relative;font-size:150px;margin-left:36px}
+.s2 .cap{margin-top:120px;max-width:560px}
+.sum li{display:grid;grid-template-columns:130px 1fr;align-items:baseline;padding:30px 0;border-top:3px dotted var(--ink)}
+.sum li:last-child{border-bottom:3px dotted var(--ink)}
+.sum .n{font-size:84px}.sum .t{font-size:50px;font-weight:700;line-height:1}
+/* 3 e 13 */
+.s3 h2{font-size:104px}
+.items{margin-top:44px}
+.items li{display:flex;flex-direction:column;gap:6px;padding:16px 0}
+.items b{font-size:40px}.items span{font-size:26px;line-height:1.35;color:#2a2d33}
+.items.sm{margin-top:36px}.items.sm li{padding:12px 0}.items.sm b{font-size:34px}.items.sm span{font-size:24px}
+.s13 .st2{font-size:88px;line-height:.92}
+/* 4 time */
+.s4{padding:0}
+.s4 .left{position:absolute;left:0;top:0;width:960px;height:1080px}
+.s4 .band{position:absolute;left:0;top:290px;width:620px;height:330px;background:var(--bl);display:flex;align-items:flex-end;justify-content:flex-end;padding:0 36px 28px 0}
+.s4 .band h2{font-size:104px;text-align:right}
+.s4 .av-main{position:absolute;left:620px;top:290px;width:330px;height:330px;background:var(--mu);display:grid;place-items:center}
+.s4 .av-main .ic{width:230px;height:230px;fill:none;stroke:var(--ink);stroke-width:18;color:var(--ink)}
+.s4 .lead{position:absolute;left:120px;top:660px;width:440px;margin:0;font-size:28px}
+.s4 .card{position:absolute;left:620px;top:660px;width:330px;display:flex;flex-direction:column;gap:6px;font-size:22px;line-height:1.35}
+.card b{font-size:36px}.card .big{font-size:30px;font-weight:800;margin-top:4px}
+hr{border:0;border-top:2px solid var(--ink);margin:10px 0 6px}
+.depts{position:absolute;left:1060px;top:190px;width:600px;display:flex;flex-direction:column;gap:64px}
+.depts li{display:grid;grid-template-columns:170px 1fr;column-gap:36px;align-items:center}
+.depts .av{width:170px;height:170px;display:grid;place-items:center;font-size:76px}
+.av0{background:var(--bl)}.av1{background:var(--mu)}.av2{background:#23262b;color:#fff}
+.depts b{font-size:44px}.depts span{font-size:23px;line-height:1.35}
+/* 5 números */
+.s5 .cap{margin-top:24px}
+.nums{display:grid;grid-template-columns:repeat(4,1fr);column-gap:28px;margin-top:84px}
+.nums li{display:flex;flex-direction:column;gap:14px;padding:6px 28px 36px;border-left:3px dotted var(--ink)}
+.nums .big{font-size:300px;line-height:.8;font-weight:900}
+.nums b{font-size:42px;margin-top:22px}.nums span:last-child{font-size:24px;line-height:1.35}
+.nums .hl{background:var(--mu);border:0;padding-top:30px}
+/* tabelas */
+.hb{display:flex;align-items:flex-end;gap:56px}
+.blk{background:var(--bl);padding:30px 46px 22px;font-size:96px;flex:none}
+.hb .cap{max-width:780px;padding-bottom:6px}
+.tbl{margin-top:56px}
+.tr{display:grid;grid-template-columns:64px 390px 440px 1fr;column-gap:36px;align-items:baseline;padding:25px 0;border-top:3px dotted var(--ink)}
+.tr:last-child{border-bottom:3px dotted var(--ink)}
+.th{border:0;padding:0 0 12px;font:400 20px BC,sans-serif;text-transform:uppercase;letter-spacing:.14em;color:var(--g)}
+.tr .n{font:800 30px BC,sans-serif}
+.tr .a{font:800 40px/1 BC,sans-serif;text-transform:uppercase}
+.tr .b{font:600 31px/1.15 BC,sans-serif;text-transform:uppercase}
+.tr .c{font-size:26px;line-height:1.35}
+.sub{display:block;font:400 22px BC,sans-serif;font-style:normal;color:var(--g);margin-top:6px}
+.tag{display:inline-block;font:600 18px BC,sans-serif;font-style:normal;letter-spacing:.06em;border:2px solid var(--ink);padding:3px 10px 2px;margin-top:10px}
+.tdocs .tr{grid-template-columns:64px 400px 1fr 300px}
+.tdocs .c{font:800 36px/1 BC,sans-serif;text-transform:uppercase}
+.tdocs .b{font:26px/1.35 PJS,sans-serif;text-transform:none}
+.tes .tr{grid-template-columns:64px 520px 380px 1fr}
+.tes .b{font:600 25px BC,sans-serif;letter-spacing:.04em}
+.tes .c{font:600 29px/1.15 BC,sans-serif;text-transform:uppercase}
+/* 9 linha do tempo */
+.s9 .cap{margin-top:24px}
+.tl{position:relative;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:auto auto;column-gap:24px;row-gap:150px;margin-top:40px}
+.tl::before{content:"";position:absolute;left:0;right:20px;top:calc(50% - 2px);border-top:3px dotted var(--ink)}
+.tl::after{content:"";position:absolute;right:4px;top:calc(50% - 10px);border:9px solid transparent;border-left:16px solid var(--ink)}
+.tl li{position:relative;display:flex;flex-direction:column;gap:12px}
+.tl .up{grid-row:1;justify-content:flex-end}.tl .dn{grid-row:2}
+.tl li::before{content:"";position:absolute;left:40px;height:75px;border-left:3px dotted var(--ink)}
+.tl .up::before{bottom:-75px}.tl .dn::before{top:-75px}
+.tl li::after{content:"";position:absolute;left:34px;width:15px;height:15px;border-radius:50%;background:var(--ink)}
+.tl .up::after{bottom:-83px}.tl .dn::after{top:-83px}
+.tl .dt{font-size:46px}
+.tl .box{border:2px solid var(--line);padding:22px 24px 24px;display:flex;flex-direction:column;gap:10px;height:184px}
+.tl .box b{font-size:31px}.tl .box span{font-size:24px;line-height:1.35}
+.tl .nos .box{background:var(--mu);border-color:var(--mu)}
+/* 11 vertical */
+.s11 h2{font-size:124px}
+.vf{position:relative;padding-left:56px;border-left:3px dotted var(--ink);margin-left:10px}
+.vf li{position:relative;display:flex;flex-direction:column;gap:8px;padding:22px 0}
+.vf li::before{content:"";position:absolute;left:-66px;top:30px;width:17px;height:17px;border-radius:50%;background:var(--ink)}
+.vf::after{content:"";position:absolute;left:-12px;bottom:-14px;border:10px solid transparent;border-top:16px solid var(--ink)}
+.vf b{font-size:40px}.vf span{font-size:25px;line-height:1.35}
+.vf .hl{background:var(--mu);padding:26px 34px;margin:10px 0}
+.vf .hl::before{left:-66px;top:34px}
+/* 12 férias */
+.trio{position:relative;display:grid;grid-template-columns:repeat(3,1fr);column-gap:28px;margin-top:64px;padding-top:34px;border-top:3px dotted var(--ink)}
+.trio::after{content:"";position:absolute;right:-4px;top:-11px;border:9px solid transparent;border-left:16px solid var(--ink)}
+.trio li{display:flex;flex-direction:column;gap:8px;padding:0 28px 28px 0}
+.trio .big{font-size:210px;line-height:.82;font-weight:900}
+.trio b{font-size:40px;margin-top:10px}.trio span:last-child{font-size:24px;line-height:1.35}
+.trio .hl{background:var(--mu);padding:24px 28px 28px}
+.rules{display:grid;grid-template-columns:1fr 1fr;column-gap:28px;margin-top:40px}
+.rules div{border:2px solid var(--line);padding:24px 28px;display:flex;flex-direction:column;gap:8px}
+.rules b{font-size:32px}.rules span{font-size:23px;line-height:1.35}
+.alert{color:var(--red);font-style:normal;font-weight:700}
+/* 15 multas */
+.s15{align-items:start}
+.s15 h2{font-size:150px}
+.mul li{display:grid;grid-template-columns:1fr 290px;column-gap:28px;align-items:center;padding:22px 0;border-top:3px dotted var(--ink)}
+.mul li:last-child{border-bottom:3px dotted var(--ink)}
+.mul li div{display:flex;flex-direction:column;gap:6px}
+.mul b{font-size:34px}.mul span{font-size:22px;line-height:1.35}
+.pen{background:none;padding:0;color:var(--red);font-size:42px;font-weight:800;text-align:right;line-height:1;white-space:nowrap}
+/* 16 checklist */
+.s16 h2{font-size:136px}
+.chk li{border-top:3px dotted var(--ink)}.chk li:last-child{border-bottom:3px dotted var(--ink)}
+.chk label{display:grid;grid-template-columns:52px 1fr;column-gap:26px;align-items:start;padding:26px 0;font-size:25px;line-height:1.35;cursor:pointer}
+.chk input{position:absolute;opacity:0}
+.chk .box{width:44px;height:44px;border:3px solid var(--ink);margin-top:2px}
+.chk input:checked+.box{background:var(--ink)}
+.chk input:focus-visible+.box{outline:3px solid var(--bar);outline-offset:3px}
+.chk b{font-size:34px;margin-right:6px}
+/* 17 fim */
+.s17 .logo{position:absolute;left:120px;top:76px}
+.s17 .band{position:absolute;left:0;top:380px;width:1060px;height:320px;background:var(--bl);display:flex;align-items:center;justify-content:flex-end;padding-right:64px}
+.s17 .band p{font-size:170px}
+.s17 .r{position:absolute;left:1140px;top:240px;width:520px}
+.s17 h2{font-size:124px}
+.btn{margin-top:40px;background:var(--ink);color:#fff;border:0;font-size:34px;padding:22px 40px 20px;cursor:pointer}
+.btn:focus-visible{outline:4px solid var(--bar);outline-offset:4px}
+.ct{font-size:22px;line-height:1.4;margin-top:16px}.ct+.ct{margin-top:4px}
+.sig{font-size:22px;margin-top:40px;color:var(--g)}
+/* celular */
+@media (max-width:760px){
+  html{background:#fff}
+  .deck{width:auto;zoom:1!important}
+  .slide{width:auto;height:auto;padding:48px 22px 44px;margin:0;border-bottom:1px solid #e3e4e7}
+  .slide>*{position:static!important}
+  .g2,.s1,.s15{display:block}
+  .chev{position:absolute!important;right:14px;top:16px;width:52px;height:40px}
+  .brand{display:none}
+  .d{line-height:.92}h2.d,.s3 h2,.s11 h2,.s16 h2,.s15 h2{font-size:46px}
+  .cap{font-size:17px}.lead{margin-top:14px}
+  .logo{font-size:16px;gap:8px}.logo svg{width:26px;height:26px}
+  .s1 .l{padding:22px 22px 30px;align-items:flex-end}
+  .s1 h1{font-size:92px;margin-top:26px}
+  .s1 .bar{height:6px;margin:22px -22px 0}
+  .s1 .who{font-size:28px;margin-top:22px}.s1 ul{font-size:16px;margin-top:10px}
+  .s1{padding:0!important}.s1 .art svg{width:100%;height:340px}
+  .sq{width:300px;height:300px;margin:0 0 22px}.sq .b{width:200px;height:200px}.sq .b span{font-size:30px;left:16px;top:14px}
+  .sq .ic{left:58px;top:72px;width:165px;height:165px}.sq .m{left:110px;top:140px;width:170px;height:160px}
+  .sq.alert{width:200px;height:190px;margin-top:24px}.sq.alert .ic{width:150px;height:150px;top:10px}.sq.alert .m{left:76px;top:60px;width:124px;height:124px}
+  .duo{width:260px;height:200px}.duo .b{width:190px;height:180px}.duo .m{left:130px;top:100px;width:130px;height:100px}
+  .s2 .duo{margin-bottom:-90px}.s2 .over{font-size:64px;margin-left:16px}.s2 .cap{margin:52px 0 14px}
+  .sum .n{font-size:34px}.sum .t{font-size:22px}.sum li{grid-template-columns:56px 1fr;padding:14px 0;border-width:2px}
+  .items{margin-top:18px}.items li{padding:9px 0}.items b,.items.sm b{font-size:20px}.items span,.items.sm span{font-size:15px}
+  .s13 .st2{font-size:34px}
+  .s4 .band{width:auto;height:auto;margin:0 -22px;padding:60px 22px 16px}.s4 .band h2{font-size:46px}
+  .s4 .av-main{width:120px;height:120px;margin-top:-60px;margin-left:auto}.s4 .av-main .ic{width:84px;height:84px}
+  .s4 .lead{width:auto;font-size:17px}.s4 .card{width:auto;margin-top:16px;font-size:15px}.card b{font-size:22px}.card .big{font-size:20px}
+  .depts{width:auto;margin-top:26px;gap:18px}.depts li{grid-template-columns:72px 1fr;column-gap:16px}.depts .av{width:72px;height:72px;font-size:32px}.depts b{font-size:22px}.depts span{font-size:15px}
+  .nums{grid-template-columns:1fr 1fr;gap:18px 12px;margin-top:26px}.nums li{padding:4px 12px 14px;gap:6px}.nums .big{font-size:96px}.nums b{font-size:20px;margin-top:6px}.nums span:last-child{font-size:14px}
+  .hb{display:block}.blk{display:inline-block;font-size:44px;padding:14px 20px 10px}.hb .cap{margin-top:14px}
+  .tbl{margin-top:22px}.th{display:none}
+  .tr,.tdocs .tr,.tes .tr{grid-template-columns:34px 1fr;column-gap:10px;row-gap:5px;padding:14px 0;border-width:2px}
+  .tr>span:not(.n){grid-column:2}.tr .n{grid-row:1/span 3;font-size:17px}
+  .tr .a,.tdocs .c{font-size:21px}.tr .b,.tes .c{font-size:17px}.tr .c,.tdocs .b{font-size:15px}.tes .b{font-size:15px}
+  .tag{font-size:13px}.sub{font-size:15px}
+  .tl{display:block;margin-top:22px}.tl::before,.tl::after,.tl li::before,.tl li::after{display:none}
+  .tl li{margin-bottom:16px}.tl .dt{font-size:24px}.tl .box{height:auto;padding:14px 16px}.tl .box b{font-size:18px}.tl .box span{font-size:15px}
+  .vf{margin:22px 0 0 6px;padding-left:28px}.vf li{padding:12px 0}.vf li::before{left:-37px;top:18px;width:13px;height:13px}.vf .hl{padding:14px 16px}.vf .hl::before{left:-37px;top:20px}.vf b{font-size:22px}.vf span{font-size:15px}
+  .trio{grid-template-columns:repeat(3,1fr);column-gap:8px;margin-top:24px;padding-top:16px}.trio li{padding:0 4px 10px 0}.trio .hl{padding:10px}
+  .trio .big{font-size:80px}.trio b{font-size:16px}.trio span:last-child{font-size:13px}
+  .rules{grid-template-columns:1fr;row-gap:12px;margin-top:20px}.rules div{padding:14px 16px}.rules b{font-size:19px}.rules span{font-size:15px}
+  .mul{margin-top:10px}.mul li{grid-template-columns:1fr 92px;column-gap:10px;padding:14px 0}.mul b{font-size:20px}.mul span{font-size:14px}.pen{font-size:21px}
+  .chk{margin-top:12px}.chk label{grid-template-columns:30px 1fr;column-gap:12px;padding:14px 0;font-size:15px}.chk .box{width:26px;height:26px}.chk b{font-size:20px}
+  .duo.sm{display:none}
+  .s17 .logo{margin-bottom:24px}.s17 .band{width:auto;height:auto;margin:0 -22px;padding:30px 22px;justify-content:flex-end}.s17 .band p{font-size:56px}
+  .s17 .r{width:auto;margin-top:26px}.s17 h2{font-size:52px}.btn{font-size:20px;padding:14px 22px 12px;margin-top:20px}.ct{font-size:15px}.sig{font-size:15px;margin-top:20px}
+}
+@page{size:1920px 1080px;margin:0}
+@media print{html{background:#fff}.deck{zoom:1!important}.slide{margin:0;break-after:page;page-break-after:always}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<main class="deck">
+<section class="slide s1" id="s1" aria-label="Slide 1 de 17"><div class="l"><div class="logo"><svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="6" fill="#152b61"/><path d="M11 12h18M11 20h13M11 28h18" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/></svg><b>Efficio</b><span>Contabilidade</span></div><h1 class="d">On<br>boar<br>ding</h1><div class="bar"></div><p class="who d"><span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p><ul class="cap"><li>CNPJ <span class="var" data-campo="cnpj">11.222.333/0001-81</span></li><li><span class="var" data-campo="regime">Simples Nacional · Anexo I</span></li><li>Cliente desde <span class="var" data-campo="inicio">dezembro de 2026</span></li><li><span class="var" data-campo="empregados">6 empregados</span> · <span class="var" data-campo="cct">CCT da Panificação</span></li><li>Atualizado em <span class="var" data-campo="atualizado_em">18/11/2026</span></li></ul></div>
+<div class="art" aria-hidden="true"><svg viewBox="0 0 960 1080" preserveAspectRatio="xMidYMid slice"><rect width="960" height="1080" fill="#23262b"/><rect x="560" y="0" width="300" height="600" fill="#7aa6bf" opacity=".78"/>
+<rect x="110" y="700" width="300" height="300" fill="#f3d488"/>
+<g fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path d="M250 400H690L726 486H214Z"/><path d="M214 486a51.5 40 0 0 0 103 0a51.5 40 0 0 0 103 0a51.5 40 0 0 0 103 0a51.5 40 0 0 0 103 0a51.5 40 0 0 0 103 0"/><path d="M244 520V860M696 520V860"/><rect x="290" y="620" width="130" height="240"/><rect x="480" y="620" width="170" height="140"/><path d="M506 726q0-52 59-52t59 52Z"/><path d="M548 690l-10 22M572 686l-8 26M596 690l-6 22"/><path d="M380 330h180v70H380z"/><path d="M150 860H810"/></g>
+</svg></div></section>
+<section class="slide s2 g2" id="s2" aria-label="Slide 2 de 17"><div><div class="duo" aria-hidden="true"><div class="b"></div><div class="m"></div></div><h2 class="d over">Sumário</h2><p class="cap">Leitura de 10 minutos. Guarde este link: ele é atualizado quando algo mudar.</p></div>
+<ol class="sum"><li><span class="d n">01</span><span class="d t">Como trabalhamos juntos</span></li><li><span class="d n">02</span><span class="d t">Suas obrigações e prazos</span></li><li><span class="d n">03</span><span class="d t">Documentos e extratos</span></li><li><span class="d n">04</span><span class="d t">Seus empregados: registro, férias, rescisão, eSocial</span></li><li><span class="d n">05</span><span class="d t">Atenção às multas e primeiros passos</span></li></ol><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">02</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s3 g2" id="s3" aria-label="Slide 3 de 17"><div class="sq " aria-hidden="true"><div class="b"></div><svg class="ic " viewBox="0 0 300 300" aria-hidden="true"><path d="M62 150a88 88 0 0 1 150-62"/><path d="M214 42v48h-48"/><path d="M238 150a88 88 0 0 1-150 62"/><path d="M86 258v-48h48"/></svg><div class="m"></div></div><div><h2 class="d">Como trabalhamos juntos</h2><p class="cap lead">Você cuida da padaria. Nós cuidamos dos impostos, da contabilidade e da folha.</p>
+<ul class="items"><li><b class="d">Você envia</b><span>os documentos até as datas combinadas.</span></li><li><b class="d">Nós apuramos</b><span>e mandamos as guias prontas.</span></li><li><b class="d">Você paga</b><span>cada guia até o vencimento.</span></li><li><b class="d">Vai mudar algo?</b><span>Avise antes: contratação, demissão, férias, compra de bens.</span></li><li><b class="d">Na dúvida, pergunte antes de decidir.</b><span>Prevenir custa menos que corrigir.</span></li></ul></div><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">03</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s4" id="s4" aria-label="Slide 4 de 17"><div class="left"><div class="band"><h2 class="d">Seu time<br>e canais</h2></div><div class="av av-main" aria-hidden="true"><svg class="ic " viewBox="0 0 300 300" aria-hidden="true"><path d="M64 66h172a22 22 0 0 1 22 22v104a22 22 0 0 1-22 22H128l-52 42v-42H64a22 22 0 0 1-22-22V88a22 22 0 0 1 22-22Z" stroke-linejoin="round"/><circle cx="104" cy="140" r="5" fill="currentColor"/><circle cx="150" cy="140" r="5" fill="currentColor"/><circle cx="196" cy="140" r="5" fill="currentColor"/></svg></div>
+<p class="cap lead">Fale pelo WhatsApp do escritório: o assunto vai direto para o departamento certo.</p><div class="card main"><b class="d">WhatsApp do escritório</b><span class="big">(11) 9 0000-0000</span><hr><span>contato@efficio.com.br</span><span>Atendimento: segunda a sexta, das 8h às 18h</span></div></div>
+<ul class="depts"><li><span class="av d av0" aria-hidden="true">FI</span><div><b class="d">Fiscal</b><hr><span>notas fiscais, DAS e DEFIS</span></div></li><li><span class="av d av1" aria-hidden="true">CO</span><div><b class="d">Contábil</b><hr><span>extratos, balanço, pró-labore e lucros</span></div></li><li><span class="av d av2" aria-hidden="true">DP</span><div><b class="d">Pessoal/DP</b><hr><span>folha, admissão, férias, rescisão e eSocial</span></div></li></ul><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">04</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s5" id="s5" aria-label="Slide 5 de 17"><header><h2 class="d">Suas obrigações em números</h2><p class="cap">O que entregamos pela sua empresa todo mês e todo ano.</p></header>
+<ul class="nums"><li class=""><span class="d big">2</span><b class="d">Fiscal</b><span>DAS mensal e DEFIS anual</span></li><li class=""><span class="d big">2</span><b class="d">Contábil</b><span>balancete mensal e balanço anual</span></li><li class=""><span class="d big">5</span><b class="d">Pessoal</b><span>folha, eSocial, FGTS, DCTFWeb e obrigações anuais</span></li><li class="hl"><span class="d big">4</span><b class="d">Datas suas por mês</b><span>dia 5, 5º dia útil, dia 20 e dia 25</span></li></ul><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">05</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide st" id="s6" aria-label="Slide 6 de 17"><header class="hb"><h2 class="d blk">Fiscal</h2><p class="cap">Obrigação · prazo legal · o que precisamos de você.</p></header><div class="tbl t3" role="table"><div class="tr th" role="row"><span></span><span role="columnheader">Obrigação</span><span role="columnheader">Prazo legal</span><span role="columnheader">O que precisamos de você</span></div><div class="tr" role="row"><span class="n">01</span><span class="a">PGDAS-D e DAS</span><span class="b">dia 20 do mês seguinte</span><span class="c">notas emitidas e recebidas até o <strong>dia 5</strong></span></div><div class="tr" role="row"><span class="n">02</span><span class="a">Vendas no cartão e PIX</span><span class="b">as operadoras informam ao fisco</span><span class="c">relatório das maquininhas até o <strong>dia 5</strong></span></div><div class="tr" role="row"><span class="n">03</span><span class="a">DEFIS<em class="sub">ano de 2026</em></span><span class="b">31/03/2027</span><span class="c">confirmar sócios e lucros distribuídos no ano</span></div><div class="tr" role="row" data-cond="servico_tomado_com_retencao"><span class="n">04</span><span class="a">EFD-Reinf<em class="tag">se contratar serviço com retenção</em></span><span class="b">dia 15 do mês seguinte</span><span class="c">envie a nota no dia em que receber</span></div></div><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">06</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide st" id="s7" aria-label="Slide 7 de 17"><header class="hb"><h2 class="d blk">Contábil</h2><p class="cap">A contabilidade em dia permite distribuir lucros com segurança.</p></header><div class="tbl t3" role="table"><div class="tr th" role="row"><span></span><span role="columnheader">Obrigação</span><span role="columnheader">Prazo e regra</span><span role="columnheader">O que precisamos de você</span></div><div class="tr" role="row"><span class="n">01</span><span class="a">Conciliação e balancete</span><span class="b">mensal</span><span class="c">extratos de todas as contas até o <strong>dia 5</strong></span></div><div class="tr" role="row"><span class="n">02</span><span class="a">Balanço anual</span><span class="b">contas aprovadas pelos sócios até 30/04 (art. 1.078 do Código Civil)</span><span class="c">nada além dos envios mensais</span></div><div class="tr" role="row"><span class="n">03</span><span class="a">Pró-labore</span><span class="b">mensal, com INSS</span><span class="c">valor de cada sócio até o <strong>dia 25</strong></span></div><div class="tr" role="row"><span class="n">04</span><span class="a">Lucros dos sócios</span><span class="b">acima de R$ 50 mil no mês por sócio, retenção de 10% de IR (Lei 15.270/2025)</span><span class="c">avise <strong>antes</strong> de retirar</span></div><div class="tr" role="row"><span class="n">05</span><span class="a">Bens e empréstimos</span><span class="b">quando houver</span><span class="c">envie o contrato ou a nota</span></div></div><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">07</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide st" id="s8" aria-label="Slide 8 de 17"><header class="hb"><h2 class="d blk">Pessoal</h2><p class="cap">Seus <span class="var" data-campo="qtd_empregados">6</span> empregados geram obrigações todo mês. A maior parte é com a gente.</p></header><div class="tbl t3" role="table"><div class="tr th" role="row"><span></span><span role="columnheader">Obrigação</span><span role="columnheader">Prazo</span><span role="columnheader">O que precisamos de você</span></div><div class="tr" role="row"><span class="n">01</span><span class="a">Folha e salários</span><span class="b">até o 5º dia útil</span><span class="c">variáveis da folha até o <strong>dia 25</strong></span></div><div class="tr" role="row"><span class="n">02</span><span class="a">eSocial</span><span class="b">dia 15 do mês seguinte</span><span class="c">nada: enviamos a partir da folha</span></div><div class="tr" role="row"><span class="n">03</span><span class="a">FGTS Digital</span><span class="b">dia 20 do mês seguinte</span><span class="c">pagar a guia que enviamos</span></div><div class="tr" role="row"><span class="n">04</span><span class="a">DCTFWeb e DARF<em class="sub">INSS e IR descontados</em></span><span class="b">DARF dia 20; declaração no último dia útil</span><span class="c">pagar o DARF</span></div><div class="tr" role="row"><span class="n">05</span><span class="a">13º e informe de rendimentos</span><span class="b">13º em 30/11 e 20/12; informe até o último dia útil de fevereiro</span><span class="c">nada: preparamos tudo</span></div></div><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">08</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s9" id="s9" aria-label="Slide 9 de 17"><header><h2 class="d">Seu mês em uma linha</h2><p class="cap">Se a data cair em fim de semana ou feriado, ela pode antecipar ou adiar. Avisamos.</p></header>
+<ol class="tl"><li class="up voce" style="grid-column:1"><b class="d dt">Até o dia 5</b><div class="box"><b class="d">Você envia</b><span>notas, extratos e relatório das maquininhas</span></div></li><li class="dn voce" style="grid-column:2"><b class="d dt">Até o 5º dia útil</b><div class="box"><b class="d">Você paga</b><span>os salários</span></div></li><li class="up nos" style="grid-column:3"><b class="d dt">Dia 15</b><div class="box"><b class="d">Nós enviamos</b><span>o eSocial</span></div></li><li class="dn voce" style="grid-column:4"><b class="d dt">Dia 20</b><div class="box"><b class="d">Você paga</b><span>DAS, FGTS e DARF do INSS</span></div></li><li class="up voce" style="grid-column:5"><b class="d dt">Até o dia 25</b><div class="box"><b class="d">Você envia</b><span>as variáveis da folha</span></div></li></ol><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">09</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide st" id="s10" aria-label="Slide 10 de 17"><header class="hb"><h2 class="d blk">Documentos e extratos</h2><p class="cap">Documento atrasado atrasa a guia. E guia atrasada tem multa e juros.</p></header><div class="tbl tdocs" role="table"><div class="tr th" role="row"><span></span><span role="columnheader">Documento</span><span role="columnheader">O que enviar</span><span role="columnheader">Prazo</span></div><div class="tr" role="row"><span class="n">01</span><span class="a">Extratos bancários</span><span class="b">todas as contas e aplicações, mês completo, em PDF ou OFX</span><span class="c">dia 5</span></div><div class="tr" role="row"><span class="n">02</span><span class="a">Maquininhas e PIX</span><span class="b">relatório de vendas do mês de cada operadora</span><span class="c">dia 5</span></div><div class="tr" role="row"><span class="n">03</span><span class="a">Notas fiscais</span><span class="b">emitidas e recebidas, com XML quando houver</span><span class="c">dia 5</span></div><div class="tr" role="row"><span class="n">04</span><span class="a">Variáveis da folha</span><span class="b">faltas, atestados, horas extras, adiantamentos, vale-transporte</span><span class="c">dia 25</span></div><div class="tr" role="row"><span class="n">05</span><span class="a">Mudanças na empresa</span><span class="b">sócios, endereço, atividade, empréstimos, compra de bens</span><span class="c">antes de assinar</span></div></div><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">10</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s11 g2" id="s11" aria-label="Slide 11 de 17"><div><h2 class="d">Registro de empregado</h2><p class="cap lead">Ninguém começa a trabalhar sem registro. Nem “só para testar”.</p></div>
+<ol class="vf"><li class=""><b class="d">3 dias úteis antes</b><span>envie os dados e documentos pelo formulário de admissão</span></li><li class=""><b class="d">Antes do 1º dia</b><span>exame admissional (ASO) feito na clínica</span></li><li class="hl"><b class="d">Até o dia anterior</b><span>registramos no eSocial (S-2200) e enviamos o contrato</span></li><li class=""><b class="d">No 1º dia</b><span>empregado assina o contrato e começa a trabalhar</span></li><li class=""><b class="d">Experiência de até 90 dias</b><span>decida antes do fim se vai efetivar</span></li></ol><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">11</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s12" id="s12" aria-label="Slide 12 de 17"><header class="hb"><h2 class="d blk">Férias</h2><p class="cap">Programe com antecedência: férias fora do prazo saem em dobro.</p></header><ol class="trio"><li class=""><span class="d big">45</span><b class="d">dias antes</b><span>informe quem sai e o período</span></li><li class=""><span class="d big">30</span><b class="d">dias antes</b><span>aviso de férias assinado pelo empregado (art. 135 da CLT)</span></li><li class="hl"><span class="d big">2</span><b class="d">dias antes</b><span>pagamento das férias + 1/3 (art. 145 da CLT)</span></li></ol>
+<div class="rules"><div><b class="d">Pode dividir em até 3 partes</b><span>uma com 14 dias ou mais; as outras com 5 ou mais</span></div><div><b class="d">Prazo para tirar</b><span>12 meses após completar o período; depois, <em class="alert">pagamento em dobro</em> (art. 137)</span></div></div><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">12</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s13 g2" id="s13" aria-label="Slide 13 de 17"><div class="sq lbl" aria-hidden="true"><div class="b"><span class="d">Rescisão</span></div><svg class="ic " viewBox="0 0 300 300" aria-hidden="true"><rect x="40" y="62" width="220" height="196" rx="20"/><path d="M40 116h220M96 34v52M204 34v52"/><text x="150" y="226" text-anchor="middle">10</text></svg><div class="m"></div></div><div><h2 class="d st2">Antes de falar com o empregado, fale com a gente.</h2>
+<ul class="items sm"><li><b class="d">Antes de comunicar</b><span>avise o tipo de desligamento, a data e o aviso prévio</span></li><li><b class="d">Nós calculamos</b><span>verbas, FGTS e regras da <span class="var" data-campo="cct">CCT da Panificação</span></span></li><li><b class="d">Até 10 dias corridos</b><span>pague as verbas e entregue os documentos (art. 477 da CLT)</span></li><li><b class="d">No mesmo prazo</b><span>guia do FGTS rescisório e baixa no eSocial (S-2299)</span></li><li><b class="d">Sindicato</b><span>assistência ou homologação quando a CCT exigir</span></li></ul></div><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">13</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide st" id="s14" aria-label="Slide 14 de 17"><header class="hb"><h2 class="d blk">Prazos do eSocial</h2><p class="cap">Nós enviamos. Você só precisa nos avisar a tempo.</p></header><div class="tbl tes" role="table"><div class="tr th" role="row"><span></span><span role="columnheader">Evento</span><span role="columnheader">Código</span><span role="columnheader">Prazo</span></div><div class="tr" role="row"><span class="n">01</span><span class="a">Admissão</span><span class="b">S-2200</span><span class="c">até o dia anterior ao início</span></div><div class="tr" role="row"><span class="n">02</span><span class="a">Desligamento</span><span class="b">S-2299</span><span class="c">até 10 dias após</span></div><div class="tr" role="row"><span class="n">03</span><span class="a">Acidente de trabalho</span><span class="b">S-2210</span><span class="c">1º dia útil seguinte; avise no mesmo dia</span></div><div class="tr" role="row"><span class="n">04</span><span class="a">Folha do mês</span><span class="b">S-1200 e S-1299</span><span class="c">dia 15 do mês seguinte</span></div><div class="tr" role="row"><span class="n">05</span><span class="a">Afastamentos, alterações e exames</span><span class="b">S-2230, S-2206, S-2220</span><span class="c">dia 15 do mês seguinte</span></div></div><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">14</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s15 g2" id="s15" aria-label="Slide 15 de 17"><div><h2 class="d">Atenção:<br>multas</h2><p class="cap lead">Quase todas se evitam com um aviso antes.</p><div class="sq alert" aria-hidden="true"><div class="b"></div><svg class="ic " viewBox="0 0 300 300" aria-hidden="true"><path d="M150 42 268 248H32Z" stroke-linejoin="round"/><path d="M150 112v72"/><circle cx="150" cy="218" r="6" fill="currentColor"/></svg><div class="m"></div></div></div>
+<ul class="mul"><li><div><b class="d">Demissão sem seguir a CCT</b><span>a <span class="var" data-campo="cct">CCT da Panificação</span> pode prever multa quando a rescisão não segue o sindicato</span></div><strong class="d pen">multa da CCT</strong></li><li><div><b class="d">Verbas fora do prazo</b><span>pagou depois de 10 dias: multa de um salário ao empregado (art. 477 da CLT)</span></div><strong class="d pen">1 salário</strong></li><li><div><b class="d">Trabalho antes do registro</b><span>multa por empregado, a partir de R$ 800 em ME/EPP (art. 47 da CLT)</span></div><strong class="d pen">desde R$ 800</strong></li><li><div><b class="d">Documentos atrasados</b><span>DAS pago após o dia 20: multa de até 20% + juros Selic</span></div><strong class="d pen">até 20% + Selic</strong></li><li><div><b class="d">Férias fora do prazo</b><span>pagamento em dobro (art. 137 da CLT)</span></div><strong class="d pen">em dobro</strong></li></ul><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">15</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s16 g2" id="s16" aria-label="Slide 16 de 17"><div><h2 class="d">Primeiros passos</h2><p class="cap lead">Para começar em <span class="var" data-campo="mes_inicio">dezembro</span>. Marque o que já enviou; acompanhamos pelo sistema.</p><div class="duo sm" aria-hidden="true"><div class="b"></div><div class="m"></div></div></div>
+<ul class="chk"><li><label><input type="checkbox"><span class="box" aria-hidden="true"></span><span><b class="d">Contrato social</b> e última alteração</span></label></li><li><label><input type="checkbox"><span class="box" aria-hidden="true"></span><span><b class="d">Procuração eletrônica</b> no e-CAC para a Efficio (ou certificado e-CNPJ)</span></label></li><li><label><input type="checkbox"><span class="box" aria-hidden="true"></span><span><b class="d">Acessos</b> do Simples Nacional, da prefeitura e da Sefaz (notas fiscais)</span></label></li><li><label><input type="checkbox"><span class="box" aria-hidden="true"></span><span><b class="d">Fechamento de <span class="var" data-campo="mes_anterior">novembro/2026</span></b> com o contador anterior: balancete, extratos e DAS</span></label></li><li><label><input type="checkbox"><span class="box" aria-hidden="true"></span><span><b class="d">Empregados</b> fichas, últimas folhas, férias vencidas e 1ª parcela do 13º paga</span></label></li></ul><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">16</text></svg><p class="brand">Efficio Contabilidade · <span class="var" data-campo="razao_social">Padaria Pão Quente Ltda</span></p></section>
+<section class="slide s17" id="s17" aria-label="Slide 17 de 17"><div class="logo"><svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="6" fill="#152b61"/><path d="M11 12h18M11 20h13M11 28h18" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/></svg><b>Efficio</b><span>Contabilidade</span></div><div class="band"><p class="d">Bem-vindos!</p></div><div class="r"><h2 class="d">Li e entendi</h2><p class="cap lead">Ao confirmar, registramos seu nome, data e hora da leitura.</p>
+<button type="button" class="btn d">Confirmar leitura</button><p class="ct"><b>Dúvidas?</b> WhatsApp (11) 9 0000-0000 · contato@efficio.com.br</p><p class="ct">Atendimento de segunda a sexta, das 8h às 18h</p><p class="cap sig">Efficio Contabilidade · CRC <span class="var" data-campo="crc">{número}</span></p></div><svg class="chev" viewBox="0 0 156 120" aria-hidden="true"><path d="M58 4 152 60 58 116" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M30 4 124 60 30 116" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/><path d="M2 2 98 60 2 118Z" fill="#111"/><text x="16" y="72" fill="#fff">17</text></svg></section>
+</main>
+<script>(function(){function z(){var w=innerWidth;document.documentElement.style.setProperty('--z',w>760&&w<1920?w/1920:1)}z();addEventListener('resize',z)})();</script>
+</body>
+</html>
