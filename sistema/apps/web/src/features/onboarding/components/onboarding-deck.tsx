@@ -230,7 +230,7 @@ export function ObligationTable({ rows }: { rows: OnboardingObligationRow[] }) {
     return <p className="ob-empty">Nenhuma obrigação desta área para a sua empresa no momento.</p>;
   return (
     <div
-      className={cn('ob-tbl ob-tobl', rows.length > 6 && 'ob-dense')}
+      className={cn('ob-tbl ob-tobl', rows.length > 7 ? 'ob-dense' : rows.length > 5 && 'ob-mid')}
       role="table"
       aria-label="Obrigações"
     >

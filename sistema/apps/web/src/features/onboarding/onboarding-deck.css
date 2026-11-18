@@ -86,10 +86,12 @@
   height: 1000px;
 }
 .ob-top {
-  height: 120px;
+  /* Vertical grid (1920×1080): kicker at 48–104, title from ~132, content centred in what is left,
+     at least 48 px clear of the head and of the 96 px footer. */
+  height: 104px;
   flex: none;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 28px;
 }
 .ob-body {
@@ -131,6 +133,7 @@
 /* The cover's logo needs air above it. */
 .ob-cover .ob-top {
   height: 176px;
+  align-items: center;
 }
 .ob-logo-lg img {
   height: 104px;
@@ -238,7 +241,24 @@
   color: var(--ob-on-dark);
 }
 .ob-head {
-  margin-top: 30px;
+  margin-top: 28px;
+}
+/* Content slides: the block after the head is centred between the head and the footer (auto margins),
+   with a 48 px minimum on both sides, so short slides do not leave a hole at the bottom and long ones
+   never touch the footer. Phones keep their own stacked spacing. */
+@media print, screen and (min-width: 761px) {
+  .ob-s .ob-body {
+    padding-bottom: 48px;
+  }
+  .ob-s .ob-head {
+    margin-bottom: 48px;
+  }
+  .ob-s:not(.ob-split) .ob-body > .ob-head + * {
+    margin-top: auto;
+  }
+  .ob-s:not(.ob-split) .ob-body > :last-child {
+    margin-bottom: auto;
+  }
 }
 .ob-pill {
   align-self: flex-start;
@@ -393,7 +413,6 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 28px;
-  margin-top: 56px;
   flex: 1;
   min-height: 0;
 }
@@ -461,7 +480,7 @@
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   gap: 28px;
-  margin: 28px 0 36px;
+  margin-top: 24px;
   background: var(--ob-p1);
   border-radius: 40px;
   padding: 30px 40px;
@@ -562,6 +581,14 @@
 }
 .ob-tr .ob-c {
   color: var(--ob-gray);
+}
+/* 6–7 rows: same type size, tighter rows, so the table keeps its 48 px clear of the footer. */
+.ob-mid .ob-tr {
+  padding: 14px 32px;
+  margin-top: 8px;
+}
+.ob-mid .ob-th {
+  margin: 0;
 }
 .ob-dense .ob-tr {
   padding: 12px 32px;
@@ -896,8 +923,7 @@
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   gap: 28px;
-  margin-top: auto;
-  margin-bottom: 36px;
+  margin-top: 32px;
 }
 .ob-rules div {
   background: var(--ob-p0);
