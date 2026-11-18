@@ -17,6 +17,7 @@ import {
   type OnboardingTemplateStored,
 } from '../onboarding';
 import {
+  ONBOARDING_DEFAULT_DUE,
   ONBOARDING_DEFAULT_NEED,
   ONBOARDING_DEFAULT_PARAMS,
   ONBOARDING_OBLIGATION_TEXTS,
@@ -187,28 +188,6 @@ export function employeesText(n: number): string {
   return n === 1 ? '1 empregado' : `${n} empregados`;
 }
 
-/** Legal deadline of a recurring task without catalog text, from its schedule ("dia 20 do mês seguinte"). */
-export function describeRecurringDeadline(r: Pick<OnboardingRecurringInput, 'period' | 'dueDay' | 'dueMonth' | 'referenceOffset'>): string {
-  const day = r.dueDay >= 31 ? 'último dia' : `dia ${r.dueDay}`;
-  const offset = r.referenceOffset === 0 ? 'de cada mês' : r.referenceOffset === 1 ? 'do mês seguinte' : `do ${r.referenceOffset}º mês seguinte`;
-  switch (r.period) {
-    case 'annual':
-      return r.dueMonth ? `anual: ${r.dueDay >= 31 ? 'último dia' : String(r.dueDay).padStart(2, '0')}/${String(r.dueMonth).padStart(2, '0')}` : 'anual';
-    case 'semiannual':
-      return `semestral: ${day}`;
-    case 'quarterly':
-      return `trimestral: ${day} ${offset}`;
-    case 'bimonthly':
-      return `bimestral: ${day} ${offset}`;
-    case 'monthly':
-      return `${day} ${offset}`;
-    case 'weekly':
-      return 'semanal';
-    default:
-      return 'diária';
-  }
-}
-
 const CATALOG_ORDER = new Map(REGIME_GROUP_ITEMS.map((item, i) => [item.key, i]));
 const CATALOG_DEPARTMENT = new Map(REGIME_GROUP_ITEMS.map((item) => [item.key, item.department]));
 
@@ -294,14 +273,15 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
     const byCatalog = r.catalogKey ? CATALOG_DEPARTMENT.get(r.catalogKey) : undefined;
     const suggested = byName ?? byCatalog ?? null;
     const area: OnboardingArea = suggested ? AREA_OF_DEPARTMENT[suggested] : 'other';
+    // No legal deadline: only what the client delivers and until when (owner's rule, 20/11/2026).
+    const text = catalog ? ONBOARDING_OBLIGATION_TEXTS[catalog]! : { need: ONBOARDING_DEFAULT_NEED, due: ONBOARDING_DEFAULT_DUE };
+    const base = `obligations.${catalog ?? 'default'}`;
     obligations[area].push({
       key: catalog ?? `task-${++custom}`,
       area,
       name: r.name,
-      deadline: (catalog ? resolve(`obligations.${catalog}.deadline`, ONBOARDING_OBLIGATION_TEXTS[catalog]!.deadline) : null) ?? describeRecurringDeadline(r),
-      need:
-        (catalog ? resolve(`obligations.${catalog}.need`, ONBOARDING_OBLIGATION_TEXTS[catalog]!.need) : resolve('obligations.default.need', ONBOARDING_DEFAULT_NEED)) ??
-        '',
+      need: resolve(`${base}.need`, text.need) ?? '',
+      due: text.due !== undefined ? resolve(`${base}.due`, text.due) : null,
       source: 'task',
     });
   }
@@ -321,6 +301,7 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
           text: resolve(`${base}.text`, item.text),
           detail: resolve(`${base}.detail`, item.detail),
           code: resolve(`${base}.code`, item.code),
+          due: resolve(`${base}.due`, item.due),
         };
       })
       .filter((item) => item.label !== null || item.text !== null || item.detail !== null || item.code !== null);
@@ -330,8 +311,8 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
         key: item.id,
         area: slide.area!,
         name: item.label ?? '',
-        deadline: item.text ?? '',
         need: item.detail ?? '',
+        due: item.due,
         source: 'template',
       }));
       obligations[slide.area].push(...fixed);
@@ -343,7 +324,7 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
       title: resolve(`${slide.key}.title`, slide.title) ?? '',
       kicker: slide.kicker !== undefined ? resolve(`${slide.key}.kicker`, slide.kicker) : null,
       subtitle: subtitle ? resolve(`${slide.key}.subtitle.${subtitle.id}`, subtitle.text) : null,
-      items: slide.area ? [] : items,
+      items: slide.area ? [] : items.map(({ due: _due, ...item }) => item),
       table,
     };
   });

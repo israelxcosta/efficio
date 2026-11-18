@@ -62,7 +62,11 @@ export interface OnboardingCondition {
   rules?: Partial<Record<OnboardingRuleKey, boolean>>;
 }
 
-/** A text line of a slide. In the obligation slides: label = obligation, text = legal deadline, detail = what we need. */
+/**
+ * A text line of a slide. In the obligation slides: label = obligation (what the office does), detail =
+ * what we need from the client, due = until when (internal deadline of the parameters). The client's
+ * document never shows legal deadlines of ancillary obligations: those concern only the office.
+ */
 export interface OnboardingTemplateItem {
   id: string;
   label?: string;
@@ -70,6 +74,8 @@ export interface OnboardingTemplateItem {
   detail?: string;
   /** Monospaced text (e-mail subject). */
   code?: string;
+  /** Obligation slides: until when the client delivers (absent: nothing to deliver). */
+  due?: string;
   when?: OnboardingCondition;
   /**
    * Obligation slides: a fixed row that stands for this catalog recurring task. It shows only when the
@@ -96,10 +102,14 @@ export interface OnboardingTemplateSlide {
   area?: Exclude<OnboardingArea, 'other'>;
 }
 
-/** Legal deadline and "o que precisamos de você" of a catalog recurring task (`recurring_tasks.catalog_key`). */
+/**
+ * "O que precisamos de você" and "até quando" of a catalog recurring task (`recurring_tasks.catalog_key`).
+ * No legal deadline: the client's document shows only what the client delivers and when.
+ */
 export interface OnboardingObligationText {
-  deadline: string;
   need: string;
+  /** Internal deadline (absent: the office needs nothing from the client for it). */
+  due?: string;
 }
 
 /** Departments of the onboarding (e-mails, who receives each document). */
@@ -363,11 +373,12 @@ export interface OnboardingObligationRow {
   /** Catalog key, `task-<n>` for a recurring task without one, or the template item id. */
   key: string;
   area: OnboardingArea;
+  /** The obligation (what the office does for the client). */
   name: string;
-  /** Legal deadline. */
-  deadline: string;
   /** What we need from the client. */
   need: string;
+  /** Until when (internal deadline); null when the office needs nothing. Never a legal deadline. */
+  due: string | null;
   /** `task`: a recurring task that applies to the client; `template`: a fixed row of the template. */
   source: 'task' | 'template';
 }

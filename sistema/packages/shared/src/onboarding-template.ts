@@ -3,7 +3,11 @@
 // `ONBOARDING_PLACEHOLDERS`; conditions (`when`) replace the `[se regime = …]`/`[se empregados …]` marks.
 // The obligation slides (fiscal, accounting, personnel) get the recurring tasks that apply to the client
 // (texts in `ONBOARDING_OBLIGATION_TEXTS`, by catalog key) and then their fixed rows (the items below:
-// label = obligation, text = legal deadline, detail = what we need), from "Variações por regime".
+// label = obligation, detail = what we need, due = until when), from "Variações por regime".
+// Owner's rule (20/11/2026): the client's document shows no due date of ancillary obligations (DCTFWeb,
+// EFD-Reinf, eSocial, DEFIS, ECD/ECF…): those matter only to the office. It shows what the client
+// delivers and until when (internal deadlines of the parameters), plus the labor deadlines the client
+// itself must meet (salaries, vacation, termination).
 // Every text has a key (`onboardingTextKeys`): the office's template and a client's adjustment
 // override texts by key; items and task rows can be hidden (`onboardingHideableKeys`).
 
@@ -11,7 +15,7 @@ import type { TaxRegime } from './constants';
 import type { OnboardingCondition, OnboardingObligationText, OnboardingParams, OnboardingTemplateSlide } from './onboarding';
 
 /** Bump when the factory content changes: the document's `updatedAt` takes it into account. */
-export const ONBOARDING_FACTORY_VERSION = '2026-11-19';
+export const ONBOARDING_FACTORY_VERSION = '2026-11-20';
 
 /** Placeholders the texts may use (value: description for the editor). */
 export const ONBOARDING_PLACEHOLDERS: Record<string, string> = {
@@ -120,34 +124,32 @@ const when = (regimes?: TaxRegime[], employees?: OnboardingCondition['employees'
 });
 const rule = (rules: OnboardingCondition['rules']): OnboardingCondition => ({ rules });
 
-/** Legal deadline and what we need, per catalog recurring task (`REGIME_GROUP_ITEMS`). */
+/** What we need and until when, per catalog recurring task (`REGIME_GROUP_ITEMS`); no legal deadline. */
 export const ONBOARDING_OBLIGATION_TEXTS: Record<string, OnboardingObligationText> = {
-  payroll: { deadline: 'salários até o 5º dia útil do mês seguinte', need: 'variáveis da folha até o {{prazos.folha}} do mês seguinte' },
-  esocial_periodic: { deadline: 'dia 15 do mês seguinte', need: 'nada: enviamos a partir da folha' },
-  fgts_digital: { deadline: 'dia 20 do mês seguinte', need: 'pagar a guia que enviamos' },
-  dctfweb: { deadline: 'DARF dia 20; declaração no último dia útil do mês seguinte', need: 'pagar o DARF' },
-  efd_reinf: { deadline: 'dia 15 do mês seguinte', need: 'envie a nota de serviço com retenção no dia em que receber' },
-  pgdas_das: {
-    deadline: 'dia 20 do mês seguinte',
-    need: 'notas emitidas e recebidas até o {{prazos.notas}} e relatório das maquininhas até o {{prazos.maquininhas}}',
+  payroll: {
+    need: 'variáveis da folha (faltas, horas extras, comissões); depois, pagar os salários',
+    due: '{{prazos.folha}}; salários até o 5º dia útil',
   },
-  defis: { deadline: '31/03 (ano anterior)', need: 'dados do ano (sócios e lucros distribuídos) até {{prazos.defis}}' },
-  das_mei: { deadline: 'dia 20 de cada mês', need: 'pagar a guia; avise se o faturamento chegar perto do limite do MEI' },
-  dasn_simei: { deadline: '31/05 (ano anterior)', need: 'notas e relatório de receitas de cada mês até o {{prazos.notas}}' },
-  pis_cofins: { deadline: 'dia 25 do mês seguinte (antecipa se não for dia útil)', need: 'notas emitidas e recebidas até o {{prazos.notas}}' },
-  efd_contribuicoes: { deadline: '10º dia útil do 2º mês seguinte', need: 'nada além das notas' },
-  efd_icms_ipi: { deadline: 'conforme o estado', need: 'notas e inventário de estoque' },
-  irpj_csll_quarterly: {
-    deadline: 'trimestral: último dia útil de abril, julho, outubro e janeiro (pode dividir em 3 quotas)',
-    need: 'notas até o {{prazos.notas}}',
-  },
-  irpj_csll_monthly_estimate: { deadline: 'estimativa mensal: último dia útil do mês seguinte', need: 'notas até o {{prazos.notas}} e extratos até o {{prazos.extratos}}' },
-  ecd: { deadline: 'último dia útil de junho', need: 'nada além dos envios mensais' },
-  ecf: { deadline: 'último dia útil de julho', need: 'nada além dos envios mensais' },
+  esocial_periodic: { need: 'Nada: fazemos a partir da folha' },
+  fgts_digital: { need: 'pagar a guia que enviamos', due: 'até o vencimento da guia' },
+  dctfweb: { need: 'Nada para declarar: só pagar o DARF que enviamos', due: 'até o vencimento do DARF' },
+  efd_reinf: { need: 'nota de serviço com retenção (INSS, IR, PIS/COFINS/CSLL)', due: 'sempre que houver, no dia em que receber' },
+  pgdas_das: { need: 'notas emitidas e recebidas; depois, pagar o DAS que enviamos', due: '{{prazos.notas}} do mês seguinte' },
+  defis: { need: 'dados do ano: sócios e lucros distribuídos', due: '{{prazos.defis}}' },
+  das_mei: { need: 'pagar a guia; avise se o faturamento chegar perto do limite do MEI', due: 'até o vencimento da guia' },
+  dasn_simei: { need: 'notas e relatório de receitas de cada mês', due: '{{prazos.notas}} do mês seguinte' },
+  pis_cofins: { need: 'notas emitidas e recebidas', due: '{{prazos.notas}} do mês seguinte' },
+  efd_contribuicoes: { need: 'Nada: fazemos a partir das notas que você envia' },
+  efd_icms_ipi: { need: 'notas emitidas e recebidas; inventário do estoque uma vez por ano', due: '{{prazos.notas}} do mês seguinte' },
+  irpj_csll_quarterly: { need: 'notas e extratos de cada mês', due: '{{prazos.notas}} do mês seguinte' },
+  irpj_csll_monthly_estimate: { need: 'notas e extratos de cada mês', due: '{{prazos.notas}} do mês seguinte' },
+  ecd: { need: 'Nada: fazemos a partir dos envios mensais' },
+  ecf: { need: 'Nada: fazemos a partir dos envios mensais' },
 };
 
-/** "O que precisamos de você" of a recurring task without catalog text. */
-export const ONBOARDING_DEFAULT_NEED = 'documentos do mês até o {{prazos.notas}}';
+/** "O que precisamos de você" and "até quando" of a recurring task without catalog text. */
+export const ONBOARDING_DEFAULT_NEED = 'documentos do mês';
+export const ONBOARDING_DEFAULT_DUE = '{{prazos.notas}} do mês seguinte';
 
 export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
   {
@@ -169,9 +171,9 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
     subtitles: [{ id: 'main', text: 'Leitura de 10 minutos. Este link vale por {{prazos.link}} e mostra sempre a versão mais recente; baixe o PDF para guardar.' }],
     items: [
       { id: 'work', text: 'Como trabalhamos juntos' },
-      { id: 'obligations', text: 'Suas obrigações e prazos' },
+      { id: 'obligations', text: 'O que fazemos e o que você envia' },
       { id: 'documents', text: 'Documentos e como enviar' },
-      { id: 'employees', text: 'Empregados: registro, férias, rescisão, eSocial' },
+      { id: 'employees', text: 'Empregados: registro, férias, rescisão e avisos' },
       { id: 'fines', text: 'Atenção às multas e primeiros passos' },
     ],
   },
@@ -217,33 +219,27 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
       { id: 'real-fiscal', label: '4 · Fiscal', text: 'PIS/COFINS, IRPJ/CSLL por estimativa, DCTFWeb e EFD-Contribuições', when: when(REAL) },
       { id: 'profit-accounting', label: '3 · Contábil', text: 'balancete mensal, ECD e ECF anuais', when: when(PROFIT) },
       { id: 'personnel', label: '5 · Pessoal', text: 'folha, eSocial, FGTS, DCTFWeb e obrigações anuais' },
-      {
-        id: 'dates',
-        label: 'Suas datas no mês',
-        text: '{{prazos.folha}}, {{prazos.notas}}, 5º dia útil e dia 20',
-        when: { notRegimes: PROFIT },
-      },
-      { id: 'dates-profit', label: 'Suas datas no mês', text: '{{prazos.folha}}, {{prazos.notas}}, 5º dia útil, dia 20 e dia 25', when: when(PROFIT) },
+      { id: 'dates', label: 'Suas datas no mês', text: '{{prazos.folha}}, {{prazos.notas}} e 5º dia útil' },
     ],
   },
   {
     key: 'fiscal',
     title: 'Fiscal',
     area: 'fiscal',
-    subtitles: [{ id: 'main', text: 'Obrigação · prazo legal · o que precisamos de você.' }],
+    subtitles: [{ id: 'main', text: 'O que fazemos por você, o que precisamos e até quando. Os prazos do governo ficam com a gente.' }],
     items: [
       {
         id: 'simples-cards',
         label: 'Vendas no cartão e PIX',
-        text: 'as operadoras informam ao fisco',
-        detail: 'relatório das maquininhas até o {{prazos.maquininhas}}',
+        detail: 'relatório de vendas de cada maquininha e do PIX (as operadoras informam ao fisco)',
+        due: '{{prazos.maquininhas}} do mês seguinte',
         when: when(SIMPLES),
       },
       {
         id: 'simples-other-taxes',
         label: 'Guias fora do DAS (ICMS-ST, DIFAL, ISS retido)',
-        text: 'conforme estado e prefeitura',
-        detail: 'notas de compra até o {{prazos.notas}}',
+        detail: 'notas de compra e de serviços contratados',
+        due: '{{prazos.notas}} do mês seguinte',
         when: when(SIMPLES),
       },
     ],
@@ -257,71 +253,68 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
       {
         id: 'mei-cash-book',
         label: 'Controle de receitas e livro caixa',
-        text: 'sem prazo legal (recomendado)',
-        detail: 'extratos de todas as contas até o {{prazos.extratos}}',
+        detail: 'extratos de todas as contas',
+        due: '{{prazos.extratos}} do mês seguinte',
         when: when(MEI),
       },
       {
         id: 'mei-pro-labore',
         label: 'Pró-labore e distribuição de lucros',
-        text: 'não se aplicam ao MEI',
-        detail: 'sua contribuição ao INSS já está no DAS-MEI',
+        detail: 'Nada: não se aplicam ao MEI; sua contribuição ao INSS já está no DAS-MEI',
         when: when(MEI),
       },
       {
         id: 'reconciliation',
-        label: 'Conciliação e balancete',
-        text: 'mensal',
-        detail: 'extratos de todas as contas até o {{prazos.extratos}}',
+        label: 'Conciliação e balancete mensal',
+        detail: 'extratos de todas as contas e aplicações',
+        due: '{{prazos.extratos}} do mês seguinte',
         when: when(['simples_nacional', 'presumed_profit']),
       },
       {
         id: 'real-reconciliation',
-        label: 'Conciliação e balancete',
-        text: 'mensal (base da estimativa de IRPJ/CSLL)',
-        detail: 'extratos de todas as contas até o {{prazos.extratos}}',
+        label: 'Conciliação e balancete mensal (base do IRPJ/CSLL)',
+        detail: 'extratos de todas as contas e aplicações',
+        due: '{{prazos.extratos}} do mês seguinte',
         when: when(REAL),
       },
       {
         id: 'simples-balance',
         label: 'Balanço anual',
-        text: 'contas aprovadas pelos sócios até 30/04 (art. 1.078 do Código Civil)',
-        detail: 'nada além dos envios mensais',
+        detail: 'Nada: fazemos a partir dos envios mensais',
         when: when(SIMPLES),
       },
       {
         id: 'real-inventory',
         label: 'Inventário de estoque',
-        text: 'posição em 31/12',
-        detail: 'contagem do estoque em janeiro',
+        detail: 'contagem do estoque em 31/12',
+        due: 'em janeiro',
         when: when(REAL),
       },
       {
         id: 'pro-labore',
         label: 'Pró-labore',
-        text: 'mensal, com INSS (DCTFWeb e DARF dia 20)',
-        detail: 'valor de cada sócio até o {{prazos.proLabore}}',
+        detail: 'valor de cada sócio no mês',
+        due: '{{prazos.proLabore}} do mês seguinte',
         when: when(['simples_nacional', 'presumed_profit']),
       },
       {
         id: 'profits',
         label: 'Lucros dos sócios',
-        text: 'acima de R$ 50 mil no mês por sócio, retenção de 10% de IR (Lei 15.270/2025)',
-        detail: 'avise antes de retirar',
+        detail: 'valor de cada retirada (acima de R$ 50 mil no mês por sócio, retém 10% de IR)',
+        due: 'antes de retirar',
         when: when(['simples_nacional', 'presumed_profit']),
       },
       {
         id: 'real-pro-labore',
         label: 'Pró-labore e lucros',
-        text: 'pró-labore com INSS; lucros acima de R$ 50 mil/mês por sócio retêm 10% de IR',
-        detail: 'valor do pró-labore até o {{prazos.proLabore}}; avise antes de retirar lucros',
+        detail: 'valor do pró-labore de cada sócio e de cada retirada de lucros (acima de R$ 50 mil/mês por sócio, retém 10% de IR)',
+        due: 'pró-labore no {{prazos.proLabore}}; lucros antes de retirar',
         when: when(REAL),
       },
       {
         id: 'simples-no-ecd',
         label: 'ECD e ECF',
-        text: 'não se aplicam ao Simples Nacional',
-        detail: 'nada',
+        detail: 'Nada: não se aplicam ao Simples Nacional',
         when: when(SIMPLES),
       },
     ],
@@ -338,49 +331,44 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
       {
         id: 'payroll',
         label: 'Folha e salários',
-        text: 'salários até o 5º dia útil do mês seguinte',
-        detail: 'variáveis da folha até o {{prazos.folha}} do mês seguinte',
+        detail: 'variáveis da folha (faltas, horas extras, comissões); depois, pagar os salários',
+        due: '{{prazos.folha}}; salários até o 5º dia útil',
         covers: 'payroll',
       },
       {
         id: 'advance',
         label: 'Adiantamento quinzenal',
-        text: 'dia 20 de cada mês',
-        detail: 'nada: calculamos na folha',
+        detail: 'pagar o adiantamento com o recibo que enviamos',
+        due: 'dia 20 de cada mês',
         when: rule({ payrollAdvance: true }),
       },
-      { id: 'esocial', label: 'eSocial', text: 'dia 15 do mês seguinte', detail: 'nada: enviamos a partir da folha', covers: 'esocial_periodic' },
-      { id: 'fgts', label: 'FGTS Digital', text: 'dia 20 do mês seguinte', detail: 'pagar a guia que enviamos', covers: 'fgts_digital' },
+      { id: 'esocial', label: 'eSocial', detail: 'Nada: fazemos a partir da folha e dos seus avisos', covers: 'esocial_periodic' },
+      { id: 'fgts', label: 'FGTS Digital', detail: 'pagar a guia que enviamos', due: 'até o vencimento da guia', covers: 'fgts_digital' },
       {
         id: 'dctfweb',
         label: 'DCTFWeb (INSS e IRRF da folha)',
-        text: 'DARF dia 20; declaração no último dia útil do mês seguinte',
-        detail: 'pagar o DARF',
+        detail: 'Nada para declarar: só pagar o DARF que enviamos',
+        due: 'até o vencimento do DARF',
         covers: 'dctfweb',
       },
       {
         id: 'thirteenth',
-        label: '13º e informe de rendimentos',
-        text: '13º em 30/11 e 20/12; informe até o último dia útil de fevereiro',
-        detail: 'nada: preparamos tudo',
+        label: '13º salário',
+        detail: 'pagar as duas parcelas com os recibos que enviamos',
+        due: '30/11 e 20/12',
       },
     ],
   },
   {
     key: 'month',
     title: 'Seu mês em uma linha',
-    subtitles: [
-      { id: 'main', text: 'Data em fim de semana ou feriado pode antecipar ou adiar: a guia que enviamos já vem com o vencimento certo.' },
-    ],
+    subtitles: [{ id: 'main', text: 'Só as datas em que você faz algo. O resto é com a gente.' }],
     items: [
-      { id: 'variables', label: 'Até o {{prazos.folha}}', text: 'você envia as variáveis da folha do mês anterior' },
+      { id: 'variables', label: 'Até o {{prazos.folha}}', text: 'você envia as variáveis da folha e o pró-labore do mês anterior', when: { notRegimes: MEI } },
+      { id: 'variables-mei', label: 'Até o {{prazos.folha}}', text: 'você envia as variáveis da folha do mês anterior', when: when(MEI) },
       { id: 'salaries', label: 'Até o 5º dia útil', text: 'você paga os salários' },
-      { id: 'documents', label: 'Até o {{prazos.notas}}', text: 'você envia notas fiscais, extratos e maquininhas do mês anterior' },
-      { id: 'esocial', label: 'Dia 15', text: 'nós enviamos o eSocial' },
-      { id: 'pay-mei', label: 'Dia 20', text: 'você paga o DAS-MEI', when: when(MEI) },
-      { id: 'pay-simples', label: 'Dia 20', text: 'você paga o DAS', when: when(SIMPLES) },
-      { id: 'pay-profit', label: 'Dia 20', text: 'você paga DARFs, FGTS e INSS', when: when(PROFIT) },
-      { id: 'pis-cofins', label: 'Dia 25', text: 'você paga PIS e COFINS', when: when(PROFIT) },
+      { id: 'documents', label: 'Até o {{prazos.notas}}', text: 'você envia notas fiscais, extratos e maquininhas/PIX do mês anterior' },
+      { id: 'guides', label: 'No vencimento', text: 'você paga cada guia até o vencimento indicado nela (enviamos antes)' },
     ],
   },
   {
@@ -438,7 +426,7 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
         text: 'nós agendamos o exame admissional (ASO); o empregado comparece na data marcada',
         when: rule({ admissionExamByClient: false }),
       },
-      { id: 'esocial', label: 'Até o dia anterior', text: 'registramos no eSocial (S-2200) e enviamos o contrato' },
+      { id: 'esocial', label: 'Nós registramos', text: 'o empregado no eSocial e enviamos o contrato para assinar' },
       { id: 'first-day', label: 'No 1º dia', text: 'empregado assina o contrato e começa a trabalhar' },
       { id: 'trial', label: 'Experiência de até 90 dias', text: 'decida antes do fim se vai efetivar' },
     ],
@@ -479,7 +467,7 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
       },
       { id: 'calculate', label: 'Nós calculamos', text: 'verbas, FGTS e regras da convenção coletiva ({{sindicato}})' },
       { id: 'pay', label: 'Até 10 dias corridos', text: 'pague as verbas e entregue os documentos (art. 477 da CLT)' },
-      { id: 'fgts', label: 'No mesmo prazo', text: 'guia do FGTS rescisório e baixa no eSocial (S-2299)' },
+      { id: 'fgts', label: 'No mesmo prazo', text: 'pague a guia do FGTS rescisório que enviamos; nós cuidamos do eSocial' },
       {
         id: 'union',
         label: 'Sindicato',
@@ -496,14 +484,28 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
   },
   {
     key: 'esocial',
-    title: 'Prazos do eSocial',
-    subtitles: [{ id: 'main', text: 'Nós enviamos. Você só precisa nos avisar a tempo.' }],
+    title: 'Quando nos avisar',
+    subtitles: [{ id: 'main', text: 'Nós cuidamos do eSocial. Você só precisa nos avisar a tempo, por {{emails.pessoal}}.' }],
     items: [
-      { id: 's2200', label: 'Admissão (S-2200)', text: 'até o dia anterior ao início' },
-      { id: 's2299', label: 'Desligamento (S-2299)', text: 'até 10 dias após' },
-      { id: 's2210', label: 'Acidente de trabalho (S-2210)', text: '1º dia útil seguinte; avise no mesmo dia' },
-      { id: 's1200', label: 'Folha do mês (S-1200 e S-1299)', text: 'dia 15 do mês seguinte' },
-      { id: 'others', label: 'Afastamentos, alterações e exames (S-2230, S-2206, S-2220)', text: 'dia 15 do mês seguinte' },
+      { id: 'admission', label: 'Admissão', text: '{{prazos.admissao}} antes do 1º dia', detail: 'dados e documentos do empregado' },
+      { id: 'vacation', label: 'Férias', text: '{{prazos.ferias}} antes da saída', detail: 'nome, período e aviso assinado' },
+      {
+        id: 'termination',
+        label: 'Rescisão',
+        text: 'antes de comunicar o empregado',
+        detail: 'tipo de desligamento, data e aviso prévio',
+        when: rule({ terminationRequestFirst: true }),
+      },
+      {
+        id: 'termination-after',
+        label: 'Rescisão',
+        text: 'no mesmo dia do aviso',
+        detail: 'tipo de desligamento, data e aviso prévio',
+        when: rule({ terminationRequestFirst: false }),
+      },
+      { id: 'leave', label: 'Afastamentos, atestados e acidente de trabalho', text: 'no mesmo dia', detail: 'atestado ou relato, data e motivo' },
+      { id: 'changes', label: 'Salário, cargo ou jornada', text: 'antes de aplicar a mudança', detail: 'o que muda e a partir de quando' },
+      { id: 'variables', label: 'Variáveis da folha', text: 'até o {{prazos.folha}} do mês seguinte', detail: 'faltas, horas extras e comissões' },
     ],
   },
   {
@@ -511,11 +513,15 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
     title: 'Atenção: multas',
     subtitles: [{ id: 'main', text: 'Quase todas se evitam com um aviso antes.' }],
     items: [
-      { id: 'union', label: 'Rescisão fora das regras do sindicato', text: 'a convenção coletiva da sua categoria pode prever multa' },
-      { id: 'late-payment', label: 'Verbas fora do prazo', text: 'pagou depois de 10 dias: multa de um salário ao empregado (art. 477 da CLT)' },
+      { id: 'late-documents', label: 'Documentos atrasados', text: 'atrasam guias e declarações; a multa por atraso é da empresa' },
       { id: 'unregistered', label: 'Trabalho antes do registro', text: 'multa por empregado, a partir de R$ 800 em ME/EPP (art. 47 da CLT)' },
-      { id: 'late-tax', label: 'Guia paga com atraso', text: 'multa de 0,33% ao dia, até 20%, + juros Selic' },
+      {
+        id: 'termination',
+        label: 'Rescisão fora do prazo ou da convenção',
+        text: 'verbas depois de 10 dias: multa de um salário (art. 477 da CLT); a convenção coletiva pode prever outras',
+      },
       { id: 'vacation', label: 'Férias fora do prazo', text: 'pagamento em dobro (art. 137 da CLT)' },
+      { id: 'late-tax', label: 'Guia paga com atraso', text: 'multa de 0,33% ao dia, até 20%, + juros Selic' },
     ],
   },
   {
@@ -546,9 +552,9 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
   },
 ];
 
-const ITEM_FIELDS = ['label', 'text', 'detail', 'code'] as const;
+const ITEM_FIELDS = ['label', 'text', 'detail', 'code', 'due'] as const;
 
-/** Key of a text: `<slide>.title`, `<slide>.kicker`, `<slide>.subtitle.<id>`, `<slide>.items.<id>.<field>`, `obligations.<key>.deadline|need`, `obligations.default.need`. */
+/** Key of a text: `<slide>.title`, `<slide>.kicker`, `<slide>.subtitle.<id>`, `<slide>.items.<id>.<field>`, `obligations.<key>.need|due`, `obligations.default.need|due`. */
 export function onboardingTextKeys(): string[] {
   const keys: string[] = [];
   for (const slide of ONBOARDING_TEMPLATE_SLIDES) {
@@ -559,8 +565,11 @@ export function onboardingTextKeys(): string[] {
       for (const field of ITEM_FIELDS) if (item[field] !== undefined) keys.push(`${slide.key}.items.${item.id}.${field}`);
     }
   }
-  for (const key of Object.keys(ONBOARDING_OBLIGATION_TEXTS)) keys.push(`obligations.${key}.deadline`, `obligations.${key}.need`);
-  keys.push('obligations.default.need');
+  for (const [key, t] of Object.entries(ONBOARDING_OBLIGATION_TEXTS)) {
+    keys.push(`obligations.${key}.need`);
+    if (t.due !== undefined) keys.push(`obligations.${key}.due`);
+  }
+  keys.push('obligations.default.need', 'obligations.default.due');
   return keys;
 }
 
@@ -576,9 +585,10 @@ export function onboardingHideableKeys(): string[] {
 export function onboardingFactoryText(key: string): string | undefined {
   const [head, kind, id, field] = key.split('.');
   if (head === 'obligations') {
-    if (kind === 'default') return id === 'need' && field === undefined ? ONBOARDING_DEFAULT_NEED : undefined;
+    if (field !== undefined) return undefined;
+    if (kind === 'default') return id === 'need' ? ONBOARDING_DEFAULT_NEED : id === 'due' ? ONBOARDING_DEFAULT_DUE : undefined;
     const t = kind ? ONBOARDING_OBLIGATION_TEXTS[kind] : undefined;
-    return t && (id === 'deadline' || id === 'need') && field === undefined ? t[id] : undefined;
+    return t && (id === 'need' || id === 'due') ? t[id] : undefined;
   }
   const slide = ONBOARDING_TEMPLATE_SLIDES.find((s) => s.key === head);
   if (!slide) return undefined;
