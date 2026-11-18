@@ -116,6 +116,7 @@ export const SLIDE_SECTION: Partial<Record<OnboardingSlideKey, number>> = {
   admission: 4,
   vacation: 4,
   termination: 4,
+  safety: 4,
   esocial: 4,
   fines: 5,
   firstSteps: 5,

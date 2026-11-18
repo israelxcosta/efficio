@@ -15,7 +15,7 @@ import type { TaxRegime } from './constants';
 import type { OnboardingCondition, OnboardingObligationText, OnboardingParams, OnboardingTemplateSlide } from './onboarding';
 
 /** Bump when the factory content changes: the document's `updatedAt` takes it into account. */
-export const ONBOARDING_FACTORY_VERSION = '2026-11-20';
+export const ONBOARDING_FACTORY_VERSION = '2026-11-21';
 
 /** Placeholders the texts may use (value: description for the editor). */
 export const ONBOARDING_PLACEHOLDERS: Record<string, string> = {
@@ -173,7 +173,7 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
       { id: 'work', text: 'Como trabalhamos juntos' },
       { id: 'obligations', text: 'O que fazemos e o que você envia' },
       { id: 'documents', text: 'Documentos e como enviar' },
-      { id: 'employees', text: 'Empregados: registro, férias, rescisão e avisos' },
+      { id: 'employees', text: 'Empregados: registro, férias, rescisão, saúde e segurança e avisos' },
       { id: 'fines', text: 'Atenção às multas e primeiros passos' },
     ],
   },
@@ -417,7 +417,7 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
       {
         id: 'exam',
         label: 'Antes do 1º dia',
-        text: 'você agenda o exame admissional (ASO) e nos envia o atestado',
+        text: 'você agenda o exame admissional (ASO) na clínica de medicina do trabalho e nos envia o atestado',
         when: rule({ admissionExamByClient: true }),
       },
       {
@@ -483,6 +483,40 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
     ],
   },
   {
+    key: 'safety',
+    title: 'Saúde e segurança do trabalho',
+    subtitles: [
+      {
+        id: 'main',
+        text: 'Obrigatório por lei para quem tem empregados: você contrata uma clínica de medicina do trabalho ou um engenheiro de segurança. Nós não emitimos laudos nem exames.',
+      },
+    ],
+    items: [
+      { id: 'contract', label: 'Contratar clínica ou engenheiro', text: 'você', detail: 'antes da 1ª admissão' },
+      { id: 'pgr', label: 'PGR: riscos do ambiente (NR-1)', text: 'engenheiro ou técnico de segurança', detail: 'antes da 1ª admissão; revisão a cada 2 anos' },
+      { id: 'pcmso', label: 'PCMSO: controle médico (NR-7)', text: 'médico do trabalho', detail: 'a partir do PGR, antes dos exames' },
+      {
+        id: 'exams',
+        label: 'Exames ocupacionais (ASO)',
+        text: 'clínica; você agenda o empregado',
+        detail: 'admissional antes do 1º dia; demissional até 10 dias após o fim; periódico e retorno conforme o PCMSO',
+      },
+      {
+        id: 'reports',
+        label: 'Laudos: insalubridade, periculosidade e LTCAT',
+        text: 'engenheiro ou médico do trabalho',
+        detail: 'se houver agente de risco: base dos adicionais',
+      },
+      { id: 'send', label: 'Cópia dos ASOs e laudos', text: 'você ou a clínica', detail: 'para {{emails.pessoal}}: entram no eSocial' },
+      {
+        id: 'exemption',
+        label: 'ME e EPP de risco 1 ou 2',
+        text: 'você declara no gov.br',
+        detail: 'sem agente de risco: sem PGR e PCMSO; exames sim',
+      },
+    ],
+  },
+  {
     key: 'esocial',
     title: 'Quando nos avisar',
     subtitles: [{ id: 'main', text: 'Nós cuidamos do eSocial. Você só precisa nos avisar a tempo, por {{emails.pessoal}}.' }],
@@ -521,6 +555,11 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
         text: 'verbas depois de 10 dias: multa de um salário (art. 477 da CLT); a convenção coletiva pode prever outras',
       },
       { id: 'vacation', label: 'Férias fora do prazo', text: 'pagamento em dobro (art. 137 da CLT)' },
+      {
+        id: 'safety',
+        label: 'Sem PGR, PCMSO ou exames em dia',
+        text: 'auto de infração da fiscalização do trabalho, por item descumprido (NR-28)',
+      },
       { id: 'late-tax', label: 'Guia paga com atraso', text: 'multa de 0,33% ao dia, até 20%, + juros Selic' },
     ],
   },
@@ -536,6 +575,7 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
       { id: 'access', label: 'Acessos', text: 'da prefeitura e da Sefaz (notas fiscais)', when: { notRegimes: ['mei', 'simples_nacional'] } },
       { id: 'closing', label: 'Fechamento do mês anterior', text: 'com o contador anterior: balancete, extratos e guias pagas' },
       { id: 'employees', label: 'Empregados', text: 'fichas, últimas folhas, férias vencidas e 13º já pago (se houver)' },
+      { id: 'safety', label: 'Saúde e segurança', text: 'contrato com a clínica ou o engenheiro, PGR, PCMSO e ASOs (se houver empregados)' },
       { id: 'routine', label: 'Todo mês', text: 'notas e extratos até o {{prazos.notas}}; variáveis da folha até o {{prazos.folha}}' },
     ],
   },

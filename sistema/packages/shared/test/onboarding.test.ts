@@ -58,7 +58,7 @@ const allText = (doc: OnboardingDocument) => JSON.stringify(doc.slides);
 const LEGAL_DATES = /dia 15|dia 20 do mês|dia 25|último dia útil|31\/03|31\/05|S-2200|S-2299|S-1200|dia anterior ao início|informe de rendimentos|prazo legal/i;
 
 describe('onboarding template', () => {
-  it('has the 18 slides in order and every key resolves to its factory text', () => {
+  it('has the 19 slides in order and every key resolves to its factory text', () => {
     expect(ONBOARDING_TEMPLATE_SLIDES.map((s) => s.key)).toEqual([...ONBOARDING_SLIDE_KEYS]);
     const keys = onboardingTextKeys();
     expect(new Set(keys).size).toBe(keys.length);
@@ -79,7 +79,7 @@ describe('onboarding template', () => {
 describe('buildOnboardingDocument', () => {
   it('Simples Nacional with employees: tasks by area, fixed rows, placeholders filled', () => {
     const doc = build('simples_nacional', 3);
-    expect(doc.slides).toHaveLength(18);
+    expect(doc.slides).toHaveLength(19);
     expect(doc.title).toBe('Efficio Contabilidade · Onboarding do cliente · Padaria Pão Quente Ltda');
     expect(slide(doc, 'cover').items.map((i) => i.text)).toEqual([
       'Pão Quente · CNPJ 11.222.333/0001-81',
@@ -104,7 +104,7 @@ describe('buildOnboardingDocument', () => {
     expect(slide(doc, 'personnel').subtitle).toBe('Hoje são 3 empregados, com obrigações todo mês. A maior parte é com a gente.');
     expect(slide(doc, 'sending').items[0]).toMatchObject({ label: 'fiscal@efficio.com.br', code: 'Notas fiscais 10/2026 | Padaria Pão Quente Ltda' });
     expect(slide(doc, 'sending').items.find((i) => i.id === 'accounting')!.code).toBe('Extratos bancários 10/2026 | Padaria Pão Quente Ltda');
-    expect(slide(doc, 'firstSteps').items.map((i) => i.id)).toEqual(['contract', 'ecac', 'access-simples', 'closing', 'employees', 'routine']);
+    expect(slide(doc, 'firstSteps').items.map((i) => i.id)).toEqual(['contract', 'ecac', 'access-simples', 'closing', 'employees', 'safety', 'routine']);
     expect(doc.missing).toEqual(['escritorio.crc', 'escritorio.email', 'escritorio.whatsapp']);
     expect(allText(doc)).not.toMatch(/\{\{/);
   });
@@ -118,10 +118,10 @@ describe('buildOnboardingDocument', () => {
     expect(slide(doc, 'personnel').subtitle).toBe('Hoje você não tem empregados. Quando contratar, é assim que funciona.');
     expect(slide(doc, 'cover').items[3]!.text).toBe('Sem empregados · SINDCOM');
     expect(slide(doc, 'numbers').items.map((i) => i.id)).toEqual(['mei-fiscal', 'mei-accounting', 'personnel', 'dates']);
-    expect(slide(doc, 'firstSteps').items.map((i) => i.id)).toEqual(['ccmei', 'ecac', 'access-simples', 'closing', 'employees', 'routine']);
+    expect(slide(doc, 'firstSteps').items.map((i) => i.id)).toEqual(['ccmei', 'ecac', 'access-simples', 'closing', 'employees', 'safety', 'routine']);
     expect(slide(doc, 'month').items.map((i) => i.id)).toEqual(['variables-mei', 'salaries', 'documents', 'guides']);
     expect(slide(doc, 'fiscal').table!.map((r) => r.due)).toEqual(['até o vencimento da guia', 'dia 10 do mês seguinte']);
-    for (const key of ['admission', 'vacation', 'termination', 'esocial']) expect(slide(doc, key).items.length).toBeGreaterThan(0);
+    for (const key of ['admission', 'vacation', 'termination', 'safety', 'esocial']) expect(slide(doc, key).items.length).toBeGreaterThan(0);
   });
 
   it('personnel content is the same with 0 or more employees (only the supporting sentence changes)', () => {
@@ -147,7 +147,7 @@ describe('buildOnboardingDocument', () => {
     const real = build('real_profit', 0);
     expect(names(real, 'fiscal')).toContain('IRPJ e CSLL — estimativa mensal');
     expect(names(real, 'accounting')).toEqual(['ECD', 'ECF', 'Conciliação e balancete mensal (base do IRPJ/CSLL)', 'Inventário de estoque', 'Pró-labore e lucros']);
-    expect(slide(real, 'firstSteps').items.map((i) => i.id)).toEqual(['contract', 'ecac', 'access', 'closing', 'employees', 'routine']);
+    expect(slide(real, 'firstSteps').items.map((i) => i.id)).toEqual(['contract', 'ecac', 'access', 'closing', 'employees', 'safety', 'routine']);
     expect(slide(real, 'fiscal').table!.find((r) => r.key === 'irpj_csll_monthly_estimate')!.due).toBe('dia 10 do mês seguinte');
   });
 

@@ -34,6 +34,11 @@ eSocial periódicos (S-1200/S-1299) dia 15; DCTFWeb último dia útil do mês se
 Admissão S-2200 até o dia anterior ao início; desligamento S-2299 até 10 dias; CAT S-2210 1º dia útil
 seguinte; salário até o 5º dia útil; rescisão paga em até 10 dias corridos (art. 477, multa de um salário);
 férias: aviso 30 dias antes (art. 135) e pagamento até 2 dias antes (art. 145); 13º: 30/11 e 20/12.
+SST: toda empresa com empregados contrata clínica de medicina do trabalho ou engenheiro de segurança
+(o escritório não emite laudos nem exames): PGR (NR-1, revisão a cada 2 anos), PCMSO (NR-7), ASOs
+(admissional antes do 1º dia; demissional até 10 dias após o fim do contrato), laudos de insalubridade/
+periculosidade e LTCAT; ME/EPP de risco 1 ou 2 sem agentes de risco ficam dispensadas de PGR e PCMSO por
+declaração, mas não dos exames.
 Quando houver dúvida, pesquise em fonte oficial (gov.br, Receita, eSocial) e cite.
 
 ## Entregas

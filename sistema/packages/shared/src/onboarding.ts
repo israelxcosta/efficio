@@ -9,7 +9,7 @@ import { onboardingHideableKeys, onboardingTextKeys } from './onboarding-templat
 import { isValidCPF, onlyDigits } from './utils/documents';
 import type { ISODate } from './utils/dates';
 
-/** The 18 slides of the document, in order. */
+/** The 19 slides of the document, in order. */
 export const ONBOARDING_SLIDE_KEYS = [
   'cover',
   'summary',
@@ -25,6 +25,7 @@ export const ONBOARDING_SLIDE_KEYS = [
   'admission',
   'vacation',
   'termination',
+  'safety',
   'esocial',
   'fines',
   'firstSteps',

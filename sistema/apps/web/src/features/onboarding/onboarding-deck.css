@@ -646,6 +646,17 @@
   font-weight: 500;
   color: var(--ob-gray);
 }
+.ob-tsst .ob-tr {
+  grid-template-columns: 52px 470px 380px 1fr;
+}
+.ob-tsst .ob-b {
+  font-weight: 700;
+  color: var(--ob-p6);
+}
+.ob-tsst .ob-c {
+  font-weight: 500;
+  color: var(--ob-gray);
+}
 .ob-tmul .ob-tr {
   grid-template-columns: 52px 520px 1fr;
 }
@@ -1350,6 +1361,7 @@
   .ob-tobl .ob-tr,
   .ob-tdocs .ob-tr,
   .ob-tes .ob-tr,
+  .ob-tsst .ob-tr,
   .ob-tmul .ob-tr,
   .ob-dense .ob-tr {
     grid-template-columns: 32px 1fr;

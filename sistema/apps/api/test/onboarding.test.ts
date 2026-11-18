@@ -131,7 +131,7 @@ describe('onboarding template and client adjustment', () => {
     const doc = async (id: string) => (await owner.get(`/clients/${id}/onboarding/document`)).body as OnboardingDocument;
 
     const s = await doc(simples);
-    expect(s.slides).toHaveLength(18);
+    expect(s.slides).toHaveLength(19);
     expect(tableNames(s, 'fiscal')).toEqual(expect.arrayContaining(['PGDAS-D e DAS', 'DEFIS', 'DCTFWeb', 'Vendas no cartão e PIX']));
     expect(tableNames(s, 'personnel')).toEqual(['Folha de pagamento', 'eSocial — eventos periódicos', 'FGTS Digital', '13º salário']);
     expect(s.client).toMatchObject({ regime: 'simples_nacional', regimeLabel: 'Simples Nacional', employees: 0, clientSince: '2025-01-10', union: null });
@@ -248,7 +248,7 @@ describe('onboarding links and the public page', () => {
     expect(opened.headers['cache-control']).toBe('no-store');
     expect(opened.headers['x-robots-tag']).toContain('noindex');
     const pub = opened.json();
-    expect(pub.document.slides).toHaveLength(18);
+    expect(pub.document.slides).toHaveLength(19);
     expect(pub.confirmedAt).toBeNull();
     // Nothing sensitive: no phone, e-mail or responsible of the registry.
     expect(opened.body).not.toContain('98765');

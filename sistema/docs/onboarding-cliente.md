@@ -69,3 +69,14 @@ indicado nela". Tabelas: o que fazemos · o que precisamos de você · até quan
 quando não precisamos de nada). O slide "Prazos do eSocial" virou "Quando nos avisar". Textos salvos com
 chaves de prazo legal (`obligations.*.deadline`, `<slide>.items.*.text` das tabelas, itens antigos do eSocial e
 de "Seu mês") são descartados na leitura.
+
+## Saúde e segurança do trabalho (21/11/2026)
+Pedido do dono: informar que a empresa é obrigada a contratar **clínica de medicina do trabalho ou engenheiro
+de segurança** para os laudos e o acompanhamento dos exames. Novo slide `safety` ("Saúde e segurança do
+trabalho", parte 4 · Empregados, entre Rescisão e Quando nos avisar), para todos os clientes: contratar antes
+da 1ª admissão; PGR (NR-1, revisão a cada 2 anos); PCMSO (NR-7); exames/ASO (admissional antes do 1º dia,
+demissional até 10 dias após o fim, periódico e retorno conforme o PCMSO); laudos de insalubridade,
+periculosidade e LTCAT; cópias para o e-mail do pessoal; dispensa de PGR/PCMSO para ME/EPP de risco 1 ou 2
+sem agentes de risco (os exames continuam). Também: item no Sumário, exame admissional "na clínica de
+medicina do trabalho", linha "Sem PGR, PCMSO ou exames em dia" (NR-28) nas multas e item "Saúde e
+segurança" nos Primeiros passos. O documento passa a ter 19 slides.

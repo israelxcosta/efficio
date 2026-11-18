@@ -518,7 +518,7 @@ describe('demo api (PGlite)', () => {
     expect(history.body.accesses.count).toBe(3);
     expect(history.body.confirmation).toMatchObject({ name: 'Marina Albuquerque', cpf: '•••.982.247-••' });
     const preview = await call('GET', `/clients/${padaria.id}/onboarding/document`);
-    expect(preview.body.slides).toHaveLength(18);
+    expect(preview.body.slides).toHaveLength(19);
     expect(preview.body.missing).toEqual([]);
     // The seeded example link opens publicly (fixed demo token).
     const seeded = await call('GET', `/public/onboarding/${await demoOnboardingToken()}`);

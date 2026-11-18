@@ -1,4 +1,4 @@
-// Client onboarding on the web: the deck renders the 18 slides and the obligation tables, the reading
+// Client onboarding on the web: the deck renders the 19 slides and the obligation tables, the reading
 // confirmation never sends an invalid CPF, the sending builds the wa.me/mailto addresses, and the audit
 // actions have pt-BR labels.
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -84,15 +84,15 @@ const doc = (employees = 3) =>
   });
 
 describe('OnboardingDeck', () => {
-  it('renders the 18 slides in order, with the client and the office', () => {
+  it('renders the 19 slides in order, with the client and the office', () => {
     const html = renderToStaticMarkup(<OnboardingDeck doc={doc()} />);
-    expect(html.match(/<section /g)).toHaveLength(18);
+    expect(html.match(/<section /g)).toHaveLength(19);
     expect(html).toContain('id="slide-cover"');
     expect(html).toContain('id="slide-confirm"');
     expect(html).toContain('Padaria Pão Quente Ltda');
     expect(html).toContain('com a Efficio Contabilidade');
-    expect(html).toContain('<b>01</b> / 18');
-    expect(html).toContain('<b>18</b> / 18');
+    expect(html).toContain('<b>01</b> / 19');
+    expect(html).toContain('<b>19</b> / 19');
     // Summary items jump to their part.
     expect(html).toContain('Como trabalhamos juntos');
   });
@@ -166,7 +166,7 @@ describe('OnboardingDeck', () => {
     );
     expect(withLogo).toContain('ob-logo ob-logo-lg');
     // Cover on top (big) + every other slide: hidden copy on top (phone) and the footer one.
-    expect(withLogo.split(`src="${logo}"`).length - 1).toBe(1 + 17 * 2);
+    expect(withLogo.split(`src="${logo}"`).length - 1).toBe(1 + 18 * 2);
     expect(withLogo).not.toContain('ob-wordmark');
     const without = renderToStaticMarkup(<OnboardingDeck doc={doc()} />);
     expect(without).not.toContain('<img');
@@ -340,7 +340,7 @@ describe('history and editor', () => {
 
   it('lists every slide and the recurring tasks in the editor, and saves only what changed', () => {
     const sections = editorSections();
-    expect(sections).toHaveLength(19);
+    expect(sections).toHaveLength(20);
     expect(sections.at(-1)!.groups.some((g) => g.title === 'Folha de pagamento')).toBe(true);
     // No "Prazo legal" field anywhere; the tables edit "O que precisamos" and "Até quando".
     const blocks = sections.flatMap((sec) => sec.groups.flatMap((g) => g.blocks));

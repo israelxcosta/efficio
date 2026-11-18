@@ -108,6 +108,9 @@ export function Logo({ doc, size = 'md' }: { doc: OnboardingDocument; size?: 'lg
   );
 }
 
+const ESOCIAL_HEADS = ['Movimentação', 'Quando nos avisar', 'O que enviar'];
+const SAFETY_HEADS = ['O que', 'Quem faz', 'Quando'];
+
 const SPLIT: readonly OnboardingSlideKey[] = ['summary', 'howWeWork', 'termination', 'firstSteps'];
 
 function Slide({
@@ -517,19 +520,23 @@ function SlideBody({
       );
     }
     case 'esocial':
+    case 'safety': {
+      const heads = slide.key === 'safety' ? SAFETY_HEADS : ESOCIAL_HEADS;
       return (
         <>
           <Head slide={slide} />
           <div
-            className={cn('ob-tbl ob-tes', items.length > 5 && 'ob-dense')}
+            className={cn('ob-tbl', slide.key === 'safety' ? 'ob-tsst' : 'ob-tes', items.length > 5 && 'ob-dense')}
             role="table"
             aria-label={slide.title}
           >
             <div className="ob-tr ob-th" role="row">
               <span />
-              <span role="columnheader">Movimentação</span>
-              <span role="columnheader">Quando nos avisar</span>
-              <span role="columnheader">O que enviar</span>
+              {heads.map((h) => (
+                <span key={h} role="columnheader">
+                  {h}
+                </span>
+              ))}
             </div>
             {items.map((item, i) => (
               <div key={item.id} className="ob-tr" role="row">
@@ -550,6 +557,7 @@ function SlideBody({
           </div>
         </>
       );
+    }
     case 'fines':
       return (
         <>

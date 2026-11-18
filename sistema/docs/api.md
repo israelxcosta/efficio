@@ -2089,7 +2089,7 @@ Revisão de segurança das fases 2 e 3, reexecutável e compatível com o PGlite
 ## Onboarding do cliente (migração 0025)
 
 Projeto: `docs/onboarding-cliente.md`; conteúdo de fábrica: `packages/shared/src/onboarding-template.ts`
-(18 slides do `conteudo.md`, por bloco, com `when: { regimes?, notRegimes?, employees?: 'some'|'none' }`
+(19 slides: os 18 do `conteudo.md` + Saúde e segurança, por bloco, com `when: { regimes?, notRegimes?, employees?: 'some'|'none' }`
 no lugar das marcações `[se …]`); montagem pura e testável: `buildOnboardingDocument`
 (`packages/shared/src/utils/onboarding.ts`), usada pela API, pelo demo e pela prévia do web.
 
