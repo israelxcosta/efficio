@@ -2,6 +2,12 @@
 
 Formato: um bloco por slide. **Título** (≤ 6 palavras) · *Apoio* (≤ 2 linhas) · itens (≤ 5).
 
+**Regra do dono (20/11/2026): o onboarding não mostra vencimentos de obrigações acessórias** (DCTFWeb,
+EFD-Reinf, eSocial, DEFIS, DASN-SIMEI, ECD/ECF, SPED, informe de rendimentos…): essa informação só importa
+ao escritório. O documento mostra **só o que o cliente entrega e quando** (prazos internos dos Parâmetros) e
+os prazos trabalhistas que o próprio cliente cumpre (salário até o 5º dia útil, aviso de férias 30 dias antes e
+pagamento 2 dias antes, verbas rescisórias em até 10 dias, 13º). Guias: "pague até o vencimento indicado nela".
+
 Marcações para o sistema:
 - `{{campo}}` = preenchido a partir do cadastro do cliente ou dos dados do escritório.
 - `[se regime = simples|mei|presumido|real]` = o bloco só aparece para os regimes listados.
@@ -29,9 +35,9 @@ Campos: `{{razaoSocial}}`, `{{nomeFantasia}}`, `{{cnpj}}`, `{{regime}}`, `{{clie
 ## 2 · Sumário
 *Leitura de 10 minutos. Este link mostra sempre a versão mais recente; baixe o PDF para guardar.*
 1. Como trabalhamos juntos
-2. Suas obrigações e prazos
+2. O que fazemos e o que você envia
 3. Documentos e como enviar
-4. Empregados: registro, férias, rescisão, eSocial
+4. Empregados: registro, férias, rescisão e avisos
 5. Atenção às multas e primeiros passos
 
 ---
@@ -67,12 +73,12 @@ Campos: `{{razaoSocial}}`, `{{nomeFantasia}}`, `{{cnpj}}`, `{{regime}}`, `{{clie
 - `[se regime = presumido|real]` **3 · Contábil** · balancete mensal, ECD e ECF anuais
 - `[se empregados > 0]` **5 · Pessoal** · folha, eSocial, FGTS, DCTFWeb e obrigações anuais
 - `[se empregados = 0]` **Pessoal** · nada hoje; quando contratar, cuidamos de tudo
-- **Suas datas no mês** · dia 1º, dia 10, 5º dia útil e dia 20 `[se regime = presumido|real]` + dia 25
+- **Suas datas no mês** · dia 1º, dia 10 e 5º dia útil
 
 ---
 
 ## 6 · Fiscal
-*Obrigação · prazo legal · o que precisamos de você.*
+*O que fazemos por você, o que precisamos e até quando. Os prazos do governo ficam com a gente.*
 - `[se regime = mei]` → tabela Fiscal · MEI
 - `[se regime = simples]` → tabela Fiscal · Simples Nacional
 - `[se regime = presumido]` → tabela Fiscal · Lucro Presumido
@@ -92,21 +98,20 @@ Campos: `{{razaoSocial}}`, `{{nomeFantasia}}`, `{{cnpj}}`, `{{regime}}`, `{{clie
 ## 8 · Pessoal
 *`[se empregados > 0]` Seus {{empregados}} empregados geram obrigações todo mês. A maior parte é com a gente.*
 *`[se empregados = 0]` Hoje você não tem empregados. Quando contratar, é assim que funciona.*
-- **Folha e salários** · até o 5º dia útil · variáveis da folha até o **dia 1º** do mês seguinte
-- **eSocial** · dia 15 do mês seguinte · nada: enviamos a partir da folha
-- **FGTS Digital** · dia 20 do mês seguinte · pagar a guia que enviamos
-- **DCTFWeb e DARF** (INSS e IR descontados) · DARF dia 20; declaração no último dia útil · pagar o DARF
-- **13º e informe de rendimentos** · 13º em 30/11 e 20/12; informe até o último dia útil de fevereiro · nada: preparamos tudo
+- **Folha e salários** · variáveis da folha; depois, pagar os salários · dia 1º; salários até o 5º dia útil
+- **eSocial** · Nada: fazemos a partir da folha e dos seus avisos · —
+- **FGTS Digital** · pagar a guia que enviamos · até o vencimento da guia
+- **DCTFWeb (INSS e IRRF da folha)** · Nada para declarar: só pagar o DARF que enviamos · até o vencimento do DARF
+- **13º salário** · pagar as duas parcelas com os recibos que enviamos · 30/11 e 20/12
 
 ---
 
 ## 9 · Seu mês em uma linha
-*Data em fim de semana ou feriado pode antecipar ou adiar: a guia que enviamos já vem com o vencimento certo.*
-- **Dia 1º** · você envia as variáveis da folha do mês anterior
+*Só as datas em que você faz algo. O resto é com a gente.*
+- **Até o dia 1º** · você envia as variáveis da folha e o pró-labore do mês anterior (MEI: só as variáveis)
 - **Até o 5º dia útil** · você paga os salários
-- **Dia 10** · você envia notas fiscais e extratos do mês anterior
-- **Dia 15** · nós enviamos o eSocial · **Dia 20** · você paga `[se regime = mei]` DAS-MEI `[se regime = simples]` DAS `[se regime = presumido|real]` DARFs, FGTS e INSS
-- `[se regime = presumido|real]` **Dia 25** · você paga PIS e COFINS
+- **Até o dia 10** · você envia notas fiscais, extratos e maquininhas/PIX do mês anterior
+- **Até o vencimento da guia** · você paga cada guia no vencimento indicado nela; enviamos antes
 
 ---
 
@@ -134,7 +139,7 @@ Campos: `{{razaoSocial}}`, `{{nomeFantasia}}`, `{{cnpj}}`, `{{regime}}`, `{{clie
 *Ninguém começa a trabalhar sem registro. Nem "só para testar".*
 - **3 dias úteis antes** · envie dados e documentos para pessoal@ · assunto `Registro de empregado | {{razaoSocial}}`
 - **Antes do 1º dia** · você agenda o exame admissional (ASO) e nos envia o atestado
-- **Até o dia anterior** · registramos no eSocial (S-2200) e enviamos o contrato
+- **Nós registramos** · o empregado no eSocial e enviamos o contrato para assinar
 - **No 1º dia** · empregado assina o contrato e começa a trabalhar
 - **Experiência de até 90 dias** · decida antes do fim se vai efetivar
 
@@ -155,28 +160,30 @@ Campos: `{{razaoSocial}}`, `{{nomeFantasia}}`, `{{cnpj}}`, `{{regime}}`, `{{clie
 - **Antes de comunicar** · peça a rescisão para pessoal@: tipo de desligamento, data e aviso prévio
 - **Nós calculamos** · verbas, FGTS e regras da convenção coletiva ({{sindicato}})
 - **Até 10 dias corridos** · pague as verbas e entregue os documentos (art. 477 da CLT)
-- **No mesmo prazo** · guia do FGTS rescisório e baixa no eSocial (S-2299)
+- **No mesmo prazo** · pague a guia do FGTS rescisório que enviamos; nós cuidamos do eSocial
 - **Sindicato** · quando a convenção exige, nós fazemos a homologação ou assistência
 
 ---
 
-## 15 · Prazos do eSocial
-*Nós enviamos. Você só precisa nos avisar a tempo.*
-- **Admissão (S-2200)** · até o dia anterior ao início
-- **Desligamento (S-2299)** · até 10 dias após
-- **Acidente de trabalho (S-2210)** · 1º dia útil seguinte; avise no mesmo dia
-- **Folha do mês (S-1200 e S-1299)** · dia 15 do mês seguinte
-- **Afastamentos, alterações e exames (S-2230, S-2206, S-2220)** · dia 15 do mês seguinte
+## 15 · Quando nos avisar
+*Nós cuidamos do eSocial. Você só precisa nos avisar a tempo, por pessoal@.*
+Movimentação · quando nos avisar · o que enviar:
+- **Admissão** · {{prazos.admissao}} (3 dias úteis) antes do 1º dia · dados e documentos do empregado
+- **Férias** · {{prazos.ferias}} (5 dias) antes da saída · nome, período e aviso assinado
+- **Rescisão** · antes de comunicar o empregado · tipo de desligamento, data e aviso prévio
+- **Afastamentos, atestados e acidente de trabalho** · no mesmo dia · atestado ou relato, data e motivo
+- **Salário, cargo ou jornada** · antes de aplicar a mudança · o que muda e a partir de quando
+- **Variáveis da folha** · até o {{prazos.folha}} (dia 1º) do mês seguinte · faltas, horas extras e comissões
 
 ---
 
 ## 16 · Atenção: multas
 *Quase todas se evitam com um aviso antes.*
-- **Rescisão fora das regras do sindicato** · a convenção coletiva da sua categoria pode prever multa
-- **Verbas fora do prazo** · pagou depois de 10 dias: multa de um salário ao empregado (art. 477 da CLT)
+- **Documentos atrasados** · atrasam guias e declarações; a multa por atraso é da empresa
 - **Trabalho antes do registro** · multa por empregado, a partir de R$ 800 em ME/EPP (art. 47 da CLT)
-- **Guia paga com atraso** · multa de 0,33% ao dia, até 20%, + juros Selic
+- **Rescisão fora do prazo ou da convenção** · verbas depois de 10 dias: multa de um salário (art. 477 da CLT); a convenção coletiva pode prever outras
 - **Férias fora do prazo** · pagamento em dobro (art. 137 da CLT)
+- **Guia paga com atraso** · multa de 0,33% ao dia, até 20%, + juros Selic
 
 ---
 
@@ -201,64 +208,60 @@ Campos: `{{razaoSocial}}`, `{{nomeFantasia}}`, `{{cnpj}}`, `{{regime}}`, `{{clie
 
 ## Variações por regime
 
-Formato das linhas: **obrigação** · prazo legal · o que precisamos de você. Prazos internos do escritório:
-notas e extratos até o **dia 10**; variáveis da folha até o **dia 1º** do mês seguinte.
+Formato das linhas: **o que fazemos** · o que precisamos de você · até quando. Sem prazo legal (regra do dono,
+20/11/2026). "Até quando" = prazos internos dos Parâmetros: notas e extratos até o **dia 10** do mês seguinte;
+variáveis da folha e pró-labore até o **dia 1º**; DEFIS até **15/02**. Obrigação que fazemos sem precisar de
+nada: "Nada: fazemos a partir de …" e "—" em "até quando". As linhas das tarefas recorrentes vêm de
+`ONBOARDING_OBLIGATION_TEXTS`; a tarefa sem texto próprio usa "documentos do mês · dia 10 do mês seguinte".
 
 ### MEI
 **Fiscal**
-- **DAS-MEI** · dia 20 de cada mês · pagar a guia; avise se o faturamento chegar perto do limite do MEI
-- **DASN-SIMEI** (ano anterior) · 31/05 · notas e relatório de receitas de cada mês até o dia 10
-- `[se empregados > 0]` **FGTS Digital** (MEI pode ter 1 empregado) · dia 20 do mês seguinte · pagar a guia
-- `[se empregados > 0]` **DCTFWeb e DARF** (INSS do empregado + 3% patronal) · DARF dia 20; declaração no último dia útil · pagar o DARF
+- **DAS-MEI** · pagar a guia; avise se o faturamento chegar perto do limite do MEI · até o vencimento da guia
+- **DASN-SIMEI** · notas e relatório de receitas de cada mês · dia 10 do mês seguinte
 
 **Contábil**
-- **Controle de receitas e livro caixa** · sem prazo legal (recomendado) · extratos de todas as contas até o dia 10
-- **Pró-labore e distribuição de lucros** · não se aplicam ao MEI: sua contribuição ao INSS já está no DAS-MEI
+- **Controle de receitas e livro caixa** · extratos de todas as contas · dia 10 do mês seguinte
+- **Pró-labore e distribuição de lucros** · Nada: não se aplicam ao MEI; sua contribuição ao INSS já está no DAS-MEI · —
 
 ### Simples Nacional
 **Fiscal**
-- **PGDAS-D e DAS** · dia 20 do mês seguinte · notas emitidas e recebidas e relatório das maquininhas até o dia 10
-- **Vendas no cartão e PIX** · as operadoras informam ao fisco · relatório das maquininhas até o dia 10
-- **DEFIS** (ano anterior) · 31/03 · confirmar sócios e lucros distribuídos no ano
-- **Guias fora do DAS** (ICMS-ST, DIFAL, ISS retido) · conforme estado e prefeitura · notas de compra até o dia 10
-- `[cond: serviço tomado com retenção]` **EFD-Reinf** · dia 15 do mês seguinte · envie a nota no dia em que receber
+- **PGDAS-D e DAS** · notas emitidas e recebidas; depois, pagar o DAS que enviamos · dia 10 do mês seguinte
+- **DCTFWeb** · Nada para declarar: só pagar o DARF que enviamos · até o vencimento do DARF
+- **EFD-Reinf** · nota de serviço com retenção (INSS, IR, PIS/COFINS/CSLL) · sempre que houver, no dia em que receber
+- **DEFIS** · dados do ano: sócios e lucros distribuídos · 15/02
+- **Vendas no cartão e PIX** · relatório de vendas de cada maquininha e do PIX (as operadoras informam ao fisco) · dia 10 do mês seguinte
+- **Guias fora do DAS** (ICMS-ST, DIFAL, ISS retido) · notas de compra e de serviços contratados · dia 10 do mês seguinte
 
 **Contábil**
-- **Conciliação e balancete** · mensal · extratos de todas as contas até o dia 10
-- **Balanço anual** · contas aprovadas pelos sócios até 30/04 (art. 1.078 do Código Civil) · nada além dos envios mensais
-- **Pró-labore** · mensal, com INSS (DCTFWeb e DARF dia 20) · valor de cada sócio até o dia 1º
-- **Lucros dos sócios** · acima de R$ 50 mil no mês por sócio, retenção de 10% de IR (Lei 15.270/2025) · avise **antes** de retirar
-- **ECD e ECF** · não se aplicam ao Simples Nacional
+- **Conciliação e balancete mensal** · extratos de todas as contas e aplicações · dia 10 do mês seguinte
+- **Balanço anual** · Nada: fazemos a partir dos envios mensais · —
+- **Pró-labore** · valor de cada sócio no mês · dia 1º do mês seguinte
+- **Lucros dos sócios** · valor de cada retirada (acima de R$ 50 mil no mês por sócio, retém 10% de IR) · antes de retirar
+- **ECD e ECF** · Nada: não se aplicam ao Simples Nacional · —
 
 ### Lucro Presumido
 **Fiscal**
-- **PIS e COFINS** (cumulativos) · dia 25 do mês seguinte (antecipa se não for dia útil) · notas emitidas e recebidas até o dia 10
-- **IRPJ e CSLL** · trimestrais: último dia útil de abril, julho, outubro e janeiro (pode dividir em 3 quotas) · notas até o dia 10
-- **DCTFWeb** (todos os tributos federais) · último dia útil do mês seguinte · nada: declaramos a partir da apuração
-- **EFD-Contribuições** · 10º dia útil do 2º mês seguinte · nada além das notas
-- `[cond: contribuinte de ICMS/IPI]` **EFD ICMS/IPI e ICMS** · conforme o estado · notas e inventário de estoque; `[cond: retenções]` **EFD-Reinf** dia 15
+- **DCTFWeb** · Nada para declarar: só pagar o DARF que enviamos · até o vencimento do DARF
+- **EFD-Reinf** · nota de serviço com retenção · sempre que houver, no dia em que receber
+- **PIS/COFINS** · notas emitidas e recebidas · dia 10 do mês seguinte
+- **EFD-Contribuições** · Nada: fazemos a partir das notas que você envia · —
+- **EFD ICMS/IPI** · notas emitidas e recebidas; inventário do estoque uma vez por ano · dia 10 do mês seguinte
+- **IRPJ e CSLL trimestrais** · notas e extratos de cada mês · dia 10 do mês seguinte
 
 **Contábil**
-- **Conciliação e balancete** · mensal · extratos de todas as contas até o dia 10
-- **ECD** (livros contábeis digitais) · último dia útil de junho · nada além dos envios mensais
-- **ECF** (escrituração contábil fiscal) · último dia útil de julho · nada além dos envios mensais
-- **Pró-labore** · mensal, com INSS · valor de cada sócio até o dia 1º
-- **Lucros dos sócios** · acima de R$ 50 mil no mês por sócio, retenção de 10% de IR (Lei 15.270/2025) · avise **antes** de retirar
+- **ECD** e **ECF** · Nada: fazemos a partir dos envios mensais · —
+- **Conciliação e balancete mensal** · extratos de todas as contas e aplicações · dia 10 do mês seguinte
+- **Pró-labore** · valor de cada sócio no mês · dia 1º do mês seguinte
+- **Lucros dos sócios** · valor de cada retirada (acima de R$ 50 mil/mês por sócio, retém 10% de IR) · antes de retirar
 
 ### Lucro Real
-**Fiscal**
-- **PIS e COFINS** (não cumulativos, com créditos) · dia 25 do mês seguinte · notas de compra e venda até o dia 10
-- **IRPJ e CSLL** · estimativa mensal: último dia útil do mês seguinte (ou trimestral, se for a opção) · notas e extratos até o dia 10
-- **DCTFWeb** (todos os tributos federais) · último dia útil do mês seguinte · nada: declaramos a partir da apuração
-- **EFD-Contribuições** · 10º dia útil do 2º mês seguinte · notas completas, com XML, até o dia 10
-- `[cond: contribuinte de ICMS/IPI]` **EFD ICMS/IPI e ICMS** · conforme o estado · notas e inventário; `[cond: retenções]` **EFD-Reinf** dia 15
+**Fiscal**: como o Presumido, com **IRPJ e CSLL — estimativa mensal** · notas e extratos de cada mês · dia 10 do mês seguinte.
 
 **Contábil**
-- **Conciliação e balancete** · mensal (base da estimativa de IRPJ/CSLL) · extratos de todas as contas até o dia 10
-- **Inventário de estoque** · posição em 31/12 · contagem do estoque em janeiro `[prazo interno a definir]`
-- **ECD** · último dia útil de junho · nada além dos envios mensais
-- **ECF** (com LALUR/LACS) · último dia útil de julho · nada além dos envios mensais
-- **Pró-labore e lucros** · pró-labore com INSS (valor até o dia 1º); lucros acima de R$ 50 mil/mês por sócio retêm 10% de IR · avise **antes** de retirar
+- **ECD** e **ECF** · Nada: fazemos a partir dos envios mensais · —
+- **Conciliação e balancete mensal (base do IRPJ/CSLL)** · extratos de todas as contas e aplicações · dia 10 do mês seguinte
+- **Inventário de estoque** · contagem do estoque em 31/12 · em janeiro `[prazo interno a definir]`
+- **Pró-labore e lucros** · valor do pró-labore e de cada retirada de lucros · pró-labore no dia 1º; lucros antes de retirar
 
 ---
 
@@ -292,7 +295,7 @@ notas e extratos até o **dia 10**; variáveis da folha até o **dia 1º** do m�
 - [ ] Inventário de estoque (Lucro Real e quem tem ICMS): prazo interno.
 - [ ] Dados do escritório: WhatsApp, e-mail geral, horário e CRC (campos `{{escritorio.*}}`).
 
-### Prazos legais conferidos (vigência 2026)
+### Prazos legais conferidos (vigência 2026) — referência do escritório, **não vão para o documento do cliente**
 - DCTFWeb: último dia útil do mês seguinte (IN RFB 2.237/2024, alterada pela IN RFB 2.248/2025). DARF continua no dia 20 (previdenciário) e nas datas de cada tributo.
 - PIS/COFINS: dia 25 do mês seguinte, antecipando se não for dia útil (Lei 11.933/2009).
 - IRPJ/CSLL trimestrais e estimativa mensal: último dia útil do mês seguinte (Lei 9.430/1996).

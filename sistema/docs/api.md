@@ -2125,8 +2125,9 @@ no lugar das marcações `[se …]`); montagem pura e testável: `buildOnboardin
   próprios são descartados) e os marcadores antigos (`prazo.*`, `escritorio.emailFiscal`…, `mesExemplo`)
   continuam valendo (`ONBOARDING_PLACEHOLDER_ALIASES`); textos/ocultos de blocos que saíram da fábrica são
   descartados na leitura. `texts` (chave → texto; chaves em `onboardingTextKeys()`: `<slide>.title`,
-  `<slide>.kicker`, `<slide>.subtitle.<id>`, `<slide>.items.<id>.label|text|detail|code`,
-  `obligations.<catalogKey>.deadline|need`, `obligations.default.need`) e `hidden`
+  `<slide>.kicker`, `<slide>.subtitle.<id>`, `<slide>.items.<id>.label|text|detail|code|due`,
+  `obligations.<catalogKey>.need|due`, `obligations.default.need|due`; as chaves antigas
+  `obligations.*.deadline` e `<slide>.items.*.text` das tabelas, com prazo legal, são descartadas na leitura) e `hidden`
   (`onboardingHideableKeys()`: `<slide>.items.<id>` e `obligations.<catalogKey>`). Chave desconhecida = 400.
   Salvar exige `office` porque o modelo carrega a identidade do escritório (WhatsApp, e-mails, CRC) e vai
   para todos os clientes, como o modelo de contrato; `registry` é dos cadastros da Gestão.
@@ -2136,10 +2137,14 @@ no lugar das marcações `[se …]`); montagem pura e testável: `buildOnboardin
   (`ONBOARDING_PLACEHOLDERS`); campo sem valor vira "—" e entra em `missing` (ex. `escritorio.whatsapp`).
   As tabelas dos slides Fiscal, Contábil e Pessoal recebem as **tarefas recorrentes do cadastro que valem
   para o cliente** — a mesma regra das ocorrências (`appliesTo`: regime ou cliente escolhido, menos as
-  exceções; não internas, não encerradas antes da competência atual) —, na ordem do catálogo, com prazo
-  legal e "o que precisamos de você" de `ONBOARDING_OBLIGATION_TEXTS` (por `catalog_key`; fora do
-  catálogo: prazo descrito a partir da agenda e o texto `obligations.default.need`), seguidas das linhas
-  fixas do modelo (pró-labore, balanço, maquininhas…). Linhas fixas com `covers: <catalogKey>` (Pessoal:
+  exceções; não internas, não encerradas antes da competência atual) —, na ordem do catálogo, com "o que
+  precisamos de você" (`need`) e "até quando" (`due`, prazo interno; `null` quando o escritório não precisa
+  de nada: "Nada: fazemos a partir de …") de `ONBOARDING_OBLIGATION_TEXTS` (por `catalog_key`; fora do
+  catálogo: `obligations.default.need|due`), seguidas das linhas fixas do modelo (pró-labore, balanço,
+  maquininhas…; `label` = obrigação, `detail` = o que precisamos, `due` = até quando). **Sem prazo legal**
+  (regra do dono, 20/11/2026): `OnboardingObligationRow` não tem mais `deadline` e o documento público não
+  traz vencimentos de obrigações acessórias (DCTFWeb, EFD-Reinf, eSocial, DEFIS, ECD/ECF…); "Seu mês" só
+  traz datas em que o cliente age e o slide `esocial` virou "Quando nos avisar" (movimentações de pessoal). Linhas fixas com `covers: <catalogKey>` (Pessoal:
   folha, eSocial, FGTS Digital, DCTFWeb) só aparecem quando a tarefa do catálogo não vale para o cliente
   (ou foi ocultada), sem repetir. **Pessoal para todos**: o conteúdo de empregados (tabela de Pessoal,
   Registro, Férias, Rescisão, eSocial e itens de pessoal dos demais slides) é igual com 0 ou mais

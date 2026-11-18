@@ -16,7 +16,6 @@ import {
   WHITE_SLIDES,
   dayBlock,
   daysBeforeBlock,
-  eventBlock,
   numberBlock,
   safeLogo,
   slideAnchor,
@@ -225,21 +224,21 @@ const COVER_LABELS: Record<string, string> = {
 const DEPT_KEYS = ['fiscal', 'accounting', 'personnel'];
 const DEPT_INITIALS: Record<string, string> = { fiscal: 'FI', accounting: 'CO', personnel: 'DP' };
 
-/** Obligation table (fiscal, accounting, personnel). */
+/** Obligation table (fiscal, accounting, personnel): what we do · what we need · until when (never legal deadlines). */
 export function ObligationTable({ rows }: { rows: OnboardingObligationRow[] }) {
   if (rows.length === 0)
     return <p className="ob-empty">Nenhuma obrigação desta área para a sua empresa no momento.</p>;
   return (
     <div
-      className={cn('ob-tbl', rows.length > 6 && 'ob-dense')}
+      className={cn('ob-tbl ob-tobl', rows.length > 6 && 'ob-dense')}
       role="table"
       aria-label="Obrigações"
     >
       <div className="ob-tr ob-th" role="row">
         <span />
-        <span role="columnheader">Obrigação</span>
-        <span role="columnheader">Prazo legal</span>
+        <span role="columnheader">O que fazemos</span>
         <span role="columnheader">O que precisamos de você</span>
+        <span role="columnheader">Até quando</span>
       </div>
       {rows.map((r, i) => (
         <div key={r.key} className="ob-tr" role="row">
@@ -250,10 +249,10 @@ export function ObligationTable({ rows }: { rows: OnboardingObligationRow[] }) {
             {r.name}
           </span>
           <span className="ob-b" role="cell">
-            {r.deadline}
-          </span>
-          <span className="ob-c" role="cell">
             {r.need}
+          </span>
+          <span className={cn('ob-c', !r.due && 'ob-none')} role="cell">
+            {r.due ?? '—'}
           </span>
         </div>
       ))}
@@ -396,7 +395,7 @@ function SlideBody({
               return (
                 <li key={item.id} className={w.office ? 'ob-us' : undefined}>
                   <small>{d.pre}</small>
-                  <span className="ob-day">
+                  <span className={cn('ob-day', !/\d/.test(d.big) && 'ob-day-word')}>
                     {d.big}
                     {d.post ? <i>{d.post}</i> : null}
                   </span>
@@ -519,32 +518,33 @@ function SlideBody({
       return (
         <>
           <Head slide={slide} />
-          <div className="ob-tbl ob-tes" role="table" aria-label={slide.title}>
+          <div
+            className={cn('ob-tbl ob-tes', items.length > 5 && 'ob-dense')}
+            role="table"
+            aria-label={slide.title}
+          >
             <div className="ob-tr ob-th" role="row">
               <span />
-              <span role="columnheader">Evento</span>
-              <span role="columnheader">Código</span>
-              <span role="columnheader">Prazo</span>
+              <span role="columnheader">Movimentação</span>
+              <span role="columnheader">Quando nos avisar</span>
+              <span role="columnheader">O que enviar</span>
             </div>
-            {items.map((item, i) => {
-              const e = eventBlock(item.label ?? '');
-              return (
-                <div key={item.id} className="ob-tr" role="row">
-                  <span className="ob-n" aria-hidden="true">
-                    {i + 1}
-                  </span>
-                  <span className="ob-a" role="cell">
-                    {e.name}
-                  </span>
-                  <span className="ob-b" role="cell">
-                    {e.code ?? ''}
-                  </span>
-                  <span className="ob-c" role="cell">
-                    {item.text}
-                  </span>
-                </div>
-              );
-            })}
+            {items.map((item, i) => (
+              <div key={item.id} className="ob-tr" role="row">
+                <span className="ob-n" aria-hidden="true">
+                  {i + 1}
+                </span>
+                <span className="ob-a" role="cell">
+                  {item.label}
+                </span>
+                <span className="ob-b" role="cell">
+                  {item.text}
+                </span>
+                <span className="ob-c" role="cell">
+                  {item.detail}
+                </span>
+              </div>
+            ))}
           </div>
         </>
       );

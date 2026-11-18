@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildOnboardingDocument,
-  describeRecurringDeadline,
   maskCpf,
   ONBOARDING_SLIDE_KEYS,
   ONBOARDING_TEMPLATE_SLIDES,
@@ -55,6 +54,8 @@ function build(regime: TaxRegime, employees: number, extra: Partial<OnboardingBu
 const slide = (doc: OnboardingDocument, key: string) => doc.slides.find((s) => s.key === key)!;
 const names = (doc: OnboardingDocument, key: string) => slide(doc, key).table!.map((r) => r.name);
 const allText = (doc: OnboardingDocument) => JSON.stringify(doc.slides);
+/** Legal due dates of ancillary obligations the client's document must never show (owner's rule, 20/11/2026). */
+const LEGAL_DATES = /dia 15|dia 20 do mês|dia 25|último dia útil|31\/03|31\/05|S-2200|S-2299|S-1200|dia anterior ao início|informe de rendimentos|prazo legal/i;
 
 describe('onboarding template', () => {
   it('has the 18 slides in order and every key resolves to its factory text', () => {
@@ -88,11 +89,18 @@ describe('buildOnboardingDocument', () => {
       'Atualizado em 18/11/2026',
     ]);
     expect(names(doc, 'fiscal')).toEqual(['DCTFWeb', 'EFD-Reinf', 'PGDAS-D e DAS', 'DEFIS', 'Vendas no cartão e PIX', 'Guias fora do DAS (ICMS-ST, DIFAL, ISS retido)']);
-    expect(names(doc, 'personnel')).toEqual(['Folha de pagamento', 'eSocial — eventos periódicos', 'FGTS Digital', '13º e informe de rendimentos']);
+    expect(names(doc, 'personnel')).toEqual(['Folha de pagamento', 'eSocial — eventos periódicos', 'FGTS Digital', '13º salário']);
     expect(names(doc, 'accounting')).toContain('Balanço anual');
     const das = slide(doc, 'fiscal').table!.find((r) => r.key === 'pgdas_das')!;
-    expect(das).toMatchObject({ deadline: 'dia 20 do mês seguinte', source: 'task', area: 'fiscal' });
-    expect(das.need).toBe('notas emitidas e recebidas até o dia 10 e relatório das maquininhas até o dia 10');
+    expect(das).toMatchObject({ need: 'notas emitidas e recebidas; depois, pagar o DAS que enviamos', due: 'dia 10 do mês seguinte', source: 'task', area: 'fiscal' });
+    expect(das).not.toHaveProperty('deadline');
+    const row = (key: string) => slide(doc, 'fiscal').table!.find((r) => r.key === key)!;
+    expect(row('defis')).toMatchObject({ need: 'dados do ano: sócios e lucros distribuídos', due: '15/02' });
+    expect(row('dctfweb')).toMatchObject({ need: 'Nada para declarar: só pagar o DARF que enviamos', due: 'até o vencimento do DARF' });
+    expect(row('simples-cards').due).toBe('dia 10 do mês seguinte');
+    const esocial = slide(doc, 'personnel').table!.find((r) => r.key === 'esocial_periodic')!;
+    expect(esocial).toMatchObject({ need: 'Nada: fazemos a partir da folha', due: null });
+    expect(slide(doc, 'personnel').table!.find((r) => r.key === 'payroll')!.due).toBe('dia 1º; salários até o 5º dia útil');
     expect(slide(doc, 'personnel').subtitle).toBe('Hoje são 3 empregados, com obrigações todo mês. A maior parte é com a gente.');
     expect(slide(doc, 'sending').items[0]).toMatchObject({ label: 'fiscal@efficio.com.br', code: 'Notas fiscais 10/2026 | Padaria Pão Quente Ltda' });
     expect(slide(doc, 'sending').items.find((i) => i.id === 'accounting')!.code).toBe('Extratos bancários 10/2026 | Padaria Pão Quente Ltda');
@@ -106,12 +114,13 @@ describe('buildOnboardingDocument', () => {
     expect(names(doc, 'fiscal')).toEqual(['DAS-MEI', 'DASN-SIMEI']);
     expect(names(doc, 'accounting')).toEqual(['Controle de receitas e livro caixa', 'Pró-labore e distribuição de lucros']);
     // No personnel task applies to MEI: the fixed rows of the template fill the table.
-    expect(names(doc, 'personnel')).toEqual(['Folha e salários', 'eSocial', 'FGTS Digital', 'DCTFWeb (INSS e IRRF da folha)', '13º e informe de rendimentos']);
+    expect(names(doc, 'personnel')).toEqual(['Folha e salários', 'eSocial', 'FGTS Digital', 'DCTFWeb (INSS e IRRF da folha)', '13º salário']);
     expect(slide(doc, 'personnel').subtitle).toBe('Hoje você não tem empregados. Quando contratar, é assim que funciona.');
     expect(slide(doc, 'cover').items[3]!.text).toBe('Sem empregados · SINDCOM');
     expect(slide(doc, 'numbers').items.map((i) => i.id)).toEqual(['mei-fiscal', 'mei-accounting', 'personnel', 'dates']);
     expect(slide(doc, 'firstSteps').items.map((i) => i.id)).toEqual(['ccmei', 'ecac', 'access-simples', 'closing', 'employees', 'routine']);
-    expect(slide(doc, 'month').items.map((i) => i.id)).toContain('pay-mei');
+    expect(slide(doc, 'month').items.map((i) => i.id)).toEqual(['variables-mei', 'salaries', 'documents', 'guides']);
+    expect(slide(doc, 'fiscal').table!.map((r) => r.due)).toEqual(['até o vencimento da guia', 'dia 10 do mês seguinte']);
     for (const key of ['admission', 'vacation', 'termination', 'esocial']) expect(slide(doc, key).items.length).toBeGreaterThan(0);
   });
 
@@ -130,13 +139,82 @@ describe('buildOnboardingDocument', () => {
   it('Lucro Presumido and Lucro Real', () => {
     const presumed = build('presumed_profit', 2);
     expect(names(presumed, 'fiscal')).toEqual(['DCTFWeb', 'EFD-Reinf', 'PIS/COFINS', 'EFD-Contribuições', 'EFD ICMS/IPI', 'IRPJ e CSLL trimestrais']);
-    expect(names(presumed, 'accounting')).toEqual(['ECD', 'ECF', 'Conciliação e balancete', 'Pró-labore', 'Lucros dos sócios']);
-    expect(slide(presumed, 'month').items.map((i) => i.id)).toEqual(['variables', 'salaries', 'documents', 'esocial', 'pay-profit', 'pis-cofins']);
-    expect(names(presumed, 'personnel')).toEqual(['Folha de pagamento', 'eSocial — eventos periódicos', 'FGTS Digital', '13º e informe de rendimentos']);
+    expect(names(presumed, 'accounting')).toEqual(['ECD', 'ECF', 'Conciliação e balancete mensal', 'Pró-labore', 'Lucros dos sócios']);
+    expect(slide(presumed, 'month').items.map((i) => i.id)).toEqual(['variables', 'salaries', 'documents', 'guides']);
+    expect(names(presumed, 'personnel')).toEqual(['Folha de pagamento', 'eSocial — eventos periódicos', 'FGTS Digital', '13º salário']);
+    expect(slide(presumed, 'fiscal').table!.find((r) => r.key === 'efd_contribuicoes')).toMatchObject({ need: 'Nada: fazemos a partir das notas que você envia', due: null });
+    expect(slide(presumed, 'accounting').table!.find((r) => r.key === 'ecd')!.due).toBeNull();
     const real = build('real_profit', 0);
     expect(names(real, 'fiscal')).toContain('IRPJ e CSLL — estimativa mensal');
-    expect(names(real, 'accounting')).toEqual(['ECD', 'ECF', 'Conciliação e balancete', 'Inventário de estoque', 'Pró-labore e lucros']);
+    expect(names(real, 'accounting')).toEqual(['ECD', 'ECF', 'Conciliação e balancete mensal (base do IRPJ/CSLL)', 'Inventário de estoque', 'Pró-labore e lucros']);
     expect(slide(real, 'firstSteps').items.map((i) => i.id)).toEqual(['contract', 'ecac', 'access', 'closing', 'employees', 'routine']);
+    expect(slide(real, 'fiscal').table!.find((r) => r.key === 'irpj_csll_monthly_estimate')!.due).toBe('dia 10 do mês seguinte');
+  });
+
+  it('no legal due date of ancillary obligations in any regime: only what the client delivers and when', () => {
+    for (const regime of ['mei', 'simples_nacional', 'presumed_profit', 'real_profit'] as TaxRegime[]) {
+      const doc = build(regime, 2);
+      expect(allText(doc), regime).not.toMatch(LEGAL_DATES);
+      expect(JSON.stringify(doc.obligations), regime).not.toMatch(LEGAL_DATES);
+      for (const key of ['fiscal', 'accounting', 'personnel']) {
+        for (const row of slide(doc, key).table!) {
+          expect(row, `${regime} ${row.key}`).not.toHaveProperty('deadline');
+          // A row either asks for something with a "until when" or says the office needs nothing.
+          expect(row.due !== null || /^Nada/.test(row.need), `${regime} ${row.key}`).toBe(true);
+        }
+      }
+      // "Seu mês": only dates when the client acts.
+      const month = slide(doc, 'month').items;
+      expect(month.map((i) => i.label), regime).toEqual(['Até o dia 1º', 'Até o 5º dia útil', 'Até o dia 10', 'Até o vencimento da guia']);
+      for (const item of month) expect(item.text, regime).toMatch(/^você /);
+      expect(slide(doc, 'numbers').items.find((i) => i.id === 'dates')!.text).toBe('dia 1º, dia 10 e 5º dia útil');
+    }
+  });
+
+  it('"Quando nos avisar": personnel changes with the parameters', () => {
+    const p = ONBOARDING_DEFAULT_PARAMS;
+    const doc = build('simples_nacional', 3);
+    const s = slide(doc, 'esocial');
+    expect(s.title).toBe('Quando nos avisar');
+    expect(s.subtitle).toContain('pessoal@efficio.com.br');
+    expect(s.items.map((i) => [i.label, i.text])).toEqual([
+      ['Admissão', '3 dias úteis antes do 1º dia'],
+      ['Férias', '5 dias antes da saída'],
+      ['Rescisão', 'antes de comunicar o empregado'],
+      ['Afastamentos, atestados e acidente de trabalho', 'no mesmo dia'],
+      ['Salário, cargo ou jornada', 'antes de aplicar a mudança'],
+      ['Variáveis da folha', 'até o dia 1º do mês seguinte'],
+    ]);
+    const other = build('mei', 0, {
+      template: {
+        params: { ...p, deadlines: { ...p.deadlines, admissionBusinessDays: 1, vacationDaysBefore: 10, payrollVariablesDay: 3 }, rules: { ...p.rules, terminationRequestFirst: false } },
+        texts: {},
+        hidden: [],
+      },
+    });
+    expect(slide(other, 'esocial').items.map((i) => i.text)).toEqual([
+      '1 dia útil antes do 1º dia',
+      '10 dias antes da saída',
+      'no mesmo dia do aviso',
+      'no mesmo dia',
+      'antes de aplicar a mudança',
+      'até o dia 3 do mês seguinte',
+    ]);
+  });
+
+  it('saved texts of keys that left the factory are ignored and the legal deadline never returns', () => {
+    const doc = build('simples_nacional', 0, {
+      template: {
+        texts: { 'obligations.pgdas_das.deadline': 'dia 20 do mês seguinte', 'fiscal.items.simples-cards.text': 'as operadoras informam', 'obligations.pgdas_das.due': 'dia 8' },
+        hidden: [],
+      },
+    });
+    expect(slide(doc, 'fiscal').table!.find((r) => r.key === 'pgdas_das')!.due).toBe('dia 8');
+    expect(allText(doc)).not.toContain('dia 20 do mês seguinte');
+    expect(onboardingFactoryText('obligations.pgdas_das.deadline')).toBeUndefined();
+    expect(onboardingFactoryText('fiscal.items.simples-cards.text')).toBeUndefined();
+    expect(onboardingFactoryText('obligations.esocial_periodic.due')).toBeUndefined();
+    expect(onboardingTemplateInputSchema.safeParse({ params: ONBOARDING_DEFAULT_PARAMS, texts: { 'obligations.pgdas_das.deadline': 'x' } }).success).toBe(false);
   });
 
   it('office template then client adjustment, hidden items, office data and deadlines', () => {
@@ -195,7 +273,9 @@ describe('buildOnboardingDocument', () => {
     expect(item('termination', 'request-after').code).toBe('Desligamento | Padaria Pão Quente Ltda');
     expect(slide(doc, 'termination').subtitle).toMatch(/no mesmo dia/);
     expect(names(doc, 'personnel')).toContain('Adiantamento quinzenal');
-    expect(slide(doc, 'fiscal').table!.find((r) => r.key === 'defis')!.need).toContain('até 20/03');
+    expect(slide(doc, 'fiscal').table!.find((r) => r.key === 'defis')!.due).toBe('20/03');
+    expect(slide(doc, 'fiscal').table!.find((r) => r.key === 'simples-cards')!.due).toBe('dia 9 do mês seguinte');
+    expect(item('month', 'documents').label).toBe('Até o dia 8');
     expect(allText(doc)).not.toMatch(/\{\{/);
     // Without a registry logo the document has none (the deck shows the Efficio wordmark).
     expect(build('mei', 0).office.logo).toBeNull();
@@ -228,7 +308,7 @@ describe('buildOnboardingDocument', () => {
     expect(slide(doc, 'howWeWork').title).toBe('Até o dia 10 para fiscal@efficio.com.br (10/2026)');
   });
 
-  it('a recurring task outside the catalog: area by department, deadline from the schedule', () => {
+  it('a recurring task outside the catalog: area by department, the default need and until when', () => {
     const doc = build('exempt', 0, {
       client: { name: 'Associação X', tradeName: null, cnpj: null, taxRegime: 'exempt', clientSince: null, employees: null, unions: [] },
       recurring: [
@@ -236,17 +316,21 @@ describe('buildOnboardingDocument', () => {
         { catalogKey: null, name: 'Relatório', department: 'Diretoria', period: 'monthly', dueDay: 12, dueMonth: null, referenceOffset: 1 },
       ],
     });
-    expect(names(doc, 'personnel')).toEqual(['RAIS', 'Folha e salários', 'eSocial', 'FGTS Digital', 'DCTFWeb (INSS e IRRF da folha)', '13º e informe de rendimentos']);
+    expect(names(doc, 'personnel')).toEqual(['RAIS', 'Folha e salários', 'eSocial', 'FGTS Digital', 'DCTFWeb (INSS e IRRF da folha)', '13º salário']);
     expect(doc.obligations.other.map((r) => r.name)).toEqual(['Relatório']);
     expect(names(doc, 'fiscal')).toEqual(['Relatório']);
-    expect(doc.obligations.other[0]).toMatchObject({ deadline: 'dia 12 do mês seguinte', need: 'documentos do mês até o dia 10' });
+    expect(doc.obligations.other[0]).toMatchObject({ need: 'documentos do mês', due: 'dia 10 do mês seguinte' });
+    // A handmade task named like a catalog item gets the catalog texts.
+    const handmade = build('simples_nacional', 0, {
+      recurring: [{ catalogKey: null, name: 'dctfweb', department: 'Fiscal', period: 'monthly', dueDay: 31, dueMonth: null, referenceOffset: 1 }],
+    });
+    expect(slide(handmade, 'fiscal').table!.find((r) => r.key === 'dctfweb')).toMatchObject({ name: 'dctfweb', due: 'até o vencimento do DARF' });
+    expect(allText(doc)).not.toContain('dia 12');
     expect(slide(doc, 'cover').items[3]!.text).toBe('Sem empregados · convenção coletiva da sua categoria');
     expect(doc.missing).toContain('cnpj');
   });
 
   it('helpers', () => {
-    expect(describeRecurringDeadline({ period: 'annual', dueDay: 31, dueMonth: 5, referenceOffset: 5 })).toBe('anual: último dia/05');
-    expect(describeRecurringDeadline({ period: 'quarterly', dueDay: 31, dueMonth: 1, referenceOffset: 1 })).toBe('trimestral: último dia do mês seguinte');
     expect(maskCpf('52998224725')).toBe('•••.982.247-••');
   });
 });

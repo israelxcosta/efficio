@@ -140,7 +140,7 @@ export const SUMMARY_TARGETS: Record<string, OnboardingSlideKey> = {
 
 export const slideAnchor = (key: OnboardingSlideKey) => `slide-${key}`;
 
-/** "2 · Fiscal" → { big: '2', label: 'Fiscal' }; "Suas datas no mês" with "dia 1º, dia 10, 5º dia útil e dia 20" → 4. */
+/** "2 · Fiscal" → { big: '2', label: 'Fiscal' }; "Suas datas no mês" with "dia 1º, dia 10 e 5º dia útil" → 3. */
 export function numberBlock(
   id: string,
   label: string | null,
@@ -156,10 +156,13 @@ export function numberBlock(
   return { big: null, label: label ?? '' };
 }
 
-/** "Até o 5º dia útil" → { pre: 'Até o', big: '5º', post: 'dia útil' }. */
+/** "Até o 5º dia útil" → { pre: 'Até o', big: '5º', post: 'dia útil' }; "Até o vencimento da guia" → { pre: 'Até o', big: 'vencimento', post: 'da guia' }. */
 export function dayBlock(label: string): { pre: string; big: string; post: string } {
   const m = /^(.*?)(\d+º?)(.*)$/.exec(label);
-  if (!m) return { pre: '', big: label, post: '' };
+  if (!m) {
+    const w = /^(até o|até a|no|na)\s+(\S+)\s*(.*)$/i.exec(label.trim());
+    return w ? { pre: w[1]!, big: w[2]!, post: w[3]!.trim() } : { pre: '', big: label, post: '' };
+  }
   return { pre: m[1]!.trim(), big: m[2]!, post: m[3]!.trim() };
 }
 
@@ -169,12 +172,6 @@ export function whoBlock(text: string): { who: string; what: string; office: boo
   if (!m) return { who: '', what: text, office: false };
   const who = m[1]!.charAt(0).toUpperCase() + m[1]!.slice(1);
   return { who, what: m[2]!, office: /^n[óo]s\b/i.test(m[1]!) };
-}
-
-/** "Admissão (S-2200)" → { name: 'Admissão', code: 'S-2200' }. */
-export function eventBlock(label: string): { name: string; code: string | null } {
-  const m = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(label);
-  return m ? { name: m[1]!, code: m[2]! } : { name: label, code: null };
 }
 
 /** "30 dias antes" → { big: '30', small: 'dias antes' }. */
@@ -219,12 +216,15 @@ const FIELD_LABELS = {
   text: 'Texto',
   detail: 'Detalhe',
   code: 'Assunto (e-mail)',
+  due: 'Até quando',
 } as const;
+/** Obligation tables: no legal deadline (the client's document shows only what it delivers and when). */
 const OBLIGATION_FIELD_LABELS = {
-  label: 'Obrigação',
-  text: 'Prazo legal',
+  label: 'O que fazemos',
+  text: 'Texto',
   detail: 'O que precisamos',
   code: 'Assunto (e-mail)',
+  due: 'Até quando',
 } as const;
 
 /** Condition of a yes/no parameter: [when on, when off]. */
@@ -278,7 +278,7 @@ export function editorSections(): EditorSection[] {
     ];
     for (const item of slide.items) {
       const blocks: EditorBlock[] = [];
-      for (const field of ['label', 'text', 'detail', 'code'] as const) {
+      for (const field of ['label', 'text', 'detail', 'code', 'due'] as const) {
         const factory = item[field];
         if (factory !== undefined)
           blocks.push({
@@ -310,18 +310,13 @@ export function editorSections(): EditorSection[] {
         title: REGIME_GROUP_ITEMS.find((i) => i.key === key)?.name ?? key,
         hideKey: `obligations.${key}`,
         when: null,
-        blocks: [
-          {
-            key: `obligations.${key}.deadline`,
-            label: 'Prazo legal',
-            factory: onboardingFactoryText(`obligations.${key}.deadline`) ?? '',
-          },
-          {
-            key: `obligations.${key}.need`,
-            label: 'O que precisamos',
-            factory: onboardingFactoryText(`obligations.${key}.need`) ?? '',
-          },
-        ],
+        blocks: (['need', 'due'] as const)
+          .filter((field) => onboardingFactoryText(`obligations.${key}.${field}`) !== undefined)
+          .map((field) => ({
+            key: `obligations.${key}.${field}`,
+            label: field === 'need' ? 'O que precisamos' : 'Até quando',
+            factory: onboardingFactoryText(`obligations.${key}.${field}`) ?? '',
+          })),
       })),
       {
         id: 'default',
@@ -333,6 +328,11 @@ export function editorSections(): EditorSection[] {
             key: 'obligations.default.need',
             label: 'O que precisamos',
             factory: onboardingFactoryText('obligations.default.need') ?? '',
+          },
+          {
+            key: 'obligations.default.due',
+            label: 'Até quando',
+            factory: onboardingFactoryText('obligations.default.due') ?? '',
           },
         ],
       },

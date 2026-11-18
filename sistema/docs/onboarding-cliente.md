@@ -9,12 +9,12 @@ registra data e hora de cada acesso. Esboço aprovado para discussão (prints no
 ## Estrutura do documento
 1. Capa: marca, razão social, CNPJ, regime, início com a Efficio, empregados e CCT, data de atualização.
 2. Boas-vindas e equipe: responsável de cada departamento e canais (WhatsApp, e-mail, horário).
-3. Resumo das obrigações: cartões por área e tabela obrigação · área · prazo legal · o que precisamos do cliente.
+3. Resumo das obrigações: cartões por área e tabela o que fazemos · o que precisamos de você · até quando.
    Gerado das **tarefas recorrentes que valem para o cliente** (grupo do regime + próprias do escritório).
-4. Seu mês em uma linha: linha do tempo com as datas do cliente (envios) e dos impostos.
+4. Seu mês em uma linha: só as datas em que o cliente faz algo (envios, salários, pagar as guias no vencimento).
 5. Documentos e extratos: prazos internos do escritório (configuráveis).
 6. Departamento pessoal: admissão, férias e rescisão em passos com antecedências.
-7. Prazos do eSocial: S-2200, S-2299, S-2230, S-2210, S-1200/1299, S-2206, S-2220.
+7. Quando nos avisar: admissão, férias, rescisão, afastamentos/acidente, alterações e variáveis da folha.
 8. Atenção: multas comuns (texto do sindicato vem do cadastro do sindicato/CCT do cliente).
 9. Primeiros passos: checklist de implantação e "Confirmar leitura".
 
@@ -58,3 +58,14 @@ registra data e hora de cada acesso. Esboço aprovado para discussão (prints no
   folha, Férias e Rescisão; maquininhas → Fiscal; pró-labore no dia 1º; adiantamento = não.
 - Logo: só o do cadastro do escritório (capa e rodapé); sem logo, a marca Efficio.
 - Conteúdo de pessoal igual para todos os clientes, com ou sem empregados.
+
+## Sem vencimentos de obrigações acessórias (20/11/2026)
+Pedido do dono: **o onboarding não mostra vencimentos de obrigações acessórias** (DCTFWeb, EFD-Reinf, eSocial,
+DEFIS, DASN-SIMEI, ECD/ECF, SPED, informe de rendimentos); isso só importa ao escritório. O cliente vê **só o
+que entrega e quando** (prazos internos dos Parâmetros: dia 1º, dia 10, antecedências de admissão e férias,
+dados da DEFIS) e os prazos trabalhistas que ele mesmo cumpre (salário até o 5º dia útil, aviso de férias 30
+dias antes e pagamento 2 dias antes, verbas rescisórias em até 10 dias, 13º). Guias: "pague até o vencimento
+indicado nela". Tabelas: o que fazemos · o que precisamos de você · até quando ("Nada: fazemos a partir de …"
+quando não precisamos de nada). O slide "Prazos do eSocial" virou "Quando nos avisar". Textos salvos com
+chaves de prazo legal (`obligations.*.deadline`, `<slide>.items.*.text` das tabelas, itens antigos do eSocial e
+de "Seu mês") são descartados na leitura.

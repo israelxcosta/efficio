@@ -133,7 +133,7 @@ describe('onboarding template and client adjustment', () => {
     const s = await doc(simples);
     expect(s.slides).toHaveLength(18);
     expect(tableNames(s, 'fiscal')).toEqual(expect.arrayContaining(['PGDAS-D e DAS', 'DEFIS', 'DCTFWeb', 'Vendas no cartão e PIX']));
-    expect(tableNames(s, 'personnel')).toEqual(['Folha de pagamento', 'eSocial — eventos periódicos', 'FGTS Digital', '13º e informe de rendimentos']);
+    expect(tableNames(s, 'personnel')).toEqual(['Folha de pagamento', 'eSocial — eventos periódicos', 'FGTS Digital', '13º salário']);
     expect(s.client).toMatchObject({ regime: 'simples_nacional', regimeLabel: 'Simples Nacional', employees: 0, clientSince: '2025-01-10', union: null });
     expect(s.client.cnpj).toMatch(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/);
     expect(slide(s, 'personnel').subtitle).toMatch(/não tem empregados/);
@@ -145,7 +145,7 @@ describe('onboarding template and client adjustment', () => {
     expect(tableNames(m1, 'fiscal')).toEqual(['DAS-MEI', 'DASN-SIMEI']);
     // Personnel content is the same with or without employees (owner's decision): fixed rows for MEI.
     expect(tableNames(m1, 'personnel')).toEqual(tableNames(m, 'personnel'));
-    expect(tableNames(m, 'personnel')).toEqual(['Folha e salários', 'eSocial', 'FGTS Digital', 'DCTFWeb (INSS e IRRF da folha)', '13º e informe de rendimentos']);
+    expect(tableNames(m, 'personnel')).toEqual(['Folha e salários', 'eSocial', 'FGTS Digital', 'DCTFWeb (INSS e IRRF da folha)', '13º salário']);
     expect(slide(m1, 'personnel').subtitle).toMatch(/1 empregado,/);
 
     const p = await doc(presumed);
@@ -178,11 +178,11 @@ describe('onboarding template and client adjustment', () => {
 
     // A template of the first version (office data, four deadlines): converted on read.
     await admin().execute(sql`insert into onboarding_templates (workspace_id, content, updated_by, updated_by_name)
-      select ${ws}, ${JSON.stringify({ office: { name: 'Antigo', whatsapp: '(19) 90000-0000', email: 'x@y.com', hours: null, crc: 'SP-9', emails: { fiscal: 'f@alfa.com.br', personnel: 'p@alfa.com.br', accounting: 'c@alfa.com.br' }, deadlines: { documentsDay: 7, payrollVariablesDay: 2, admissionBusinessDays: 4, vacationDaysBefore: 6 } }, texts: { 'fiscal.items.mei-fgts.label': 'velho', 'howWeWork.title': 'Como é' }, hidden: ['fiscal.items.mei-fgts'] })}::jsonb, null, 'Israel Dono'`);
+      select ${ws}, ${JSON.stringify({ office: { name: 'Antigo', whatsapp: '(19) 90000-0000', email: 'x@y.com', hours: null, crc: 'SP-9', emails: { fiscal: 'f@alfa.com.br', personnel: 'p@alfa.com.br', accounting: 'c@alfa.com.br' }, deadlines: { documentsDay: 7, payrollVariablesDay: 2, admissionBusinessDays: 4, vacationDaysBefore: 6 } }, texts: { 'fiscal.items.mei-fgts.label': 'velho', 'howWeWork.title': 'Como é', 'obligations.pgdas_das.deadline': 'dia 20 do mês seguinte', 'fiscal.items.simples-cards.text': 'as operadoras informam ao fisco', 'esocial.items.s2200.text': 'até o dia anterior' }, hidden: ['fiscal.items.mei-fgts', 'month.items.esocial'] })}::jsonb, null, 'Israel Dono'`);
     const legacy = (await owner.get('/onboarding/template')).body;
     expect(legacy.params.contact).toEqual({ whatsapp: '(19) 90000-0000', hours: ONBOARDING_DEFAULT_PARAMS.contact.hours, crc: 'SP-9' });
     expect(legacy.params.deadlines).toMatchObject({ documentsDay: 7, cardsDay: 7, payrollVariablesDay: 2, proLaboreDay: 2, admissionBusinessDays: 4, vacationDaysBefore: 6, linkDays: 30 });
-    // Blocks removed from the factory content are dropped, so the editor can save again.
+    // Blocks removed from the factory content (incl. the legal deadlines, 20/11/2026) are dropped, so the editor can save again.
     expect(legacy.texts).toEqual({ 'howWeWork.title': 'Como é' });
     expect(legacy.hidden).toEqual([]);
     d = await doc();

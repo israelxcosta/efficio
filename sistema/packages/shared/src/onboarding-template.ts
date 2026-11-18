@@ -368,7 +368,7 @@ export const ONBOARDING_TEMPLATE_SLIDES: readonly OnboardingTemplateSlide[] = [
       { id: 'variables-mei', label: 'Até o {{prazos.folha}}', text: 'você envia as variáveis da folha do mês anterior', when: when(MEI) },
       { id: 'salaries', label: 'Até o 5º dia útil', text: 'você paga os salários' },
       { id: 'documents', label: 'Até o {{prazos.notas}}', text: 'você envia notas fiscais, extratos e maquininhas/PIX do mês anterior' },
-      { id: 'guides', label: 'No vencimento', text: 'você paga cada guia até o vencimento indicado nela (enviamos antes)' },
+      { id: 'guides', label: 'Até o vencimento da guia', text: 'você paga cada guia no vencimento indicado nela; enviamos antes' },
     ],
   },
   {

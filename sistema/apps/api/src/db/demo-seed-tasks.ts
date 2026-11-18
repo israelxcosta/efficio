@@ -443,7 +443,7 @@ export async function seedTasks(
       clientIds: staff,
     });
     await recurring({ ...dpOrders, name: 'FGTS Digital', dueDay: 20, clientIds: staff });
-    await recurring({ ...dpOrders, name: 'eSocial: fechamento dos eventos periódicos', dueDay: 15, clientIds: staff });
+    await recurring({ ...dpOrders, name: 'eSocial — eventos periódicos', dueDay: 15, clientIds: staff });
     await recurring({ ...contabilOrders, name: 'Balancete mensal', dueDay: 25, targetDaysBefore: 5, regimes: ['simples_nacional', 'presumed_profit', 'real_profit'] });
     await recurring({ ...contabilOrders, name: 'ECD', period: 'annual', dueMonth: 6, dueDay: 30, referenceOffset: 6, regimes: ['presumed_profit', 'real_profit'] });
     await recurring({ ...contabilOrders, name: 'ECF', period: 'annual', dueMonth: 7, dueDay: 31, referenceOffset: 7, regimes: ['presumed_profit', 'real_profit'] });

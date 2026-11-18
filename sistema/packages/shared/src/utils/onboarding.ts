@@ -24,7 +24,7 @@ import {
   ONBOARDING_PLACEHOLDER_ALIASES,
   ONBOARDING_TEMPLATE_SLIDES,
 } from '../onboarding-template';
-import { matchSuggestedDepartment, REGIME_GROUP_ITEMS, type SuggestedDepartment } from '../regime-groups';
+import { matchSuggestedDepartment, normalizeRecurringName, REGIME_GROUP_ITEMS, type SuggestedDepartment } from '../regime-groups';
 import { addMonthKey, formatDateBR, monthKey, type ISODate } from './dates';
 import { formatCNPJ, formatPhone, onlyDigits } from './documents';
 import { dateInTimeZone } from './tasks';
@@ -190,6 +190,9 @@ export function employeesText(n: number): string {
 
 const CATALOG_ORDER = new Map(REGIME_GROUP_ITEMS.map((item, i) => [item.key, i]));
 const CATALOG_DEPARTMENT = new Map(REGIME_GROUP_ITEMS.map((item) => [item.key, item.department]));
+const CATALOG_BY_NAME = new Map(REGIME_GROUP_ITEMS.map((item) => [normalizeRecurringName(item.name), item.key]));
+/** The catalog key of a recurring task: its own, else a handmade task named like a catalog item ("DCTFWeb"). */
+const catalogKeyOf = (r: Pick<OnboardingRecurringInput, 'catalogKey' | 'name'>) => r.catalogKey ?? CATALOG_BY_NAME.get(normalizeRecurringName(r.name)) ?? null;
 
 export function buildOnboardingDocument(input: OnboardingBuildInput): OnboardingDocument {
   const params = normalizeOnboardingParams(input.template);
@@ -257,11 +260,13 @@ export function buildOnboardingDocument(input: OnboardingBuildInput): Onboarding
 
   // --- obligation rows from the recurring tasks ---
   const obligations: Record<OnboardingArea, OnboardingObligationRow[]> = { fiscal: [], accounting: [], personnel: [], other: [] };
-  const sorted = [...input.recurring].sort((a, b) => {
-    const oa = a.catalogKey ? (CATALOG_ORDER.get(a.catalogKey) ?? 999) : 999;
-    const ob = b.catalogKey ? (CATALOG_ORDER.get(b.catalogKey) ?? 999) : 999;
-    return oa - ob || a.name.localeCompare(b.name, 'pt-BR');
-  });
+  const sorted = input.recurring
+    .map((r) => ({ ...r, catalogKey: catalogKeyOf(r) }))
+    .sort((a, b) => {
+      const oa = a.catalogKey ? (CATALOG_ORDER.get(a.catalogKey) ?? 999) : 999;
+      const ob = b.catalogKey ? (CATALOG_ORDER.get(b.catalogKey) ?? 999) : 999;
+      return oa - ob || a.name.localeCompare(b.name, 'pt-BR');
+    });
   let custom = 0;
   const seen = new Set<string>();
   for (const r of sorted) {

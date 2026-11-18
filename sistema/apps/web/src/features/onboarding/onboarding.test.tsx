@@ -36,7 +36,6 @@ import {
   dayBlock,
   defaultLinkMessage,
   editorSections,
-  eventBlock,
   fillLinkMessage,
   mailtoUrl,
   numberBlock,
@@ -105,16 +104,35 @@ describe('OnboardingDeck', () => {
       html.indexOf('id="slide-fiscal"'),
       html.indexOf('id="slide-accounting"'),
     );
-    expect(fiscal).toContain('Prazo legal');
+    // No legal deadline: what we do · what we need · until when (internal deadline).
+    expect(fiscal).not.toContain('Prazo legal');
+    expect(fiscal).toContain('O que fazemos');
     expect(fiscal).toContain('O que precisamos de você');
+    expect(fiscal).toContain('Até quando');
     expect(fiscal.indexOf('PGDAS-D e DAS')).toBeLessThan(fiscal.indexOf('Vendas no cartão e PIX'));
-    expect(fiscal).toContain('dia 20 do mês seguinte');
+    expect(fiscal).not.toContain('dia 20');
+    expect(fiscal).toContain('dia 10 do mês seguinte');
     const personnel = html.slice(
       html.indexOf('id="slide-personnel"'),
       html.indexOf('id="slide-month"'),
     );
     expect(personnel).toContain('Folha de pagamento');
-    expect(personnel).toContain('13º e informe de rendimentos');
+    expect(personnel).toContain('13º salário');
+    expect(personnel).not.toContain('dia 15');
+    // A row the office does alone shows "Nada: …" and a dash in "Até quando".
+    expect(personnel).toContain('Nada: fazemos a partir da folha e dos seus avisos');
+    expect(personnel).toContain('ob-none');
+    const month = html.slice(
+      html.indexOf('id="slide-month"'),
+      html.indexOf('id="slide-documents"'),
+    );
+    expect(month).not.toMatch(/eSocial|EFD-Reinf|DCTFWeb|PIS/);
+    expect(month).toContain('vencimento');
+    const notify = html.slice(html.indexOf('id="slide-esocial"'), html.indexOf('id="slide-fines"'));
+    expect(notify).toContain('Quando nos avisar');
+    expect(notify).toContain('3 dias úteis antes do 1º dia');
+    expect(notify).toContain('5 dias antes da saída');
+    expect(notify).not.toMatch(/S-2200|S-2299|10 dias após/);
     expect((personnel.match(/role="row"/g) ?? []).length).toBe(
       d.slides.find((s) => s.key === 'personnel')!.table!.length + 1,
     );
@@ -169,7 +187,12 @@ describe('OnboardingDeck', () => {
       },
       overrides: null,
       office: { name: 'Efficio Contabilidade', logo: null },
-      client: { ...doc().client, cnpj: '11222333000181', taxRegime: 'simples_nacional', unions: [] },
+      client: {
+        ...doc().client,
+        cnpj: '11222333000181',
+        taxRegime: 'simples_nacional',
+        unions: [],
+      },
       recurring: [],
       updatedAt: '2026-11-18T15:00:00.000Z',
       today: '2026-11-18',
@@ -185,9 +208,7 @@ describe('OnboardingDeck', () => {
       big: '2',
       label: 'Fiscal',
     });
-    expect(
-      numberBlock('dates', 'Suas datas no mês', 'dia 1º, dia 10, 5º dia útil e dia 20').big,
-    ).toBe('4');
+    expect(numberBlock('dates', 'Suas datas no mês', 'dia 1º, dia 10 e 5º dia útil').big).toBe('3');
     expect(dayBlock('Até o 5º dia útil')).toEqual({ pre: 'Até o', big: '5º', post: 'dia útil' });
     expect(dayBlock('Dia 15')).toEqual({ pre: 'Dia', big: '15', post: '' });
     expect(whoBlock('nós enviamos o eSocial')).toEqual({
@@ -195,7 +216,11 @@ describe('OnboardingDeck', () => {
       what: 'o eSocial',
       office: true,
     });
-    expect(eventBlock('Admissão (S-2200)')).toEqual({ name: 'Admissão', code: 'S-2200' });
+    expect(dayBlock('Até o vencimento da guia')).toEqual({
+      pre: 'Até o',
+      big: 'vencimento',
+      post: 'da guia',
+    });
   });
 });
 
@@ -317,6 +342,15 @@ describe('history and editor', () => {
     const sections = editorSections();
     expect(sections).toHaveLength(19);
     expect(sections.at(-1)!.groups.some((g) => g.title === 'Folha de pagamento')).toBe(true);
+    // No "Prazo legal" field anywhere; the tables edit "O que precisamos" and "Até quando".
+    const blocks = sections.flatMap((sec) => sec.groups.flatMap((g) => g.blocks));
+    expect(blocks.some((b) => b.label === 'Prazo legal' || b.key.endsWith('.deadline'))).toBe(
+      false,
+    );
+    expect(blocks.map((b) => b.key)).toEqual(
+      expect.arrayContaining(['obligations.pgdas_das.due', 'fiscal.items.simples-cards.due']),
+    );
+    expect(blocks.map((b) => b.key)).not.toContain('obligations.esocial_periodic.due');
     expect(
       changedTexts({ 'summary.title': 'Sumário', 'team.title': 'Equipe' }, () => 'Sumário'),
     ).toEqual({ 'team.title': 'Equipe' });
@@ -374,10 +408,20 @@ describe('Parâmetros do onboarding', () => {
     expect(html).toContain('Parâmetros do onboarding');
     expect(html).toContain('Rua A, 10 - Centro, Campinas/SP');
     expect(html).toContain('href="/configuracoes?aba=escritorio"');
-    for (const label of ['WhatsApp de atendimento', 'Horário de atendimento', 'CRC', 'Extratos bancários', 'Rescisão', 'Pró-labore', 'Validade do link (dias)'])
+    for (const label of [
+      'WhatsApp de atendimento',
+      'Horário de atendimento',
+      'CRC',
+      'Extratos bancários',
+      'Rescisão',
+      'Pró-labore',
+      'Validade do link (dias)',
+    ])
       expect(html).toContain(`>${label}</label>`);
     // Rules render from the factory values (the owner's answers).
-    expect(html).toMatch(/aria-checked="true"[^>]*aria-label="Exame admissional agendado pelo cliente"/);
+    expect(html).toMatch(
+      /aria-checked="true"[^>]*aria-label="Exame admissional agendado pelo cliente"/,
+    );
     expect(html).toMatch(/aria-checked="false"[^>]*aria-label="Adiantamento quinzenal na folha"/);
     expect(html.match(/>sugestão</g)).toHaveLength(7);
     expect(render(true)).toContain('<fieldset disabled=""');
@@ -390,8 +434,10 @@ describe('Parâmetros do onboarding', () => {
     const saved = onboardingParamsSchema.parse(edited);
     expect(paramsDefaults(saved)).toEqual(edited);
     expect(
-      onboardingParamsSchema.safeParse({ ...values, deadlines: { ...values.deadlines, documentsDay: 40 } })
-        .success,
+      onboardingParamsSchema.safeParse({
+        ...values,
+        deadlines: { ...values.deadlines, documentsDay: 40 },
+      }).success,
     ).toBe(false);
   });
 });

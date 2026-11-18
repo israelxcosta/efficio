@@ -571,6 +571,11 @@
 .ob-dense .ob-tr .ob-a {
   font-size: 24px;
 }
+.ob-dense .ob-th {
+  padding: 0 32px 2px;
+  margin: 0;
+  font-size: 17px;
+}
 .ob-dense .ob-n {
   width: 44px;
   height: 44px;
@@ -588,16 +593,31 @@
   font-weight: 500;
   color: var(--ob-gray);
 }
+.ob-tobl .ob-tr {
+  grid-template-columns: 52px 400px 1fr 330px;
+}
+.ob-tobl .ob-b {
+  font-weight: 500;
+  color: var(--ob-p9);
+}
+.ob-tobl .ob-c {
+  font-weight: 800;
+  color: var(--ob-p6);
+}
+.ob-tobl .ob-c.ob-none {
+  font-weight: 500;
+  color: var(--ob-gray);
+}
 .ob-tes .ob-tr {
-  grid-template-columns: 52px 640px 300px 1fr;
+  grid-template-columns: 52px 560px 400px 1fr;
 }
 .ob-tes .ob-b {
-  font-weight: 700;
-  color: var(--ob-p7);
+  font-weight: 800;
+  color: var(--ob-p6);
 }
 .ob-tes .ob-c {
-  font-weight: 600;
-  color: var(--ob-p9);
+  font-weight: 500;
+  color: var(--ob-gray);
 }
 .ob-tmul .ob-tr {
   grid-template-columns: 52px 520px 1fr;
@@ -723,6 +743,11 @@
   font-weight: 800;
   line-height: 0.9;
   letter-spacing: -0.05em;
+}
+.ob-day.ob-day-word {
+  font-size: 52px;
+  line-height: 1;
+  letter-spacing: -0.03em;
 }
 .ob-day i {
   display: block;
@@ -1281,6 +1306,7 @@
     display: none;
   }
   .ob-tr,
+  .ob-tobl .ob-tr,
   .ob-tdocs .ob-tr,
   .ob-tes .ob-tr,
   .ob-tmul .ob-tr,
@@ -1351,6 +1377,9 @@
   }
   .ob-day {
     font-size: 52px;
+  }
+  .ob-day.ob-day-word {
+    font-size: 26px;
   }
   .ob-day i {
     font-size: 14px;
