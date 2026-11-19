@@ -14,6 +14,7 @@ import { Select as RS } from 'radix-ui';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { inputClasses } from './input';
+import { selectMotion } from '@/lib/motion';
 
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   wrapperClassName?: string;
@@ -66,7 +67,7 @@ function collect(children: ReactNode): Entry[] {
 }
 
 const itemClass =
-  'relative flex cursor-pointer select-none items-center rounded-lg py-2 pr-9 pl-3 text-sm text-fg outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle data-[state=checked]:font-semibold';
+  'relative flex cursor-pointer select-none items-center rounded-lg py-2 pr-9 pl-3 text-sm text-fg outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle data-[state=checked]:font-semibold';
 
 /**
  * Design-system select: the same API as a native `<select>` (children are `<option>`/`<optgroup>`,
@@ -185,7 +186,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
             position="popper"
             sideOffset={6}
             collisionPadding={12}
-            className="z-50 max-h-[min(360px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-border bg-surface shadow-lg data-[state=open]:animate-fade-in"
+            className={cn(
+              'z-50 max-h-[min(360px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-border bg-surface shadow-lg',
+              selectMotion,
+            )}
           >
             <RS.ScrollUpButton className="flex h-7 items-center justify-center text-muted">
               <ChevronUp className="size-4" />

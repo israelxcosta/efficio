@@ -17,7 +17,11 @@ interface SheetProps {
   width?: 'md' | 'lg' | 'xl';
 }
 
-/** Side panel used by every create/edit form (design: "Nova Transação"). */
+/**
+ * Side panel used by every create/edit form (design: "Nova Transação"). Motion: the panel slides
+ * with the drawer curve (300ms in, 220ms out) and the scrim fades out over the same 220ms, so both
+ * leave together; under reduced motion the slide becomes a crossfade (index.css).
+ */
 export function Sheet({
   open,
   onOpenChange,
@@ -32,7 +36,7 @@ export function Sheet({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px] data-[state=open]:animate-fade-in dark:bg-black/50" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px] data-[state=open]:animate-fade-in data-[state=closed]:animate-scrim-out dark:bg-black/50" />
         <Dialog.Content
           className={cn(
             'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-surface shadow-lg outline-none data-[state=closed]:animate-sheet-out data-[state=open]:animate-sheet-in sm:inset-y-2 sm:right-2 sm:rounded-2xl sm:border sm:border-border',

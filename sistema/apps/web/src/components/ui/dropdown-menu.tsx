@@ -2,6 +2,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { DropdownMenu as DM } from 'radix-ui';
 import { Check, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { menuMotion } from '@/lib/motion';
 
 export const DropdownMenu = DM.Root;
 export const DropdownMenuTrigger = DM.Trigger;
@@ -13,7 +14,8 @@ export function DropdownMenuContent({ className, align = 'end', sideOffset = 6, 
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          'z-50 min-w-[200px] overflow-hidden rounded-lg border border-border bg-surface p-1.5 shadow-lg data-[state=open]:animate-fade-in',
+          'z-50 min-w-[200px] overflow-hidden rounded-lg border border-border bg-surface p-1.5 shadow-lg',
+          menuMotion,
           className,
         )}
         {...props}
@@ -31,7 +33,7 @@ export function DropdownMenuItem({ className, icon, tone = 'default', children, 
   return (
     <DM.Item
       className={cn(
-        'flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle [&_svg]:size-4',
+        'flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle [&_svg]:size-4',
         tone === 'danger' ? 'text-danger data-[highlighted]:bg-danger-soft' : 'text-fg',
         className,
       )}
@@ -44,10 +46,12 @@ export function DropdownMenuItem({ className, icon, tone = 'default', children, 
 }
 
 export const DropdownMenuSub = DM.Sub;
+
+// Items highlight instantly (no colour transition): arrow-key navigation must not animate.
 export const DropdownMenuRadioGroup = DM.RadioGroup;
 
 const itemBase =
-  'flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-fg outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle data-[state=open]:bg-bg-subtle [&_svg]:size-4';
+  'flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-fg outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle data-[state=open]:bg-bg-subtle [&_svg]:size-4';
 
 /** Item that opens a submenu ("Mudar situação ›"). */
 export function DropdownMenuSubTrigger({ className, icon, children, ...props }: ComponentProps<typeof DM.SubTrigger> & { icon?: ReactNode }) {
@@ -66,7 +70,7 @@ export function DropdownMenuSubContent({ className, ...props }: ComponentProps<t
       <DM.SubContent
         sideOffset={6}
         collisionPadding={8}
-        className={cn('z-50 min-w-[200px] overflow-hidden rounded-lg border border-border bg-surface p-1.5 shadow-lg data-[state=open]:animate-fade-in', className)}
+        className={cn('z-50 min-w-[200px] overflow-hidden rounded-lg border border-border bg-surface p-1.5 shadow-lg', menuMotion, className)}
         {...props}
       />
     </DM.Portal>
