@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { popoverMotion } from '@/lib/motion';
 import { Popover } from 'radix-ui';
 import { ListFilter, Search, SlidersHorizontal, X } from 'lucide-react';
 import {
@@ -216,7 +217,7 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
               align="end"
               sideOffset={6}
               collisionPadding={12}
-              className="z-50 flex w-72 flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-lg data-[state=open]:animate-fade-in"
+              className={`z-50 flex w-72 flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-lg ${popoverMotion}`}
             >
               {filters.scope !== 'department' ? <Field label="Departamento">{departmentSelect(true)}</Field> : null}
               {!calendar ? <Field label="Mês de vencimento">{monthSelect(true)}</Field> : null}

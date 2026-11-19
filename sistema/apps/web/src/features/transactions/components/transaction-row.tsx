@@ -420,7 +420,7 @@ export function RowMenu({ tx, onAddEmployees }: RowMenuProps) {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition-[opacity,background-color,color] hover:bg-bg-subtle hover:text-fg group-hover:opacity-100"
             aria-label={`Ações de ${tx.description}`}
           >
             <Ellipsis className="size-4" />

@@ -172,7 +172,33 @@ Movimento serve a feedback, estado e continuidade, nunca à decoração (fonte:
   `isAnimationActive: 'auto'` (respeita reduced motion; nunca passe `true`), `false` durante o resize do card,
   300ms `ease-out`. Telas de impressão (relatório do cliente, evolução) ficam com `isAnimationActive={false}`.
   O `Gauge` gira o knob junto com o arco (mesma duração e curva).
-- **Dado lido não se move por estilo**: nada de count-up; troca de período esmaece (`isPlaceholderData`).
+- **Sheet**: painel com `animate-sheet-in`/`animate-sheet-out` (`--ease-drawer`, 300/220ms) e scrim com
+  `animate-fade-in`/`animate-scrim-out` (220ms): fundo e painel saem juntos.
+- **Frequência decide**: atalho de teclado, setas e digitação **não animam**. A paleta ⌘K abre e fecha seca
+  (scrim incluído); itens de `DropdownMenu`, `Select` e da paleta destacam sem `transition-colors`.
+- **Popover, menu e select**: classes de `lib/motion.ts` (`popoverMotion`, `menuMotion`, `selectMotion`):
+  `animate-pop-in`/`animate-pop-out` (opacity + scale .96, 200/150ms) a partir de
+  `--radix-*-content-transform-origin`, ou seja, crescem do gatilho. Tooltip e `HelpTip` ficam só com o fade do
+  `delayed-open`. Popover novo usa uma dessas constantes.
+- **Pressão**: `Button` (todas as variantes, menos `link`) faz `active:scale-[0.97]` com
+  `transition-[…,scale] duration-(--dur-press) ease-out`; ícones de 36px da barra flutuante usam `.95` (com .97
+  a diferença é de ~1px). Nada de `active:translate-y-px`.
+- **Troca de ícone de estado** (`PaidToggle`, `TaskStatusButton`): o ícone recebe `key` do estado (remonta) e a
+  classe `.icon-in` (`@starting-style`: opacity 0, scale .25, blur 4px → 200ms `--ease-out`) só depois de uma
+  mudança real (`useHasChanged`, `lib/use-has-changed.ts`); nunca no primeiro render. Estado alternado usa
+  transição, não keyframe (o antigo `animate-pop` 1.22× foi removido). Não troque ícones por `display`
+  (`hidden`/`block`) num elemento com `.icon-in`: reaparecer reanima; use `opacity`.
+- **Hover não move o próprio elemento**: muda cor, anel ou sombra, ou um filho se move (cartão da lista de
+  Cartões: as luzes decorativas do `CardVisual` deslizam via `group/card-link`; avatar da lateral e swatches
+  do `ColorPicker`: só o anel). Nunca `transition` genérico: liste as propriedades
+  (`transition-[background-color,color,opacity]`).
+- **Painel (Personalizar)**: o card pego levanta (`scale-[1.02]` + `shadow-lg`, 150ms) enquanto a posição segue
+  o ponteiro sem transição; ao soltar, desliza até a célula e volta à escala 1 com `--ease-out` em
+  `--dur-settle` (250ms). Quando a largura do board muda (janela, lateral) o grid recebe `data-instant` por
+  dois quadros e os cards pulam para o lugar, sem deslizar atrás do redimensionamento.
+- **Dado lido não se move por estilo**: nada de count-up; troca de período esmaece (`isPlaceholderData` →
+  `opacity-60 transition-opacity`). O painel financeiro esmaece com `delay-150` só na ida (cache rápido não
+  pisca) e marca `aria-busy`.
 - **Reduced motion** (bloco global): deslocamento e escala viram crossfade (mesmo tempo, só opacity);
   transições de cor/opacity/sombra continuam; loops decorativos (`animate-shimmer`, `animate-pulse`,
   `ob-loading`) param em opacidade .7; o spinner continua girando, mais devagar (1,5s).
