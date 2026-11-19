@@ -1,0 +1,37 @@
+/* Injeção de demonstração: reproduz em CSS puro (sobre o build atual) as melhorias 1, 3 e 6 do motion.md. */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-soft: var(--ease-out);
+  --dur-press: 150ms;
+  --dur-pop-in: 200ms;
+  --dur-pop-out: 150ms;
+  --dur-panel-in: 300ms;
+  --dur-panel-out: 220ms;
+  --dur-settle: 250ms;
+}
+/* 1. Modal: anima só scale/opacity (propriedades individuais não brigam com o `translate` do Tailwind v4) + saída */
+@keyframes dialog-in { from { opacity: 0; scale: 0.96; } }
+@keyframes dialog-out { to { opacity: 0; scale: 0.96; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes sheet-in { from { transform: translateX(100%); } }
+@keyframes sheet-out { to { transform: translateX(100%); } }
+.data-\[state\=open\]\:animate-dialog-in[data-state='open'] { animation: dialog-in var(--dur-pop-in) var(--ease-out); }
+.data-\[state\=open\]\:animate-dialog-in[data-state='closed'] { animation: dialog-out var(--dur-pop-out) var(--ease-out); }
+/* overlays de Modal/Sheet/paleta: saem junto com o painel */
+.backdrop-blur-\[2px\][data-state='closed'] { animation: fade-out var(--dur-pop-out) var(--ease-out); }
+/* 3. Sheet: curva de drawer nas duas direções (nunca ease-in), saída mais curta, overlay sincronizado */
+.data-\[state\=open\]\:animate-sheet-in[data-state='open'] { animation: sheet-in var(--dur-panel-in) var(--ease-drawer); }
+.data-\[state\=closed\]\:animate-sheet-out[data-state='closed'] { animation: sheet-out var(--dur-panel-out) var(--ease-drawer); }
+.bg-black\/25.backdrop-blur-\[2px\][data-state='closed'] { animation: fade-out var(--dur-panel-out) var(--ease-out); }
+/* 6. Drag do painel: levanta o card ao pegar, assenta com curva forte ao soltar */
+[data-widget-id] { transition-duration: var(--dur-settle) !important; transition-timing-function: var(--ease-out) !important; }
+[data-widget-id].z-30 { transition-property: none !important; box-shadow: none !important; }
+[data-widget-id] > * { transition: scale var(--dur-press) var(--ease-out), box-shadow var(--dur-press) var(--ease-out); }
+[data-widget-id].z-30 > * { scale: 1.02; box-shadow: var(--shadow-lg); }
+@media (prefers-reduced-motion: reduce) {
+  [data-widget-id].z-30 > * { scale: none; }
+  .data-\[state\=open\]\:animate-sheet-in[data-state='open'] { animation-name: fade-in; }
+  .data-\[state\=closed\]\:animate-sheet-out[data-state='closed'] { animation-name: fade-out; }
+}
