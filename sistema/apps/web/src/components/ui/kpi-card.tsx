@@ -24,7 +24,7 @@ interface KpiCardProps {
   footerContent?: ReactNode;
   /** Small icon before the label (dashboard strip). */
   icon?: ReactNode;
-  /** Dashboard strip: 12px label, 22px value, tighter padding. */
+  /** Dense grids: 12px label and tighter padding (the value is always `text-kpi`, 24px). */
   compact?: boolean;
   /** Extra content under the value (full width, left-aligned), e.g. a breakdown band. */
   children?: ReactNode;
@@ -50,8 +50,9 @@ export function KpiCard({
   const parts = changeParts(change, changeUnit, invert);
   const tone = parts ? CHANGE_TONE[parts.tone] : 'text-muted';
   const Icon = parts?.up === false ? TrendingDown : TrendingUp;
+  // The comparison is a line of text under the value (as in `MetricStrip`), not a grey band.
   const footer = (
-    <div className={cn('flex items-center justify-between gap-2 border-t border-border bg-surface-muted text-muted', compact ? 'px-3.5 py-2 text-caption' : 'px-4 py-2.5 text-xs')}>
+    <div className={cn('flex items-center justify-between gap-2 text-caption text-muted', compact ? 'mt-2' : 'mt-2.5')}>
       <span className="flex min-w-0 items-center gap-1.5 truncate">
         {footerContent ? (
           footerContent
@@ -65,34 +66,30 @@ export function KpiCard({
           <span>Sem base de comparação</span>
         )}
       </span>
-      {href ? <ArrowRight className="size-3.5 text-subtle transition-transform group-hover:translate-x-0.5" aria-hidden /> : null}
+      {href ? <ArrowRight className="size-3.5 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5" aria-hidden /> : null}
     </div>
   );
   const body = (
-    <>
-      <div className={compact ? 'px-3.5 pt-3 pb-2.5' : 'px-4 pt-4 pb-3.5'}>
-        <div className={cn('flex items-center gap-1.5 font-medium text-muted', compact ? 'text-[12px]' : 'text-[13px]')}>
-          {icon ? <span className="flex shrink-0 text-subtle [&_svg]:size-4">{icon}</span> : null}
-          {label}
-          {info ? (
-            <Tooltip content={info}>
-              <span className="text-subtle" aria-label={info}>
-                <Info className="size-3.5" />
-              </span>
-            </Tooltip>
-          ) : null}
-        </div>
-        {/* Numbers sit on the right edge of the card (label stays on the left). */}
-        <div className={cn('tabular flex justify-end text-right leading-tight font-semibold tracking-tight text-fg', compact ? 'mt-1 truncate text-kpi' : 'mt-1.5 text-[26px]', valueClassName)}>
-          {value}
-        </div>
-        {children}
+    <div className={cn('flex flex-1 flex-col', compact ? 'px-4 py-3.5' : 'px-5 py-4')}>
+      <div className={cn('flex items-center gap-1.5 font-medium text-muted', compact ? 'text-[12px]' : 'text-[13px]')}>
+        {icon ? <span className="flex shrink-0 text-subtle [&_svg]:size-4">{icon}</span> : null}
+        {label}
+        {info ? (
+          <Tooltip content={info}>
+            <span className="text-subtle" aria-label={info}>
+              <Info className="size-3.5" />
+            </span>
+          </Tooltip>
+        ) : null}
       </div>
-      {footer}
-    </>
+      {/* Label over the value, both on the left (app-screens §5, same as MetricStrip). */}
+      <div className={cn('tabular mt-1.5 text-kpi font-semibold tracking-tight text-fg', compact && 'truncate', valueClassName)}>{value}</div>
+      {children}
+      <div className="mt-auto">{footer}</div>
+    </div>
   );
   const classes = cn(
-    'group flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-surface transition-colors',
+    'group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-colors',
     href && 'hover:border-border-strong',
     className,
   );

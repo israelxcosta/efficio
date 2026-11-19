@@ -30,7 +30,7 @@
 | `bg`             | `#F6F6F4` | fundo da aplicação (off-white quente)       |
 | `bg-subtle`      | `#EFEFEC` | sidebar, trilho de segmentados              |
 | `surface`        | `#FFFFFF` | cards, sheets, inputs                       |
-| `surface-muted`  | `#F7F7F5` | rodapé de KPI, linhas zebradas, inputs read |
+| `surface-muted`  | `#F7F7F5` | hover de linha, linhas zebradas, inputs read |
 | `border`         | `#E7E7E3` | bordas padrão                               |
 | `border-strong`  | `#D6D6D1` | bordas de input em hover, divisores fortes  |
 | `text`           | `#16181D` | texto principal                             |
@@ -128,7 +128,13 @@ clareadas no modo escuro por `useTone()` (`src/lib/theme.tsx`) para continuarem 
 | H2 (card)    | 15–16px / 600                    | "Fluxo de Caixa", "Resumo do período" |
 | Body         | 14px / 400–500                   | texto geral                           |
 | Small        | 12–13px / 400–500                | legendas, rodapés de KPI              |
-| Overline     | 11px / 600, uppercase, 0.12em    | "PLANEJAMENTO", "OPORTUNIDADE"        |
+| Rótulo de seção | 13px / 600, `--app-brand-text`, sem caixa alta | "Tarefas", "Vencimentos" (Início)  |
+| Rótulo de grupo | 12px / 600 (`eyebrow`), sem caixa alta | grupos dentro de card ou painel lateral |
+
+**Hierarquia dos painéis** (decisão do dono: sem caixa alta espaçada, ver `@utility eyebrow`): o
+rótulo de seção (`SectionLabel as="h2" level="section"`, `components/ui/card.tsx`) é a única cor de
+marca no fluxo de leitura e fica acima dos cards, com **40px acima e 12px abaixo**; o título do card
+(16px / 600, `text-fg`) continua sendo o nível de título. O ganho vem do contraste de cor e de espaço.
 
 Escala compacta dos cards do dashboard (tokens `--text-*` em `index.css`, classes Tailwind):
 
@@ -230,7 +236,8 @@ Movimento serve a feedback, estado e continuidade, nunca à decoração (fonte:
 | Button             | variantes `primary` (brand-800), `soft` (brand-100/brand-800), `outline` (surface + border), `ghost`, `danger`; tamanhos sm 32 / md 40 / lg 44; raio md |
 | SegmentedControl   | trilho `bg-subtle` raio md, item ativo `surface` + sombra xs; variante `solid` com ativo `brand-800` texto branco (abas principais) |
 | Card               | `surface`, borda, raio xl, padding 20–24; header com título H2 + subtítulo small muted + ação à direita |
-| KpiCard            | rótulo small + ícone info; valor Display; rodapé `surface-muted` com seta (TrendingUp/Down) colorida, "% vs mês anterior" e chevron (cor e texto da variação por `changeParts`, `features/dashboard/kpi-logic.ts`); fora dos dashboards (relatórios, aba inteligente) |
+| KpiCard            | rótulo small + ícone info; valor `text-kpi` (24px) **à esquerda**, rótulo sobre o valor; a comparação é uma linha de texto (12,5 muted) no pé do card, com seta (TrendingUp/Down) colorida, "% vs mês anterior" e seta → quando é link (cor e texto da variação por `changeParts`, `features/dashboard/kpi-logic.ts`); sem faixa cinza de rodapé; fora dos dashboards (relatórios, aba inteligente) |
+| MiniStat / MiniStatGroup | KPIs de topo das telas de lista (Pagar/Receber, Metas, Cartões, Relatórios, Extrato, Contas, Transferências), no mesmo padrão da `MetricStrip`: `MiniStatGroup` é um container de borda única e raio `xl` com células separadas por divisores de 1px (passe as colunas em `className`, ex. `lg:grid-cols-4`; no celular 2 colunas; a última célula ímpar leva `col-span-2`); célula = rótulo 12,5 muted (+ ajuda), valor tabular à esquerda (18px no celular, `text-kpi` 24px a partir de `sm`), dica opcional 12,5 muted; `amount === 0` deixa o valor cinza |
 | MetricStrip        | faixa de números do topo dos dois dashboards (`components/ui/metric-strip.tsx`): um `Card` com células separadas por divisores de 1px; célula = rótulo 12,5 muted + (i), valor `text-kpi` à esquerda (32px na célula `hero`, que tem 1,3 fração), minigráfico opcional à direita e rodapé de uma linha (truncado, texto inteiro em `footerTitle`); ≥ 1000px de faixa uma fileira, 560–999px `medium` (2 ou 3) por fileira, abaixo cada célula vira linha com o valor inteiro à direita (20px, sem `truncate`); a célula inteira é link (camada por cima), e botões/links do rodapé ficam acima dela |
 | StackBar           | barra empilhada proporcional (`components/charts/stack-bar.tsx`): 6px (`sm`) ou 10px (`md`), raio cheio, 2px entre segmentos, larguras exatas e % inteiros pelo maior resto (`stackSegments`); segmento hachurado (`hatch`) para o que está em aberto; marca opcional de 2px com rótulo `text-micro` ("dia 5", "mês anterior"); `aria-hidden` |
 | Sparkline          | linha SVG de 1,5px sem eixos (`components/charts/sparkline.tsx`, 96×32), `--app-data` ou cinza (`--app-chart-expense-strong`) para despesas, ponto no último valor, comprime na horizontal em célula estreita; `aria-hidden` |
@@ -254,7 +261,7 @@ Movimento serve a feedback, estado e continuidade, nunca à decoração (fonte:
 | SearchSelect       | lista do `Select` com campo de busca no topo (base de `ClientPicker` e `MemberPicker`); aceita grupos, dica à direita e gatilho próprio (célula de tabela) |
 | WidgetCard         | card de widget dos dois dashboards (`features/dashboard/layout/widget-card.tsx`): título estável 16px + (i) com a descrição, abaixo a **linha do achado** (`subtitle`, 12,5px, uma linha, texto inteiro em `title`), ação encostada na borda direita (desce para uma 2ª linha abaixo de 384px), corpo `flex-1` e rodapé de uma linha; com alerta, ponto vermelho no título; alça de mover, olho "Ocultar card", cursor de mover e borda `border-strong` **só no modo Personalizar** (`WidgetChrome.editing`) |
 | StatusSummary      | topo dos StatusCards do Início (`features/tasks/components/band-list.tsx`): número-herói `text-kpi` opcional (cor só em `danger`/`warning`) + rótulo 12,5, depois `StackBar md` com a marca "dia N"; `BandList` abaixo com o % de cada faixa (`total`) e a variante `dense` (32px; `tight` 28px nos cards M de 296px) |
-| DashSlot           | célula da grade do Início (`features/tasks/components/dash-slot.tsx`): altura por `heightForRows` (S/M/L) e largura por faixa de contêiner (`span.wide` de 12, `span.medium` de 2, 1 no celular); `mediumRows`/`phoneRows` trocam a altura abaixo de 4 colunas; colunas por `DashColsContext` (a página mede a própria largura) |
+| DashSlot           | célula da grade do Início (`features/tasks/components/dash-slot.tsx`): altura por `heightForRows` (S/M/L) e largura por faixa de contêiner (`span.wide` de 12, `span.medium` de 2, 1 no celular); `mediumRows`/`phoneRows` trocam a altura abaixo de 4 colunas; colunas por `DashColsContext` (a página mede a própria largura); `fit` (cards sem lista ajustável: Por responsável, Processos, Pendências fiscais, Visão geral dos clientes, Cadastro incompleto) troca a altura fixa por mínima (2 linhas), a linha da grade fica com a altura do maior e as listas usam `SlotList` (corte por quantidade, `cap`, em vez de pela altura); listas de até 6 linhas não ocupam a largura toda (Cadastro incompleto em 8 de 12 colunas) |
 | FitList            | lista cortada às linhas que cabem no card (mede cada linha a cada redimensionamento) com a linha "+ N …" (`showMore={false}` quando o rodapé já tem "Ver todos"); aceita o total real do servidor |
 | TransactionRow `line` | densidade dos dashboards: uma linha de 40px (estado, descrição + contato na mesma linha, vencimento relativo, valor, "⋯"), sem o selo "+ Empregados" (fica no menu) e sem a coluna de conta |
 | ChartBox           | envolve um gráfico Recharts e ocupa a altura restante do card (mínimo 96px), para o gráfico crescer junto |

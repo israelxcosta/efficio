@@ -13,7 +13,7 @@ import {
 } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { StackBar } from '@/components/charts/stack-bar';
-import { Card } from '@/components/ui/card';
+import { Card, SectionLabel } from '@/components/ui/card';
 import { MetricStrip, type MetricCell } from '@/components/ui/metric-strip';
 import { MemberAvatar } from '@/components/ui/member-avatar';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
@@ -37,7 +37,7 @@ import { TaskStatusGlyph } from '../components/task-status';
 import { RecurringOccurrenceRow } from '../components/occurrence-row';
 import { occurrenceBucket, taskBucket } from '../occurrence';
 import { monthName } from '../components/tasks-summary';
-import { DashColsContext, DashSlot, dashGridClass, useDashCols } from '../components/dash-slot';
+import { DashColsContext, DashSlot, SlotList, dashGridClass, useDashCols } from '../components/dash-slot';
 import { daysText, shortDate, shortName } from '../due';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
@@ -149,10 +149,10 @@ export default function TaskHomePage() {
           <DashSlot rows={3} phoneRows={4} span={{ wide: 6, medium: 1 }}>
             <AgendaCard {...cards} />
           </DashSlot>
-          <DashSlot rows={3} phoneRows={4} span={{ wide: 6, medium: 1 }}>
+          <DashSlot rows={3} span={{ wide: 6, medium: 1 }} fit>
             <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
           </DashSlot>
-          <DashSlot rows={3} span={{ wide: 6, medium: 1 }}>
+          <DashSlot rows={3} span={{ wide: 6, medium: 1 }} fit>
             <ProcessesCard {...cards} />
           </DashSlot>
         </Section>
@@ -176,14 +176,15 @@ export default function TaskHomePage() {
         </Section>
 
         <Section title="Obrigações e clientes">
-          <DashSlot rows={4} span={{ wide: 8, medium: 2 }}>
+          <DashSlot rows={4} span={{ wide: 8, medium: 2 }} fit>
             <FiscalCard {...cards} />
           </DashSlot>
-          <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }}>
+          <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }} fit>
             <ClientsOverviewCard {...cards} onList={setList} />
           </DashSlot>
           {showIncomplete ? (
-            <DashSlot rows={3} phoneRows={4} span={{ wide: 12, medium: 2 }}>
+            // A list of up to 6 rows never spans the page (app-screens §4.2): 8 of 12 columns.
+            <DashSlot rows={3} span={{ wide: 8, medium: 2 }} fit>
               <IncompleteCard {...cards} onList={setList} canFinance={can('finance')} />
             </DashSlot>
           ) : null}
@@ -195,12 +196,18 @@ export default function TaskHomePage() {
   );
 }
 
-/** A block of the start page: a quiet heading over the card grid (12, 2 or 1 columns by width). */
+/**
+ * A block of the start page: the section label (13px, brand colour; the card titles stay the title
+ * level) over the card grid (12, 2 or 1 columns by width). 40px above (16 + the page's 24px gap),
+ * 12px below, so the blocks read apart.
+ */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const cols = useDashCols();
   return (
-    <section aria-label={title} className="flex flex-col gap-3">
-      <h2 className="text-title-sm font-semibold tracking-tight text-fg">{title}</h2>
+    <section aria-label={title} className="mt-4 flex flex-col gap-3">
+      <SectionLabel as="h2" level="section">
+        {title}
+      </SectionLabel>
       <div className={dashGridClass(cols)}>{children}</div>
     </section>
   );
@@ -540,7 +547,7 @@ function ByAssignee({ home, people, where, loading }: { home: TaskHomeResponse |
       ) : rows.length === 0 ? (
         <BodyEmpty title="Ninguém com tarefas em aberto" />
       ) : (
-        <FitList items={rows} getKey={(r) => r.key} moreLabel={['pessoa', 'pessoas']} renderItem={(r) => <BreakdownItem row={r} max={max} />} />
+        <SlotList cap={5} items={rows} getKey={(r) => r.key} moreLabel={['pessoa', 'pessoas']} renderItem={(r) => <BreakdownItem row={r} max={max} />} />
       )}
     </WidgetCard>
   );

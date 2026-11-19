@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { BankLogo } from '@/components/ui/bank-logo';
 import { ConfirmDialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat, PageHeader } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup, PageHeader } from '@/components/ui/misc';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -86,12 +86,12 @@ export default function AccountsPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <MiniStatGroup className="lg:grid-cols-4">
         <MiniStat label="Saldo em contas" value={formatBRL(inTotal)} amount={inTotal} tone={inTotal < 0 ? 'danger' : undefined} />
         <MiniStat label="Investimentos" value={formatBRL(invested)} amount={invested} info="Somados à parte do saldo em contas." />
         <MiniStat label="Patrimônio" value={formatBRL(inTotal + invested)} amount={inTotal + invested} />
         <MiniStat label="Previsto fim do mês" value={formatBRL(projected)} amount={projected} info="Saldo das contas mais os lançamentos pendentes do mês." />
-      </div>
+      </MiniStatGroup>
 
       {accounts.isPending ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

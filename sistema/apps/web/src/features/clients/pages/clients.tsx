@@ -57,55 +57,9 @@ const PAGE_SIZE = 25;
 
 type StatusFilter = ClientStatus | 'all';
 
-/** Icon button of a row, with its name in a tooltip (and the reason when it is blocked). */
-function RowAction({
-  label,
-  icon,
-  onClick,
-  blockedReason,
-  tone = 'neutral',
-}: {
-  label: string;
-  icon: ReactNode;
-  onClick: () => void;
-  blockedReason?: string | null;
-  tone?: 'neutral' | 'danger' | 'success';
-}) {
-  const button = (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={Boolean(blockedReason)}
-      onClick={onClick}
-      className={cn(
-        'flex size-8 items-center justify-center rounded-md text-muted transition-colors disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4',
-        tone === 'neutral' && 'hover:bg-bg-subtle hover:text-fg',
-        tone === 'danger' && 'hover:bg-danger-soft hover:text-danger',
-        tone === 'success' && 'hover:bg-success-soft hover:text-success',
-      )}
-    >
-      {icon}
-    </button>
-  );
-  return (
-    <Tooltip content={blockedReason ?? label}>
-      {blockedReason ? (
-        <span
-          tabIndex={0}
-          className="inline-flex cursor-not-allowed rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-brand-500/25"
-        >
-          {button}
-        </span>
-      ) : (
-        button
-      )}
-    </Tooltip>
-  );
-}
-
 /**
- * An item of the phone card's "⋯" menu. A tap opens no tooltip, so a blocked item shows its reason
- * under the name.
+ * An item of a client's "⋯" menu (table rows and phone cards). A tap opens no tooltip, so a blocked
+ * item shows its reason under the name.
  */
 function MenuAction({
   label,
@@ -130,14 +84,15 @@ function MenuAction({
   );
 }
 
-function FeeCell({ client, today, onOpen }: { client: Client; today: string; onOpen: () => void }) {
+/** The current fee; in the table it sits on the right edge (money is right-aligned, tabular). */
+function FeeCell({ client, today, onOpen, align = 'left' }: { client: Client; today: string; onOpen: () => void; align?: 'left' | 'right' }) {
   const fee = client.currentFee;
   if (fee) {
     return (
       <button
         type="button"
         onClick={onOpen}
-        className="text-left"
+        className={align === 'right' ? 'ml-auto block text-right' : 'text-left'}
         aria-label={`Honorários de ${client.name}`}
       >
         <span className="tabular block font-semibold whitespace-nowrap text-fg">{formatBRL(fee.amount)}</span>
@@ -213,71 +168,25 @@ export default function ClientsPage() {
   const data = clients.data;
   const summary = data?.summary;
 
-  // The buttons of the table (desktop); the cards (phones) use `cardActions`.
-  const actions = (c: Client) => (
-    <div className="flex items-center justify-end gap-0.5">
-      <RowAction label="Abrir ficha do cliente" icon={<Eye />} onClick={() => navigate(clientPagePath('financeiro', c.id))} />
-      <RowAction
-        label="Editar cadastro"
-        icon={<Pencil />}
-        blockedReason={readOnlyReason}
-        onClick={() => setSheet({ open: true, client: c })}
-      />
-      <RowAction
-        label="Honorários e taxa por empregado"
-        icon={<HandCoins />}
-        onClick={() => setFeesFor(c)}
-      />
-      <RowAction label="Gerar contrato" icon={<FileSignature />} onClick={() => void contract.start(c)} />
-      {c.status === 'active' ? (
-        <RowAction
-          label="Inativar"
-          icon={<UserX />}
-          tone="danger"
-          blockedReason={readOnlyReason}
-          onClick={() => setToInactivate(c)}
-        />
-      ) : (
-        <RowAction
-          label="Reativar"
-          icon={<UserCheck />}
-          tone="success"
-          blockedReason={readOnlyReason}
-          onClick={() => setToReactivate(c)}
-        />
-      )}
-      <RowAction
-        label="Excluir"
-        icon={<Trash2 />}
-        tone="danger"
-        blockedReason={
-          readOnlyReason ??
-          (c.transactionCount > 0
-            ? 'Cliente com lançamentos vinculados não pode ser excluído. Use "Inativar".'
-            : null)
-        }
-        onClick={() => setToDelete(c)}
-      />
-    </div>
-  );
-
   const deleteBlockedReason = (c: Client) =>
     readOnlyReason ??
     (c.transactionCount > 0 ? 'Cliente com lançamentos vinculados não pode ser excluído. Use "Inativar".' : null);
 
-  // The cards (phones): "Ver" opens the client page; the other actions go into a "⋯" menu.
-  const cardActions = (c: Client) => {
+  // "Ver" opens the client page; the other actions go into a "⋯" menu (table rows and phone cards
+  // alike: one visible action per row, app-screens §7.8).
+  const rowActions = (c: Client, layout: 'table' | 'card') => {
     const name = c.tradeName || c.name;
+    const table = layout === 'table';
     return (
-      <div className="flex items-center gap-1.5">
-        <Button variant="outline" size="sm" className="h-10 px-3.5" asChild>
+      <div className={cn('flex items-center gap-1.5', table && 'justify-end')}>
+        <Button variant={table ? 'ghost' : 'outline'} size="sm" className={table ? 'h-9 px-3' : 'h-10 px-3.5'} asChild>
           <Link to={clientPagePath('financeiro', c.id)} aria-label={`Ver ficha de ${name}`}>
-            <Eye aria-hidden /> Ver
+            <Eye aria-hidden /> {table ? 'Ver ficha' : 'Ver'}
           </Link>
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" aria-label={`Mais ações de ${name}`}>
+            <Button variant={table ? 'ghost' : 'outline'} size="icon" className={cn(table && 'size-9')} aria-label={`Mais ações de ${name}`}>
               <Ellipsis aria-hidden />
             </Button>
           </DropdownMenuTrigger>
@@ -455,22 +364,27 @@ export default function ClientsPage() {
                   </div>
                   <div className="flex items-center justify-between gap-3 pl-12">
                     <FeeCell client={c} today={today} onOpen={() => setFeesFor(c)} />
-                    {cardActions(c)}
+                    {rowActions(c, 'card')}
                   </div>
                 </li>
               ))}
             </ul>
             <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[1000px] text-sm">
+              <table className="w-full min-w-[960px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs font-medium text-muted">
                     <th className="px-4 py-2.5">Cliente</th>
                     <th className="px-4 py-2.5">CNPJ</th>
                     <th className="px-4 py-2.5">Regime</th>
                     <th className="px-4 py-2.5">Início do contrato</th>
-                    <th className="px-4 py-2.5">Honorário vigente</th>
-                    <th className="px-4 py-2.5">Situação</th>
-                    <th className="px-4 py-2.5 text-right">Ações</th>
+                    <th className="px-4 py-2.5 text-right">Honorário vigente</th>
+                    {/* "Ativos" already filters: no status column; "Todos" marks only the inactive ones,
+                        "Inativos" says why and when. */}
+                    {status === 'all' ? <th className="px-4 py-2.5">Situação</th> : null}
+                    {status === 'inactive' ? <th className="px-4 py-2.5">Inativação</th> : null}
+                    <th className="px-4 py-2.5 text-right">
+                      <span className="sr-only">Ações</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -519,11 +433,23 @@ export default function ClientsPage() {
                         <td className="tabular px-4 py-3 whitespace-nowrap">
                           {formatDateBR(c.contractStartDate)}
                         </td>
-                        <td className="px-4 py-3">
-                          <FeeCell client={c} today={today} onOpen={() => setFeesFor(c)} />
+                        <td className="px-4 py-3 text-right">
+                          <FeeCell client={c} today={today} onOpen={() => setFeesFor(c)} align="right" />
                         </td>
-                        <td className="px-4 py-3">{statusBadge(c)}</td>
-                        <td className="px-4 py-3">{actions(c)}</td>
+                        {status === 'all' ? <td className="px-4 py-3">{c.status === 'inactive' ? statusBadge(c) : null}</td> : null}
+                        {status === 'inactive' ? (
+                          <td className="px-4 py-3 text-xs text-muted">
+                            {c.inactivation ? (
+                              <>
+                                <span className="block whitespace-nowrap text-fg">{INACTIVATION_REASON_LABELS[c.inactivation.reason]}</span>
+                                <span className="tabular block whitespace-nowrap">{formatDateBR(c.inactivation.date)}</span>
+                              </>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                        ) : null}
+                        <td className="px-4 py-2">{rowActions(c, 'table')}</td>
                       </tr>
                     );
                   })}

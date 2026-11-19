@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat, PageHeader } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup, PageHeader } from '@/components/ui/misc';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -54,7 +54,7 @@ export default function CardsPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <MiniStatGroup className="lg:grid-cols-4">
         {/* Using the limit is not a problem: ink, warning/red only past the same 70%/90% marks as the bars; zero is grey. */}
         <MiniStat label="Limite total" value={formatBRL(totalLimit)} amount={totalLimit} />
         <MiniStat
@@ -66,7 +66,7 @@ export default function CardsPage() {
         />
         <MiniStat label="Disponível" value={formatBRL(Math.max(0, totalLimit - used))} amount={Math.max(0, totalLimit - used)} />
         <MiniStat label="Faturas atuais" value={formatBRL(currentInvoices)} amount={currentInvoices} />
-      </div>
+      </MiniStatGroup>
 
       {cards.isPending ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

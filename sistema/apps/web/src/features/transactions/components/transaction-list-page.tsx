@@ -5,7 +5,7 @@ import { formatBRL, todayISO, TRANSACTION_ORIGIN_LABELS, TRANSACTION_ORIGINS, ty
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat, PageHeader } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup, PageHeader } from '@/components/ui/misc';
 import { Field, Input } from '@/components/ui/input';
 import { PeriodNavigator } from '@/components/ui/period-navigator';
 import { useScreenPeriod } from '@/lib/active-month';
@@ -187,7 +187,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <MiniStatGroup className="lg:grid-cols-4">
         {/* Ink for the totals (an amount to pay or receive is not a problem); red only for overdue > 0; zero is grey. */}
         <MiniStat label="Total no período" value={summary ? formatBRL(summary.total) : '—'} amount={summary?.total} hint={summary ? `${summary.count} lançamentos` : undefined} />
         <MiniStat label={labels.paid} value={summary ? formatBRL(summary.paid) : '—'} amount={summary?.paid} />
@@ -199,7 +199,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
           tone="danger"
           hint={summary?.overdueCount ? `${summary.overdueCount} em atraso` : 'Nada em atraso'}
         />
-      </div>
+      </MiniStatGroup>
 
       {/* Phones (spec app-screens §12): month + "Hoje", the status in one scrollable row, then search
           and "Filtros (N)" with the selects and the period type in a panel, so the list starts on the

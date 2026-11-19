@@ -32,6 +32,22 @@ export function CardHeader({ title, subtitle, info, action, icon, className }: C
   );
 }
 
-export function SectionLabel({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn('eyebrow text-brand-text', className)} {...props} />;
+interface SectionLabelProps extends HTMLAttributes<HTMLHeadingElement> {
+  /** Element to render (a page section uses `h2`). */
+  as?: 'p' | 'h2' | 'h3';
+  /**
+   * `group` (default): small label of a group inside a card or sheet (`eyebrow`, 12px).
+   * `section`: label of a page section above a card grid, 13px/600 in the brand colour, sentence case
+   * (the card titles stay the title level). The page gives it 40px above and 12px below.
+   */
+  level?: 'group' | 'section';
+}
+
+export function SectionLabel({ as: Tag = 'p', level = 'group', className, ...props }: SectionLabelProps) {
+  return (
+    <Tag
+      className={cn(level === 'section' ? 'text-[13px] leading-[18px] font-semibold text-brand-text' : 'eyebrow text-brand-text', className)}
+      {...props}
+    />
+  );
 }

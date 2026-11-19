@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { BankLogo } from '@/components/ui/bank-logo';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, Money, PageHeader } from '@/components/ui/misc';
+import { ErrorState, MiniStatGroup, Money, PageHeader } from '@/components/ui/misc';
 import { PeriodNavigator } from '@/components/ui/period-navigator';
 import { useScreenPeriod } from '@/lib/active-month';
 import { Select } from '@/components/ui/select';
@@ -99,13 +99,13 @@ export default function StatementPage() {
         </label>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <MiniStatGroup className="lg:grid-cols-5">
         <BalanceTile label="Saldo inicial" value={data?.openingBalance} loading={statement.isPending} />
         <BalanceTile label="Entradas" value={data?.totalIn} loading={statement.isPending} tone="income" icon={<ArrowDownLeft />} hint={data?.pendingIn ? `+ ${formatBRL(data.pendingIn)} previsto` : undefined} />
         <BalanceTile label="Saídas" value={data ? -data.totalOut : undefined} loading={statement.isPending} tone="expense" icon={<ArrowUpRight />} hint={data?.pendingOut ? `- ${formatBRL(data.pendingOut)} previsto` : undefined} />
         <BalanceTile label="Saldo final" value={data?.closingBalance} loading={statement.isPending} strong />
         <BalanceTile label="Saldo previsto" value={data?.projectedClosingBalance} loading={statement.isPending} hint="Inclui pendentes do período" className="col-span-2 lg:col-span-1" />
-      </div>
+      </MiniStatGroup>
 
       <Card className="overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
@@ -201,23 +201,24 @@ function BalanceTile({
   className?: string;
 }) {
   return (
-    <div className={cn('rounded-lg border border-border bg-surface px-4 py-3 shadow-xs', strong && 'border-brand-200 bg-primary-soft/40', className)}>
-      <p className="flex items-center gap-1.5 text-xs font-medium text-muted [&_svg]:size-3.5">
+    // A cell of the page's KPI group (same anatomy as `MiniStat`); the closing balance is the bold one.
+    <div className={cn('min-w-0 bg-surface px-4 py-3 sm:px-5 sm:py-4', className)}>
+      <p className="flex items-center gap-1.5 text-caption font-medium text-muted [&_svg]:size-3.5">
         {icon ? <span className={tone === 'income' ? 'text-success' : 'text-danger'}>{icon}</span> : null}
         {label}
       </p>
       {loading || value === undefined ? (
-        <Skeleton className="mt-2 h-6 w-28" />
+        <Skeleton className="mt-2 h-6 w-28 sm:h-7" />
       ) : (
         // Zero is grey; in/out colours stay (the statement is a mixed list).
         <Money
           value={value}
           signed={tone !== undefined || value < 0}
           tone={value === 0 ? 'neutral' : undefined}
-          className={cn('mt-1 block text-lg tracking-tight', value === 0 && 'text-subtle')}
+          className={cn('mt-1 block text-lg leading-tight tracking-tight sm:mt-1.5 sm:text-kpi', strong && 'font-bold', value === 0 && 'text-subtle')}
         />
       )}
-      {hint ? <p className="mt-0.5 text-[11px] text-subtle">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-caption text-muted">{hint}</p> : null}
     </div>
   );
 }

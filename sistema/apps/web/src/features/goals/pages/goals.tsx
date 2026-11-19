@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { CategoryIcon } from '@/components/ui/category-icon';
 import { ConfirmDialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat, PageHeader } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup, PageHeader } from '@/components/ui/misc';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -50,12 +50,12 @@ export default function GoalsPage() {
         actions={<WriteGate><Button onClick={() => setSheet({ open: true, goal: null })}><Plus /> Nova meta</Button></WriteGate>}
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <MiniStatGroup className="lg:grid-cols-4">
         <MiniStat label="Já conquistado" value={formatBRL(saved)} amount={saved} />
         <MiniStat label="Objetivo total" value={formatBRL(target)} amount={target} />
         <MiniStat label="Progresso geral" value={formatPercent(target ? saved / target : 0, 0)} amount={target ? saved / target : 0} />
         <MiniStat label="Guardar por mês" value={formatBRL(monthly)} amount={monthly} />
-      </div>
+      </MiniStatGroup>
 
       {goals.isPending ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { RefreshCw, TriangleAlert } from 'lucide-react';
 import { formatBRL } from '@effinance/shared';
 import { cn } from '@/lib/utils';
@@ -115,23 +115,34 @@ interface MiniStatProps {
   className?: string;
 }
 
+/**
+ * The KPI group of a page (one pattern with `MetricStrip`, app-screens §5): a single bordered
+ * container whose `MiniStat` cells are split by 1px dividers. Pass the grid columns in `className`
+ * (e.g. `grid-cols-2 lg:grid-cols-4`); phones keep 2 columns. Fill every row (an odd last cell takes
+ * `col-span-2`), or the divider colour shows in the gap.
+ */
+export function MiniStatGroup({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border', className)} {...props}>
+      {children}
+    </div>
+  );
+}
+
+/** A cell of `MiniStatGroup`: label over the value (18px on phones, 24px `text-kpi` from `sm`), left-aligned. */
 export function MiniStat({ label, value, tone, amount, hint, info, className }: MiniStatProps) {
   const isZero = amount === 0;
   const alert = isZero ? undefined : tone;
   return (
-    <div className={cn('rounded-lg border border-border bg-surface px-4 py-3', className)}>
-      {info ? (
-        <div className="flex items-center gap-1">
-          <p className="text-xs font-medium text-muted">{label}</p>
-          <HelpTip label={`Sobre ${label.toLowerCase()}`}>{info}</HelpTip>
-        </div>
-      ) : (
-        <p className="text-xs font-medium text-muted">{label}</p>
-      )}
+    <div className={cn('min-w-0 bg-surface px-4 py-3 sm:px-5 sm:py-4', className)}>
+      <div className="flex min-w-0 items-center gap-1">
+        <p className="truncate text-caption font-medium text-muted">{label}</p>
+        {info ? <HelpTip label={`Sobre ${label.toLowerCase()}`}>{info}</HelpTip> : null}
+      </div>
       {/* Figures stay in ink; colour only flags a problem (a negative result, an overdue total > 0). Zero is grey. */}
       <p
         className={cn(
-          'tabular mt-1 text-lg font-semibold tracking-tight',
+          'tabular mt-1 text-lg leading-tight font-semibold tracking-tight sm:mt-1.5 sm:text-kpi',
           isZero ? 'text-subtle' : 'text-fg',
           alert === 'danger' && 'text-danger',
           alert === 'warning' && 'text-warning',
@@ -139,7 +150,7 @@ export function MiniStat({ label, value, tone, amount, hint, info, className }: 
       >
         {value}
       </p>
-      {hint ? <p className="mt-0.5 text-xs text-subtle">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-caption text-muted">{hint}</p> : null}
     </div>
   );
 }

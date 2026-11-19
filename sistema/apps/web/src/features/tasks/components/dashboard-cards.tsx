@@ -36,7 +36,7 @@ import { auditHref, groupDeadlineInfo } from '../occurrence';
 import { useTaskActions } from '../task-actions';
 import { tasksHref, type TaskFilterPatch } from '../url-state';
 import { BandList, SegmentBar, StatusSummary } from './band-list';
-import { useDashCols } from './dash-slot';
+import { SlotList, useDashCols } from './dash-slot';
 import type { DashboardList } from './dashboard-list-sheet';
 import { useOccurrenceSheetLinks } from './occurrence-row';
 import { monthName } from './tasks-summary';
@@ -214,7 +214,8 @@ export function ProcessesCard(p: CardProps) {
           if (!rows.length) return <BodyEmpty title="Nenhuma obrigação na competência" />;
           return (
             <div className="flex min-h-0 flex-1 flex-col">
-              <FitList
+              <SlotList
+                cap={5}
                 items={rows}
                 getKey={(r) => r.department?.id ?? 'none'}
                 moreLabel={['departamento', 'departamentos']}
@@ -363,7 +364,8 @@ export function FiscalCard(p: CardProps) {
                 />
               </div>
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <FitList
+                <SlotList
+                  cap={6}
                   items={d.fiscal.items}
                   getKey={(o) => `${o.recurringTaskId}:${o.periodKey}`}
                   moreLabel={['obrigação', 'obrigações']}
@@ -539,7 +541,8 @@ export function IncompleteCard(p: CardProps & { onList: (l: DashboardList) => vo
           !inc ? null : inc.items.length === 0 ? (
             <BodyEmpty title="Nenhum cadastro incompleto" />
           ) : (
-            <FitList
+            <SlotList
+              cap={5}
               items={inc.items}
               total={inc.count}
               showMore={false}

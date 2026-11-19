@@ -112,7 +112,40 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* A short list never spans the page (app-screens §4.2): the categories pair with the biggest expenses. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {o && o.topCategories.length ? (
+          <Card className="flex flex-col p-5">
+            <CardHeader title="Categorias que mais pesaram" />
+            {/* Centred in the height of the pair, so the shorter block has no void at the bottom. */}
+            <div className="mt-4 flex flex-1 flex-col justify-center">
+              <DonutChart
+                data={o.topCategories}
+                total={o.expense}
+                height={170}
+                maxItems={7}
+                onSelect={(c) => c.categoryId && navigate(categoryListHref('expense', c.categoryId, month))}
+              />
+            </div>
+          </Card>
+        ) : null}
+        <Card className={cn('overflow-hidden', !(o && o.topCategories.length) && 'lg:col-span-2')}>
+          <div className="p-5 pb-2">
+            <CardHeader title="Maiores despesas" />
+          </div>
+          <div className="p-1.5">
+            {overview.isPending ? (
+              <SkeletonRows rows={4} className="p-3" />
+            ) : o && o.topExpenses.length ? (
+              o.topExpenses.slice(0, 5).map((t) => <TransactionRow key={t.id} tx={t} showDue={false} />)
+            ) : (
+              <EmptyState compact className="m-3" title="Sem despesas no mês" />
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <CardHeader title="Fixas x variáveis" />
           <div className="mt-4 h-48">
@@ -155,35 +188,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
             )}
           </div>
         </Card>
-        <Card className="overflow-hidden">
-          <div className="p-5 pb-2">
-            <CardHeader title="Maiores despesas" />
-          </div>
-          <div className="p-1.5">
-            {overview.isPending ? (
-              <SkeletonRows rows={4} className="p-3" />
-            ) : o && o.topExpenses.length ? (
-              o.topExpenses.slice(0, 5).map((t) => <TransactionRow key={t.id} tx={t} showDue={false} />)
-            ) : (
-              <EmptyState compact className="m-3" title="Sem despesas no mês" />
-            )}
-          </div>
-        </Card>
       </div>
-      {o && o.topCategories.length ? (
-        <Card className="p-5">
-          <CardHeader title="Categorias que mais pesaram" />
-          <div className="mt-4">
-            <DonutChart
-              data={o.topCategories}
-              total={o.expense}
-              height={170}
-              maxItems={7}
-              onSelect={(c) => c.categoryId && navigate(categoryListHref('expense', c.categoryId, month))}
-            />
-          </div>
-        </Card>
-      ) : null}
     </div>
   );
 }

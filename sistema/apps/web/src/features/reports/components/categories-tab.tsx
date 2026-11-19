@@ -5,7 +5,7 @@ import { formatBRL, formatPercent, type CategoryType, type Granularity } from '@
 import { Card, CardHeader } from '@/components/ui/card';
 import { CategoryIcon } from '@/components/ui/category-icon';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup } from '@/components/ui/misc';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -94,12 +94,12 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
         </nav>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <MiniStatGroup className="lg:grid-cols-4">
         <MiniStat label={`Total ${type === 'expense' ? 'de despesas' : 'de receitas'}`} value={r ? formatBRL(r.total) : '—'} amount={r?.total} />
         <MiniStat label="Média por período" value={r && periodsWithData ? formatBRL(Math.round(r.total / periodsWithData)) : '—'} />
         <MiniStat label="Maior categoria" value={r && r.series[0] ? [...r.series].sort((a, b) => b.total - a.total)[0]!.name : '—'} />
         <MiniStat label="Períodos projetados" value={String(projected.length)} info="Gerados por fixas, recorrentes e parcelas" />
-      </div>
+      </MiniStatGroup>
 
       {report.isError ? (
         <ErrorState error={report.error} onRetry={() => report.refetch()} />

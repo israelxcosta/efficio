@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { BankLogo } from '@/components/ui/bank-logo';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat, PageHeader } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup, PageHeader } from '@/components/ui/misc';
 import { PeriodNavigator } from '@/components/ui/period-navigator';
 import { useScreenPeriod } from '@/lib/active-month';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -73,12 +73,12 @@ export default function TransfersPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <MiniStatGroup className="md:grid-cols-4">
             <MiniStat label="Total investido" value={accounts.isPending ? '—' : formatBRL(invested)} amount={accounts.isPending ? undefined : invested} info="Somado à parte do saldo em contas." />
             <MiniStat label="Aplicado no período" value={formatBRL(applied)} amount={applied} />
             <MiniStat label="Resgatado no período" value={formatBRL(redeemed)} amount={redeemed} />
             <MiniStat label="Transferido" value={formatBRL(moved)} amount={moved} />
-          </div>
+          </MiniStatGroup>
 
           <Card className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">

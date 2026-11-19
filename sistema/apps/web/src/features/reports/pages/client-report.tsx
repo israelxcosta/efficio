@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup } from '@/components/ui/misc';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip } from '@/components/ui/tooltip';
 import { usePermissions } from '@/features/auth/permissions';
@@ -328,7 +328,7 @@ function paymentOffsetText(days: number | null): string {
 function Kpis({ analysis: a }: { analysis: ClientAnalysis }) {
   const due = a.onTimeCount + a.paidLateCount + a.overdueCount;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 print:grid-cols-4">
+    <MiniStatGroup className="lg:grid-cols-4 print:grid-cols-4">
       <MiniStat
         label="Faturado"
         value={formatBRL(a.billed)}
@@ -349,7 +349,7 @@ function Kpis({ analysis: a }: { analysis: ClientAnalysis }) {
         tone={a.punctuality !== null && a.punctuality < 0.6 ? 'warning' : undefined}
         hint={due ? `${a.onTimeCount} de ${due} no prazo` : 'nada venceu ainda'}
       />
-    </div>
+    </MiniStatGroup>
   );
 }
 

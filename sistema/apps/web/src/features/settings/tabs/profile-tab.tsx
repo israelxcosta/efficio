@@ -70,35 +70,43 @@ export function ProfileTab() {
         </Card>
       </Cell>
 
+      {/* One card for the personal preferences (a card per control left a 290px card with one switch). */}
       <Cell>
         <Card className="p-6">
-          <CardHeader title="Aparência" />
-          <SegmentedControl
-            className="mt-5"
-            ariaLabel="Tema"
-            value={theme}
-            onChange={(t: ThemePreference) => setTheme(t)}
-            options={[
-              { value: 'light', label: 'Claro', icon: <Sun /> },
-              { value: 'dark', label: 'Escuro', icon: <Moon /> },
-              { value: 'system', label: 'Sistema', icon: <Monitor /> },
-            ]}
-          />
+          <CardHeader title="Preferências" />
+          <div className="mt-5 flex flex-col divide-y divide-border">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
+              <div className="min-w-0">
+                <p className="text-body-sm font-semibold text-fg">Tema</p>
+                <p className="text-caption text-muted">Claro, escuro ou o mesmo do sistema.</p>
+              </div>
+              <SegmentedControl
+                ariaLabel="Tema"
+                value={theme}
+                onChange={(t: ThemePreference) => setTheme(t)}
+                options={[
+                  { value: 'light', label: 'Claro', icon: <Sun /> },
+                  { value: 'dark', label: 'Escuro', icon: <Moon /> },
+                  { value: 'system', label: 'Sistema', icon: <Monitor /> },
+                ]}
+              />
+            </div>
+            {canAccessFinance ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
+                <div className="min-w-0">
+                  <p className="text-body-sm font-semibold text-fg">Painel financeiro</p>
+                  <p className="text-caption text-muted">Cards exibidos, tamanhos e cards ocultos pelo botão de olho.</p>
+                </div>
+                <Button variant="outline" asChild>
+                  <Link to="/financeiro?personalizar=1">
+                    <SlidersHorizontal /> Personalizar painel
+                  </Link>
+                </Button>
+              </div>
+            ) : null}
+          </div>
         </Card>
       </Cell>
-
-      {canAccessFinance ? (
-        <Cell>
-          <Card className="p-6">
-            <CardHeader title="Painel financeiro" info="Cards exibidos, tamanhos e cards ocultos pelo botão de olho." />
-            <Button className="mt-5" variant="outline" asChild>
-              <Link to="/financeiro?personalizar=1">
-                <SlidersHorizontal /> Personalizar painel
-              </Link>
-            </Button>
-          </Card>
-        </Cell>
-      ) : null}
     </TabGrid>
   );
 }

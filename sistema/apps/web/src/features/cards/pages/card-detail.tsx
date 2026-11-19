@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup } from '@/components/ui/misc';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { axisProps, moneyAxisFormatter, MoneyTooltip, StripeDefs } from '@/components/charts/chart-utils';
@@ -168,11 +168,13 @@ export default function CardDetailPage() {
           ) : null}
         </div>
         {inv ? (
-          <div className="grid grid-cols-2 gap-3 border-b border-border p-5 md:grid-cols-3">
-            <MiniStat label="Total da fatura" value={formatBRL(inv.total)} amount={inv.total} />
-            {/* Red only when the invoice is overdue; an open amount before the due date is not a problem. */}
-            <MiniStat label="Em aberto" value={formatBRL(inv.unpaidTotal)} amount={inv.unpaidTotal} tone={inv.status === 'overdue' ? 'danger' : undefined} />
-            <MiniStat label="Compras" value={String(inv.transactions.length)} className="col-span-2 md:col-span-1" />
+          <div className="border-b border-border p-5">
+            <MiniStatGroup className="md:grid-cols-3">
+              <MiniStat label="Total da fatura" value={formatBRL(inv.total)} amount={inv.total} />
+              {/* Red only when the invoice is overdue; an open amount before the due date is not a problem. */}
+              <MiniStat label="Em aberto" value={formatBRL(inv.unpaidTotal)} amount={inv.unpaidTotal} tone={inv.status === 'overdue' ? 'danger' : undefined} />
+              <MiniStat label="Compras" value={String(inv.transactions.length)} className="col-span-2 md:col-span-1" />
+            </MiniStatGroup>
           </div>
         ) : null}
         <div className="p-1.5">

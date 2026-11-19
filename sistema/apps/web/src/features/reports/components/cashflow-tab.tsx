@@ -4,7 +4,7 @@ import { Waves } from 'lucide-react';
 import { formatBRL, type Granularity } from '@effinance/shared';
 import { Card, CardHeader } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat, Money } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup, Money } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,12 +55,12 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
         </Select>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <MiniStatGroup className="lg:grid-cols-4">
         <MiniStat label="Saldo inicial" value={r ? formatBRL(r.openingBalance) : '—'} amount={r?.openingBalance} />
         <MiniStat label="Entradas" value={r ? formatBRL(totals.in) : '—'} amount={r ? totals.in : undefined} hint={totals.pin ? `${formatBRL(totals.pin)} previsto` : undefined} />
         <MiniStat label="Saídas" value={r ? formatBRL(totals.out) : '—'} amount={r ? totals.out : undefined} hint={totals.pout ? `${formatBRL(totals.pout)} previsto` : undefined} />
         <MiniStat label="Saldo final projetado" value={r ? formatBRL(r.closingBalance) : '—'} amount={r?.closingBalance} tone={r && r.closingBalance < 0 ? 'danger' : undefined} />
-      </div>
+      </MiniStatGroup>
 
       <Card className="p-5">
         <CardHeader title="Fluxo de caixa" icon={<Waves />} />

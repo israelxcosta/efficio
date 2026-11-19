@@ -2,7 +2,7 @@ import { ChartPie, Receipt, Sparkles } from 'lucide-react';
 import { formatBRL, formatPercent } from '@effinance/shared';
 import { Card, CardHeader } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, MiniStat } from '@/components/ui/misc';
+import { ErrorState, MiniStat, MiniStatGroup } from '@/components/ui/misc';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { DonutChart } from '@/components/charts/donut-chart';
@@ -39,7 +39,7 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <MiniStatGroup className="lg:grid-cols-5">
         <MiniStat label="Receitas" value={v(o?.income)} amount={o?.income} hint={<ChangeHint change={changes?.income} label={previous.label} />} />
         <MiniStat label="Despesas" value={v(o?.expense)} amount={o?.expense} hint={<ChangeHint change={changes?.expense} label={previous.label} />} />
         <MiniStat label="Resultado" value={v(o?.net)} amount={o?.net} tone={o && o.net < 0 ? 'danger' : undefined} hint={<ChangeHint change={changes?.net} label={previous.label} />} />
@@ -51,7 +51,7 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
           className="col-span-2 lg:col-span-1"
           hint={<ChangeHint change={changes?.averageDailyExpense} label={previous.label} />}
         />
-      </div>
+      </MiniStatGroup>
 
       <Card className="p-5">
         <CardHeader title="Insights do período" icon={<Sparkles />} />
