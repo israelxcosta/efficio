@@ -67,10 +67,13 @@ export async function auditRetentionStatus(db: DbExecutor, workspaceId: string, 
 // ---------------------------------------------------------------------------
 
 const CSV_HEADER = ['Data e hora', 'Usuário', 'Ação', 'Entidade', 'ID da entidade', 'IP', 'Navegador', 'Detalhes'];
-/** A cell a spreadsheet would read as a formula is prefixed with an apostrophe (CSV injection). */
-const FORMULA_START = /^[=+\-@\t\r]/;
+/**
+ * A cell a spreadsheet would read as a formula is prefixed with an apostrophe (CSV injection). Leading
+ * spaces too: spreadsheets trim them and still evaluate ` =HYPERLINK(…)`.
+ */
+const FORMULA_START = /^\s*[=+\-@\t\r]/;
 
-function csvCell(value: string | null | undefined): string {
+export function csvCell(value: string | null | undefined): string {
   let v = value ?? '';
   if (FORMULA_START.test(v)) v = `'${v}`;
   return /[;"\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;

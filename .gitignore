@@ -1,0 +1,17 @@
+# Repository root (old static site + sistema/). sistema/.gitignore has the app rules; this file keeps
+# secrets and local configuration out of git anywhere in the repository, including the root.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+.npmrc
+.aws/
+*.tfstate
+*.tfstate.*
+.terraform/
+node_modules/
+.DS_Store
