@@ -1,0 +1,229 @@
+rules:
+- id: drizzle-sql-raw
+  languages: [typescript, javascript]
+  severity: ERROR
+  message: sql.raw() com valor não literal (injeção SQL)
+  patterns:
+    - pattern-either:
+      - pattern: sql.raw($X)
+      - pattern: $S.raw($X)
+    - pattern-not: sql.raw("...")
+    - pattern-not: $S.raw("...")
+- id: sql-template-interpolation-into-string
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: SQL montado por string/template e passado a execute/query/unsafe
+  pattern-either:
+    - pattern: $DB.execute(`...${$X}...`)
+    - pattern: $DB.query(`...${$X}...`)
+    - pattern: $DB.unsafe($X)
+    - pattern: $DB.query($A + $B)
+- id: dangerously-set-inner-html
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: dangerouslySetInnerHTML
+  pattern-either:
+    - pattern: <$E dangerouslySetInnerHTML={...} />
+    - pattern: "{dangerouslySetInnerHTML: $X}"
+- id: dom-xss-sinks
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: sink de DOM XSS
+  pattern-either:
+    - pattern: $E.innerHTML = $X
+    - pattern: $E.outerHTML = $X
+    - pattern: $E.insertAdjacentHTML(...)
+    - pattern: document.write(...)
+    - pattern: document.writeln(...)
+- id: eval-new-function
+  languages: [typescript, javascript]
+  severity: ERROR
+  message: eval / new Function / setTimeout com string
+  pattern-either:
+    - pattern: eval(...)
+    - pattern: new Function(...)
+    - pattern: Function(...)
+    - pattern: setTimeout("...", ...)
+    - pattern: setInterval("...", ...)
+- id: dynamic-regexp
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: RegExp construída com valor dinâmico (ReDoS/injeção de regex)
+  patterns:
+    - pattern-either:
+      - pattern: new RegExp($X, ...)
+      - pattern: RegExp($X, ...)
+    - pattern-not: new RegExp("...", ...)
+    - pattern-not: RegExp("...", ...)
+- id: child-process
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: uso de child_process
+  pattern-either:
+    - pattern: require('child_process')
+    - pattern: import $X from 'node:child_process'
+    - pattern: import { ... } from 'node:child_process'
+    - pattern: import { ... } from 'child_process'
+    - pattern: import * as $X from 'child_process'
+    - pattern: import * as $X from 'node:child_process'
+- id: fs-dynamic-path
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: fs com caminho não literal (path traversal se vier do usuário)
+  patterns:
+    - pattern-either:
+      - pattern: $FS.readFile($P, ...)
+      - pattern: $FS.readFileSync($P, ...)
+      - pattern: $FS.writeFile($P, ...)
+      - pattern: $FS.writeFileSync($P, ...)
+      - pattern: $FS.createReadStream($P, ...)
+      - pattern: $FS.createWriteStream($P, ...)
+      - pattern: $FS.unlink($P, ...)
+      - pattern: $FS.rm($P, ...)
+      - pattern: $FS.readdir($P, ...)
+    - metavariable-regex:
+        metavariable: $FS
+        regex: ^(fs|fsp|promises|fs\.promises)$
+    - pattern-not: $FS.$M("...", ...)
+- id: open-redirect
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: redirect com destino dinâmico
+  patterns:
+    - pattern-either:
+      - pattern: $REPLY.redirect($X)
+      - pattern: $REPLY.redirect($C, $X)
+      - pattern: window.location.href = $X
+      - pattern: window.location = $X
+      - pattern: location.href = $X
+      - pattern: window.location.assign($X)
+      - pattern: window.location.replace($X)
+      - pattern: location.assign($X)
+      - pattern: location.replace($X)
+      - pattern: window.open($X, ...)
+    - pattern-not: $REPLY.redirect("...")
+    - pattern-not: $REPLY.redirect($C, "...")
+    - pattern-not: window.location.href = "..."
+    - pattern-not: location.href = "..."
+    - pattern-not: window.open("...", ...)
+- id: weak-hash-or-random
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: hash fraco ou Math.random em contexto possivelmente sensível
+  pattern-either:
+    - pattern: crypto.createHash("md5")
+    - pattern: crypto.createHash("sha1")
+    - pattern: createHash("md5")
+    - pattern: createHash("sha1")
+    - pattern: Math.random()
+- id: insecure-cipher
+  languages: [typescript, javascript]
+  severity: ERROR
+  message: cifra/modo inseguro
+  patterns:
+    - pattern-either:
+      - pattern: createCipheriv($ALG, ...)
+      - pattern: crypto.createCipheriv($ALG, ...)
+      - pattern: createCipher(...)
+    - metavariable-regex:
+        metavariable: $ALG
+        regex: (?i).*(ecb|des|rc4|cbc).*
+- id: timing-unsafe-compare
+  languages: [typescript, javascript]
+  severity: INFO
+  message: comparação com === de segredo/token/hash (usar timingSafeEqual)
+  patterns:
+    - pattern-either:
+      - pattern: $A === $B
+      - pattern: $A !== $B
+    - metavariable-regex:
+        metavariable: $A
+        regex: (?i).*(secret|signature|hmac|digest|tokenhash|token_hash|apikey|expected).*
+- id: jwt-none-or-no-verify
+  languages: [typescript, javascript]
+  severity: ERROR
+  message: JWT decode sem verify / alg none
+  pattern-either:
+    - pattern: jwt.decode(...)
+    - pattern: "{algorithms: [..., 'none', ...]}"
+- id: cookie-insecure
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: cookie sem httpOnly/secure
+  pattern-either:
+    - pattern: "$R.setCookie($N, $V, {..., httpOnly: false, ...})"
+    - pattern: "$R.setCookie($N, $V, {..., secure: false, ...})"
+- id: cors-wildcard-credentials
+  languages: [typescript, javascript]
+  severity: ERROR
+  message: CORS origin true/* (com credenciais)
+  pattern-either:
+    - pattern: "{..., origin: true, ...}"
+    - pattern: "{..., origin: '*', ...}"
+- id: tls-reject-unauthorized-false
+  languages: [typescript, javascript]
+  severity: ERROR
+  message: verificação TLS desativada
+  pattern-either:
+    - pattern: "{..., rejectUnauthorized: false, ...}"
+    - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+- id: target-blank-noopener
+  languages: [typescript, javascript]
+  severity: INFO
+  message: target=_blank sem rel=noopener
+  patterns:
+    - pattern: <a target="_blank" ... />
+    - pattern-not: <a target="_blank" rel="..." ... />
+    - pattern-not: <a rel="..." target="_blank" ... />
+- id: postmessage-wildcard
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: postMessage com '*' ou listener sem checar origin
+  pattern-either:
+    - pattern: $W.postMessage($M, "*")
+- id: prototype-pollution-merge
+  languages: [typescript, javascript]
+  severity: INFO
+  message: atribuição por chave dinâmica em objeto (possível prototype pollution)
+  patterns:
+    - pattern: $O[$K1][$K2] = $V
+- id: localstorage-token
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: token/segredo em localStorage/sessionStorage
+  patterns:
+    - pattern-either:
+      - pattern: localStorage.setItem($K, ...)
+      - pattern: sessionStorage.setItem($K, ...)
+    - metavariable-regex:
+        metavariable: $K
+        regex: (?i).*(token|secret|session|jwt|auth|password).*
+- id: logging-sensitive
+  languages: [typescript, javascript]
+  severity: INFO
+  message: log de dado possivelmente sensível
+  patterns:
+    - pattern-either:
+      - pattern: console.log(..., $X, ...)
+      - pattern: $L.log.info(..., $X, ...)
+      - pattern: $L.info(..., $X, ...)
+    - metavariable-regex:
+        metavariable: $X
+        regex: (?i).*(password|senha|secret|token|cpf|cnpj).*
+- id: unsafe-deserialize-yaml
+  languages: [typescript, javascript]
+  severity: WARNING
+  message: desserialização insegura
+  pattern-either:
+    - pattern: yaml.load(...)
+    - pattern: unserialize(...)
+- id: ssrf-fetch-dynamic
+  languages: [typescript]
+  severity: INFO
+  message: fetch com URL dinâmica no backend (SSRF)
+  paths:
+    include: ["apps/api/src/**"]
+  patterns:
+    - pattern-either:
+      - pattern: fetch($U, ...)
+    - pattern-not: fetch("...", ...)

@@ -8,8 +8,8 @@ interface Section {
 }
 
 const TERMS_UPDATED_AT = '20/10/2026';
-/** The onboarding paragraph (18/11/2026). */
-const PRIVACY_UPDATED_AT = '18/11/2026';
+/** Onboarding, operators and retention as the system does them (docs/security/privacidade-lgpd-2026-11-19.md). */
+const PRIVACY_UPDATED_AT = '19/11/2026';
 
 const TERMS: Section[] = [
   {
@@ -73,8 +73,8 @@ const PRIVACY: Section[] = [
     title: '2. Dados que tratamos',
     paragraphs: [
       'Cadastro: nome, e-mail e senha (guardada apenas como hash). Dados financeiros que você registra: contas, cartões, lançamentos, metas, categorias e observações.',
-      'Contatos que você cadastra: nome, CPF/CNPJ, e-mail, telefone e endereço. Dados técnicos de segurança: IP, navegador e datas de acesso das sessões.',
-      'Quando o escritório envia o onboarding, guardamos o nome e o telefone ou e-mail de quem recebeu o link. Cada abertura do link registra data e hora, o tipo de aparelho, o navegador e o sistema (resumidos a partir do identificador do navegador) e o endereço IP truncado (os últimos dígitos são descartados). A cidade aproximada poderá ser registrada no futuro. Ao confirmar a leitura, guardamos o nome e o CPF informados (cifrados) e a data e hora da confirmação, para comprovar a ciência das orientações. O link expira em 30 dias e pode ser revogado pelo escritório; esses registros seguem a guarda dos dados do cliente e são excluídos com ele.',
+      'Contatos que você cadastra: nome, CPF/CNPJ, e-mail, telefone e endereço. Dados técnicos de segurança: endereço IP truncado (os últimos dígitos são descartados), identificador do navegador e datas de acesso das sessões e das ações registradas na auditoria.',
+      'Quando o escritório envia o onboarding, guardamos (cifrados) o nome e o telefone ou e-mail de quem recebeu o link. Cada abertura do link registra data e hora, o tipo de aparelho, o navegador e o sistema (resumidos a partir do identificador do navegador, que não é guardado inteiro) e o endereço IP truncado. Não registramos a localização. Ao confirmar a leitura, guardamos o nome e o CPF informados (cifrados), a data e hora e o IP truncado, e o registro de auditoria dessa confirmação guarda também o identificador do navegador, para comprovar a ciência das orientações. O link vale pelo prazo definido pelo escritório (30 dias por padrão, no máximo 90) e pode ser revogado a qualquer momento; esses registros seguem a guarda dos dados do cliente e são excluídos com o cadastro dele ou com o espaço.',
     ],
   },
   {
@@ -86,7 +86,7 @@ const PRIVACY: Section[] = [
   {
     title: '4. Compartilhamento',
     paragraphs: [
-      'Somente com operadores necessários ao serviço: Amazon Web Services (hospedagem e chaves de criptografia, no Brasil), Mercado Pago (pagamentos) e o provedor de envio de e-mails. Membros de um espaço compartilhado veem os dados daquele espaço conforme a permissão dada pelo proprietário.',
+      'Somente com operadores necessários ao serviço: o provedor do servidor onde o sistema e o banco de dados ficam hospedados ([PROVEDOR E PAÍS DO SERVIDOR]), o provedor da caixa de e-mail usada para enviar mensagens do sistema, o serviço de armazenamento das cópias de segurança cifradas ([SERVIÇO DE BACKUP]) e a BrasilAPI, consultada com o CNPJ informado para preencher dados públicos da empresa. Quando ativados, também o Mercado Pago (pagamento da assinatura; o Efficio não recebe dados de cartão) e o agregador de Open Finance (conexão com bancos autorizada por você). Mensagens de WhatsApp são abertas no aparelho de quem envia; o Efficio não as envia nem as lê. Membros de um espaço compartilhado veem os dados daquele espaço conforme a permissão dada pelo proprietário.',
     ],
   },
   {
@@ -99,13 +99,15 @@ const PRIVACY: Section[] = [
   {
     title: '6. Retenção',
     paragraphs: [
-      'Mantemos os dados enquanto a conta ou o espaço existir. Após a exclusão, os dados são removidos e a chave de criptografia destruída; cópias de backup expiram no ciclo de retenção [30] dias. Registros exigidos por lei (como os de acesso, art. 15 do Marco Civil da Internet) são guardados pelo prazo legal.',
+      'Mantemos os dados enquanto a conta ou o espaço existir. Após a exclusão, os dados são removidos e a chave de criptografia do espaço destruída. As cópias de segurança são cifradas e expiram sozinhas: as diárias em até 60 dias e as semanais em até 1 ano; até lá, um dado excluído ainda pode existir nelas, e só é usado para recuperar o sistema após uma falha.',
+      'O registro de auditoria (ações sensíveis, com IP truncado e identificador do navegador) é guardado por 24 meses e depois apagado. Registros exigidos por lei (como os de acesso, art. 15 do Marco Civil da Internet, por 6 meses) são guardados pelo prazo legal.',
     ],
   },
   {
     title: '7. Seus direitos',
     paragraphs: [
       'Você pode confirmar o tratamento, acessar, corrigir, exportar (portabilidade) e excluir seus dados diretamente nas Configurações, além de revogar consentimentos e pedir informações pelo e-mail do encarregado.',
+      'Se os seus dados foram cadastrados por um escritório que usa o Efficio (por exemplo, como cliente, responsável pela empresa ou quem recebeu o link do onboarding), o escritório decide sobre eles: faça o pedido ao escritório, que pode consultar, corrigir, exportar ou excluir esses dados no sistema, ou ao encarregado acima, que o encaminha.',
     ],
   },
   {

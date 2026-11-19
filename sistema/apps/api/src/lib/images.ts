@@ -52,7 +52,13 @@ export function decodeImageDataUri(value: string, maxBytes: number, tooLarge: st
   return { type: declared, bytes };
 }
 
-export function toDataUri(type: string, bytes: Uint8Array): string {
+/**
+ * The data URI of a stored image, or null when the stored type is not an allowed image type or the bytes
+ * are not that type (an old or tampered row): what reaches the browser — and the clients, in contracts
+ * and onboarding pages — is always a real PNG, JPEG or WebP, never SVG/HTML relabelled.
+ */
+export function toDataUri(type: string, bytes: Uint8Array): string | null {
+  if (!(IMAGE_TYPES as readonly string[]).includes(type) || sniffImage(bytes) !== type) return null;
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return `data:${type};base64,${btoa(binary)}`;

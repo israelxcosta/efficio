@@ -20,7 +20,7 @@ function sslOptions(): postgres.Options<Record<string, never>>['ssl'] {
  */
 export const RUNTIME_SESSION_SETTINGS = {
   application_name: 'efficio-api',
-  idle_in_transaction_session_timeout: '30s',
+  idle_in_transaction_session_timeout: 30_000, // ms
 } as const;
 
 export interface CreateDbOptions {

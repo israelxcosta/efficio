@@ -199,10 +199,10 @@ function toTemplate(row: OfficeRow | null): ContractTemplateResponse {
   return {
     ...contractSummary(lightOf(row)),
     blocks: [...blocksOf(row)].map((b) => ({ ...b })),
+    // A stored image that is not a valid PNG/JPEG/WebP (old or tampered row) falls back to the factory one.
     watermarkImage:
-      row?.contractWatermark && row.contractWatermarkType
-        ? toDataUri(row.contractWatermarkType, row.contractWatermark)
-        : CONTRACT_FACTORY_WATERMARK,
+      (row?.contractWatermark && row.contractWatermarkType ? toDataUri(row.contractWatermarkType, row.contractWatermark) : null) ??
+      CONTRACT_FACTORY_WATERMARK,
   };
 }
 
@@ -333,9 +333,8 @@ export async function clientContract(ctx: Ctx, clientId: string): Promise<Client
     watermark: {
       enabled,
       image: enabled
-        ? row?.contractWatermark && row.contractWatermarkType
-          ? toDataUri(row.contractWatermarkType, row.contractWatermark)
-          : CONTRACT_FACTORY_WATERMARK
+        ? ((row?.contractWatermark && row.contractWatermarkType ? toDataUri(row.contractWatermarkType, row.contractWatermark) : null) ??
+          CONTRACT_FACTORY_WATERMARK)
         : null,
     },
     office: { name: office.tradeName?.trim() ? office.tradeName : office.legalName, legalName: office.legalName, logo: office.logo, registered: office.registered },

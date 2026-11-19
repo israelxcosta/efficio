@@ -308,12 +308,22 @@ export async function loadDocument(ctx: DocumentContext, clientId: string): Prom
 
 // --- links -----------------------------------------------------------------------------------------
 
-/** Phone digits for `wa.me`: Brazilian numbers get the country code 55. */
+/**
+ * Phone digits for `wa.me`: Brazilian numbers only, with the country code 55. A number with an explicit
+ * international prefix (`+1 …`) other than Brazil's is refused (its digits must not be read as a DDD and a
+ * number of someone else), and the national part must look like a real one: DDD 11–99 and a mobile
+ * (9 + 8 digits) or a landline (2–5 + 7 digits). The link goes to the client: never to a guessed number.
+ */
 export function whatsappNumber(phone: string): string | null {
   const d = onlyDigits(phone);
-  if (d.length === 10 || d.length === 11) return `55${d}`;
-  if ((d.length === 12 || d.length === 13) && d.startsWith('55')) return d;
-  return null;
+  let national: string;
+  if (phone.trim().startsWith('+')) {
+    if (!d.startsWith('55')) return null;
+    national = d.slice(2);
+  } else if (d.length === 10 || d.length === 11) national = d;
+  else if ((d.length === 12 || d.length === 13) && d.startsWith('55')) national = d.slice(2);
+  else return null;
+  return /^[1-9][1-9](?:9\d{8}|[2-5]\d{7})$/.test(national) ? `55${national}` : null;
 }
 
 export function maskPhone(digits: string): string {
