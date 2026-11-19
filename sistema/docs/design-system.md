@@ -43,8 +43,8 @@
 | `warning`        | `#95600F` | texto de atenção / vence em breve (versão escura do amarelo) |
 | `warning-soft`   | `#FDF3DC` | banner de aviso                             |
 | `data`           | `#2F5FBF` | série principal, em andamento (= `chart-income`) |
-| `chart-yellow`   | `#FFDB4D` | marca de atenção / vence em breve (só barras e pontos) |
-| `chart-orange`   | `#FF9933` | marca de resolvido com atraso / risco alto (só barras e pontos) |
+| `chart-yellow`   | `#F2B931` | marca de atenção / vence em breve (só barras e pontos); âmbar dourado, não limão (1,8:1 no branco: sempre com rótulo ao lado) |
+| `chart-orange`   | `#EE7D26` | marca de resolvido com atraso / risco alto (só barras e pontos; 2,8:1 no branco) |
 | `orange-strong`  | `#A84B0F` | texto do laranja (5,7:1 no branco)          |
 | `chart-negative` | = `danger` | despesas no fluxo de caixa e resultado negativo (alias) |
 | `chart-expense`  | `#C3C8D1` | despesas e comparações em cinza             |
@@ -72,6 +72,11 @@ pago com atraso laranja, vencido em aberto vermelho hachurado), faixas de atraso
 (até 30 dias amarelo → 31–60 laranja → mais de 60 vermelho, como a carteira por risco). Os antigos tokens
 `--app-aging-*` (bege, terracota e marrom) saíram.
 
+Escada de risco amarelo → laranja → vermelho: a luminosidade desce a cada degrau (L\* 78 → 64 → 46 no claro;
+80 → 66 no escuro, com o vermelho separado pelo matiz), para continuar distinguível em cinza e com
+daltonismo vermelho-verde. O amarelo não chega a 3:1 no branco sem ficar mais escuro que o laranja (vira
+mostarda/marrom e quebra a escada); por isso toda marca amarela vem com rótulo e valor ao lado.
+
 ### Modo escuro
 
 Neutro, sem azul: fundo cinza escuro, cards e seções em cinza mais claro, texto off-white e tons
@@ -87,7 +92,8 @@ tokens `hero-*` (`from-hero-from via-hero-via to-hero-to`, destaque `text-hero-a
 | `surface-muted` | `#323232` | `primary` | `#F4F3EF` com texto `#1E1E1E` |
 | `border` | `#3B3B3B` | `primary-soft` | `#3B3B3B` |
 | `border-strong` | `#4C4C4B` | `danger` (= `chart-negative`) | `#F27A7D` (5,3:1 no `surface`, 4,9:1 no `danger-soft` `#432A2B`) |
-| `success` | `#4FCB85` | `chart-orange` / `orange-strong` | `#FFA652` |
+| `success` | `#4FCB85` | `chart-orange` | `#EE8634` |
+| `chart-yellow` | `#F2C14E` | `orange-strong` | `#FFA652` |
 
 O fundo, a cor e a fonte de `html`/`body` ficam **fora** de `@layer` em `index.css`, para que estilos
 de quem hospeda o app (ex.: o esqueleto do artifact do claude.ai) não os sobrescrevam.

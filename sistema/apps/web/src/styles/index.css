@@ -64,10 +64,13 @@
   /*
    * Resolved late, high risk, 31–60 days overdue (orange) · due soon, waiting, attention, up to 30 days
    * overdue (yellow). Marks only: text uses `--app-orange-strong` / `--app-warning`.
+   * Risk ladder yellow → orange → red steps down in lightness (L* 78 → 64 → 46), so it still reads in
+   * grey and for red-green colour blindness. Yellow is a golden amber (not lemon); 3:1 on white would
+   * make it darker than the orange (mustard/brown), so it relies on labels next to every mark.
    */
-  --app-chart-orange: #ff9933;
+  --app-chart-orange: #ee7d26;
   --app-orange-strong: #a84b0f;
-  --app-chart-yellow: #ffdb4d;
+  --app-chart-yellow: #f2b931;
   /* Neutral series (e.g. the earlier period in comparisons). */
   --app-chart-neutral: #d0d5dd;
   --app-chart-grid: #e9ecf1;
@@ -144,9 +147,10 @@
   --app-chart-expense: #5d5d5b;
   --app-chart-expense-strong: #96958f;
   --app-chart-negative: var(--app-danger);
-  --app-chart-orange: #ffa652;
+  /* Same ladder on the dark surface (L* 80 → 66; the red sits apart by hue). */
+  --app-chart-orange: #ee8634;
   --app-orange-strong: #ffa652;
-  --app-chart-yellow: #f5cf4a;
+  --app-chart-yellow: #f2c14e;
   --app-chart-neutral: #5d5d5b;
   --app-chart-grid: #3b3b3b;
   --app-chart-1: #c3d4f6;
