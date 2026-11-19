@@ -72,6 +72,20 @@ pago com atraso laranja, vencido em aberto vermelho hachurado), faixas de atraso
 (até 30 dias amarelo → 31–60 laranja → mais de 60 vermelho, como a carteira por risco). Os antigos tokens
 `--app-aging-*` (bege, terracota e marrom) saíram.
 
+**Vermelho é sinal, não textura.** Três regras valem para valores e KPIs:
+
+- **Cor de entrada/saída só em listas mistas.** Verde/vermelho no valor só onde ele separa entrada de saída:
+  Extrato, "Maiores despesas" no Painel/Relatórios, fatura do cartão. Em lista de um tipo só (Contas a pagar,
+  Contas a receber) o valor fica em `text-fg` com o sinal no texto (`-R$` / `+R$`): `TransactionRow neutralAmount`.
+  O vermelho da linha fica para o que está vencido de verdade ("Venceu há 9 dias", status).
+- **Zero é cinza.** `MiniStat` recebe o número cru em `amount`; com `amount === 0` o valor sai em `text-subtle`
+  e o tom `danger`/`warning` é ignorado ("Vencido R$ 0,00" não é problema). No Extrato, o `BalanceTile` segue
+  a mesma regra.
+- **Só o que é problema ganha cor.** "A pagar", "A receber", "Limite utilizado" (abaixo de 70%), "Resgatado"
+  ficam em tinta; `danger` para vencido > 0, resultado/saldo negativo, fatura vencida, uso de limite > 90%
+  (`warning` > 70%, como as barras). Em frases de contagem, só o número leva a cor: "3 no prazo · **1** com
+  atraso · **2** atrasadas em aberto", com o número em `text-orange-strong`/`text-danger` e o resto em `text-muted`.
+
 Escada de risco amarelo → laranja → vermelho: a luminosidade desce a cada degrau (L\* 78 → 64 → 46 no claro;
 80 → 66 no escuro, com o vermelho separado pelo matiz), para continuar distinguível em cinza e com
 daltonismo vermelho-verde. O amarelo não chega a 3:1 no branco sem ficar mais escuro que o laranja (vira

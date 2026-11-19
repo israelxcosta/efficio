@@ -19,6 +19,7 @@ import { ErrorState, MiniStat } from '@/components/ui/misc';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { axisProps, moneyAxisFormatter, MoneyTooltip, StripeDefs } from '@/components/charts/chart-utils';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { useTransactionActions } from '@/features/transactions/transaction-actions';
 import { TransactionRow } from '@/features/transactions/components/transaction-row';
 import { useCards, useInvoice, useInvoices } from '../api';
@@ -140,6 +141,7 @@ export default function CardDetailPage() {
                     maxBarSize={36}
                     onClick={(d: { payload?: { month?: string } }) => d.payload?.month && setMonth(d.payload.month)}
                     style={{ cursor: 'pointer' }}
+                    {...chartMotion()}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -167,8 +169,9 @@ export default function CardDetailPage() {
         </div>
         {inv ? (
           <div className="grid grid-cols-2 gap-3 border-b border-border p-5 md:grid-cols-3">
-            <MiniStat label="Total da fatura" value={formatBRL(inv.total)} />
-            <MiniStat label="Em aberto" value={formatBRL(inv.unpaidTotal)} tone={inv.unpaidTotal ? 'danger' : 'success'} />
+            <MiniStat label="Total da fatura" value={formatBRL(inv.total)} amount={inv.total} />
+            {/* Red only when the invoice is overdue; an open amount before the due date is not a problem. */}
+            <MiniStat label="Em aberto" value={formatBRL(inv.unpaidTotal)} amount={inv.unpaidTotal} tone={inv.status === 'overdue' ? 'danger' : undefined} />
             <MiniStat label="Compras" value={String(inv.transactions.length)} className="col-span-2 md:col-span-1" />
           </div>
         ) : null}

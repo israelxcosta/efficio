@@ -22,6 +22,7 @@ import {
   MoneyTooltip,
 } from '@/components/charts/chart-utils';
 import { niceDomain, yAxisWidth } from '@/components/charts/chart-scale';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { StackBar } from '@/components/charts/stack-bar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -420,7 +421,7 @@ export function MonthlyResultWidget({ d, alert }: WidgetProps) {
               <YAxis {...axisProps} width={yWidth} domain={axis.domain} ticks={axis.ticks} interval={0} tickFormatter={moneyAxisFormatter} />
               <Tooltip cursor={{ fill: 'var(--app-bg-subtle)', radius: 8 }} content={<ResultTooltip d={d} />} />
               <ReferenceLine y={0} stroke="var(--app-border-strong)" />
-              <Bar dataKey="net" name="net" radius={[3, 3, 3, 3]} maxBarSize={44} isAnimationActive={!resizing}>
+              <Bar dataKey="net" name="net" radius={[3, 3, 3, 3]} maxBarSize={44} {...chartMotion(resizing)}>
                 {rows.map((r) => (
                   <Cell key={r.month} fill={r.net < 0 ? CHART_COLORS.negative : CHART_COLORS.income} />
                 ))}

@@ -29,6 +29,7 @@ import {
   MoneyTooltip,
 } from '@/components/charts/chart-utils';
 import { niceDomain, yAxisWidth } from '@/components/charts/chart-scale';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { useCashflowReport, useEvolutionReport } from '@/features/reports/api';
 import { periodLabel, type PeriodMode } from '@/lib/period';
 import { useElementSize } from '@/lib/use-element-size';
@@ -315,7 +316,7 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
                 fill={CHART_COLORS.income}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={44}
-                isAnimationActive={!resizing}
+                {...chartMotion(resizing)}
               />
               <Bar
                 yAxisId="money"
@@ -324,7 +325,7 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
                 fill={CHART_COLORS.negative}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={44}
-                isAnimationActive={!resizing}
+                {...chartMotion(resizing)}
               />
               {showClients ? (
                 <Line

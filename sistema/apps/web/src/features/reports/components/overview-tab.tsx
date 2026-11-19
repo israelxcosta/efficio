@@ -40,13 +40,14 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <MiniStat label="Receitas" value={v(o?.income)} tone="success" hint={<ChangeHint change={changes?.income} label={previous.label} />} />
-        <MiniStat label="Despesas" value={v(o?.expense)} hint={<ChangeHint change={changes?.expense} label={previous.label} />} />
-        <MiniStat label="Resultado" value={v(o?.net)} tone={o && o.net < 0 ? 'danger' : undefined} hint={<ChangeHint change={changes?.net} label={previous.label} />} />
+        <MiniStat label="Receitas" value={v(o?.income)} amount={o?.income} hint={<ChangeHint change={changes?.income} label={previous.label} />} />
+        <MiniStat label="Despesas" value={v(o?.expense)} amount={o?.expense} hint={<ChangeHint change={changes?.expense} label={previous.label} />} />
+        <MiniStat label="Resultado" value={v(o?.net)} amount={o?.net} tone={o && o.net < 0 ? 'danger' : undefined} hint={<ChangeHint change={changes?.net} label={previous.label} />} />
         <MiniStat label="Margem" value={o ? formatPercent(o.savingsRate ?? 0, 1) : '—'} hint={<ChangeHint change={changes?.savingsRate} label={previous.label} />} />
         <MiniStat
           label="Gasto médio diário"
           value={v(o?.averageDailyExpense)}
+          amount={o?.averageDailyExpense}
           className="col-span-2 lg:col-span-1"
           hint={<ChangeHint change={changes?.averageDailyExpense} label={previous.label} />}
         />

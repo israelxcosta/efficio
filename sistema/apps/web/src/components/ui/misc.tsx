@@ -100,7 +100,24 @@ export function StatPill({ label, value, tone = 'neutral', className }: { label:
   );
 }
 
-export function MiniStat({ label, value, tone, hint, info, className }: { label: string; value: ReactNode; tone?: 'success' | 'danger' | 'warning' | 'brand'; hint?: ReactNode; info?: ReactNode; className?: string }) {
+interface MiniStatProps {
+  label: string;
+  value: ReactNode;
+  /** Only `danger`/`warning` paint the figure, and only when it flags a problem (see `amount`). */
+  tone?: 'success' | 'danger' | 'warning' | 'brand';
+  /**
+   * Raw number behind `value`. When given, zero renders in `text-subtle` (zero is grey) and the
+   * `danger`/`warning` tone is dropped: "Vencido R$ 0,00" is not a problem.
+   */
+  amount?: number | null;
+  hint?: ReactNode;
+  info?: ReactNode;
+  className?: string;
+}
+
+export function MiniStat({ label, value, tone, amount, hint, info, className }: MiniStatProps) {
+  const isZero = amount === 0;
+  const alert = isZero ? undefined : tone;
   return (
     <div className={cn('rounded-lg border border-border bg-surface px-4 py-3', className)}>
       {info ? (
@@ -111,12 +128,13 @@ export function MiniStat({ label, value, tone, hint, info, className }: { label:
       ) : (
         <p className="text-xs font-medium text-muted">{label}</p>
       )}
-      {/* Figures stay in ink; colour only flags a problem (a negative result, an overdue total). */}
+      {/* Figures stay in ink; colour only flags a problem (a negative result, an overdue total > 0). Zero is grey. */}
       <p
         className={cn(
-          'tabular mt-1 text-lg font-semibold tracking-tight text-fg',
-          tone === 'danger' && 'text-danger',
-          tone === 'warning' && 'text-warning',
+          'tabular mt-1 text-lg font-semibold tracking-tight',
+          isZero ? 'text-subtle' : 'text-fg',
+          alert === 'danger' && 'text-danger',
+          alert === 'warning' && 'text-warning',
         )}
       >
         {value}

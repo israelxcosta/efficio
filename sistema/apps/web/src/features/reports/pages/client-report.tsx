@@ -332,12 +332,14 @@ function Kpis({ analysis: a }: { analysis: ClientAnalysis }) {
       <MiniStat
         label="Faturado"
         value={formatBRL(a.billed)}
+        amount={a.billed}
         hint={a.firstDue ? `${pluralize(a.count, 'cobrança', 'cobranças')} desde ${formatMonthKey(monthKey(a.firstDue), 'short')}` : 'nenhuma cobrança'}
       />
-      <MiniStat label="Recebido" value={formatBRL(a.received)} hint={pluralize(a.paidCount, 'pagamento', 'pagamentos')} info="Com juros e descontos." />
+      <MiniStat label="Recebido" value={formatBRL(a.received)} amount={a.received} hint={pluralize(a.paidCount, 'pagamento', 'pagamentos')} info="Com juros e descontos." />
       <MiniStat
         label="Em aberto"
         value={formatBRL(a.open)}
+        amount={a.open}
         tone={a.overdue > 0 ? 'danger' : undefined}
         hint={a.overdue > 0 ? `${formatBRL(a.overdue)} vencido` : a.open > 0 ? 'a vencer, nada vencido' : 'nada em aberto'}
       />

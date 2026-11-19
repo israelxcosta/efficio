@@ -51,10 +51,10 @@ export default function GoalsPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label="Já conquistado" value={formatBRL(saved)} tone="success" />
-        <MiniStat label="Objetivo total" value={formatBRL(target)} />
-        <MiniStat label="Progresso geral" value={formatPercent(target ? saved / target : 0, 0)} tone="brand" />
-        <MiniStat label="Guardar por mês" value={formatBRL(monthly)} />
+        <MiniStat label="Já conquistado" value={formatBRL(saved)} amount={saved} />
+        <MiniStat label="Objetivo total" value={formatBRL(target)} amount={target} />
+        <MiniStat label="Progresso geral" value={formatPercent(target ? saved / target : 0, 0)} amount={target ? saved / target : 0} />
+        <MiniStat label="Guardar por mês" value={formatBRL(monthly)} amount={monthly} />
       </div>
 
       {goals.isPending ? (

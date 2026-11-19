@@ -209,7 +209,13 @@ function BalanceTile({
       {loading || value === undefined ? (
         <Skeleton className="mt-2 h-6 w-28" />
       ) : (
-        <Money value={value} signed={tone !== undefined || value < 0} className="mt-1 block text-lg tracking-tight" />
+        // Zero is grey; in/out colours stay (the statement is a mixed list).
+        <Money
+          value={value}
+          signed={tone !== undefined || value < 0}
+          tone={value === 0 ? 'neutral' : undefined}
+          className={cn('mt-1 block text-lg tracking-tight', value === 0 && 'text-subtle')}
+        />
       )}
       {hint ? <p className="mt-0.5 text-[11px] text-subtle">{hint}</p> : null}
     </div>

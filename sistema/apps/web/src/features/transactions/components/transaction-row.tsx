@@ -225,6 +225,16 @@ interface TransactionRowProps {
    * "+ Empregados" chip (it stays in the menu) and without the account column.
    */
   density?: 'default' | 'compact' | 'line';
+  /**
+   * Single-type lists (Contas a pagar / a receber): the amount stays in ink with its sign ("-R$" /
+   * "+R$"). Green/red is kept for mixed lists (statement, top expenses), where it tells in from out.
+   */
+  neutralAmount?: boolean;
+}
+
+/** Ink for transfers (no direction) and single-type lists; otherwise Money paints by sign. */
+function amountTone(tx: Transaction, amount: number | undefined, neutralAmount: boolean | undefined): 'neutral' | undefined {
+  return neutralAmount || (tx.type === 'transfer' && amount === undefined) ? 'neutral' : undefined;
 }
 
 /** Responsive list row used across lists (payables, receivables, dashboard, statement). */
@@ -233,7 +243,7 @@ export function TransactionRow(props: TransactionRowProps) {
 }
 
 /** One-line row of the dashboard lists (FitList cuts by row, so every row has the same height). */
-function TransactionLine({ tx, amount, muted }: TransactionRowProps) {
+function TransactionLine({ tx, amount, muted, neutralAmount }: TransactionRowProps) {
   const actions = useTransactionActions();
   const signed = amount ?? (tx.type === 'expense' ? -tx.amount : tx.amount);
   const isCardPurchase = Boolean(tx.creditCardId) && tx.type !== 'transfer';
@@ -270,14 +280,14 @@ function TransactionLine({ tx, amount, muted }: TransactionRowProps) {
         <span className="hidden max-w-36 shrink-0 truncate text-right @sm:block @xl:w-36" title={formatDateBR(tx.date)}>
           <DueLabel tx={tx} beside />
         </span>
-        <Money value={signed} tone={tx.type === 'transfer' && amount === undefined ? 'neutral' : undefined} signed className="min-w-[5.5rem] shrink-0 text-right text-body-sm @xl:w-28" />
+        <Money value={signed} tone={amountTone(tx, amount, neutralAmount)} showPlus={neutralAmount} signed className="min-w-[5.5rem] shrink-0 text-right text-body-sm @xl:w-28" />
         <RowMenu tx={tx} />
       </div>
     </div>
   );
 }
 
-function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, density = 'default' }: TransactionRowProps) {
+function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, density = 'default', neutralAmount }: TransactionRowProps) {
   const compact = density === 'compact';
   const detail = [tx.category ? `${tx.category.name}${tx.subcategory ? ` · ${tx.subcategory.name}` : ''}` : null, tx.contact?.name]
     .filter(Boolean)
@@ -377,7 +387,7 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
         </div>
       ) : null}
       <div className="shrink-0 text-right @md:w-28 @lg:w-32">
-        <Money value={signed} tone={tx.type === 'transfer' && amount === undefined ? 'neutral' : undefined} signed className="text-[15px]" />
+        <Money value={signed} tone={amountTone(tx, amount, neutralAmount)} showPlus={neutralAmount} signed className="text-[15px]" />
         {trailing}
       </div>
       <RowMenu tx={tx} onAddEmployees={isFee ? employees.show : undefined} />

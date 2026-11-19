@@ -55,10 +55,17 @@ export default function CardsPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label="Limite total" value={formatBRL(totalLimit)} />
-        <MiniStat label="Limite utilizado" value={formatBRL(used)} tone="danger" hint={totalLimit ? `${Math.round((used / totalLimit) * 100)}% do limite` : undefined} />
-        <MiniStat label="Disponível" value={formatBRL(Math.max(0, totalLimit - used))} tone="success" />
-        <MiniStat label="Faturas atuais" value={formatBRL(currentInvoices)} tone="brand" />
+        {/* Using the limit is not a problem: ink, warning/red only past the same 70%/90% marks as the bars; zero is grey. */}
+        <MiniStat label="Limite total" value={formatBRL(totalLimit)} amount={totalLimit} />
+        <MiniStat
+          label="Limite utilizado"
+          value={formatBRL(used)}
+          amount={used}
+          tone={totalLimit && used / totalLimit > 0.9 ? 'danger' : totalLimit && used / totalLimit > 0.7 ? 'warning' : undefined}
+          hint={totalLimit ? `${Math.round((used / totalLimit) * 100)}% do limite` : undefined}
+        />
+        <MiniStat label="Disponível" value={formatBRL(Math.max(0, totalLimit - used))} amount={Math.max(0, totalLimit - used)} />
+        <MiniStat label="Faturas atuais" value={formatBRL(currentInvoices)} amount={currentInvoices} />
       </div>
 
       {cards.isPending ? (

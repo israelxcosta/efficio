@@ -9,6 +9,7 @@ import { ErrorState, Money } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { axisProps, CHART_COLORS, moneyAxisFormatter, MoneyTooltip } from '@/components/charts/chart-utils';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { cn, initials } from '@/lib/utils';
 import { useContactReport } from '../api';
 import { GRANULARITY_OPTIONS } from './categories-tab';
@@ -76,8 +77,8 @@ export function ContactsTab({ from, to }: { from: string; to: string }) {
                     <XAxis type="number" {...axisProps} tickFormatter={moneyAxisFormatter} />
                     <YAxis type="category" dataKey="name" {...axisProps} width={120} />
                     <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ receita: 'Receitas', despesa: 'Despesas' }} hideZero />} />
-                    <Bar dataKey="receita" name="receita" fill={CHART_COLORS.income} radius={[0, 3, 3, 0]} maxBarSize={14} />
-                    <Bar dataKey="despesa" name="despesa" fill={CHART_COLORS.expense} radius={[0, 3, 3, 0]} maxBarSize={14} />
+                    <Bar dataKey="receita" name="receita" fill={CHART_COLORS.income} radius={[0, 3, 3, 0]} maxBarSize={14} {...chartMotion()} />
+                    <Bar dataKey="despesa" name="despesa" fill={CHART_COLORS.expense} radius={[0, 3, 3, 0]} maxBarSize={14} {...chartMotion()} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -92,8 +93,8 @@ export function ContactsTab({ from, to }: { from: string; to: string }) {
                     <YAxis {...axisProps} tickFormatter={moneyAxisFormatter} width={56} />
                     <Tooltip content={<MoneyTooltip names={{ receita: 'Receitas', despesa: 'Despesas' }} />} />
                     <Legend formatter={(v) => (v === 'receita' ? 'Receitas' : 'Despesas')} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="linear" dataKey="receita" stroke={CHART_COLORS.income} strokeWidth={2} dot={false} />
-                    <Line type="linear" dataKey="despesa" stroke={CHART_COLORS.expenseStrong} strokeWidth={2} dot={false} />
+                    <Line type="linear" dataKey="receita" stroke={CHART_COLORS.income} strokeWidth={2} dot={false} {...chartMotion()} />
+                    <Line type="linear" dataKey="despesa" stroke={CHART_COLORS.expenseStrong} strokeWidth={2} dot={false} {...chartMotion()} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

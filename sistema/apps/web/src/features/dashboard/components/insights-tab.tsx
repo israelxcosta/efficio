@@ -16,6 +16,7 @@ import { KpiCard } from '@/components/ui/kpi-card';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { axisProps, MoneyTooltip } from '@/components/charts/chart-utils';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { cn } from '@/lib/utils';
 import { useOverviewReport } from '@/features/reports/api';
 import { TransactionRow } from '@/features/transactions/components/transaction-row';
@@ -123,7 +124,7 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" {...axisProps} width={80} />
                   <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ value: 'Valor' }} />} />
-                  <Bar dataKey="value" name="value" radius={[6, 6, 6, 6]} barSize={22} />
+                  <Bar dataKey="value" name="value" radius={[6, 6, 6, 6]} barSize={22} {...chartMotion()} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

@@ -74,10 +74,10 @@ export default function TransfersPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <MiniStat label="Total investido" value={accounts.isPending ? '—' : formatBRL(invested)} tone="brand" info="Somado à parte do saldo em contas." />
-            <MiniStat label="Aplicado no período" value={formatBRL(applied)} tone="success" />
-            <MiniStat label="Resgatado no período" value={formatBRL(redeemed)} tone="warning" />
-            <MiniStat label="Transferido" value={formatBRL(moved)} />
+            <MiniStat label="Total investido" value={accounts.isPending ? '—' : formatBRL(invested)} amount={accounts.isPending ? undefined : invested} info="Somado à parte do saldo em contas." />
+            <MiniStat label="Aplicado no período" value={formatBRL(applied)} amount={applied} />
+            <MiniStat label="Resgatado no período" value={formatBRL(redeemed)} amount={redeemed} />
+            <MiniStat label="Transferido" value={formatBRL(moved)} amount={moved} />
           </div>
 
           <Card className="p-4">

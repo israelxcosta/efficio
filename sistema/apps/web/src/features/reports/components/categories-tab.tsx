@@ -11,6 +11,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { axisProps, moneyAxisFormatter, MoneyTooltip, SERIES_PALETTE } from '@/components/charts/chart-utils';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { useCategoryReport } from '../api';
 import { useTone } from '@/lib/theme';
 
@@ -94,7 +95,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label={`Total ${type === 'expense' ? 'de despesas' : 'de receitas'}`} value={r ? formatBRL(r.total) : '—'} />
+        <MiniStat label={`Total ${type === 'expense' ? 'de despesas' : 'de receitas'}`} value={r ? formatBRL(r.total) : '—'} amount={r?.total} />
         <MiniStat label="Média por período" value={r && periodsWithData ? formatBRL(Math.round(r.total / periodsWithData)) : '—'} />
         <MiniStat label="Maior categoria" value={r && r.series[0] ? [...r.series].sort((a, b) => b.total - a.total)[0]!.name : '—'} />
         <MiniStat label="Períodos projetados" value={String(projected.length)} info="Gerados por fixas, recorrentes e parcelas" />
@@ -142,9 +143,10 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
                       fill={s.color}
                       maxBarSize={44}
                       radius={i === series.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+                      {...chartMotion()}
                     />
                   ))}
-                  <Line type="linear" dataKey="total" name="total" stroke="var(--app-fg)" strokeWidth={2} dot={false} />
+                  <Line type="linear" dataKey="total" name="total" stroke="var(--app-fg)" strokeWidth={2} dot={false} {...chartMotion()} />
                 </ComposedChart>
               </ResponsiveContainer>
             )}

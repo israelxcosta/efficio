@@ -691,8 +691,14 @@ function PunctualityList({
             <span className="flex flex-col items-end leading-tight [grid-area:total]">
               <span className="tabular text-[13px] font-semibold text-fg">{rate === null ? '—' : `${rate}%`}</span>
               <span className="tabular text-mini whitespace-nowrap text-muted">
-                {r.doneOnTime} no prazo · <span className={r.doneLate ? 'text-orange-strong' : undefined}>{r.doneLate} com atraso</span>
-                {r.overdue ? <span className="text-danger"> · {r.overdue} {r.overdue === 1 ? 'atrasada' : 'atrasadas'} em aberto</span> : null}
+                {/* Only the figure carries the colour; the sentence stays muted (red is a signal, not a texture). */}
+                {r.doneOnTime} no prazo · <span className={r.doneLate ? 'font-semibold text-orange-strong' : undefined}>{r.doneLate}</span> com atraso
+                {r.overdue ? (
+                  <>
+                    {' · '}
+                    <span className="font-semibold text-danger">{r.overdue}</span> {r.overdue === 1 ? 'atrasada' : 'atrasadas'} em aberto
+                  </>
+                ) : null}
               </span>
             </span>
           </>

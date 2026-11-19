@@ -257,14 +257,46 @@
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
   --shadow-lg: var(--shadow-lg);
+}
 
-  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+/*
+ * Motion (docs/design-system.md → "Motion"). Movement serves feedback, state and continuity, never
+ * decoration. Durations come only from the --dur-* scale; enter and exit with --ease-out, panels
+ * with --ease-drawer, colour with ease; never ease-in. The exit is always shorter than the entrance.
+ */
+:root {
+  --dur-hover: 100ms; /* hover/focus colour */
+  --dur-press: 150ms; /* button press, lifting a card */
+  --dur-tooltip: 125ms;
+  --dur-state: 200ms; /* toggle, chevron, dimming stale data, icon swap */
+  --dur-pop-in: 200ms; /* modal, popover, menu, select: entrance */
+  --dur-pop-out: 150ms; /* ... exit */
+  --dur-panel-in: 300ms; /* Sheet */
+  --dur-panel-out: 220ms;
+  --dur-settle: 250ms; /* dropped card settling in its cell */
+  --dur-chart: 300ms; /* Recharts series (chartMotion), gauge, progress bar */
+}
 
-  --animate-pop: pop 260ms var(--ease-out-soft);
-  --animate-fade-in: fade-in 160ms ease-out;
-  --animate-sheet-in: sheet-in 240ms var(--ease-out-soft);
-  --animate-sheet-out: sheet-out 200ms ease-in;
-  --animate-dialog-in: dialog-in 180ms var(--ease-out-soft);
+@theme inline {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-soft: var(--ease-out); /* legacy alias */
+
+  /* `transition-colors` and friends without an explicit duration: hover colour. */
+  --default-transition-duration: var(--dur-hover);
+  --default-transition-timing-function: ease;
+
+  --animate-pop: pop 260ms var(--ease-out);
+  --animate-fade-in: fade-in var(--dur-pop-in) var(--ease-out);
+  --animate-fade-out: fade-out var(--dur-pop-out) var(--ease-out);
+  --animate-scrim-out: fade-out var(--dur-panel-out) var(--ease-out);
+  --animate-pop-in: pop-in var(--dur-pop-in) var(--ease-out);
+  --animate-pop-out: pop-out var(--dur-pop-out) var(--ease-out);
+  --animate-dialog-in: dialog-in var(--dur-pop-in) var(--ease-out);
+  --animate-dialog-out: dialog-out var(--dur-pop-out) var(--ease-out);
+  --animate-sheet-in: sheet-in var(--dur-panel-in) var(--ease-drawer);
+  --animate-sheet-out: sheet-out var(--dur-panel-out) var(--ease-drawer);
   --animate-shimmer: shimmer 1.4s ease-in-out infinite;
 }
 
@@ -275,24 +307,36 @@
 }
 @keyframes fade-in {
   from { opacity: 0; }
-  to { opacity: 1; }
+}
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+/*
+ * Individual properties (scale, not transform): Tailwind v4's -translate-x/y-1/2 use the `translate`
+ * property, so animating `transform` here would add a second offset and the dialog would enter
+ * off-centre and then jump.
+ */
+@keyframes pop-in {
+  from { opacity: 0; scale: 0.96; }
+}
+@keyframes pop-out {
+  to { opacity: 0; scale: 0.96; }
+}
+@keyframes dialog-in {
+  from { opacity: 0; scale: 0.96; }
+}
+@keyframes dialog-out {
+  to { opacity: 0; scale: 0.96; }
 }
 @keyframes sheet-in {
   from { transform: translateX(100%); }
-  to { transform: translateX(0); }
 }
 @keyframes sheet-out {
-  from { transform: translateX(0); }
   to { transform: translateX(100%); }
 }
-@keyframes dialog-in {
-  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
 @keyframes shimmer {
-  0% { opacity: 0.55; }
+  0%, 100% { opacity: 0.55; }
   50% { opacity: 1; }
-  100% { opacity: 0.55; }
 }
 
 /*
@@ -396,12 +440,50 @@ html:root > body {
   text-transform: none;
 }
 
+/*
+ * Reduced motion: fewer and gentler, not zero. Movement becomes a short crossfade (same timing,
+ * opacity only); colour/opacity transitions stay because they carry state; decorative loops stop
+ * in a static, readable state; the spinner (essential feedback) keeps turning, slower. Recharts
+ * follows the same preference through chartMotion() ('auto'); sonner handles itself.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
   ::after {
-    animation-duration: 1ms !important;
-    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, opacity, box-shadow !important;
+  }
+  /* Entrances/exits: opacity only (these later @keyframes win over the ones above). */
+  @keyframes pop-in {
+    from { opacity: 0; }
+  }
+  @keyframes pop-out {
+    to { opacity: 0; }
+  }
+  @keyframes dialog-in {
+    from { opacity: 0; }
+  }
+  @keyframes dialog-out {
+    to { opacity: 0; }
+  }
+  @keyframes sheet-in {
+    from { opacity: 0; }
+  }
+  @keyframes sheet-out {
+    to { opacity: 0; }
+  }
+  @keyframes pop {
+    from, to { opacity: 1; }
+  }
+  /* Decorative loops stop (the doubled class outranks the onboarding sheet, loaded later). */
+  .animate-shimmer,
+  .animate-pulse,
+  .ob-loading.ob-loading {
+    animation: none;
+    opacity: 0.7;
+  }
+  .animate-spin {
+    animation-duration: 1.5s;
   }
 }
 

@@ -38,7 +38,7 @@ export interface WidgetChrome {
 
 export const WidgetChromeContext = createContext<WidgetChrome | null>(null);
 
-/** True while the card is being resized: pass `isAnimationActive={!resizing}` to Recharts marks. */
+/** True while the card is being resized: spread `chartMotion(resizing)` on Recharts marks. */
 export function useWidgetResizing(): boolean {
   return useContext(WidgetChromeContext)?.resizing ?? false;
 }

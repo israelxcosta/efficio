@@ -87,10 +87,10 @@ export default function AccountsPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label="Saldo em contas" value={formatBRL(inTotal)} tone={inTotal < 0 ? 'danger' : undefined} />
-        <MiniStat label="Investimentos" value={formatBRL(invested)} tone="brand" info="Somados à parte do saldo em contas." />
-        <MiniStat label="Patrimônio" value={formatBRL(inTotal + invested)} />
-        <MiniStat label="Previsto fim do mês" value={formatBRL(projected)} info="Saldo das contas mais os lançamentos pendentes do mês." />
+        <MiniStat label="Saldo em contas" value={formatBRL(inTotal)} amount={inTotal} tone={inTotal < 0 ? 'danger' : undefined} />
+        <MiniStat label="Investimentos" value={formatBRL(invested)} amount={invested} info="Somados à parte do saldo em contas." />
+        <MiniStat label="Patrimônio" value={formatBRL(inTotal + invested)} amount={inTotal + invested} />
+        <MiniStat label="Previsto fim do mês" value={formatBRL(projected)} amount={projected} info="Saldo das contas mais os lançamentos pendentes do mês." />
       </div>
 
       {accounts.isPending ? (

@@ -17,6 +17,7 @@ import {
   useStripeScope,
 } from '@/components/charts/chart-utils';
 import { trimLeadingEmpty, yAxisWidth } from '@/components/charts/chart-scale';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { ErrorState } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -270,8 +271,8 @@ export function EvolutionWidget({ month, size, prefs, setPref, alert }: WidgetPr
                 />
                 <YAxis {...axisProps} width={yWidth} tickCount={4} tickFormatter={moneyAxisFormatter} domain={[0, (max: number) => max * 1.12]} />
                 <Tooltip cursor={{ fill: 'var(--app-bg-subtle)', radius: 8 }} content={<EvolutionTooltip />} />
-                <Bar dataKey="realizado" name="realizado" stackId="t" fill={color} maxBarSize={56} isAnimationActive={!resizing} />
-                <Bar dataKey="aberto" name="aberto" stackId="t" fill={stripeFill(type, scope)} radius={[4, 4, 0, 0]} maxBarSize={56} isAnimationActive={!resizing}>
+                <Bar dataKey="realizado" name="realizado" stackId="t" fill={color} maxBarSize={56} {...chartMotion(resizing)} />
+                <Bar dataKey="aberto" name="aberto" stackId="t" fill={stripeFill(type, scope)} radius={[4, 4, 0, 0]} maxBarSize={56} {...chartMotion(resizing)}>
                   <LabelList dataKey="total" content={(p) => <PeakLabel {...p} peak={peak} />} />
                 </Bar>
                 <Line
@@ -283,7 +284,7 @@ export function EvolutionWidget({ month, size, prefs, setPref, alert }: WidgetPr
                   strokeOpacity={0.7}
                   dot={false}
                   activeDot={false}
-                  isAnimationActive={!resizing}
+                  {...chartMotion(resizing)}
                 />
                 {todayRow ? (
                   <ReferenceLine
@@ -407,7 +408,7 @@ export function CompositionWidget({ month, prefs, setPref, alert }: WidgetProps)
                   strokeWidth={1}
                   radius={i === series.length - 1 ? [4, 4, 0, 0] : 0}
                   maxBarSize={56}
-                  isAnimationActive={!resizing}
+                  {...chartMotion(resizing)}
                   className={s.categoryId ? 'cursor-pointer' : undefined}
                   onClick={(entry: { payload?: { month?: MonthKey } }) => {
                     if (s.categoryId && s.key !== OTHERS_KEY && entry.payload?.month) navigate(categoryListHref(type, s.categoryId, entry.payload.month));

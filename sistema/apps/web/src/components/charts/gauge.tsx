@@ -13,9 +13,9 @@ export function Gauge({ score, size = 200 }: GaugeProps) {
   const r = 80;
   const cx = 100;
   const cy = 95;
-  const angle = Math.PI * (1 - clamped / 1000);
-  const mx = cx + r * Math.cos(angle);
-  const my = cy - r * Math.sin(angle);
+  // The knob is drawn at the arc's start and rotated around the centre, so it travels along the arc
+  // with the stroke instead of jumping to the end while the stroke animates.
+  const deg = (clamped / 1000) * 180;
   const arc = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
   const length = Math.PI * r;
   const progress = (clamped / 1000) * length;
@@ -32,9 +32,11 @@ export function Gauge({ score, size = 200 }: GaugeProps) {
         strokeWidth="10"
         strokeLinecap="round"
         strokeDasharray={`${progress} ${length}`}
-        style={{ transition: 'stroke-dasharray 700ms cubic-bezier(.2,.8,.2,1)' }}
+        style={{ transition: 'stroke-dasharray var(--dur-chart) var(--ease-out)' }}
       />
-      <circle cx={mx} cy={my} r="7" fill="var(--app-surface)" stroke="var(--app-fg)" strokeWidth="2.5" />
+      <g style={{ transform: `rotate(${deg}deg)`, transformOrigin: `${cx}px ${cy}px`, transition: 'transform var(--dur-chart) var(--ease-out)' }}>
+        <circle cx={cx - r} cy={cy} r="7" fill="var(--app-surface)" stroke="var(--app-fg)" strokeWidth="2.5" />
+      </g>
       <text x={cx} y={cy - 6} textAnchor="middle" fontSize={fontSize} fontWeight="700" fill="var(--app-fg)" style={{ fontVariantNumeric: 'tabular-nums' }}>
         {Math.round(clamped)}
       </text>

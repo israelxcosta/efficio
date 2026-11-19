@@ -7,6 +7,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { axisProps, CHART_COLORS, CHART_TEXT, ChartBox, moneyAxisFormatter, MoneyTooltip } from '@/components/charts/chart-utils';
 import { niceDomain, projectionTiles, summarizeProjection, yAxisWidth } from '@/components/charts/chart-scale';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { cn } from '@/lib/utils';
 import type { DashboardPrefs, WidgetProps } from '../layout/types';
 import { useWidgetResizing, WidgetCard } from '../layout/widget-card';
@@ -171,7 +172,7 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
                 fill={color}
                 fillOpacity={0.08}
                 activeDot={{ r: 4, fill: color, stroke: 'var(--app-surface)', strokeWidth: 2 }}
-                isAnimationActive={!resizing}
+                {...chartMotion(resizing)}
               />
               {worst ? <ReferenceDot x={worst.date} y={worst.saldo} r={4} fill={color} stroke="var(--app-surface)" strokeWidth={2} /> : null}
             </AreaChart>

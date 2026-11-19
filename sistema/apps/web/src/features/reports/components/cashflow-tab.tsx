@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { axisProps, CHART_COLORS, LegendDot, moneyAxisFormatter, MoneyTooltip } from '@/components/charts/chart-utils';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { niceDomain, trimLeadingEmpty, yAxisWidth } from '@/components/charts/chart-scale';
 import { useAccounts } from '@/features/accounts/api';
 import { useCashflowReport } from '../api';
@@ -55,10 +56,10 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
       </Card>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label="Saldo inicial" value={r ? formatBRL(r.openingBalance) : '—'} />
-        <MiniStat label="Entradas" value={r ? formatBRL(totals.in) : '—'} tone="success" hint={totals.pin ? `${formatBRL(totals.pin)} previsto` : undefined} />
-        <MiniStat label="Saídas" value={r ? formatBRL(totals.out) : '—'} hint={totals.pout ? `${formatBRL(totals.pout)} previsto` : undefined} />
-        <MiniStat label="Saldo final projetado" value={r ? formatBRL(r.closingBalance) : '—'} tone={r && r.closingBalance < 0 ? 'danger' : undefined} />
+        <MiniStat label="Saldo inicial" value={r ? formatBRL(r.openingBalance) : '—'} amount={r?.openingBalance} />
+        <MiniStat label="Entradas" value={r ? formatBRL(totals.in) : '—'} amount={r ? totals.in : undefined} hint={totals.pin ? `${formatBRL(totals.pin)} previsto` : undefined} />
+        <MiniStat label="Saídas" value={r ? formatBRL(totals.out) : '—'} amount={r ? totals.out : undefined} hint={totals.pout ? `${formatBRL(totals.pout)} previsto` : undefined} />
+        <MiniStat label="Saldo final projetado" value={r ? formatBRL(r.closingBalance) : '—'} amount={r?.closingBalance} tone={r && r.closingBalance < 0 ? 'danger' : undefined} />
       </div>
 
       <Card className="p-5">
@@ -80,8 +81,8 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
                 <YAxis {...axisProps} domain={flowAxis.domain} ticks={flowAxis.ticks} interval={0} tickFormatter={moneyAxisFormatter} width={yAxisWidth(flowAxis.ticks)} />
                 {projected.length ? <ProjectionArea from={projected[0]!.label} to={projected[projected.length - 1]!.label} /> : null}
                 <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ entradas: 'Entradas', saidas: 'Saídas' }} />} />
-                <Bar dataKey="entradas" name="entradas" stackId="flow" fill={CHART_COLORS.income} radius={[3, 3, 0, 0]} maxBarSize={34} />
-                <Bar dataKey="saidas" name="saidas" stackId="flow" fill={CHART_COLORS.negative} radius={[3, 3, 0, 0]} maxBarSize={34} />
+                <Bar dataKey="entradas" name="entradas" stackId="flow" fill={CHART_COLORS.income} radius={[3, 3, 0, 0]} maxBarSize={34} {...chartMotion()} />
+                <Bar dataKey="saidas" name="saidas" stackId="flow" fill={CHART_COLORS.negative} radius={[3, 3, 0, 0]} maxBarSize={34} {...chartMotion()} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
@@ -99,7 +100,7 @@ export function CashflowTab({ from, to }: { from: string; to: string }) {
                 <YAxis {...axisProps} domain={balanceAxis.domain} ticks={balanceAxis.ticks} interval={0} tickFormatter={moneyAxisFormatter} width={yAxisWidth(balanceAxis.ticks)} />
                 {projected.length ? <ProjectionArea from={projected[0]!.label} to={projected[projected.length - 1]!.label} /> : null}
                 <Tooltip cursor={{ stroke: 'var(--app-border-strong)' }} content={<MoneyTooltip names={{ saldo: 'Saldo acumulado' }} />} />
-                <Line type="linear" dataKey="saldo" name="saldo" stroke="var(--app-fg)" strokeWidth={2} dot={{ r: 2.5, fill: 'var(--app-fg)', strokeWidth: 0 }} />
+                <Line type="linear" dataKey="saldo" name="saldo" stroke="var(--app-fg)" strokeWidth={2} dot={{ r: 2.5, fill: 'var(--app-fg)', strokeWidth: 0 }} {...chartMotion()} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>

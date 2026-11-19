@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useElementSize } from '@/lib/use-element-size';
 import { SERIES_PALETTE } from './chart-utils';
 import { centerFontSize } from './chart-scale';
+import { chartMotion } from './chart-motion';
 import { useTone } from '@/lib/theme';
 
 interface DonutChartProps {
@@ -96,7 +97,7 @@ export function DonutChart({ data, total, centerLabel = 'Total', height = 200, m
             paddingAngle={2}
             cornerRadius={6}
             stroke="none"
-            animationDuration={700}
+            {...chartMotion()}
             rootTabIndex={-1}
             onMouseEnter={(_, index) => setActive(index)}
             onMouseLeave={() => setActive(null)}

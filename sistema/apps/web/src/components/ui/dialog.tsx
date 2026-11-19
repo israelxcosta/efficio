@@ -18,8 +18,10 @@ export function Modal({ open, onOpenChange, title, description, children, footer
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
-        <RDialog.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] data-[state=open]:animate-fade-in dark:bg-black/55" />
+        <RDialog.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out dark:bg-black/55" />
         {/*
+          Centred with the `translate` utilities; the dialog-in/out keyframes animate only `scale` and
+          `opacity`, so they never fight the centring (the overlay fades out with the same 150ms).
           The dialog never scrolls as a whole: the header and the footer stay put and only the body
           scrolls, inside the rounded frame (overflow-hidden keeps the scrollbar off the corners).
         */}
@@ -28,7 +30,7 @@ export function Modal({ open, onOpenChange, title, description, children, footer
             if ((e.target as Element | null)?.closest?.('[data-sonner-toaster]')) e.preventDefault();
           }}
           className={cn(
-            'fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-lg outline-none data-[state=open]:animate-dialog-in',
+            'fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-lg outline-none data-[state=open]:animate-dialog-in data-[state=closed]:animate-dialog-out',
             className,
           )}
         >

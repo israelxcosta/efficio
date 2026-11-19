@@ -21,6 +21,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { axisProps, CHART_COLORS, LegendDot, moneyAxisFormatter, MoneyTooltip } from '@/components/charts/chart-utils';
+import { chartMotion } from '@/components/charts/chart-motion';
 import { useActiveMonth } from '@/lib/active-month';
 import { cn } from '@/lib/utils';
 import { useComparisonReport } from '../api';
@@ -126,8 +127,8 @@ export function ComparisonTab() {
                     <XAxis dataKey="name" {...axisProps} interval={0} angle={chartData.length > 6 ? -20 : 0} textAnchor={chartData.length > 6 ? 'end' : 'middle'} height={chartData.length > 6 ? 56 : 30} />
                     <YAxis {...axisProps} tickFormatter={moneyAxisFormatter} width={56} />
                     <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ a: 'Período A', b: 'Período B' }} />} />
-                    <Bar dataKey="a" name="a" fill={CHART_COLORS.neutral} radius={[3, 3, 0, 0]} maxBarSize={26} />
-                    <Bar dataKey="b" name="b" fill={CHART_COLORS.income} radius={[3, 3, 0, 0]} maxBarSize={26} />
+                    <Bar dataKey="a" name="a" fill={CHART_COLORS.neutral} radius={[3, 3, 0, 0]} maxBarSize={26} {...chartMotion()} />
+                    <Bar dataKey="b" name="b" fill={CHART_COLORS.income} radius={[3, 3, 0, 0]} maxBarSize={26} {...chartMotion()} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

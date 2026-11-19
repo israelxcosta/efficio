@@ -125,12 +125,14 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label="Total no período" value={summary ? formatBRL(summary.total) : '—'} hint={summary ? `${summary.count} lançamentos` : undefined} />
-        <MiniStat label={labels.paid} value={summary ? formatBRL(summary.paid) : '—'} tone="success" />
-        <MiniStat label={labels.pending} value={summary ? formatBRL(summary.pending) : '—'} tone="warning" />
+        {/* Ink for the totals (an amount to pay or receive is not a problem); red only for overdue > 0; zero is grey. */}
+        <MiniStat label="Total no período" value={summary ? formatBRL(summary.total) : '—'} amount={summary?.total} hint={summary ? `${summary.count} lançamentos` : undefined} />
+        <MiniStat label={labels.paid} value={summary ? formatBRL(summary.paid) : '—'} amount={summary?.paid} />
+        <MiniStat label={labels.pending} value={summary ? formatBRL(summary.pending) : '—'} amount={summary?.pending} />
         <MiniStat
           label="Vencido"
           value={summary ? formatBRL(summary.overdue) : '—'}
+          amount={summary?.overdue}
           tone="danger"
           hint={summary?.overdueCount ? `${summary.overdueCount} em atraso` : 'Nada em atraso'}
         />
@@ -259,7 +261,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
           ) : (
             <div className={list.isPlaceholderData ? 'opacity-60 transition-opacity' : undefined}>
               {list.data.items.map((tx) => (
-                <TransactionRow key={tx.id} tx={tx} />
+                <TransactionRow key={tx.id} tx={tx} neutralAmount />
               ))}
             </div>
           )}
