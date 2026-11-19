@@ -23,6 +23,21 @@ describe('request logs never carry the public onboarding token (CWE-532)', () =>
     expect(sanitizeUrl(`/api/public/onboarding/${ONBOARDING_TOKEN}/confirm`)).toBe('/api/public/onboarding/[token]/confirm');
   });
 
+  it('masks every credential that travels in a URL (invites, webhook secret, query tokens)', () => {
+    const secret = 'S3cr3t_webhook-path-segment-0123456789abcdefgh';
+    expect(sanitizeUrl(`/api/invites/${ONBOARDING_TOKEN}`)).toBe('/api/invites/[token]');
+    expect(sanitizeUrl(`/api/invites/${ONBOARDING_TOKEN}/accept`)).toBe('/api/invites/[token]/accept');
+    expect(sanitizeUrl(`/api/open-finance/webhooks/pluggy/${secret}`)).toBe('/api/open-finance/webhooks/pluggy/[secret]');
+    // Query strings: only allow-listed, non-personal keys keep their values.
+    expect(sanitizeUrl(`/api/auth/password/reset?token=${ONBOARDING_TOKEN}`)).toBe('/api/auth/password/reset?token=[redacted]');
+    expect(sanitizeUrl(`/api/x?access_token=${ONBOARDING_TOKEN}&page=2`)).toBe('/api/x?access_token=[redacted]&page=2');
+    // The reset token never reaches a URL the API sees: the e-mailed link carries it in the fragment.
+    for (const url of [`/api/invites/${ONBOARDING_TOKEN}`, `/api/open-finance/webhooks/pluggy/${secret}`]) {
+      expect(sanitizeUrl(url)).not.toContain(ONBOARDING_TOKEN);
+      expect(sanitizeUrl(url)).not.toContain(secret);
+    }
+  });
+
   it('keeps it out of the request lines the API writes', async () => {
     const lines: string[] = [];
     const stream = new Writable({

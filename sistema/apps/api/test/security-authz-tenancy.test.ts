@@ -1,6 +1,6 @@
 // Authorization and tenant isolation regressions (security review, BOLA/BFLA/BOPLA):
-// - a member without `finance` never reads a client's notes, whichever route lists the client
-//   (`/clients`, `/search` and also `/contacts`);
+// - suppliers and clients' notes are financial: a member without `finance` gets 403 on `/contacts`
+//   (the web hides the supplier page behind `FinanceGate`; `/clients` and `/search` hide the notes);
 // - removing a member is the strongest revocation: a manager may not remove someone holding a key the
 //   manager does not hold ("ninguém revoga o que não tem");
 // - ids of another workspace, in the path or nested in a body, are "not found" and change nothing.
@@ -24,8 +24,8 @@ beforeEach(async () => {
 
 const SECRET_NOTE = 'Aurora: cobrar juros do atraso de setembro';
 
-describe('BOPLA: client notes are financial on every route', () => {
-  it('a member without `finance` gets the client notes as null from /contacts too', async () => {
+describe('BOPLA/BFLA: suppliers and client notes are financial on every route', () => {
+  it('a member without `finance` reads nothing through /contacts (suppliers, client notes)', async () => {
     const owner = await registerUser(app, 'Dona');
     const viewer = await member(app, owner, 'viewer', 'Colaboradora');
     const created = await owner.post('/clients', {
@@ -38,26 +38,34 @@ describe('BOPLA: client notes are financial on every route', () => {
     });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     const clientId = created.body.id as string;
-    expect((await owner.post('/contacts', { name: 'Fornecedor Aurora' })).status).toBe(201);
+    const supplier = await owner.post('/contacts', { name: 'Fornecedor Aurora', notes: 'Aurora: prazo de 30 dias' });
+    expect(supplier.status).toBe(201);
 
-    // The finance roles keep the notes.
+    // The finance roles keep the list, the notes included.
     const full = await owner.get('/contacts?kind=client');
     expect(full.status).toBe(200);
     expect(full.body.items).toEqual([expect.objectContaining({ id: clientId, notes: SECRET_NOTE })]);
 
-    // Without `finance`: the same client, without the notes (with or without `kind`, and by search).
-    for (const url of ['/contacts?kind=client', '/contacts', '/contacts?search=aurora']) {
+    // Without `finance`: 403 on every /contacts route (it used to list suppliers and the clients' notes).
+    for (const url of ['/contacts?kind=client', '/contacts', '/contacts?search=aurora', '/contacts?kind=supplier', `/contacts/${supplier.body.id}`]) {
       const res = await viewer.get(url);
-      expect(res.status, url).toBe(200);
-      const client = res.body.items.find((c: { id: string }) => c.id === clientId);
-      expect(client, url).toMatchObject({ id: clientId, kind: 'client', notes: null });
-      expect(JSON.stringify(res.body), url).not.toContain('cobrar juros');
+      expect(res.status, url).toBe(403);
+      expect(JSON.stringify(res.body), url).not.toMatch(/cobrar juros|prazo de 30 dias|Fornecedor Aurora/);
     }
-    // Suppliers stay visible to every member (finance-access.test.ts).
-    const suppliers = await viewer.get('/contacts?kind=supplier');
-    expect(suppliers.body.items.map((c: { name: string }) => c.name)).toEqual(['Fornecedor Aurora']);
+    expect((await viewer.post('/contacts', { name: 'Outro' })).status).toBe(403);
+    expect((await viewer.put(`/contacts/${supplier.body.id}`, { name: 'Tomado' })).status).toBe(403);
+    expect((await viewer.del(`/contacts/${supplier.body.id}`)).status).toBe(403);
+    // The client itself stays visible to the member through /clients, without the notes.
+    const client = await viewer.get(`/clients/${clientId}`);
+    expect(client.body).toMatchObject({ id: clientId, notes: null });
+
+    // A collaborator granted `finance` reads it all (the key, not the role, decides).
+    const granted = await owner.put(`/workspaces/current/members/${viewer.userId}/permissions`, { overrides: { finance: true } });
+    expect(granted.status, JSON.stringify(granted.body)).toBe(200);
+    const now = await viewer.get('/contacts?kind=client');
+    expect(now.status).toBe(200);
+    expect(now.body.items).toEqual([expect.objectContaining({ id: clientId, notes: SECRET_NOTE })]);
     // Clients are never read one by one through /contacts (suppliers only).
-    expect((await viewer.get(`/contacts/${clientId}`)).status).toBe(404);
     expect((await owner.get(`/contacts/${clientId}`)).status).toBe(404);
   });
 });

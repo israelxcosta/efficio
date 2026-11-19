@@ -4,6 +4,8 @@
 // - Errors: Drizzle puts every bound parameter of a failed query in the message (`params: …`), and
 //   Postgres errors quote offending values in `message`/`detail` (e-mails, names, documents…).
 
+import { maskIp } from './ip';
+
 const SAFE_QUERY_KEYS = new Set([
   'page',
   'pageSize',
@@ -115,7 +117,8 @@ export function serializeRequest(req: {
     method: req.method,
     url: sanitizeUrl(req.url),
     host: req.hostname,
-    remoteAddress: req.ip,
+    // Truncated like everywhere else (IPv4 /24, IPv6 /48): the full IP is personal data (LGPD).
+    remoteAddress: maskIp(req.ip) ?? undefined,
     remotePort: req.socket?.remotePort,
   };
 }

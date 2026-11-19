@@ -215,6 +215,26 @@ Atenção: a autorização do OneDrive dá acesso a **todo** o OneDrive da conta
 prefira uma conta Microsoft só para os backups. Os arquivos saem cifrados; sem a senha dos backups
 ninguém os lê.
 
+### 9.3.1 LGPD: retenção dos backups e transferência internacional
+
+- **Dados excluídos continuam nos backups por até 365 dias.** Excluir um cliente, contato, anexo
+  ou usuário no sistema não o apaga dos backups já feitos: ele some do servidor em até ~8 semanas
+  (14 diários + 8 semanais) e do Drive/OneDrive em até 60 dias (diários, `RCLONE_KEEP_DAYS`) e
+  **365 dias** (semanais). Registre esse prazo na política de privacidade e no registro de
+  operações (ROPA). Num pedido de eliminação (art. 18, VI), responda que os dados saem da base na
+  hora e dos backups cifrados quando eles vencerem, e que nunca voltam para a base ativa. Se um
+  backup antigo for restaurado, aplique de novo as exclusões feitas depois da data dele.
+- **Google Drive e OneDrive são transferência internacional de dados** (LGPD art. 33; Resolução
+  CD/ANPD nº 19/2024): os servidores do Google e da Microsoft ficam fora do Brasil. Os arquivos saem
+  cifrados (AES-256, a senha fica só com o escritório), mas a transferência existe mesmo assim.
+  Registre na política de privacidade e no ROPA o fornecedor, a finalidade (cópia de segurança), o
+  mecanismo (cláusulas contratuais padrão / termos de proteção de dados do fornecedor) e o prazo de
+  365 dias. Para evitar a transferência, use um destino no Brasil (por exemplo, um bucket S3 em
+  `sa-east-1` via rclone) e documente essa escolha.
+- Os logs de acesso do Caddy (`docker compose logs caddy`) não guardam tokens dos links, querystrings,
+  User-Agent, Referer nem cookies, e o IP fica truncado (/24 IPv4, /48 IPv6). A rotação local é de
+  5 arquivos de 10 MB por contêiner (`x-logging` no `docker-compose.prod.yml`).
+
 ### 9.4 Camadas extras
 
 - **Backups semanais do painel Hostinger** (do disco inteiro do VPS): mantenha ativos. São uma

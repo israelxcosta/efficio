@@ -5,7 +5,7 @@
 // transaction of the request (lib/scoped-context.ts); the public page reuses `loadDocument` and the
 // access/confirmation writers from `public.ts`.
 
-import { and, asc, count, desc, eq, inArray, max, min, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, lt, max, min, sql } from 'drizzle-orm';
 import {
   buildOnboardingDocument,
   formatOfficeAddress,
@@ -370,6 +370,7 @@ export async function createLink(
     to = input.channel === 'whatsapp' ? whatsappNumber(input.to!) : input.to!.trim().toLowerCase();
     if (!to) throw new ValidationError('Telefone inválido: informe DDD e número.');
   }
+  await purgeExpiredAccesses(ctx.db, ctx.workspaceId);
   const template = await templateRow(ctx.db, ctx.workspaceId);
   const days = normalizeOnboardingParams(template?.content).deadlines.linkDays;
   const token = randomToken(32);
@@ -522,12 +523,38 @@ export const ACCESS_DEDUP_MINUTES = 30;
 /** Upper bound of stored accesses per link (a link shared widely cannot fill the table). */
 export const MAX_ACCESSES_PER_LINK = 1000;
 
+/** Accesses of a link are kept this long after it expires (LGPD: minimization), then deleted. */
+export const ACCESS_RETENTION_MONTHS = 12;
+
+/**
+ * Deletes the accesses of the workspace's links expired more than {@link ACCESS_RETENTION_MONTHS} ago
+ * (one statement, inside the caller's tenant transaction). Runs whenever the workspace records an access
+ * or creates a link, so the clean-up costs nothing to schedule; returns how many rows went.
+ */
+export async function purgeExpiredAccesses(db: DbExecutor, workspaceId: string): Promise<number> {
+  const expired = db
+    .select({ id: onboardingLinks.id })
+    .from(onboardingLinks)
+    .where(
+      and(
+        eq(onboardingLinks.workspaceId, workspaceId),
+        lt(onboardingLinks.expiresAt, sql`now() - make_interval(months => ${ACCESS_RETENTION_MONTHS})`),
+      ),
+    );
+  const deleted = await db
+    .delete(onboardingAccesses)
+    .where(and(eq(onboardingAccesses.workspaceId, workspaceId), inArray(onboardingAccesses.linkId, expired)))
+    .returning({ id: onboardingAccesses.id });
+  return deleted.length;
+}
+
 export async function recordAccess(
   db: DbExecutor,
   workspaceId: string,
   linkId: string,
   visit: Pick<OnboardingAccessView, 'device' | 'browser' | 'os' | 'ip'>,
 ): Promise<void> {
+  await purgeExpiredAccesses(db, workspaceId);
   const scope = and(eq(onboardingAccesses.workspaceId, workspaceId), eq(onboardingAccesses.linkId, linkId));
   const [stats] = await db
     .select({

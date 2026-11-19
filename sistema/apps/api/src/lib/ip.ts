@@ -1,10 +1,20 @@
-/** Masks an IP for display/audit: IPv4 keeps 3 octets (189.6.12.x), IPv6 keeps 3 groups. */
+/**
+ * Masks an IP for display/audit/logs: IPv4 keeps 3 octets (189.6.12.x, a /24), IPv6 keeps the first 3
+ * groups of the expanded address (2804:14c:5b::x, a /48) — `2804::5` is `2804:0:0:x`, never `2804::5:x`
+ * (splitting the compressed text would keep the host part). Anything unparseable gives null.
+ */
 export function maskIp(ip: string | null | undefined): string | null {
   if (!ip) return null;
-  const v4 = ip.replace(/^::ffff:/, '');
+  const v4 = ip.replace(/^::ffff:/i, '');
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(v4)) return v4.split('.').slice(0, 3).join('.') + '.x';
-  if (ip.includes(':')) return ip.split(':').slice(0, 3).join(':') + ':x';
-  return null;
+  if (!ip.includes(':')) return null;
+  const groups = ipv6Groups(ip);
+  return groups
+    ? `${groups
+        .slice(0, 3)
+        .map((g) => g.toString(16))
+        .join(':')}:x`
+    : null;
 }
 
 /** First 200 chars of the User-Agent (enough to identify the device in the sessions list). */

@@ -37,9 +37,34 @@ www.{$DOMAIN} {
 
 {$DOMAIN} {
 	header -Server
+	# Log de acesso minimizado (LGPD art. 6º, III; OWASP Logging): sem tokens, IP truncado, sem cabeçalhos
+	# identificadores. Tokens no caminho (links de 30 dias do onboarding /o/<token>, convites
+	# /convite/<token>, as rotas públicas da API e o segredo do webhook do Open Finance) viram ***;
+	# toda querystring sai (o link de redefinir senha usa #fragmento, que nem chega ao servidor).
+	# Referer sai porque, com Referrer-Policy same-origin, os assets e chamadas /api feitos pela página
+	# /o/<token> carregam o token nele. IP: /24 (IPv4) e /48 (IPv6), o bastante para investigar abuso
+	# por rede; o IP completo para auditoria fica no audit_logs da API (com retenção própria).
 	log {
 		output stdout
-		format json
+		format filter {
+			wrap json
+			request>uri regexp "^/(o|convite|api/public/onboarding|api/invites|api/open-finance/webhooks/[^/?]+)/[^/?]+" "/${1}/***"
+			request>uri regexp "[?].*$" "?***"
+			request>remote_ip ip_mask {
+				ipv4 24
+				ipv6 48
+			}
+			request>client_ip ip_mask {
+				ipv4 24
+				ipv6 48
+			}
+			request>headers>User-Agent delete
+			request>headers>Referer delete
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+			request>headers>X-Forwarded-For delete
+			resp_headers>Set-Cookie delete
+		}
 	}
 
 	# API: a resposta já traz os cabeçalhos do helmet. Corpo até 15 MB (anexo de 10 MB em base64 no

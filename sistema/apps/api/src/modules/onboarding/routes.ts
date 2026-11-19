@@ -23,7 +23,7 @@ import { requirePermission } from '../../lib/permissions';
 import { rateLimited } from '../../lib/platform';
 import { requestContext } from '../../lib/request-context';
 import { memberGuards, runScoped } from '../../lib/scoped-context';
-import { confirmPublicOnboarding, openPublicOnboarding } from './public';
+import { confirmPublicOnboarding, openPublicOnboarding, userAgentSummary } from './public';
 import { createLink, getHistory, getOverrides, getTemplate, loadDocument, revokeLink, saveOverrides, saveTemplate } from './service';
 
 const office = { onRequest: requirePermission('office') };
@@ -126,8 +126,11 @@ export const publicOnboardingRoutes: FastifyPluginAsyncZod = async (app) => {
     { schema: { params: tokenParams, body: onboardingConfirmInputSchema }, config: rateLimited(app.platform, 10, '1 minute') },
     async (req) => {
       const result = await confirmPublicOnboarding(app.db, req.params.token, req.body, requestVisitor(req));
+      const context = requestContext(req);
       await audit(app.db, {
-        ...requestContext(req),
+        ...context,
+        // The summary only (like the accesses), never the client's full user agent.
+        userAgent: userAgentSummary(context.userAgent),
         action: ONBOARDING_AUDIT_ACTIONS.confirmed,
         workspaceId: result.workspaceId,
         userId: null,

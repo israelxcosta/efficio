@@ -72,6 +72,16 @@ export function summarizeUserAgent(ua: string | null | undefined): Pick<Onboardi
   return { device, browser, os };
 }
 
+/**
+ * The user agent as recorded in the audit trail of a public page: only the summary (browser, system,
+ * device), like the accesses — the full string fingerprints the client's device (LGPD: minimization).
+ */
+export function userAgentSummary(ua: string | null | undefined): string | null {
+  if (!ua) return null;
+  const { device, browser, os } = summarizeUserAgent(ua);
+  return [browser, os, device === 'unknown' ? null : device].filter(Boolean).join(' · ') || null;
+}
+
 interface Route {
   workspaceId: string;
   linkId: string;

@@ -45,7 +45,7 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/goals/:id/contributions` | — | `GoalContribution[]` |
 | POST | `/api/goals/:id/contributions` | `goalContributionInputSchema` | `GoalContribution` (201) |
 | DELETE | `/api/goals/:id/contributions/:contributionId` | — | 204 |
-| GET | `/api/contacts` | `contactQuerySchema` (`kind`: `client` \| `supplier`; sem `kind` = ambos, para seletores) | `Paginated<Contact>` |
+| GET | `/api/contacts` | `contactQuerySchema` (`kind`: `client` \| `supplier`; sem `kind` = ambos, para seletores) | `Paginated<Contact>` — todo `/api/contacts` exige `finance`, leitura inclusive (fornecedores são financeiros, como no web e na busca): sem a chave, 403 |
 | GET | `/api/contacts/:id` | — | `Contact` (só fornecedores) |
 | POST | `/api/contacts` | `contactInputSchema` | `Contact` (201) — cria um fornecedor |
 | PUT | `/api/contacts/:id` | `contactInputSchema` | `Contact` (só fornecedores; cliente → 404) |
@@ -588,7 +588,7 @@ Uma instância da API com PostgreSQL e Caddy na mesma máquina (kit em `deploy/`
 | PATCH | `/api/workspaces/current/members/:userId` | `memberRoleSchema` | `Member` (`members`; ninguém concede o que não tem) |
 | GET | `/api/workspaces/current/members/:userId/permissions` | — | `MemberPermissions` (`members`; fase 3) |
 | PUT | `/api/workspaces/current/members/:userId/permissions` | `memberPermissionsInputSchema` (`role?`, `overrides`) | `MemberPermissions` (`members`; 402 sem assinatura; fase 3) |
-| DELETE | `/api/workspaces/current/members/:userId` | `memberRemovalQuerySchema` (`?replacementId=`) | 204 (`members` remove; membro pode sair). Com tarefas abertas/recorrentes/etapas no nome dele e sem `replacementId`: 409 `details: MemberHandoverCounts` (migração 0024) |
+| DELETE | `/api/workspaces/current/members/:userId` | `memberRemovalQuerySchema` (`?replacementId=`) | 204 (`members` remove; membro pode sair). Remover outra pessoa exige ter **todas** as chaves efetivas dela (ninguém revoga o que não tem; o proprietário tem todas): senão 403 `details: { keys: PermissionKey[] }` com as chaves que faltam ("Você não pode remover quem tem uma permissão que você não tem: …"). Com tarefas abertas/recorrentes/etapas no nome dele e sem `replacementId`: 409 `details: MemberHandoverCounts` (migração 0024) |
 | GET | `/api/workspaces/current/invites` | — | `Invite[]` (`members`) |
 | POST | `/api/workspaces/current/invites` | `inviteInputSchema` | `Invite` (201, `members`; o papel convidado não pode dar o que quem convida não tem) |
 | DELETE | `/api/workspaces/current/invites/:id` | — | 204 (`members`) |
