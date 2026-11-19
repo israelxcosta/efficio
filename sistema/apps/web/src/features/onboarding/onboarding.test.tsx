@@ -298,7 +298,7 @@ describe('Enviar onboarding', () => {
       ),
     );
     expect(
-      mail.startsWith(
+      mail!.startsWith(
         'mailto:marina@padaria.com.br?subject=Onboarding%20%C2%B7%20P%C3%A3o%20Quente&body=',
       ),
     ).toBe(true);

@@ -135,7 +135,7 @@ export const dateRangeQuerySchema = z
 
 export const registerSchema = z.object({
   name: requiredName(80),
-  email: z.email({ message: 'E-mail inválido' }).trim().toLowerCase(),
+  email: z.email({ message: 'E-mail inválido' }).trim().toLowerCase().max(254, { message: 'E-mail inválido' }),
   password: z
     .string()
     .min(10, { message: 'A senha deve ter ao menos 10 caracteres' })
@@ -155,8 +155,9 @@ export const registerSchema = z.object({
 export type RegisterInput = z.input<typeof registerSchema>;
 
 export const loginSchema = z.object({
-  email: z.email({ message: 'E-mail inválido' }).trim().toLowerCase(),
-  password: z.string().min(1, { message: 'Informe a senha' }),
+  email: z.email({ message: 'E-mail inválido' }).trim().toLowerCase().max(254, { message: 'E-mail inválido' }),
+  // Bounded like `currentPasswordSchema` (saas.ts): the hash must not run over a megabyte of input.
+  password: z.string().min(1, { message: 'Informe a senha' }).max(1024, { message: 'Senha muito longa' }),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
@@ -265,7 +266,7 @@ export type GoalContributionInput = z.input<typeof goalContributionInputSchema>;
 
 const optionalEmail = () =>
   z
-    .union([z.email({ message: 'E-mail inválido' }), z.literal('')])
+    .union([z.email({ message: 'E-mail inválido' }).max(254, { message: 'E-mail inválido' }), z.literal('')])
     .nullish()
     .transform((v) => (v ? v.toLowerCase() : null));
 

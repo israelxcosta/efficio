@@ -1,6 +1,6 @@
 // Log hygiene (LGPD): request lines and errors must not carry personal data or secrets.
 // - URLs: only known, non-personal query parameters keep their values (`/search?q=<CPF>` does not),
-//   and invite tokens and webhook secrets in paths are masked.
+//   and invite/onboarding tokens and webhook secrets in paths are masked.
 // - Errors: Drizzle puts every bound parameter of a failed query in the message (`params: …`), and
 //   Postgres errors quote offending values in `message`/`detail` (e-mails, names, documents…).
 
@@ -38,6 +38,9 @@ export function sanitizeUrl(url: string | undefined): string | undefined {
   const q = url.indexOf('?');
   const path = (q < 0 ? url : url.slice(0, q))
     .replace(/(\/invites\/)[^/?]+/, '$1[token]')
+    // The public onboarding link (`/o/<token>`): whoever holds it opens the client's document and can
+    // sign the "Li e entendi" in the client's name.
+    .replace(/(\/public\/onboarding\/)[^/?]+/, '$1[token]')
     // The CNPJ lookup (who the office's clients are).
     .replace(/(\/cnpj\/)[^/?]+/, '$1[cnpj]')
     // Open Finance webhooks authenticate with a secret path segment.

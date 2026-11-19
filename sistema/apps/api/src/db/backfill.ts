@@ -23,10 +23,15 @@ import {
 import { getCipher } from '../lib/crypto/keyring';
 import { isEncrypted } from '../lib/crypto/field-cipher';
 import { withTenant } from '../lib/tenant';
-import { CONTACT_ENCRYPTED_FIELDS, encryptContactInput, responsibleNameIndex } from '../modules/contacts/service';
+import { CONTACT_ALL_ENCRYPTED_FIELDS, CONTACT_ENCRYPTED_FIELDS, encryptContactInput, responsibleNameIndex } from '../modules/contacts/service';
 import { encryptTaskText, TASK_COMMENT_TEXT, TASK_DESCRIPTION } from '../modules/tasks/encrypted-text';
 
-const pendingWorkspaces = or(isNull(workspaces.wrappedKey), isNull(workspaces.encryptionBackfilledAt));
+const CLIENT_ONLY_ENCRYPTED_FIELDS = CONTACT_ALL_ENCRYPTED_FIELDS.filter(
+  (f): f is Exclude<(typeof CONTACT_ALL_ENCRYPTED_FIELDS)[number], (typeof CONTACT_ENCRYPTED_FIELDS)[number]> =>
+    !(CONTACT_ENCRYPTED_FIELDS as readonly string[]).includes(f),
+);
+
+const pendingWorkspaces =or(isNull(workspaces.wrappedKey), isNull(workspaces.encryptionBackfilledAt));
 
 export async function backfillEncryption(db: DbExecutor): Promise<{ workspaces: number; rows: number }> {
   const pending = await db.select({ id: workspaces.id }).from(workspaces).where(pendingWorkspaces);
@@ -38,13 +43,24 @@ export async function backfillEncryption(db: DbExecutor): Promise<{ workspaces: 
       const plain = (v: string | null) => v !== null && v !== '' && !isEncrypted(v);
 
       for (const c of await tx.select().from(contacts)) {
-        if (!CONTACT_ENCRYPTED_FIELDS.some((f) => plain(c[f])) && (c.documentHash || !c.document)) continue;
-        const decrypted = { ...c };
-        for (const f of CONTACT_ENCRYPTED_FIELDS) {
-          if (isEncrypted(c[f])) decrypted[f] = await cipher.decrypt('contacts', f, c[f]);
+        // Client-only encrypted fields (responsible person, inactivation notes): migration 0026 refuses
+        // clear text in any of them, so they are encrypted in the same UPDATE as the supplier fields.
+        const clientOnly: Partial<Record<(typeof CLIENT_ONLY_ENCRYPTED_FIELDS)[number], string | null>> = {};
+        for (const f of CLIENT_ONLY_ENCRYPTED_FIELDS) {
+          if (plain(c[f])) clientOnly[f] = await cipher.encrypt('contacts', f, c[f]);
         }
-        const { id: contactId, workspaceId: _w, createdAt: _c, documentHash: _h, ...input } = decrypted;
-        await tx.update(contacts).set(await encryptContactInput(cipher, { ...input, name: c.name })).where(eq(contacts.id, contactId));
+        const mainPending = CONTACT_ENCRYPTED_FIELDS.some((f) => plain(c[f])) || (!c.documentHash && !!c.document);
+        if (!mainPending && Object.keys(clientOnly).length === 0) continue;
+        let main = {};
+        if (mainPending) {
+          const decrypted = { ...c };
+          for (const f of CONTACT_ENCRYPTED_FIELDS) {
+            if (isEncrypted(c[f])) decrypted[f] = await cipher.decrypt('contacts', f, c[f]);
+          }
+          const { id: _id, workspaceId: _w, createdAt: _c, documentHash: _h, ...input } = decrypted;
+          main = await encryptContactInput(cipher, { ...input, name: c.name });
+        }
+        await tx.update(contacts).set({ ...main, ...clientOnly }).where(eq(contacts.id, c.id));
         n++;
       }
       // Blind index of the responsible name of clients saved before 0022 (exact search).

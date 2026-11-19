@@ -741,17 +741,22 @@ classificação de segredo) ou filtre o caminho no envio.
 - CI (`.github/workflows/ci.yml` na raiz do repositório, rodando dentro de `sistema/`; em todo PR e push na `main` e em `claude/**`): token só `contents: read`, actions
   fixadas por SHA, `pnpm install --frozen-lockfile`, typecheck, testes com Postgres, builds (falha
   se houver sourcemap no web), `pnpm audit`, gitleaks no histórico inteiro (`.gitleaks.toml`) e
-  build da imagem com checagens (UID 10001, FS somente leitura, sem npm, sem seed, CA presente).
+  build da imagem com checagens (UID 10001, FS somente leitura, sem npm, sem seed, CA presente,
+  HEALTHCHECK), osv-scanner no lockfile (OSV.dev, inclui pacotes maliciosos `MAL-*`) com SBOM
+  CycloneDX como artefato (30 dias) e o kit do VPS (`deploy-kit`). Binários baixados no CI
+  (gitleaks, osv-scanner) têm SHA-256 fixado.
   Dependabot (`.github/dependabot.yml`) mantém SHAs, digests e dependências atualizados.
-- No GitHub: proteção da `main` (PR com revisão, checks obrigatórios `verify`/`audit`/`secrets`/
-  `image`), CODEOWNERS para `apps/api/Dockerfile`, `.github/`, `pnpm-workspace.yaml`,
+- No GitHub: proteção da `main` (PR com revisão, checks obrigatórios `verify`/`audit`/`osv`/
+  `secrets`/`image`/`deploy-kit`), CODEOWNERS para `apps/api/Dockerfile`, `.github/`, `pnpm-workspace.yaml`,
   `pnpm-lock.yaml` e `docs/deploy-aws.md`; secret scanning com *push protection*; Dependabot alerts;
   *private vulnerability reporting*.
 - Deploy (workflow separado, a criar): `environment: production` com aprovação obrigatória,
   `permissions: { id-token: write, contents: read }`, credenciais AWS por **OIDC** (sem access keys
   em secrets). Trust policy da role de deploy:
   `token.actions.githubusercontent.com:aud = sts.amazonaws.com` e
-  `token.actions.githubusercontent.com:sub = repo:israelxcosta/effinance:environment:production`.
+  `token.actions.githubusercontent.com:sub = repo:israelxcosta/efficio:environment:production`
+  (condição `StringEquals`, nunca `StringLike` com curinga: o repositório é o `efficio`, não o
+  `effinance` de origem).
   Permissões só para: push no repositório ECR, `ecs:RegisterTaskDefinition`, `ecs:UpdateService` e
   `ecs:RunTask` (migração) nos recursos do Effinance, `iam:PassRole` nas quatro roles com
   `iam:PassedToService = ecs-tasks.amazonaws.com`, `s3:PutObject/DeleteObject` no bucket web e

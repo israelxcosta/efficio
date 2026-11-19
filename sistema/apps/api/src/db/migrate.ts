@@ -13,7 +13,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export const migrationsFolder = path.resolve(here, here.endsWith(path.join('src', 'db')) ? '../../drizzle' : '../drizzle');
 
 export async function runMigrations(url?: string) {
-  const { db, client } = createDb(url);
+  const { db, client } = createDb(url, { purpose: 'migrator' });
   try {
     await migrate(db, { migrationsFolder });
     if (await needsBackfill(db)) {

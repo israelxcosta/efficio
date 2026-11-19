@@ -183,6 +183,13 @@
       "when": 1794965216757,
       "tag": "0025_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795109434040,
+      "tag": "0026_db_security_hardening",
+      "breakpoints": true
     }
   ]
 }

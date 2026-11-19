@@ -12,11 +12,28 @@ function sslOptions(): postgres.Options<Record<string, never>>['ssl'] {
   return env.DATABASE_SSL === 'require' ? 'require' : false;
 }
 
-export function createDb(url: string = env.DATABASE_URL) {
+/**
+ * Session limits of the API connections, sent at connection start (they win over `ALTER ROLE … SET`,
+ * so they are never looser than docs/deploy-aws.md and deploy/db-init): a transaction left open by a
+ * bug or a slow external call is ended by the server after 30 s instead of holding locks and a pooled
+ * connection; tenant transactions still pin their own statement_timeout (lib/tenant.ts).
+ */
+export const RUNTIME_SESSION_SETTINGS = {
+  application_name: 'efficio-api',
+  idle_in_transaction_session_timeout: '30s',
+} as const;
+
+export interface CreateDbOptions {
+  /** `migrator`: DDL, backfill and VACUUM can legitimately run long — no session limits. */
+  purpose?: 'runtime' | 'migrator';
+}
+
+export function createDb(url: string = env.DATABASE_URL, options: CreateDbOptions = {}) {
   const client = postgres(url, {
     max: env.NODE_ENV === 'test' ? 4 : 10,
     ssl: sslOptions(),
     onnotice: () => {},
+    connection: options.purpose === 'migrator' ? { application_name: 'efficio-migrate' } : { ...RUNTIME_SESSION_SETTINGS },
   });
   const db = drizzle(client, { schema, casing: 'snake_case' });
   return { db, client };

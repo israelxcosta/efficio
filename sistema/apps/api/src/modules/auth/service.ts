@@ -121,10 +121,42 @@ export async function register(
   }
 }
 
-export async function checkPassword(db: DbExecutor, input: LoginInput): Promise<UserRow> {
+/**
+ * Failed password checks per account within {@link LOGIN_FAILURE_WINDOW_MINUTES}, whatever the source IP
+ * (the per-IP limit alone lets a botnet guess one account's password at will; NIST SP 800-63B 5.2.2).
+ * Counted since the last password change too: a reset or change frees the account at once.
+ */
+export const LOGIN_MAX_FAILURES = 20;
+export const LOGIN_FAILURE_WINDOW_MINUTES = 15;
+export const LOGIN_FAILED_ACTION = 'auth.login_failed';
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+export const LOGIN_FAILED_MESSAGE = 'E-mail ou senha incorretos';
+
+/**
+ * Checks e-mail and password and records a failure (`auth.login_failed`, with the account when there is
+ * one). An account over its failure budget answers exactly like a wrong password — even to the right
+ * one — so the lock tells nobody whether the e-mail has an account, and the guessing gains nothing.
+ * Unknown and known e-mails run the same queries and one password hash (no timing difference).
+ */
+export async function checkPassword(db: DbExecutor, input: LoginInput, ctx: AuditContext = {}): Promise<UserRow> {
   const [row] = await db.select().from(users).where(eq(users.email, input.email));
-  const ok = await verifyPassword(input.password, row?.passwordHash ?? (await timingGuardHash()));
-  if (!row || !ok) throw new UnauthorizedError('E-mail ou senha incorretos');
+  const [failures] = await db
+    .select({ n: count() })
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.userId, row?.id ?? NIL_UUID),
+        eq(auditLogs.action, LOGIN_FAILED_ACTION),
+        gt(auditLogs.createdAt, sql`now() - make_interval(mins => ${LOGIN_FAILURE_WINDOW_MINUTES})`),
+        gt(auditLogs.createdAt, row?.passwordChangedAt ?? new Date(0)),
+      ),
+    );
+  const locked = (failures?.n ?? 0) >= LOGIN_MAX_FAILURES;
+  const ok = await verifyPassword(input.password, row && !locked ? row.passwordHash : await timingGuardHash());
+  if (!row || locked || !ok) {
+    await audit(db, { ...ctx, action: LOGIN_FAILED_ACTION, userId: row?.id ?? null, metadata: locked ? { locked: true } : null });
+    throw new UnauthorizedError(LOGIN_FAILED_MESSAGE);
+  }
   return row;
 }
 

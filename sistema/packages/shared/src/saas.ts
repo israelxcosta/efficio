@@ -322,13 +322,21 @@ export const newPasswordSchema = z
   .max(128, { message: 'Senha muito longa' })
   .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), { message: 'Use letras e números' });
 
+/**
+ * A password typed to prove who one is (login, re-authentication): no strength rule (accounts may
+ * predate the current policy), but bounded — the hash must not run over a megabyte of input.
+ */
+export const currentPasswordSchema = (message = 'Informe a senha') =>
+  z.string().min(1, { message }).max(1024, { message: 'Senha muito longa' });
+
 const totpCode = z
   .string()
+  .max(64, { message: 'Código inválido' })
   .trim()
   .regex(/^(\d{6}|[A-Za-z0-9]{4}-[A-Za-z0-9]{4})$/, { message: 'Código inválido' });
 
 export const mfaVerifySchema = z.object({
-  mfaToken: z.string().min(10),
+  mfaToken: z.string().min(10).max(2048),
   /** 6-digit TOTP code or a recovery code (xxxx-xxxx). */
   code: totpCode,
 });
@@ -345,24 +353,24 @@ export const mfaCodeSchema = z.object({
 export type MfaCodeInput = z.infer<typeof mfaCodeSchema>;
 
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, { message: 'Informe a senha atual' }),
+  currentPassword: currentPasswordSchema('Informe a senha atual'),
   newPassword: newPasswordSchema,
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export const forgotPasswordSchema = z.object({
-  email: z.email({ message: 'E-mail inválido' }).trim().toLowerCase(),
+  email: z.email({ message: 'E-mail inválido' }).trim().toLowerCase().max(254, { message: 'E-mail inválido' }),
 });
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 
 export const resetPasswordSchema = z.object({
-  token: z.string().min(20),
+  token: z.string().min(20).max(200),
   password: newPasswordSchema,
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export const deleteAccountSchema = z.object({
-  password: z.string().min(1, { message: 'Informe sua senha' }),
+  password: currentPasswordSchema('Informe sua senha'),
 });
 export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 
@@ -387,7 +395,7 @@ export const deleteWorkspaceSchema = z.object({
 });
 
 export const inviteInputSchema = z.object({
-  email: z.email({ message: 'E-mail inválido' }).trim().toLowerCase(),
+  email: z.email({ message: 'E-mail inválido' }).trim().toLowerCase().max(254, { message: 'E-mail inválido' }),
   role: z.enum(['editor', 'viewer']),
 });
 export type InviteInput = z.infer<typeof inviteInputSchema>;

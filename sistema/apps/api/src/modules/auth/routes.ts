@@ -57,6 +57,9 @@ import {
   setSessionWorkspace,
 } from './sessions';
 
+/** Minimum duration of `POST /auth/password/forgot`, whether or not the e-mail has an account. */
+export const FORGOT_PASSWORD_MIN_MS = 250;
+
 const relaxed = env.NODE_ENV === 'test';
 const limit = (max: number, timeWindow = '1 minute') => ({ rateLimit: { max: relaxed ? 1000 : max, timeWindow } });
 
@@ -93,13 +96,8 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   });
 
   app.post('/login', { schema: { body: loginSchema }, config: limit(10) }, async (req, reply) => {
-    let user: UserRow;
-    try {
-      user = await checkPassword(app.db, req.body);
-    } catch (error) {
-      await audit(app.db, { ...requestContext(req), action: 'auth.login_failed' });
-      throw error;
-    }
+    // Records the failure itself (with the account, for the per-account budget).
+    const user = await checkPassword(app.db, req.body, requestContext(req));
     if (user.mfaEnabled) {
       return { mfaRequired: true, mfaToken: await signMfaToken(reply, user.id) } satisfies MfaChallengeResponse;
     }
@@ -173,7 +171,16 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   });
 
   app.post('/password/forgot', { schema: { body: forgotPasswordSchema }, config: limit(5, '15 minutes') }, async (req, reply) => {
-    const result = await requestPasswordReset(app.db, req.body.email, requestContext(req));
+    const started = performance.now();
+    let result: Awaited<ReturnType<typeof requestPasswordReset>>;
+    try {
+      result = await requestPasswordReset(app.db, req.body.email, requestContext(req));
+    } finally {
+      // An existing account costs several more queries (budget, token, audit) than an unknown e-mail:
+      // every answer takes at least the same time, so the duration does not tell them apart (CWE-208).
+      const wait = FORGOT_PASSWORD_MIN_MS - (performance.now() - started);
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    }
     if (result) {
       const link = passwordResetLink(app.platform.appUrl, result.token);
       // Not awaited: the answer must take the same time whether or not the e-mail has an account

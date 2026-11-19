@@ -19,6 +19,7 @@ import { setSecurityLogSink } from './lib/audit';
 import { authPlugin } from './lib/auth';
 import { configureKeyring } from './lib/crypto/keyring';
 import { AppError, ForbiddenError, fromDatabaseError } from './lib/errors';
+import { rateLimitKey } from './lib/ip';
 import { serializeError, serializeRequest } from './lib/log';
 import { auditLogRetentionMonths, billingEnabled, type Platform } from './lib/platform';
 import { tenantRoutes } from './lib/tenant-routes';
@@ -160,7 +161,8 @@ export async function buildApp(options: BuildAppOptions = {}) {
     if (!reply.hasHeader('cache-control')) reply.header('cache-control', 'no-store');
     return payload;
   });
-  await app.register(rateLimit, { global: false, ...(redis ? { redis } : {}) });
+  // Keyed per client IP, an IPv6 client per /64 (it controls the whole prefix): lib/ip.ts.
+  await app.register(rateLimit, { global: false, keyGenerator: (req) => rateLimitKey(req.ip), ...(redis ? { redis } : {}) });
 
   // CSRF: cookies are SameSite, and in addition every state-changing request must come from an
   // allowed origin (when the browser says where it comes from) and carry JSON — a cross-site form

@@ -97,6 +97,9 @@ const workspaceRef = () => uuid().references(() => workspaces.id, { onDelete: 'c
 const tenantUnique = (table: string, t: { workspaceId: AnyPgColumn; id: AnyPgColumn }) =>
   unique(`${table}_workspace_id_id_uq`).on(t.workspaceId, t.id);
 
+/** `v1.<iv>.<ct>` of FieldCipher (same shape as ENCRYPTED_TEXT_PATTERN below; used by contacts, 0026). */
+const ENCRYPTED_FIELD_PATTERN = '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$';
+
 // ---------------------------------------------------------------------------
 // Identity, tenancy and billing (not tenant-scoped: never touched inside a tenant transaction)
 // ---------------------------------------------------------------------------
@@ -564,6 +567,19 @@ export const contacts = pgTable(
       'contacts_secrets_chk',
       sql`${t.responsibleDocument} ~ '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$' and length(${t.responsibleDocument}) <= 200 and ${t.simplesAccessCode} ~ '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$' and length(${t.simplesAccessCode}) <= 1200 and ${t.accountantPassword} ~ '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$' and length(${t.accountantPassword}) <= 1200`,
     ),
+    // Migration 0026 (NOT VALID: legacy rows are encrypted by the backfill of `db:migrate`): every field
+    // the API encrypts (CONTACT_ALL_ENCRYPTED_FIELDS) is ciphertext or empty, never clear text; the blind
+    // indexes are HMAC-SHA-256 in hex (a CPF/CNPJ written there by mistake is refused).
+    check(
+      'contacts_encrypted_fields_chk',
+      sql.join(
+        [t.document, t.email, t.phone, t.zipCode, t.street, t.number, t.complement, t.district, t.notes, t.responsibleName, t.responsibleEmail, t.responsiblePhone, t.inactivationNotes].map(
+          (c) => sql`(${c} = '' or ${c} ~ ${sql.raw(`'${ENCRYPTED_FIELD_PATTERN}'`)})`,
+        ),
+        sql` and `,
+      ),
+    ),
+    check('contacts_blind_index_chk', sql`${t.documentHash} ~ '^[0-9a-f]{64}$' and ${t.responsibleNameHash} ~ '^[0-9a-f]{64}$'`),
   ],
 );
 

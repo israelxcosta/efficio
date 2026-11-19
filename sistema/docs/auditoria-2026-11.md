@@ -37,8 +37,9 @@ mailer SMTP (TLS verificado), logs sem dados pessoais, cabeçalhos e CSP do Cadd
 - O backup (cifrado) contém nomes, e-mails, valores e descrições em texto claro dentro do arquivo cifrado; as
   senhas dos clientes e documentos vão cifrados e não abrem sem a chave mestra.
 - Usuário `efficio` do servidor está no grupo docker (equivale a root).
-- `picomatch` (GHSA-fc5q-39xc-vjpf, 17/11/2026): sem versão corrigida; só usado para montar o sistema (tsup),
-  nunca em execução. Exceção em `pnpm-workspace.yaml` (`auditConfig.ignoreGhsas`); remover quando sair a correção.
+- `picomatch` (GHSA-fc5q-39xc-vjpf, 17/11/2026): exceção **removida em 19/11/2026**. O banco de advisories do
+  npm deixou de apontar o 4.0.7 (versão do lockfile) como vulnerável, e `pnpm audit` passa sem nenhum
+  `auditConfig.ignoreGhsas`. O CI também roda osv-scanner (OSV.dev) no lockfile como segunda fonte.
 
 ## 2. Funções — teste de ponta a ponta (10 fluxos)
 

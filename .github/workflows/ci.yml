@@ -5,7 +5,9 @@
 # - third-party actions pinned by full commit SHA (tag in the comment), container images by digest,
 #   downloaded binaries verified by SHA-256;
 # - pnpm version + hash from package.json#packageManager, `--frozen-lockfile`, no dependency cache
-#   (avoids cache poisoning; enable `package-manager-cache` only if install time matters).
+#   (avoids cache poisoning; enable `package-manager-cache` only if install time matters);
+# - dependency scanning from two sources (`pnpm audit` = GitHub advisories, osv-scanner = OSV.dev
+#   incl. OpenSSF malicious packages) + CycloneDX SBOM artifact; full-history gitleaks scan.
 # Keep pins current with Dependabot (.github/dependabot.yml).
 #
 # The app lives in `sistema/` (the git root also holds the old static site): every job runs there
@@ -104,6 +106,44 @@ jobs:
       - name: pnpm audit
         run: pnpm audit
 
+  osv:
+    name: OSV scan and SBOM (lockfile)
+    # Second, independent source: OSV.dev aggregates the GitHub advisories plus the OpenSSF
+    # malicious-packages feed (MAL-*), which `pnpm audit` does not cover. No install, no secrets:
+    # only pnpm-lock.yaml is read. The CycloneDX SBOM (package names + versions) is kept as an
+    # artifact for incident response ("are we affected by X?").
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      OSV_SCANNER_VERSION: 2.7.1
+      OSV_SCANNER_SHA256: fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install osv-scanner (checksum verified)
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/osv-scanner" \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+      - name: osv-scanner (fails on any known vulnerability or malicious package)
+        run: '"$RUNNER_TEMP/osv-scanner" scan source --lockfile=pnpm-lock.yaml'
+      - name: CycloneDX SBOM
+        # Exit code 1 only means "vulnerabilities found" (already gated above); anything else fails.
+        run: |
+          "$RUNNER_TEMP/osv-scanner" scan source --lockfile=pnpm-lock.yaml \
+            --format=cyclonedx-1-5 --output="$RUNNER_TEMP/sbom-npm.cdx.json" || test $? -eq 1
+          test -s "$RUNNER_TEMP/sbom-npm.cdx.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-npm-cyclonedx
+          path: ${{ runner.temp }}/sbom-npm.cdx.json
+          retention-days: 30
+          if-no-files-found: error
+
   secrets:
     name: Secret scan (full history)
     runs-on: ubuntu-24.04
@@ -153,6 +193,7 @@ jobs:
             if command -v npm || command -v corepack; then echo "package manager in runtime image"; exit 1; fi
             if touch dist/probe 2>/dev/null; then echo "application files are writable"; exit 1; fi
           '
+          test -n "$(docker image inspect -f '{{if .Config.Healthcheck}}{{.Config.Healthcheck.Test}}{{end}}' effinance-api:ci)"
 
   deploy-kit:
     name: VPS kit (compose, scripts, web image)
