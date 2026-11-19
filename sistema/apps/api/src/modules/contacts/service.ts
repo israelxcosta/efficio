@@ -161,7 +161,7 @@ export async function updateContact(db: DbExecutor, workspaceId: string, id: str
   const [row] = await db
     .update(contacts)
     .set(await encryptContactInput(cipher, input))
-    .where(eq(contacts.id, id))
+    .where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.id, id)))
     .returning();
   return toContact(cipher, row!);
 }
@@ -181,5 +181,5 @@ export async function detachContactFromSeries(db: DbExecutor, workspaceId: strin
 export async function deleteContact(db: DbExecutor, workspaceId: string, id: string) {
   await getSupplierOrThrow(db, workspaceId, id);
   await detachContactFromSeries(db, workspaceId, id);
-  await db.delete(contacts).where(eq(contacts.id, id));
+  await db.delete(contacts).where(and(eq(contacts.workspaceId, workspaceId), eq(contacts.id, id)));
 }

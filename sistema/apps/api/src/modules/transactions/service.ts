@@ -306,7 +306,7 @@ async function insertTransaction(
     await tx
       .update(transactions)
       .set(paidFields(input.date))
-      .where(and(eq(transactions.recurrenceId, series!.id), eq(transactions.occurrenceIndex, 0)));
+      .where(and(eq(transactions.workspaceId, series!.workspaceId), eq(transactions.recurrenceId, series!.id), eq(transactions.occurrenceIndex, 0)));
   }
   const rows = await tx
     .select({ id: transactions.id })
@@ -415,6 +415,7 @@ export async function updateTransaction(
     if (Object.keys(seriesPatch).length === 0) return;
 
     const siblingsWhere = and(
+      eq(transactions.workspaceId, workspaceId),
       eq(transactions.recurrenceId, row.recurrenceId),
       ne(transactions.id, row.id),
       eq(transactions.paid, false),
@@ -430,19 +431,22 @@ export async function updateTransaction(
         await tx
           .update(transactions)
           .set({ ...seriesPatch, invoiceMonth: invoiceMonthFor(card, s.date) })
-          .where(eq(transactions.id, s.id));
+          .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, s.id)));
       }
     } else {
       await tx.update(transactions).set(seriesPatch).where(siblingsWhere);
     }
 
     // Future materializations follow the new values.
-    const [series] = await tx.select().from(recurrences).where(eq(recurrences.id, row.recurrenceId));
+    const [series] = await tx
+      .select()
+      .from(recurrences)
+      .where(and(eq(recurrences.workspaceId, workspaceId), eq(recurrences.id, row.recurrenceId)));
     if (series) {
       await tx
         .update(recurrences)
         .set({ template: { ...series.template, ...seriesPatch } })
-        .where(eq(recurrences.id, series.id));
+        .where(and(eq(recurrences.workspaceId, workspaceId), eq(recurrences.id, series.id)));
     }
   });
 
@@ -682,14 +686,16 @@ export async function deleteTransaction(
     // A row synced from Open Finance must not come back with the next sync.
     await addTombstones(tx, workspaceId, [row]);
     if (scope === 'one' || !row.recurrenceId) {
-      await tx.delete(transactions).where(eq(transactions.id, row.id));
-      if (row.recurrenceId) await cleanupSeries(tx, row.recurrenceId);
+      await tx.delete(transactions).where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, row.id)));
+      if (row.recurrenceId) await cleanupSeries(tx, workspaceId, row.recurrenceId);
       return;
     }
 
     if (scope === 'all') {
-      await tx.delete(transactions).where(eq(transactions.recurrenceId, row.recurrenceId));
-      await tx.delete(recurrences).where(eq(recurrences.id, row.recurrenceId));
+      await tx
+        .delete(transactions)
+        .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.recurrenceId, row.recurrenceId)));
+      await tx.delete(recurrences).where(and(eq(recurrences.workspaceId, workspaceId), eq(recurrences.id, row.recurrenceId)));
       return;
     }
 
@@ -699,6 +705,7 @@ export async function deleteTransaction(
       .delete(transactions)
       .where(
         and(
+          eq(transactions.workspaceId, workspaceId),
           eq(transactions.recurrenceId, row.recurrenceId),
           or(
             eq(transactions.id, row.id),
@@ -706,8 +713,11 @@ export async function deleteTransaction(
           ),
         ),
       );
-    await tx.update(recurrences).set({ nextDate: null }).where(eq(recurrences.id, row.recurrenceId));
-    await cleanupSeries(tx, row.recurrenceId);
+    await tx
+      .update(recurrences)
+      .set({ nextDate: null })
+      .where(and(eq(recurrences.workspaceId, workspaceId), eq(recurrences.id, row.recurrenceId)));
+    await cleanupSeries(tx, workspaceId, row.recurrenceId);
   });
 }
 
@@ -755,25 +765,26 @@ export async function anticipateInstallments(
   await db
     .update(transactions)
     .set({ date, invoiceMonth, updatedAt: new Date() })
-    .where(inArray(transactions.id, chosen.map((t) => t.id)));
+    .where(and(eq(transactions.workspaceId, workspaceId), inArray(transactions.id, chosen.map((t) => t.id))));
 
   const moved = await db
     .select()
     .from(transactions)
-    .where(inArray(transactions.id, chosen.map((t) => t.id)))
+    .where(and(eq(transactions.workspaceId, workspaceId), inArray(transactions.id, chosen.map((t) => t.id))))
     .orderBy(asc(transactions.installmentNumber));
   return toTransactions(db, moved);
 }
 
 /** Removes a series that no longer has occurrences nor anything left to generate. */
-async function cleanupSeries(db: DbExecutor, recurrenceId: string) {
-  const [series] = await db.select().from(recurrences).where(eq(recurrences.id, recurrenceId));
+async function cleanupSeries(db: DbExecutor, workspaceId: string, recurrenceId: string) {
+  const ofSeries = and(eq(recurrences.workspaceId, workspaceId), eq(recurrences.id, recurrenceId));
+  const [series] = await db.select().from(recurrences).where(ofSeries);
   if (!series || series.nextDate) return;
   const [left] = await db
     .select({ id: transactions.id })
     .from(transactions)
-    .where(eq(transactions.recurrenceId, recurrenceId))
+    .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.recurrenceId, recurrenceId)))
     .limit(1);
-  if (!left) await db.delete(recurrences).where(eq(recurrences.id, recurrenceId));
+  if (!left) await db.delete(recurrences).where(ofSeries);
 }
 

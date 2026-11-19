@@ -101,7 +101,7 @@ export async function materializeSeries(
   await db
     .update(recurrences)
     .set({ nextIndex: index, nextDate: index < max ? date : null })
-    .where(eq(recurrences.id, series.id));
+    .where(and(eq(recurrences.workspaceId, series.workspaceId), eq(recurrences.id, series.id)));
 }
 
 /**

@@ -1,5 +1,5 @@
 // Finance is restricted to the workspace administrators (owner/editor). A `viewer` ("Colaborador")
-// keeps the other modules (clients, suppliers, profile, workspace…) but gets 403 on every financial
+// keeps the other modules (clients, profile, workspace…; suppliers are financial) but gets 403 on every financial
 // route — reads included — and sees clients without fees and the search without financial hits.
 // The route inventory comes from the real app, so a route or module added later is covered too.
 // Today is pinned to 2026-10-20 (vitest.config.ts).
@@ -36,6 +36,9 @@ const FINANCE_MODULES = new Set([
   'reports',
   'imports',
   'open-finance',
+  // Suppliers (fornecedores) are financial: the web shows them behind `FinanceGate` and the search
+  // never returns them to a member without `finance`; the API agrees (security review, BOPLA/BFLA).
+  'contacts',
 ]);
 /** Visible to every member (each with its own write/owner checks). `tasks`: module in development. */
 const OPEN_MODULES = new Set([
@@ -44,7 +47,6 @@ const OPEN_MODULES = new Set([
   'workspaces',
   'invites',
   'billing',
-  'contacts',
   'clients',
   'cnpj',
   'search',
@@ -245,7 +247,7 @@ describe('finance restricted to administrators', () => {
     expect(list.body.summary).toMatchObject({ monthlyFees: 123_456, withoutCurrentFee: 0, averageFee: 123_456 });
   });
 
-  it('a viewer reads clients and suppliers without fees (no amount leaves the server)', async () => {
+  it('a viewer reads clients without fees and no suppliers (no amount leaves the server)', async () => {
     const owner = await registerUser(app, 'Dona');
     const viewer = await member(owner, 'viewer', 'colaboradora2@teste.com');
     const { clientId } = await seedOffice(owner);
@@ -284,9 +286,10 @@ describe('finance restricted to administrators', () => {
     const fees = await viewer.get(`/clients/${clientId}/fees`);
     expect(fees).toMatchObject({ status: 403, body: { error: 'forbidden', message: FINANCE_FORBIDDEN_MESSAGE } });
 
+    // Suppliers are financial (like the web's `FinanceGate` and the search): 403, not a list.
     const suppliers = await viewer.get('/contacts?kind=supplier');
-    expect(suppliers.status).toBe(200);
-    expect(suppliers.body.items.map((c: { name: string }) => c.name)).toEqual(['Fornecedor Aurora']);
+    expect(suppliers).toMatchObject({ status: 403, body: { error: 'forbidden', message: FINANCE_FORBIDDEN_MESSAGE } });
+    expect(JSON.stringify(suppliers.body)).not.toContain('Fornecedor Aurora');
     // Other modules stay available.
     expect((await viewer.get('/auth/me')).status).toBe(200);
     expect((await viewer.get('/workspaces/current/members')).status).toBe(200);

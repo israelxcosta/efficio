@@ -706,7 +706,7 @@ export async function syncConnection(
           amount: t.amount,
           type,
           externalId: t.id,
-          ...(await categoryColumns(tx, suggestion)),
+          ...(await categoryColumns(tx, workspaceId, suggestion)),
           invoiceMonth,
         });
       }
@@ -765,9 +765,16 @@ export async function syncConnection(
 }
 
 /** Suggested id → category/subcategory columns (the suggestion may be a subcategory). */
-async function categoryColumns(tx: DbExecutor, id: string | null): Promise<{ categoryId: string | null; subcategoryId: string | null }> {
+async function categoryColumns(
+  tx: DbExecutor,
+  workspaceId: string,
+  id: string | null,
+): Promise<{ categoryId: string | null; subcategoryId: string | null }> {
   if (!id) return { categoryId: null, subcategoryId: null };
-  const [row] = await tx.select({ parentId: categories.parentId }).from(categories).where(eq(categories.id, id));
+  const [row] = await tx
+    .select({ parentId: categories.parentId })
+    .from(categories)
+    .where(and(eq(categories.workspaceId, workspaceId), eq(categories.id, id)));
   if (!row) return { categoryId: null, subcategoryId: null };
   return row.parentId ? { categoryId: row.parentId, subcategoryId: id } : { categoryId: id, subcategoryId: null };
 }

@@ -113,7 +113,7 @@ export async function updateGoal(db: DbExecutor, workspaceId: string, id: string
 
 export async function deleteGoal(db: DbExecutor, workspaceId: string, id: string) {
   await getGoalOrThrow(db, workspaceId, id);
-  await db.delete(goals).where(eq(goals.id, id));
+  await db.delete(goals).where(and(eq(goals.workspaceId, workspaceId), eq(goals.id, id)));
 }
 
 async function toContribution(row: GoalContributionRow): Promise<GoalContribution> {
