@@ -75,6 +75,21 @@ export function canEditMemberAccess(data: Pick<MemberPermissions, 'userId' | 'ro
   return data.editable && data.role !== 'owner' && Boolean(meId) && data.userId !== meId;
 }
 
+/**
+ * Keys the person holds that the signed-in manager does not (`holds`, the same keys the API lists as
+ * `grantable`). Removing someone revokes all their keys and nobody revokes what they do not have: with
+ * any key here the API answers 403 (`details.keys`), so the members list hides "Remover". The owner is
+ * never removed (every key).
+ */
+export function keysBlockingRemoval(
+  member: { role: MemberRole; permissionOverrides?: PermissionOverrides | null },
+  holds: (key: PermissionKey) => boolean,
+): PermissionKey[] {
+  if (member.role === 'owner') return [...PERMISSION_KEYS];
+  const held = effectivePermissions(member.role, member.permissionOverrides ?? {});
+  return PERMISSION_KEYS.filter((k) => held[k] && !holds(k));
+}
+
 /** Keys whose value differs from the role's default (the "Ajustado" badge). */
 export function adjustedKeys(role: MemberRole, overrides: PermissionOverrides | null | undefined): PermissionKey[] {
   if (role === 'owner') return [];

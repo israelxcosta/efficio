@@ -29,6 +29,10 @@ import {
   tasks,
   transactions,
   offices,
+  onboardingAccesses,
+  onboardingClientOverrides,
+  onboardingLinks,
+  onboardingTemplates,
   unionClients,
   unionConventions,
   unions,
@@ -68,6 +72,11 @@ import type { Access } from './access';
 const CONTACT_PHASE3_ENCRYPTED = ['responsibleDocument', 'simplesAccessCode', 'accountantPassword'] as const;
 const UNION_ENCRYPTED = ['responsibleName', 'responsibleEmail', 'responsiblePhone', 'notes'] as const;
 const OFFICE_ENCRYPTED = ['responsibleDocument', 'responsibleEmail', 'responsiblePhone', 'pixKey'] as const;
+/**
+ * Client onboarding (migration 0025): the reading confirmation's name and CPF are decrypted like the
+ * other personal data of the export (the responsible's CPF above); the token hash never leaves.
+ */
+const ONBOARDING_LINK_ENCRYPTED = ['recipientName', 'recipientTo', 'confirmedName', 'confirmedCpf'] as const;
 /** History entries without `seq` (a sequence shared by every workspace). */
 const { seq: _seq, ...eventColumns } = getTableColumns(taskEvents);
 
@@ -126,6 +135,22 @@ export async function exportWorkspace(db: DbExecutor, access: Access, billingEna
       tx.select().from(unionClients).orderBy(asc(unionClients.unionId), asc(unionClients.clientId)),
       tx.select().from(offices),
     ]);
+    // Client onboarding (migration 0025): the office's template, each client's adjustment, the links sent
+    // (without the token hash), their accesses (IP already truncated, device) and reading confirmations.
+    const [onboardingTemplateRows, onboardingOverrideRows, onboardingLinkRows, onboardingAccessRows] = await Promise.all([
+      tx.select().from(onboardingTemplates),
+      tx.select().from(onboardingClientOverrides).orderBy(asc(onboardingClientOverrides.clientId)),
+      tx.select().from(onboardingLinks).orderBy(asc(onboardingLinks.clientId), asc(onboardingLinks.createdAt)),
+      tx.select().from(onboardingAccesses).orderBy(asc(onboardingAccesses.linkId), asc(onboardingAccesses.accessedAt)),
+    ]);
+    const onboarding = {
+      onboardingTemplate: onboardingTemplateRows[0] ?? null,
+      onboardingClientOverrides: onboardingOverrideRows,
+      onboardingLinks: await Promise.all(
+        onboardingLinkRows.map(({ tokenHash: _token, ...r }) => cipher.decryptFields('onboarding_links', r, ONBOARDING_LINK_ENCRYPTED)),
+      ),
+      onboardingAccesses: onboardingAccessRows,
+    };
     const phase3 = {
       clientDocuments: await Promise.all(
         documentRows.map(async (r) => ({ ...r, note: await decrypt('client_documents', 'note', r.note) })),
@@ -231,6 +256,7 @@ export async function exportWorkspace(db: DbExecutor, access: Access, billingEna
         attachmentRows.map(async (r) => ({ ...r, fileName: await decryptTaskText(cipher, ATTACHMENT_NAME, r.fileName) })),
       ),
       ...phase3,
+      ...onboarding,
       taskNotes: await Promise.all(
         noteRows.map(async (r) => ({
           ...r,

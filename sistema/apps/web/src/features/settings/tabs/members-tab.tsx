@@ -27,10 +27,11 @@ import { Select } from '@/components/ui/select';
 import { SkeletonRows } from '@/components/ui/skeleton';
 import { copyText } from '@/lib/clipboard';
 import { formatDateTime } from '@/lib/datetime';
+import { ApiRequestError } from '@/lib/api';
 import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { MemberAvatar } from '@/components/ui/member-avatar';
-import { adjustmentSummary, memberAccessLine } from '../member-access';
+import { adjustmentSummary, keysBlockingRemoval, memberAccessLine } from '../member-access';
 import { MemberAccessSheet, useMemberAccessParam } from '../member-access-sheet';
 import { handoverCountsOf, MemberHandoverDialog } from '../member-handover';
 import { useAuth } from '@/features/auth/auth-context';
@@ -188,6 +189,12 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
       if (counts && !replacementId) {
         setToRemove(null);
         setHandover({ person, counts });
+      } else if (error instanceof ApiRequestError && error.status === 403) {
+        // E.g. the person holds a key the manager does not ("Você não pode remover quem tem…"): the
+        // API's own message, deduplicated with the global access toast.
+        setToRemove(null);
+        setHandover(null);
+        toast.error(error.message, { id: 'forbidden' });
       } else toastError(error);
     }
   }
@@ -258,9 +265,12 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
                       <option value="editor">{ROLE_LABELS.editor}</option>
                       <option value="viewer">{ROLE_LABELS.viewer}</option>
                     </Select>
-                    <Button variant="ghost" size="icon-sm" aria-label={`Remover ${m.name}`} title="Remover do espaço" onClick={() => setToRemove(m)}>
-                      <Trash2 />
-                    </Button>
+                    {/* Only who holds every key of the person removes them (the API refuses otherwise). */}
+                    {keysBlockingRemoval(m, can).length === 0 ? (
+                      <Button variant="ghost" size="icon-sm" aria-label={`Remover ${m.name}`} title="Remover do espaço" onClick={() => setToRemove(m)}>
+                        <Trash2 />
+                      </Button>
+                    ) : null}
                   </div>
                 ) : (
                   <Badge tone={m.role === 'owner' ? 'solid' : 'neutral'} size="md" title={ROLE_HINTS[m.role]}>
