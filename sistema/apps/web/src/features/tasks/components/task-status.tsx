@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronsUp, ChevronUp, Circle, CircleCheck, CirclePause, CircleX, Contrast } from 'lucide-react';
 import { TASK_STATUS_LABELS, type ISODate, type Task, type TaskPriority, type TaskStatus } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip } from '@/components/ui/tooltip';
 import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
+import { useHasChanged } from '@/lib/use-has-changed';
 import { completedByText, DUE_TONE_CLASS, taskDueInfo } from '../due';
 import { deadlineTip, occurrenceTaskDueInfo } from '../occurrence';
 
@@ -57,20 +57,12 @@ interface TaskStatusButtonProps {
 
 /**
  * Round button at the left of a task row (in place of Contas a pagar's 👍/👎): concludes an open task
- * (hover previews the check) or reopens a concluded one. Pops when the status changes.
+ * (hover previews the check) or reopens a concluded one. Motion: presses to .97 and the new glyph
+ * crossfades in when the status changes (`.icon-in`). The hover preview swaps by opacity, not by
+ * `display`, so the glyph stays rendered and its entrance does not replay on every hover-out.
  */
 export function TaskStatusButton({ status, taskTitle, onToggle, size = 'md', loading, disabled, disabledReason }: TaskStatusButtonProps) {
-  const [animate, setAnimate] = useState(false);
-  const first = useRef(true);
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    setAnimate(true);
-    const t = setTimeout(() => setAnimate(false), 300);
-    return () => clearTimeout(t);
-  }, [status]);
+  const changed = useHasChanged(status);
 
   const done = status === 'done';
   const canceled = status === 'canceled';
@@ -97,22 +89,26 @@ export function TaskStatusButton({ status, taskTitle, onToggle, size = 'md', loa
           onToggle(done ? 'reopen' : 'done');
         }}
         className={cn(
-          'group/status relative inline-flex shrink-0 items-center justify-center rounded-full transition-colors duration-150 pointer-coarse:size-10',
+          'group/status relative inline-flex shrink-0 items-center justify-center rounded-full transition-[background-color,color,scale] duration-(--dur-press) ease-out pointer-coarse:size-10',
           size === 'sm' ? 'size-8' : 'size-9',
           BUTTON_TONE[status],
           open && !blocked && 'hover:bg-success-soft/60 hover:text-success focus-visible:bg-success-soft/60 focus-visible:text-success',
           done && !blocked && 'hover:brightness-95',
+          !blocked && 'active:scale-[0.97]',
           blocked && 'cursor-not-allowed',
           disabled && 'opacity-60',
-          animate && 'animate-pop',
           loading && 'opacity-70',
         )}
       >
-        <span className={cn('inline-flex', open && !blocked && 'group-hover/status:hidden group-focus-visible/status:hidden')}>
-          <TaskStatusGlyph status={status} />
+        <span className={cn('inline-flex', open && !blocked && 'group-hover/status:opacity-0 group-focus-visible/status:opacity-0')}>
+          <TaskStatusGlyph key={status} status={status} className={changed ? 'icon-in' : undefined} />
         </span>
         {open && !blocked ? (
-          <Check className="hidden size-4 group-hover/status:block group-focus-visible/status:block" strokeWidth={2.25} aria-hidden />
+          <Check
+            className="absolute inset-0 m-auto size-4 opacity-0 group-hover/status:opacity-100 group-focus-visible/status:opacity-100"
+            strokeWidth={2.25}
+            aria-hidden
+          />
         ) : null}
       </button>
     </Tooltip>

@@ -10,8 +10,9 @@ import { WriteGate } from '@/features/auth/permissions';
 import { Notifications } from './notifications';
 import type { Area } from './nav';
 
+// Press feedback at .95 (not the Button's .97): on a 36px icon .97 is about one pixel and reads as nothing.
 const btn =
-  'inline-flex size-9 items-center justify-center rounded-full transition-colors hover:bg-bg-subtle disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-[18px]';
+  'inline-flex size-9 items-center justify-center rounded-full transition-[background-color,color,scale] duration-(--dur-press) ease-out hover:bg-bg-subtle active:scale-95 disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-[18px]';
 
 /** One icon-only quick action: the name shows in a tooltip and is the button's accessible name. */
 function QuickAction({ label, className, onClick, disabled, children }: { label: string; className?: string; onClick: () => void; disabled?: boolean; children: ReactNode }) {
@@ -34,7 +35,7 @@ export function QuickBar({ area, onSearch }: { area: Area; onSearch: () => void 
             type="button"
             onClick={onSearch}
             aria-label={area === 'financeiro' ? 'Buscar no financeiro ou executar ação (⌘K)' : 'Buscar na gestão de tarefas ou executar ação (⌘K)'}
-            className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-fg transition-opacity hover:opacity-90"
+            className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-fg transition-[opacity,scale] duration-(--dur-press) ease-out hover:opacity-90 active:scale-95"
           >
             <Search className="size-[18px]" />
           </button>

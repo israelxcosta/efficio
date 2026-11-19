@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
 import { ThumbsDown, ThumbsUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useHasChanged } from '@/lib/use-has-changed';
 import { Tooltip } from './tooltip';
 
 interface PaidToggleProps {
@@ -14,19 +14,12 @@ interface PaidToggleProps {
   loading?: boolean;
 }
 
-/** 👍 paid / 👎 pending (default). Pops when toggled. */
+/**
+ * 👍 paid / 👎 pending (default). Motion: the button presses to .97 and, when the state changes, the
+ * new icon crossfades in (`.icon-in`, keyed so it remounts); nothing replays on first render.
+ */
 export function PaidToggle({ paid, onToggle, kind = 'expense', disabled, disabledReason, size = 'md', loading }: PaidToggleProps) {
-  const [animate, setAnimate] = useState(false);
-  const first = useRef(true);
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    setAnimate(true);
-    const t = setTimeout(() => setAnimate(false), 300);
-    return () => clearTimeout(t);
-  }, [paid]);
+  const changed = useHasChanged(paid);
 
   const paidLabel = kind === 'income' ? 'Recebido' : kind === 'transfer' ? 'Efetivada' : 'Pago';
   const pendingLabel = kind === 'income' ? 'A receber' : kind === 'transfer' ? 'Agendada' : 'Pendente';
@@ -45,14 +38,16 @@ export function PaidToggle({ paid, onToggle, kind = 'expense', disabled, disable
           onToggle(!paid);
         }}
         className={cn(
-          'inline-flex shrink-0 items-center justify-center rounded-full transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60',
+          'inline-flex shrink-0 items-center justify-center rounded-full transition-[background-color,color,scale] duration-(--dur-press) ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60',
           size === 'sm' ? 'size-8' : 'size-9',
           paid ? 'bg-success-soft text-success hover:brightness-95' : 'bg-danger-soft text-danger hover:brightness-95',
-          animate && 'animate-pop',
           loading && 'opacity-70',
         )}
       >
-        <Icon className={size === 'sm' ? 'size-3.5' : 'size-4'} aria-hidden fill={paid ? 'currentColor' : 'none'} fillOpacity={0.15} />
+        <Icon
+          key={paid ? 'paid' : 'pending'}
+          className={cn(size === 'sm' ? 'size-3.5' : 'size-4', changed && 'icon-in')}
+          aria-hidden fill={paid ? 'currentColor' : 'none'} fillOpacity={0.15} />
       </button>
     </Tooltip>
   );

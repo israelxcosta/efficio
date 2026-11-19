@@ -10,15 +10,18 @@ interface PeriodNavigatorProps {
   onChange: (value: PeriodValue) => void;
   modes?: PeriodMode[];
   className?: string;
+  /** Classes of the mode selector, e.g. `max-sm:hidden` when a filter panel carries it on phones. */
+  modesClassName?: string;
 }
 
 /** Mode selector (Dia/Semana/Mês/Ano) + ‹ label › navigation. */
-export function PeriodNavigator({ value, onChange, modes = ['day', 'week', 'month'], className }: PeriodNavigatorProps) {
+export function PeriodNavigator({ value, onChange, modes = ['day', 'week', 'month'], className, modesClassName }: PeriodNavigatorProps) {
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       {modes.length > 1 ? (
         <SegmentedControl
           ariaLabel="Tipo de período"
+          className={modesClassName}
           value={value.mode}
           onChange={(mode) => onChange({ mode, anchor: value.anchor })}
           options={modes.map((m) => ({ value: m, label: PERIOD_MODE_LABELS[m] }))}

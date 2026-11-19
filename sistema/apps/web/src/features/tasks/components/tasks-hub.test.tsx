@@ -74,6 +74,19 @@ describe('TasksHubView', () => {
     for (const a of createActions(can)) expect(a.label.toLowerCase()).toContain(a.short.toLowerCase());
   });
 
+  it('is one scrollable row on phones, with the name beside the icon', () => {
+    const html = render();
+    const at = html.indexOf('aria-label="Páginas de tarefas"');
+    const nav = html.slice(html.lastIndexOf('<nav', at), html.indexOf('>', at));
+    expect(nav).toContain('max-sm:flex-nowrap');
+    expect(nav).toContain('max-sm:overflow-x-auto');
+    expect(nav).not.toContain('flex-wrap ');
+    // Items: 40px tall on phones (touch target), never a column (icon over name) there.
+    const link = html.slice(html.indexOf('<a'), html.indexOf('>', html.indexOf('<a')));
+    expect(link).toContain('max-sm:h-10');
+    expect(link).not.toContain('max-sm:flex-col');
+  });
+
   it('draws the divider only when there are pages after the views', () => {
     expect(render()).toContain('data-hub-divider');
     expect(render(hubViewItems(can).filter((v) => v.group === 'views'))).not.toContain('data-hub-divider');

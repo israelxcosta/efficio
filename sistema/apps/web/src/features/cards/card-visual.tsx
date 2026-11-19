@@ -25,8 +25,15 @@ export function CardVisual({ card, className, compact }: { card: CreditCard; cla
       className={cn('relative flex aspect-[1.586] w-full flex-col justify-between overflow-hidden rounded-2xl p-5 text-white shadow-lg', compact && 'p-4', className)}
       style={{ background: `linear-gradient(135deg, ${base} 0%, color-mix(in oklab, ${base} 55%, #000) 100%)` }}
     >
-      <div className="pointer-events-none absolute -top-16 -right-10 size-48 rounded-full bg-white/10" aria-hidden />
-      <div className="pointer-events-none absolute -bottom-20 -left-10 size-56 rounded-full bg-white/5" aria-hidden />
+      {/* Inside a link (cards list) the decorative circles carry the hover, not the card. */}
+      <div
+        className="pointer-events-none absolute -top-16 -right-10 size-48 rounded-full bg-white/10 transition-[translate,background-color] duration-(--dur-state) ease-out group-hover/card-link:bg-white/15 motion-safe:group-hover/card-link:-translate-x-3 motion-safe:group-hover/card-link:translate-y-2"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -bottom-20 -left-10 size-56 rounded-full bg-white/5 transition-[translate] duration-(--dur-state) ease-out motion-safe:group-hover/card-link:translate-x-3"
+        aria-hidden
+      />
       <div className="relative flex items-start justify-between">
         <div>
           <p className="text-[11px] font-semibold tracking-wider text-white/70 uppercase">{bank?.name ?? 'Cartão'}</p>

@@ -3,6 +3,7 @@ import { Popover } from 'radix-ui';
 import { ChevronDown, Plus, Search } from 'lucide-react';
 import type { Category, CategoryType, CategoryWithChildren } from '@effinance/shared';
 import { cn } from '@/lib/utils';
+import { popoverMotion } from '@/lib/motion';
 import { inputClasses } from '@/components/ui/input';
 import { CategoryIcon } from '@/components/ui/category-icon';
 import { useCategories } from './api';
@@ -151,7 +152,7 @@ export function CategoryPicker({
             sideOffset={6}
             collisionPadding={12}
             onOpenAutoFocus={(e) => e.preventDefault()}
-            className="z-50 flex w-[max(var(--radix-popover-trigger-width),300px)] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg data-[state=open]:animate-fade-in"
+            className={cn('z-50 flex w-[max(var(--radix-popover-trigger-width),300px)] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg', popoverMotion)}
           >
             <label className="flex items-center gap-2 border-b border-border px-3.5">
               <Search className="size-4 shrink-0 text-subtle" aria-hidden />

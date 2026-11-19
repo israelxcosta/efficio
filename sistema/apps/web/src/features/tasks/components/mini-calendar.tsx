@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/misc';
 import { usePermissions } from '@/features/auth/permissions';
 import { cn } from '@/lib/utils';
+import { popoverMotion } from '@/lib/motion';
 import { useTaskCalendar } from '../api';
 import { itemsByDay, type CalendarItem } from '../calendar-logic';
 import { competenceName } from '../occurrence';
@@ -186,7 +187,7 @@ export function MiniCalendar({
                 e.preventDefault();
                 refs.current[current]?.focus();
               }}
-              className="z-50 flex w-72 flex-col gap-2 rounded-xl border border-border bg-surface p-3 shadow-lg data-[state=open]:animate-fade-in"
+              className={cn('z-50 flex w-72 flex-col gap-2 rounded-xl border border-border bg-surface p-3 shadow-lg', popoverMotion)}
             >
               {openDay ? (
                 <>

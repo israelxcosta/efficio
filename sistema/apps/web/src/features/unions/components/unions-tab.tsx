@@ -366,7 +366,7 @@ function UnionToolbar({ filters, total, onChange }: { filters: UnionFilters; tot
 }
 
 const menuButton =
-  'flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100';
+  'flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition-[background-color,color,opacity] hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100';
 
 /** "01/11/2026" and "Vence em 2 dias" (or "Sem data-base"), with the cycle in the tooltip. */
 function ConventionWhen({ union: u, inline }: { union: UnionListItem; inline?: boolean }) {

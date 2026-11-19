@@ -90,7 +90,8 @@ export default function CardsPage() {
             const inv = c.currentInvoice;
             return (
               <Card key={c.id} className="flex flex-col gap-4 p-4">
-                <Link to={`/cartoes/${c.id}`} className="block transition-transform hover:-translate-y-0.5" aria-label={`Abrir ${c.name}`}>
+                {/* Hover: the card itself stays put; its decorative light shifts (CardVisual, group/card-link). */}
+                <Link to={`/cartoes/${c.id}`} className="group/card-link block rounded-2xl" aria-label={`Abrir ${c.name}`}>
                   <CardVisual card={c} />
                 </Link>
                 <div>

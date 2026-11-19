@@ -530,7 +530,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 pointer-coarse:opacity-100"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition-[background-color,color,opacity] hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 pointer-coarse:opacity-100"
               aria-label={`Ações de ${r.name}`}
             >
               <Ellipsis className="size-4" />
@@ -640,7 +640,7 @@ function RepetitionRow({ recurring: r, monthName, onOpen, onStop }: { recurring:
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 pointer-coarse:opacity-100"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition-[background-color,color,opacity] hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 pointer-coarse:opacity-100"
               aria-label={`Ações de ${r.name}`}
             >
               <Ellipsis className="size-4" />

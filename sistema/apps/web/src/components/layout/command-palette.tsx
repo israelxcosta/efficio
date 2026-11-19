@@ -286,8 +286,10 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] data-[state=open]:animate-fade-in" />
-        <Dialog.Content className="fixed top-[12vh] left-1/2 z-50 w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-lg outline-none data-[state=open]:animate-fade-in">
+        {/* No enter/exit animation (scrim included): the palette is opened by ⌘K and closed by Esc or
+            by picking a result, and keyboard actions never animate (docs/design-system.md → Motion). */}
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px]" />
+        <Dialog.Content className="fixed top-[12vh] left-1/2 z-50 w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-lg outline-none">
           <Dialog.Title className="sr-only">Buscar</Dialog.Title>
           <Dialog.Description className="sr-only">{SEARCH_DESCRIPTIONS[scope]}</Dialog.Description>
           <Command shouldFilter={!q || q.length < 2} label="Busca global">

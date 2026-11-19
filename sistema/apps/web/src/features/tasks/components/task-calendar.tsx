@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip } from '@/components/ui/tooltip';
 import { usePermissions } from '@/features/auth/permissions';
 import { cn } from '@/lib/utils';
+import { popoverMotion } from '@/lib/motion';
 import { agendaDayTitle, CALENDAR_WEEKDAYS, calendarWeeks, itemsByDay, monthItemCount, type CalendarDay, type CalendarItem } from '../calendar-logic';
 import { longDay } from '../format';
 import { competenceName, deadlineTip, groupDeadlineInfo } from '../occurrence';
@@ -267,7 +268,7 @@ function MoreItems({ day, items, today, mine }: { day: CalendarDay; items: Calen
       {trigger(items.length - 2, 'xl:hidden')}
       {items.length > 3 ? trigger(items.length - 3, 'hidden xl:inline') : null}
       <Popover.Portal>
-        <Popover.Content side="bottom" align="start" sideOffset={4} collisionPadding={12} className="z-50 w-80 rounded-xl border border-border bg-surface p-2 shadow-lg data-[state=open]:animate-fade-in">
+        <Popover.Content side="bottom" align="start" sideOffset={4} collisionPadding={12} className={cn('z-50 w-80 rounded-xl border border-border bg-surface p-2 shadow-lg', popoverMotion)}>
           <p className="px-2 py-1.5 text-body-sm font-semibold text-fg">{longDay(day.date)}</p>
           <div className="scrollbar-thin max-h-80 overflow-y-auto">
             {items.map((item) =>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Infinity as InfinityIcon, Layers, Repeat, Split, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Copy, Ellipsis, FastForward, Infinity as InfinityIcon, Layers, Repeat, Split, ThumbsDown, ThumbsUp, Trash2, UsersRound } from 'lucide-react';
 import {
   FREQUENCIES,
   FREQUENCY_LABELS,
@@ -28,6 +28,8 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmployeesDialog } from '@/features/fee-charges/employees-dialog';
 import { cn } from '@/lib/utils';
 import { ApiRequestError } from '@/lib/api';
 import { useAccounts } from '@/features/accounts/api';
@@ -40,6 +42,7 @@ import { ScopeDialog } from './scope-dialog';
 import { SplitEditor, evenSplit, newSplitRow, validateSplits, type SplitRow, type SplitRowErrors } from './components/split-editor';
 import { toastError } from '@/lib/notify';
 import { WriteGate } from '@/features/auth/permissions';
+import { useTransactionActions } from './transaction-actions';
 
 export type TxKind = 'income' | 'expense';
 
@@ -136,6 +139,7 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
   const [scopeOpen, setScopeOpen] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<TransactionUpdateInput | null>(null);
   const [splitErrors, setSplitErrors] = useState<{ rows: Record<number, SplitRowErrors>; summary?: string }>({ rows: {} });
+  const [employeesFor, setEmployeesFor] = useState<Transaction | null>(null);
 
   useEffect(() => {
     if (state.open) {
@@ -333,6 +337,16 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
         }
         footer={
           <>
+            {isEdit && tx ? (
+              <MoreActions
+                tx={tx}
+                onClose={() => onOpenChange(false)}
+                onAddEmployees={() => {
+                  onOpenChange(false);
+                  setEmployeesFor(tx);
+                }}
+              />
+            ) : null}
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
@@ -632,7 +646,63 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
         loading={update.isPending}
         onConfirm={(scope) => pendingUpdate && void runUpdate(pendingUpdate, scope)}
       />
+      {employeesFor ? <EmployeesDialog fee={employeesFor} open onOpenChange={(o) => !o && setEmployeesFor(null)} /> : null}
     </>
+  );
+}
+
+/**
+ * Phones only: the row there has no "⋯" (a tap opens this sheet), so the sheet carries the row
+ * menu's other actions. Marking as paid is the status field of the form itself.
+ */
+function MoreActions({ tx, onClose, onAddEmployees }: { tx: Transaction; onClose: () => void; onAddEmployees: () => void }) {
+  const actions = useTransactionActions();
+  if (actions.readOnlyReason) return null;
+  const canAnticipate = tx.recurrenceKind === 'installment' && (tx.installmentNumber ?? 0) < (tx.installmentTotal ?? 0);
+  return (
+    <div className="mr-auto sm:hidden">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="icon" aria-label="Mais ações do lançamento">
+            <Ellipsis aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="top">
+          <DropdownMenuItem icon={<Copy />} className="min-h-10" onSelect={() => actions.duplicate(tx)}>
+            Duplicar
+          </DropdownMenuItem>
+          {tx.feeKind === 'fee' ? (
+            <DropdownMenuItem icon={<UsersRound />} className="min-h-10" onSelect={onAddEmployees}>
+              + Empregados
+            </DropdownMenuItem>
+          ) : null}
+          {canAnticipate ? (
+            <DropdownMenuItem
+              icon={<FastForward />}
+              className="min-h-10"
+              onSelect={() => {
+                onClose();
+                actions.anticipate(tx);
+              }}
+            >
+              Antecipar parcelas
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            icon={<Trash2 />}
+            tone="danger"
+            className="min-h-10"
+            onSelect={() => {
+              onClose();
+              actions.remove(tx);
+            }}
+          >
+            Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
@@ -664,7 +734,8 @@ function StatusOption({
           : 'border-border text-muted hover:border-border-strong hover:text-fg',
       )}
     >
-      <span className={cn(active && 'animate-pop')}>{icon}</span>
+      {/* No pop on selection: the colour already marks the chosen type (docs/design-system.md → Motion). */}
+      <span>{icon}</span>
       {label}
     </button>
   );

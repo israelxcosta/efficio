@@ -229,7 +229,7 @@ export function TaskRowMenu({ task, moveLabel = 'Mudar situação', className }:
           <button
             type="button"
             className={cn(
-              'flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 pointer-coarse:opacity-100',
+              'flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition-[background-color,color,opacity] hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 pointer-coarse:opacity-100',
               className,
             )}
             aria-label={`Ações de ${task.title}`}

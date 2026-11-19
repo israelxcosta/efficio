@@ -5,6 +5,7 @@ import { type OccurrenceCell, type OpenTaskStatus, type TaskStatus } from '@effi
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { popoverMotion } from '@/lib/motion';
 import { useTaskHistory } from '../api';
 import { cellTip, nextCellStatus, statusForKey } from '../audit-logic';
 import { dateTimeBR } from '../format';
@@ -221,7 +222,7 @@ export function ConclusionPopover({ open, onOpenChange, cell, header, children, 
           align="center"
           sideOffset={6}
           collisionPadding={12}
-          className="z-50 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-border bg-surface p-4 shadow-lg data-[state=open]:animate-fade-in"
+          className={cn('z-50 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-border bg-surface p-4 shadow-lg', popoverMotion)}
         >
           <p id={titleId} className="text-caption text-muted">
             {header}

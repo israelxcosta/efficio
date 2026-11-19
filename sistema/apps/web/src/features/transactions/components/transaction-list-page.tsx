@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
-import { ChevronLeft, ChevronRight, Plus, Receipt, Search, HandCoins, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Receipt, Search, HandCoins, SlidersHorizontal, X } from 'lucide-react';
 import { formatBRL, todayISO, TRANSACTION_ORIGIN_LABELS, TRANSACTION_ORIGINS, type TransactionStatus } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, MiniStat, PageHeader } from '@/components/ui/misc';
-import { Input } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import { PeriodNavigator } from '@/components/ui/period-navigator';
 import { useScreenPeriod } from '@/lib/active-month';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
+import { Sheet } from '@/components/ui/sheet';
 import { SkeletonRows } from '@/components/ui/skeleton';
-import { periodRange } from '@/lib/period';
+import { PERIOD_MODE_LABELS, periodRange, type PeriodMode } from '@/lib/period';
 import { useAccounts } from '@/features/accounts/api';
 import { useCards } from '@/features/cards/api';
 import { useCategories } from '@/features/categories/api';
@@ -25,6 +26,7 @@ import { WriteGate } from '@/features/auth/permissions';
 import { ORIGIN_PARAM, originFromParam } from '../origin';
 
 const PAGE_SIZE = 50;
+const PERIOD_MODES: PeriodMode[] = ['day', 'week', 'month', 'year'];
 
 function useDebounced<T>(value: T, ms = 300): T {
   const [v, setV] = useState(value);
@@ -54,6 +56,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
   const origin = originFromParam(params.get(ORIGIN_PARAM));
   const page = Number(params.get('pagina') ?? '1') || 1;
   const [searchInput, setSearchInput] = useState(params.get('busca') ?? '');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const search = useDebounced(searchInput.trim());
 
   function update(patch: Record<string, string | null>) {
@@ -102,11 +105,71 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
 
   const summary = list.data?.summary;
   const hasFilters = Boolean(categoryId || contactId || source || search || origin);
+  // Phones: the selects live in the "Filtros" panel; the button counts the ones in use.
+  const panelCount = [categoryId, contactId, source, origin].filter(Boolean).length;
+  const clearFilters = () => {
+    setSearchInput('');
+    update({ categoria: null, contato: null, origem: null, [ORIGIN_PARAM]: null, busca: null });
+  };
   const totalPages = list.data ? Math.max(1, Math.ceil(list.data.total / list.data.pageSize)) : 1;
 
   const labels = isExpense
     ? { title: 'Contas a pagar', paid: 'Pago', pending: 'A pagar', new: 'Nova despesa', empty: 'Nenhuma conta a pagar neste período' }
     : { title: 'Contas a receber', paid: 'Recebido', pending: 'A receber', new: 'Nova receita', empty: 'Nenhuma conta a receber neste período' };
+
+  // The same selects inline (from `sm` up) and in the phone panel; `sm` = the compact inline size.
+  const categorySelect = (sm: boolean) => (
+    <Select size_={sm ? 'sm' : 'md'} value={categoryId} onChange={(e) => update({ categoria: e.target.value })} aria-label={sm ? 'Categoria' : undefined}>
+      <option value="">Todas as categorias</option>
+      {(categories.data ?? []).map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.name}
+        </option>
+      ))}
+    </Select>
+  );
+  const contactSelect = (sm: boolean) => (
+    <Select
+      size_={sm ? 'sm' : 'md'}
+      value={contactId}
+      onChange={(e) => update({ contato: e.target.value })}
+      aria-label={sm ? (type === 'income' ? 'Cliente' : 'Fornecedor') : undefined}
+    >
+      <option value="">{type === 'income' ? 'Todos os clientes' : 'Todos os fornecedores'}</option>
+      {contactOptions(contacts.data?.items ?? [], { type, selected: contactId })}
+    </Select>
+  );
+  const sourceSelect = (sm: boolean) => (
+    <Select size_={sm ? 'sm' : 'md'} value={source} onChange={(e) => update({ origem: e.target.value })} aria-label={sm ? 'Conta ou cartão' : undefined}>
+      <option value="">Todas as contas</option>
+      <optgroup label="Contas">
+        {(accounts.data ?? []).map((a) => (
+          <option key={a.id} value={`account:${a.id}`}>
+            {a.name}
+          </option>
+        ))}
+      </optgroup>
+      {isExpense ? (
+        <optgroup label="Cartões">
+          {(cards.data ?? []).map((c) => (
+            <option key={c.id} value={`card:${c.id}`}>
+              {c.name}
+            </option>
+          ))}
+        </optgroup>
+      ) : null}
+    </Select>
+  );
+  const originSelect = (sm: boolean) => (
+    <Select size_={sm ? 'sm' : 'md'} value={origin} onChange={(e) => update({ [ORIGIN_PARAM]: e.target.value })} aria-label={sm ? 'Origem' : undefined}>
+      <option value="">Todas as origens</option>
+      {TRANSACTION_ORIGINS.map((o) => (
+        <option key={o} value={o}>
+          {TRANSACTION_ORIGIN_LABELS[o]}
+        </option>
+      ))}
+    </Select>
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -138,6 +201,9 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
         />
       </div>
 
+      {/* Phones (spec app-screens §12): month + "Hoje", the status in one scrollable row, then search
+          and "Filtros (N)" with the selects and the period type in a panel, so the list starts on the
+          first screen. From `sm` up, everything stays inline. */}
       <Card className="p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {status === 'overdue' ? (
@@ -145,14 +211,17 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
           ) : (
             <PeriodNavigator
               value={period}
-              modes={['day', 'week', 'month', 'year']}
+              modes={PERIOD_MODES}
               onChange={setPeriod}
+              className="max-sm:flex-nowrap"
+              modesClassName="max-sm:hidden"
             />
           )}
           <SegmentedControl
             ariaLabel="Status"
             value={status}
             onChange={(s) => update({ status: s === 'all' ? null : s })}
+            className="max-sm:flex max-sm:w-full max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&>button]:h-10 max-sm:[&>button]:flex-[1_0_auto] max-sm:[&>button]:px-2.5"
             options={[
               { value: 'all', label: 'Todos' },
               { value: 'pending', label: labels.pending },
@@ -161,70 +230,77 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
             ]}
           />
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))_auto]">
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Buscar descrição ou observação"
-              className="h-9 rounded-[10px] pl-9 text-[13px]"
+              className="h-9 rounded-[10px] pl-9 text-[13px] max-sm:h-10"
               aria-label="Buscar"
             />
           </div>
-          <Select size_="sm" value={categoryId} onChange={(e) => update({ categoria: e.target.value })} aria-label="Categoria">
-            <option value="">Todas as categorias</option>
-            {(categories.data ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-          <Select size_="sm" value={contactId} onChange={(e) => update({ contato: e.target.value })} aria-label={type === 'income' ? 'Cliente' : 'Fornecedor'}>
-            <option value="">{type === 'income' ? 'Todos os clientes' : 'Todos os fornecedores'}</option>
-            {contactOptions(contacts.data?.items ?? [], { type, selected: contactId })}
-          </Select>
-          <Select size_="sm" value={source} onChange={(e) => update({ origem: e.target.value })} aria-label="Conta ou cartão">
-            <option value="">Todas as contas</option>
-            <optgroup label="Contas">
-              {(accounts.data ?? []).map((a) => (
-                <option key={a.id} value={`account:${a.id}`}>
-                  {a.name}
-                </option>
-              ))}
-            </optgroup>
-            {isExpense ? (
-              <optgroup label="Cartões">
-                {(cards.data ?? []).map((c) => (
-                  <option key={c.id} value={`card:${c.id}`}>
-                    {c.name}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-          </Select>
-          <Select size_="sm" value={origin} onChange={(e) => update({ [ORIGIN_PARAM]: e.target.value })} aria-label="Origem">
-            <option value="">Todas as origens</option>
-            {TRANSACTION_ORIGINS.map((o) => (
-              <option key={o} value={o}>
-                {TRANSACTION_ORIGIN_LABELS[o]}
-              </option>
-            ))}
-          </Select>
+          <div className="contents max-sm:hidden">
+            {categorySelect(true)}
+            {contactSelect(true)}
+            {sourceSelect(true)}
+            {originSelect(true)}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 sm:hidden"
+            onClick={() => setFiltersOpen(true)}
+            aria-label={panelCount ? `Filtros, ${panelCount} em uso` : 'Filtros'}
+            aria-haspopup="dialog"
+          >
+            <SlidersHorizontal aria-hidden /> Filtros{panelCount ? ` (${panelCount})` : ''}
+          </Button>
           {hasFilters ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearchInput('');
-                update({ categoria: null, contato: null, origem: null, [ORIGIN_PARAM]: null, busca: null });
-              }}
-            >
+            <Button variant="ghost" size="sm" className="max-sm:hidden" onClick={clearFilters}>
               <X /> Limpar
             </Button>
           ) : null}
         </div>
       </Card>
+
+      <Sheet
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="Filtros"
+        description={labels.title}
+        footer={
+          <>
+            <Button variant="ghost" onClick={clearFilters}>
+              Limpar
+            </Button>
+            <Button onClick={() => setFiltersOpen(false)}>
+              {list.data ? `Ver ${list.data.total} ${list.data.total === 1 ? 'lançamento' : 'lançamentos'}` : 'Ver lançamentos'}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {status !== 'overdue' ? (
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="mb-1.5 text-[13px] font-medium text-fg">Período</legend>
+              <SegmentedControl
+                ariaLabel="Tipo de período"
+                value={period.mode}
+                onChange={(mode) => setPeriod({ mode, anchor: period.anchor })}
+                options={PERIOD_MODES.map((m) => ({ value: m, label: PERIOD_MODE_LABELS[m] }))}
+                fullWidth
+                className="[&>button]:h-10"
+              />
+            </fieldset>
+          ) : null}
+          <Field label="Categoria">{categorySelect(false)}</Field>
+          <Field label={type === 'income' ? 'Cliente' : 'Fornecedor'}>{contactSelect(false)}</Field>
+          <Field label="Conta ou cartão">{sourceSelect(false)}</Field>
+          <Field label="Origem">{originSelect(false)}</Field>
+        </div>
+      </Sheet>
 
       <Card className="@container overflow-hidden">
         <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">

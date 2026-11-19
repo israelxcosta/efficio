@@ -801,7 +801,7 @@ function SubtaskList({ task, readOnly }: { task: TaskDetail; readOnly: boolean }
                 type="button"
                 aria-label={`Remover subtarefa ${s.title}`}
                 onClick={() => remove.mutate(s.id, { onError: (e) => toastError(e) })}
-                className="flex size-8 items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-bg-subtle hover:text-fg group-hover/sub:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                className="flex size-8 items-center justify-center rounded-md text-muted opacity-0 transition-[background-color,color,opacity] hover:bg-bg-subtle hover:text-fg group-hover/sub:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
               >
                 <X className="size-4" />
               </button>
@@ -885,7 +885,7 @@ function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptio
                       <button
                         type="button"
                         aria-label={`Ações do comentário de ${c.author?.name ?? 'pessoa removida'}`}
-                        className="-mt-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-bg-subtle hover:text-fg group-hover/comment:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100"
+                        className="-mt-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted opacity-0 transition-[background-color,color,opacity] hover:bg-bg-subtle hover:text-fg group-hover/comment:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100"
                       >
                         <Ellipsis className="size-4" />
                       </button>

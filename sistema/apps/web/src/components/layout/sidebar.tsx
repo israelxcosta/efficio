@@ -88,8 +88,9 @@ export function AvatarLink({ name, userId, photoVersion, active, badge }: { name
         aria-label={`Minha área — ${name}`}
         aria-current={active ? 'page' : undefined}
         className={cn(
-          'relative flex size-10 items-center justify-center rounded-full ring-2 transition-transform duration-150 hover:scale-105',
-          active ? 'ring-primary' : 'ring-surface',
+          // Hover changes the ring colour only: the avatar itself does not grow.
+          'relative flex size-10 items-center justify-center rounded-full ring-2 transition-[box-shadow] duration-(--dur-hover)',
+          active ? 'ring-primary' : 'ring-surface hover:ring-border-strong',
         )}
       >
         <MemberAvatar size="lg" name={name} userId={userId} photoVersion={photoVersion} />

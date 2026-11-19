@@ -2,11 +2,14 @@
 // height, without the "+ Empregados" chip (it stays in the menu) and without the account column.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Transaction } from '@effinance/shared';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TransactionActionsContext } from '../transaction-actions';
 import { TransactionRow } from './transaction-row';
+
+// The full row draws the category icon, whose color follows the theme.
+vi.mock('@/lib/theme', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/theme')>()), useTone: () => (color: string) => color }));
 
 const noop = () => {};
 const actions = {
@@ -70,12 +73,12 @@ const feeTx = {
   contact: { id: 'c-1', name: 'Transportadora Rota Sul Ltda' },
 } as unknown as Transaction;
 
-function row(density: 'line') {
+function row(density: 'line' | 'default', tx: Transaction = feeTx) {
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
       <TooltipProvider>
         <TransactionActionsContext.Provider value={actions}>
-          <TransactionRow tx={feeTx} density={density} />
+          <TransactionRow tx={tx} density={density} neutralAmount />
         </TransactionActionsContext.Provider>
       </TooltipProvider>
     </QueryClientProvider>,
@@ -95,5 +98,29 @@ describe('TransactionRow density "line"', () => {
     expect(html).toContain('Transportadora Rota Sul Ltda');
     expect(html).toContain('aria-label="Ações de Honorários ref. 10/2026"');
     expect(html).toContain('h-10');
+  });
+});
+
+/** The class list of the element wrapping the row menu ("Ações de …"). */
+function menuWrapper(html: string, description: string): string {
+  const at = html.indexOf(`aria-label="Ações de ${description}"`);
+  expect(at).toBeGreaterThan(-1);
+  const open = html.lastIndexOf('<span class="contents', at);
+  return html.slice(open, html.indexOf('>', open));
+}
+
+// Phones (P1-2 of the 2026-11-19 design review): the full row drops its "⋯" (a tap opens the edit
+// sheet, which carries the actions) and tightens the gap, so the description is not cut short.
+describe('TransactionRow on phones', () => {
+  it('hides the menu below sm and tightens the gap', () => {
+    const expense = { ...feeTx, type: 'expense', description: 'Aluguel do escritório', feeKind: null } as unknown as Transaction;
+    const html = row('default', expense);
+    expect(menuWrapper(html, 'Aluguel do escritório')).toContain('max-sm:hidden');
+    expect(html).toContain('max-sm:gap-2.5');
+  });
+
+  it('keeps the menu of transfers, whose sheet has no other way to their actions', () => {
+    const transfer = { ...feeTx, type: 'transfer', description: 'Transferência', transferKind: 'transfer', feeKind: null } as unknown as Transaction;
+    expect(menuWrapper(row('default', transfer), 'Transferência')).not.toContain('max-sm:hidden');
   });
 });

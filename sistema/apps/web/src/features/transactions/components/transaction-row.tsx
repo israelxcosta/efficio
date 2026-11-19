@@ -305,7 +305,8 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
     <div className="@container">
     <div
       className={cn(
-        'group flex items-center gap-3 rounded-lg transition-colors hover:bg-surface-muted',
+        // Phones: 10px gaps and no "⋯" (below), so the description keeps its room.
+        'group flex items-center gap-3 rounded-lg transition-colors hover:bg-surface-muted max-sm:gap-2.5',
         compact ? 'px-2 py-2' : 'px-3 py-3 @lg:px-4',
         muted && 'opacity-70',
       )}
@@ -390,7 +391,11 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
         <Money value={signed} tone={amountTone(tx, amount, neutralAmount)} showPlus={neutralAmount} signed className="text-[15px]" />
         {trailing}
       </div>
-      <RowMenu tx={tx} onAddEmployees={isFee ? employees.show : undefined} />
+      {/* Phones: a tap on the row opens the edit sheet, whose "Mais ações" carries this menu's items.
+          Transfers keep it (their sheet has no such menu; card payments do not open one at all). */}
+      <span className={cn('contents', tx.type !== 'transfer' && 'max-sm:hidden')}>
+        <RowMenu tx={tx} onAddEmployees={isFee ? employees.show : undefined} />
+      </span>
     </div>
     {employees.element}
     </div>

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 const VARIANTS = {
   primary:
-    'bg-primary text-primary-fg shadow-xs hover:bg-primary-hover active:translate-y-px disabled:bg-primary/50',
+    'bg-primary text-primary-fg shadow-xs hover:bg-primary-hover disabled:bg-primary/50',
   soft: 'bg-primary-soft text-primary-soft-fg hover:bg-brand-200/70',
   outline:
     'border border-border bg-surface text-fg shadow-xs hover:border-border-strong hover:bg-surface-muted',
@@ -13,7 +13,7 @@ const VARIANTS = {
   danger: 'bg-danger text-white shadow-xs hover:brightness-95',
   'danger-soft': 'bg-danger-soft text-danger hover:brightness-95',
   success: 'bg-success text-white shadow-xs hover:brightness-95',
-  link: 'text-brand-text underline-offset-4 hover:underline px-0 h-auto',
+  link: 'text-brand-text underline-offset-4 hover:underline px-0 h-auto active:scale-100',
 } as const;
 
 const SIZES = {
@@ -32,12 +32,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean;
 }
 
+/** Press feedback: every variant (except the inline link) scales to .97 over --dur-press. */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { className, variant = 'primary', size = 'md', loading, disabled, asChild, children, type, ...props },
   ref,
 ) {
   const classes = cn(
-    'inline-flex shrink-0 select-none items-center justify-center whitespace-nowrap font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-150 disabled:pointer-events-none disabled:opacity-60 [&_svg]:size-4 [&_svg]:shrink-0',
+    'inline-flex shrink-0 select-none items-center justify-center whitespace-nowrap font-semibold transition-[background-color,border-color,color,box-shadow,scale] duration-(--dur-press) ease-out active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60 [&_svg]:size-4 [&_svg]:shrink-0',
     VARIANTS[variant],
     SIZES[size],
     className,

@@ -3,6 +3,7 @@ import { Popover } from 'radix-ui';
 import { formatBRL, INACTIVATION_REASON_LABELS, type MonthKey } from '@effinance/shared';
 import { Card, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { popoverMotion } from '@/lib/motion';
 import { monthName, signedCount, signedMoney, type EvolutionRow } from './evolution-logic';
 
 const MOBILE_ROWS = 6;
@@ -169,7 +170,7 @@ function NamesButton({ count, title, items }: { count: number; title: string; it
           sideOffset={6}
           collisionPadding={12}
           onClick={(e) => e.stopPropagation()}
-          className="z-50 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-border bg-surface p-3 text-left shadow-lg data-[state=open]:animate-fade-in"
+          className={cn('z-50 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-border bg-surface p-3 text-left shadow-lg', popoverMotion)}
         >
           <p className="text-caption font-medium text-muted">{title}</p>
           <ul className="mt-2 flex flex-col gap-1.5">

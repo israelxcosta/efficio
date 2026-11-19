@@ -22,10 +22,11 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
             aria-label={color}
             onClick={() => onChange(color)}
             className={cn(
-              'flex size-8 items-center justify-center rounded-full transition-transform hover:scale-110',
-              active && 'ring-2 ring-offset-2 ring-offset-surface',
+              // Hover shows a neutral ring (the swatch does not grow); the chosen one rings in its colour.
+              'flex size-8 items-center justify-center rounded-full ring-offset-2 ring-offset-surface transition-[box-shadow] duration-(--dur-hover)',
+              active ? 'ring-2' : 'hover:ring-2 hover:ring-border-strong',
             )}
-            style={{ backgroundColor: color, ['--tw-ring-color' as string]: color }}
+            style={{ backgroundColor: color, ...(active ? { ['--tw-ring-color' as string]: color } : {}) }}
           >
             {active ? <Check className="size-4 text-white" strokeWidth={3} /> : null}
           </button>

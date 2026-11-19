@@ -2,6 +2,7 @@ import {
   Component as ReactComponent,
   memo,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -118,6 +119,25 @@ interface Preview {
 export function DashboardBoard({ width, month, d, loading, kind, components, alerts, onCustomize, editing }: BoardProps) {
   const api = useDashboardLayout();
   const g = useMemo(() => geometryFor(width), [width]);
+  // The board width changed (window resize, sidebar): the cards jump to their new cells for a couple
+  // of frames instead of sliding 250ms behind the resize ([data-instant] in index.css).
+  const [prevWidth, setPrevWidth] = useState(width);
+  const [instant, setInstant] = useState(false);
+  if (prevWidth !== width) {
+    setPrevWidth(width);
+    setInstant(true);
+  }
+  useEffect(() => {
+    if (!instant) return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setInstant(false));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [instant, width]);
   const { cols } = g;
   const base = useMemo(() => resolveBoard(api.layout, WIDGET_SPECS, kind, cols), [api.layout, kind, cols]);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -290,7 +310,7 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
   }
   const moving = preview?.mode === 'move' ? shown.get(preview.id) : undefined;
   return (
-    <div data-widget-grid data-cols={cols} className="relative" style={{ height: rows > 0 ? rows * (g.rowPx + g.gap) - g.gap : 0 }}>
+    <div data-widget-grid data-cols={cols} data-instant={instant || undefined} className="relative" style={{ height: rows > 0 ? rows * (g.rowPx + g.gap) - g.gap : 0 }}>
       {moving ? (
         <div
           aria-hidden
@@ -443,8 +463,10 @@ function WidgetFrame({ spec, item, geometry, dragging, resizing, editing, Body, 
       data-size={`${item.c}x${item.r}`}
       style={{ width: box.width, height: box.height, transform: `translate(${box.left}px, ${box.top}px)` }}
       className={cn(
-        'group/widget absolute top-0 left-0 min-h-0 min-w-0 rounded-xl transition-[transform,translate] duration-200 ease-out motion-reduce:transition-none',
-        dragging && 'pointer-events-none z-30 shadow-lg transition-none',
+        // Dropped: glides to its cell and settles back to scale 1 with --ease-out. Picked up: lifts
+        // (1.02 + shadow) while the position follows the pointer untransitioned.
+        'group/widget absolute top-0 left-0 min-h-0 min-w-0 rounded-xl transition-[transform,translate,scale,box-shadow] duration-(--dur-settle) ease-out motion-reduce:transition-none',
+        dragging && 'pointer-events-none z-30 scale-[1.02] shadow-lg transition-[scale,box-shadow] duration-(--dur-press)',
         resizing && 'z-20 outline-2 outline-offset-2 outline-primary',
       )}
     >

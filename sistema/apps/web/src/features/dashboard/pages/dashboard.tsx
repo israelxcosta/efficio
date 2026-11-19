@@ -198,10 +198,23 @@ export default function DashboardPage() {
 
       {dashboard.isError ? (
         <ErrorState error={dashboard.error} onRetry={() => dashboard.refetch()} />
-      ) : tab === 'insights' ? (
-        <InsightsTab month={month} dashboard={d} loading={dashboard.isPending} />
       ) : (
-        <Overview d={d} loading={dashboard.isPending} month={month} kind={kind} width={width} editing={editing} onCustomize={() => startEditing(true)} />
+        // Stale data while another month loads (keepPreviousData): dim to 60% like the other screens.
+        // The delay only applies on the way down, so a fast cache hit does not flash and the way
+        // back to 100% starts at once.
+        <div
+          className={cn(
+            'flex flex-col gap-6 transition-opacity duration-(--dur-state)',
+            dashboard.isPlaceholderData && 'opacity-60 delay-150',
+          )}
+          aria-busy={dashboard.isPlaceholderData || undefined}
+        >
+          {tab === 'insights' ? (
+            <InsightsTab month={month} dashboard={d} loading={dashboard.isPending} />
+          ) : (
+            <Overview d={d} loading={dashboard.isPending} month={month} kind={kind} width={width} editing={editing} onCustomize={() => startEditing(true)} />
+          )}
+        </div>
       )}
       <CustomizeSheet open={customizing} onOpenChange={setCustomizing} kind={kind} />
       <p aria-live="polite" className="sr-only">

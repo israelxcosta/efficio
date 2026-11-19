@@ -223,7 +223,7 @@ function ConventionsBody({ data, onNavigate }: { data: NonNullable<ReturnType<ty
 }
 
 const menuButton =
-  'flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100';
+  'flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition-[background-color,color,opacity] hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100';
 
 /** Right column of a deadline row: the date and "Venceu há 3 dias". */
 export function DeadlineWhen({ date, deadline, tooltip }: { date: string | null; deadline: { bucket: DocumentDeadline['deadline']['bucket']; days: number | null }; tooltip?: string }) {

@@ -5,6 +5,7 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  Ellipsis,
   Eye,
   FileSignature,
   HandCoins,
@@ -32,6 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
@@ -98,6 +100,33 @@ function RowAction({
         button
       )}
     </Tooltip>
+  );
+}
+
+/**
+ * An item of the phone card's "⋯" menu. A tap opens no tooltip, so a blocked item shows its reason
+ * under the name.
+ */
+function MenuAction({
+  label,
+  icon,
+  onSelect,
+  blockedReason,
+  tone = 'default',
+}: {
+  label: string;
+  icon: ReactNode;
+  onSelect: () => void;
+  blockedReason?: string | null;
+  tone?: 'default' | 'danger';
+}) {
+  return (
+    <DropdownMenuItem icon={icon} tone={tone} disabled={Boolean(blockedReason)} onSelect={onSelect} className="min-h-10 [&>svg]:shrink-0">
+      <span className="min-w-0">
+        <span className="block">{label}</span>
+        {blockedReason ? <span className="block text-xs font-normal text-muted">{blockedReason}</span> : null}
+      </span>
+    </DropdownMenuItem>
   );
 }
 
@@ -184,7 +213,7 @@ export default function ClientsPage() {
   const data = clients.data;
   const summary = data?.summary;
 
-  // Same buttons in the table (desktop) and in the cards (mobile).
+  // The buttons of the table (desktop); the cards (phones) use `cardActions`.
   const actions = (c: Client) => (
     <div className="flex items-center justify-end gap-0.5">
       <RowAction label="Abrir ficha do cliente" icon={<Eye />} onClick={() => navigate(clientPagePath('financeiro', c.id))} />
@@ -231,6 +260,43 @@ export default function ClientsPage() {
       />
     </div>
   );
+
+  const deleteBlockedReason = (c: Client) =>
+    readOnlyReason ??
+    (c.transactionCount > 0 ? 'Cliente com lançamentos vinculados não pode ser excluído. Use "Inativar".' : null);
+
+  // The cards (phones): "Ver" opens the client page; the other actions go into a "⋯" menu.
+  const cardActions = (c: Client) => {
+    const name = c.tradeName || c.name;
+    return (
+      <div className="flex items-center gap-1.5">
+        <Button variant="outline" size="sm" className="h-10 px-3.5" asChild>
+          <Link to={clientPagePath('financeiro', c.id)} aria-label={`Ver ficha de ${name}`}>
+            <Eye aria-hidden /> Ver
+          </Link>
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" aria-label={`Mais ações de ${name}`}>
+              <Ellipsis aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-72 max-w-[calc(100vw-2rem)]">
+            <MenuAction label="Editar cadastro" icon={<Pencil />} blockedReason={readOnlyReason} onSelect={() => setSheet({ open: true, client: c })} />
+            <MenuAction label="Honorários e taxa por empregado" icon={<HandCoins />} onSelect={() => setFeesFor(c)} />
+            <MenuAction label="Gerar contrato" icon={<FileSignature />} onSelect={() => void contract.start(c)} />
+            <DropdownMenuSeparator />
+            {c.status === 'active' ? (
+              <MenuAction label="Inativar" icon={<UserX />} tone="danger" blockedReason={readOnlyReason} onSelect={() => setToInactivate(c)} />
+            ) : (
+              <MenuAction label="Reativar" icon={<UserCheck />} blockedReason={readOnlyReason} onSelect={() => setToReactivate(c)} />
+            )}
+            <MenuAction label="Excluir" icon={<Trash2 />} tone="danger" blockedReason={deleteBlockedReason(c)} onSelect={() => setToDelete(c)} />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  };
 
   const statusBadge = (c: Client) =>
     c.inactivation ? (
@@ -362,7 +428,7 @@ export default function ClientsPage() {
           <>
             <ul className="divide-y divide-border md:hidden">
               {data!.items.map((c) => (
-                <li key={c.id} className="flex flex-col gap-3 p-4">
+                <li key={c.id} className="flex flex-col gap-2 p-4">
                   <div className="flex items-start gap-3">
                     <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg">
                       {initials(c.tradeName || c.name)}
@@ -387,11 +453,9 @@ export default function ClientsPage() {
                     </Link>
                     {statusBadge(c)}
                   </div>
-                  {/* The six actions take ~200px: on narrow phones they wrap below the fee instead of
-                      overflowing the card. */}
-                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pl-12">
+                  <div className="flex items-center justify-between gap-3 pl-12">
                     <FeeCell client={c} today={today} onOpen={() => setFeesFor(c)} />
-                    <div className="-mr-1.5 ml-auto">{actions(c)}</div>
+                    {cardActions(c)}
                   </div>
                 </li>
               ))}

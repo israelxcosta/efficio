@@ -99,7 +99,7 @@ export function ContributionDialog({ goal, onClose }: { goal: Goal | null; onClo
                   </span>
                   <button
                     type="button"
-                    className="text-subtle opacity-0 transition group-hover:opacity-100 hover:text-danger"
+                    className="text-subtle opacity-0 transition-[color,opacity] group-hover:opacity-100 hover:text-danger"
                     aria-label="Excluir aporte"
                     onClick={async () => {
                       try {

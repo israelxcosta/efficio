@@ -287,7 +287,6 @@
   --default-transition-duration: var(--dur-hover);
   --default-transition-timing-function: ease;
 
-  --animate-pop: pop 260ms var(--ease-out);
   --animate-fade-in: fade-in var(--dur-pop-in) var(--ease-out);
   --animate-fade-out: fade-out var(--dur-pop-out) var(--ease-out);
   --animate-scrim-out: fade-out var(--dur-panel-out) var(--ease-out);
@@ -300,11 +299,6 @@
   --animate-shimmer: shimmer 1.4s ease-in-out infinite;
 }
 
-@keyframes pop {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.22); }
-  100% { transform: scale(1); }
-}
 @keyframes fade-in {
   from { opacity: 0; }
 }
@@ -337,6 +331,32 @@
 @keyframes shimmer {
   0%, 100% { opacity: 0.55; }
   50% { opacity: 1; }
+}
+
+/*
+ * In-place icon swap (paid/pending, task concluded): the new icon is keyed so it remounts and
+ * enters from a small blurred scale (skill "motion": icon crossfade). Applied only after a real
+ * change (useHasChanged), never on first render. Without @starting-style support the icon simply
+ * swaps. Under reduced motion only the opacity part remains (scale/filter leave the transition list).
+ */
+.icon-in {
+  transition: opacity var(--dur-state) var(--ease-out), scale var(--dur-state) var(--ease-out),
+    filter var(--dur-state) var(--ease-out);
+}
+@starting-style {
+  .icon-in {
+    opacity: 0;
+    scale: 0.25;
+    filter: blur(4px);
+  }
+}
+
+/*
+ * Dashboard board (widget-grid.tsx): [data-instant] is set for a couple of frames whenever the board
+ * width changes, so the cards jump to their new cells instead of sliding behind a window resize.
+ */
+[data-widget-grid][data-instant] [data-widget-id] {
+  transition: none;
 }
 
 /*
@@ -471,9 +491,6 @@ html:root > body {
   }
   @keyframes sheet-out {
     to { opacity: 0; }
-  }
-  @keyframes pop {
-    from, to { opacity: 1; }
   }
   /* Decorative loops stop (the doubled class outranks the onboarding sheet, loaded later). */
   .animate-shimmer,

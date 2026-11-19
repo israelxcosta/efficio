@@ -308,7 +308,7 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 pointer-coarse:opacity-100"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted opacity-70 transition-[background-color,color,opacity] hover:bg-bg-subtle hover:text-fg group-hover:opacity-100 pointer-coarse:opacity-100"
             aria-label={`Ações de ${detail.name} para ${cell.client.name}`}
           >
             <Ellipsis className="size-4" />

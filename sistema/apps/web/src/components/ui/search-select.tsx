@@ -2,6 +2,7 @@ import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactElement
 import { Popover } from 'radix-ui';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { popoverMotion } from '@/lib/motion';
 import { inputClasses } from './input';
 
 export interface SearchSelectOption {
@@ -142,7 +143,7 @@ export function SearchSelect({
           collisionPadding={12}
           onOpenAutoFocus={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
-          className="z-50 flex w-[min(max(var(--radix-popover-trigger-width),280px),calc(100vw-24px))] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg data-[state=open]:animate-fade-in"
+          className={cn('z-50 flex w-[min(max(var(--radix-popover-trigger-width),280px),calc(100vw-24px))] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg', popoverMotion)}
         >
           <label className="flex items-center gap-2 border-b border-border px-3.5">
             <Search className="size-4 shrink-0 text-subtle" aria-hidden />
