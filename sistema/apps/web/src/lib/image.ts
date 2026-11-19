@@ -5,6 +5,18 @@ export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 
 export type ImageCheck = { ok: true } | { ok: false; error: string };
 
+/**
+ * Same shape the API accepts for office images (`officeImageSchema`): a base64 PNG/JPEG/WebP data URI.
+ * Anything else (SVG, GIF, `https:` tracking pixels, `javascript:`, `blob:` of another page) never
+ * reaches an `<img src>`: the office logo is shown on the public onboarding page (`/o/:token`), in
+ * contracts and letters printed to PDF, so the client never loads what the API should not send.
+ */
+const SAFE_IMAGE_DATA_URI = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+
+export function safeImageSrc(value: string | null | undefined): string | null {
+  return typeof value === 'string' && SAFE_IMAGE_DATA_URI.test(value) ? value : null;
+}
+
 /** "Use PNG, JPG ou WebP." / "A logo passa de 500 KB." */
 export function checkImageFile(file: { type: string; size: number }, maxBytes: number, tooBig: string): ImageCheck {
   if (!(IMAGE_TYPES as readonly string[]).includes(file.type)) return { ok: false, error: 'Use PNG, JPG ou WebP.' };

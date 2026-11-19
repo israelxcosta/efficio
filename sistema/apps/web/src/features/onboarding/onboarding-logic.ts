@@ -13,6 +13,7 @@ import {
   type OnboardingSlideKey,
   TAX_REGIME_LABELS,
 } from '@effinance/shared';
+import { safeImageSrc } from '@/lib/image';
 
 // Pure helpers of the client onboarding screens (tested in onboarding.test.tsx).
 
@@ -36,9 +37,15 @@ export function fillLinkMessage(message: string, url: string): string {
   return text ? `${text}\n${url}` : url;
 }
 
-/** `https://wa.me/<digits>?text=<message>` (the API sends the number with 55). */
-export function whatsappUrl(to: string, message: string): string {
-  return `https://wa.me/${onlyDigits(to)}?text=${encodeURIComponent(message)}`;
+/**
+ * `https://wa.me/<digits>?text=<message>` (the API sends the number with 55). Null when the number is
+ * not 10–13 digits: `https://wa.me/?text=…` would open WhatsApp's contact picker and the client's
+ * link (a 30-day bearer token to their data) could go to anyone.
+ */
+export function whatsappUrl(to: string, message: string): string | null {
+  const digits = onlyDigits(to);
+  if (!/^\d{10,13}$/.test(digits)) return null;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
 export function mailtoUrl(to: string, subject: string, body: string): string {
@@ -181,9 +188,12 @@ export function daysBeforeBlock(label: string): { big: string; small: string } |
   return m ? { big: m[1]!, small: m[2]! } : null;
 }
 
-/** Only `data:image/…` logos (the API sends nothing else; never an external address). */
+/**
+ * Only base64 PNG/JPEG/WebP logos (what the API accepts; never SVG, which can carry scripts, nor an
+ * external address that would track who opens the public page).
+ */
 export function safeLogo(logo: string | null): string | null {
-  return logo && /^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,/i.test(logo) ? logo : null;
+  return safeImageSrc(logo);
 }
 
 // --- editor ------------------------------------------------------------------------------------------

@@ -1,11 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { contactInputSchema, contactQuerySchema } from '@effinance/shared';
+import { canAccessFinance } from '../../lib/finance-access';
 import { idParams } from '../common/params';
 import { createContact, deleteContact, getContact, listContacts, updateContact } from './service';
 
 export const contactRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/', { schema: { querystring: contactQuerySchema } }, async (req) =>
-    listContacts(req.db, req.workspaceId, req.query),
+    // Clients' notes only for the finance roles (same as /clients and the search).
+    listContacts(req.db, req.workspaceId, req.query, { finance: canAccessFinance(req.access) }),
   );
 
   app.get('/:id', { schema: { params: idParams } }, async (req) => getContact(req.db, req.workspaceId, req.params.id));

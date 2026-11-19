@@ -1,5 +1,6 @@
 import { adjustmentFactorText, formatBRL, formatDateBR, indexValuesOf, type FeeAdjustment, type FeeAdjustmentLetter, type FeeAdjustmentLetterOffice, type ISODate } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
+import { safeImageSrc } from '@/lib/image';
 import { cn } from '@/lib/utils';
 import { formatBps, indexRows } from '../logic';
 import { batchBasis, dateLine, letterheadLines, noticeOnTime, recipientLines } from '../letter-text';
@@ -29,7 +30,7 @@ export function AdjustmentLetter({ letter, adjustment, office, date }: Adjustmen
   const start = formatDateBR(letter.period.startDate);
   const onTime = noticeOnTime(letter, date);
   const showEmployee = letter.previous.employeeFee > 0 || letter.adjusted.employeeFee > 0;
-  const logo = office.logo?.startsWith('data:image/') ? office.logo : null;
+  const logo = safeImageSrc(office.logo);
   const signer = office.responsibleName ?? head.name;
   const addressee = letter.client.tradeName || letter.client.name;
 

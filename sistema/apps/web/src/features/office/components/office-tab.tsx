@@ -31,7 +31,7 @@ import { WriteGate } from '@/features/auth/permissions';
 import { Cell, TabGrid } from '@/features/settings/tabs/layout';
 import { useCnpjLookup } from '@/features/clients/api';
 import { ApiRequestError } from '@/lib/api';
-import { checkImageFile, pickImage, readAsDataUrl } from '@/lib/image';
+import { checkImageFile, pickImage, readAsDataUrl, safeImageSrc } from '@/lib/image';
 import { toastError } from '@/lib/notify';
 import { useOffice, useRemoveOfficeLogo, useSaveOffice, useSaveOfficeLogo } from '../api';
 
@@ -367,8 +367,8 @@ function LogoCard({ office }: { office: Office | undefined }) {
         <div className="flex h-16 w-40 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted">
           {!office ? (
             <Skeleton className="h-full w-full" />
-          ) : office.logo ? (
-            <img src={office.logo} alt="Logo do escritório" className="max-h-full max-w-full object-contain" />
+          ) : safeImageSrc(office.logo) ? (
+            <img src={safeImageSrc(office.logo)!} alt="Logo do escritório" className="max-h-full max-w-full object-contain" />
           ) : (
             <span className="text-body-sm text-subtle">Sem logo</span>
           )}

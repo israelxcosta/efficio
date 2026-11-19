@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { ContractBlock } from '@effinance/shared';
+import { safeImageSrc } from '@/lib/image';
 import { cn } from '@/lib/utils';
 
 // The contract on A4 pages (spec §13.9): the editor's preview (scaled to its column) and the print
@@ -71,7 +72,10 @@ interface ContractPagesProps {
 }
 
 /** A4 pages scaled to the width of their container (screen only). */
-export function ContractPages({ blocks, watermark, logo, className, label = 'Pré-visualização do contrato' }: ContractPagesProps) {
+export function ContractPages({ blocks, watermark: rawWatermark, logo: rawLogo, className, label = 'Pré-visualização do contrato' }: ContractPagesProps) {
+  // Office images come from the API: only base64 PNG/JPEG/WebP reach <img> (never SVG or a URL).
+  const watermark = safeImageSrc(rawWatermark);
+  const logo = safeImageSrc(rawLogo);
   const frame = useRef<HTMLDivElement>(null);
   const measurer = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
@@ -131,7 +135,9 @@ export function ContractPages({ blocks, watermark, logo, className, label = 'Pr�
  * The same contract in the print flow: the browser paginates (`@page A4, 20 mm`), the watermark is a
  * fixed image (repeated on every printed page) and the logo opens the first page.
  */
-export function ContractPrintFlow({ blocks, watermark, logo }: Omit<ContractPagesProps, 'className' | 'label'>) {
+export function ContractPrintFlow({ blocks, watermark: rawWatermark, logo: rawLogo }: Omit<ContractPagesProps, 'className' | 'label'>) {
+  const watermark = safeImageSrc(rawWatermark);
+  const logo = safeImageSrc(rawLogo);
   return (
     <div className="hidden text-black print:block">
       <style>{'@page { size: A4 portrait; margin: 20mm; }'}</style>

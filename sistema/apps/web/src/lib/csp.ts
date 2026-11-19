@@ -65,3 +65,20 @@ export async function inlineScriptHashes(html: string): Promise<string[]> {
     }),
   );
 }
+
+/**
+ * Headers of the local servers (`vite` and `vite preview`), the same the production host sends
+ * (deploy/Caddyfile, docs/deploy-aws.md) minus HSTS (plain http locally). Without them the preview
+ * could be framed (clickjacking) and tested without the protections the real site has. The dev
+ * server gets no CSP header (Vite injects inline scripts for HMR); preview adds frame-ancestors,
+ * which a <meta> CSP cannot carry.
+ */
+export function localServerHeaders({ preview = false }: { preview?: boolean } = {}): Record<string, string> {
+  return {
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'same-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()',
+    ...(preview ? { 'Content-Security-Policy': "frame-ancestors 'none'; object-src 'none'; base-uri 'self'" } : {}),
+  };
+}

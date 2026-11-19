@@ -86,12 +86,26 @@ export async function encryptContactInput(cipher: FieldCipher, input: ContactInp
   return { ...encrypted, documentHash: digits ? await documentIndex(cipher, digits) : null };
 }
 
+/** What the requesting member may read (lib/finance-access.ts). */
+export interface ContactView {
+  /**
+   * Clients' notes are financial (`withoutFees` in modules/clients and the search hide them): without
+   * the `finance` permission a client row comes with `notes: null`.
+   */
+  finance: boolean;
+}
+
 /**
  * Search: name (partial) or CPF/CNPJ (exact, through the blind index). Encrypted fields such as
  * e-mail and phone are not searchable. Without `kind`, suppliers and clients (pickers of the
  * transaction forms and filters).
  */
-export async function listContacts(db: DbExecutor, workspaceId: string, q: ContactQuery): Promise<Paginated<Contact>> {
+export async function listContacts(
+  db: DbExecutor,
+  workspaceId: string,
+  q: ContactQuery,
+  view: ContactView = { finance: false },
+): Promise<Paginated<Contact>> {
   const cipher = await getCipher(workspaceId);
   let search;
   if (q.search) {
@@ -115,7 +129,12 @@ export async function listContacts(db: DbExecutor, workspaceId: string, q: Conta
     db.select({ total: countAll() }).from(contacts).where(where),
   ]);
   return {
-    items: await Promise.all(rows.map((r) => toContact(cipher, r))),
+    items: await Promise.all(
+      rows.map(async (r) => {
+        const contact = await toContact(cipher, r);
+        return view.finance || contact.kind !== 'client' ? contact : { ...contact, notes: null };
+      }),
+    ),
     total: count?.total ?? 0,
     page: q.page,
     pageSize: q.pageSize,

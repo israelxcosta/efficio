@@ -4,7 +4,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { contentSecurityPolicy, inlineScriptHashes } from './src/lib/csp.js';
+import { contentSecurityPolicy, inlineScriptHashes, localServerHeaders } from './src/lib/csp.js';
 
 const apiProxy = {
   '/api': {
@@ -81,8 +81,9 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       exclude: ['@electric-sql/pglite'],
     },
-    server: { port: 5173, proxy: apiProxy },
-    preview: { port: 4173, proxy: apiProxy },
+    // Same anti-framing/referrer headers as production (the demo may be embedded by its host: none).
+    server: { port: 5173, proxy: apiProxy, ...(demo ? {} : { headers: localServerHeaders() }) },
+    preview: { port: 4173, proxy: apiProxy, ...(demo ? {} : { headers: localServerHeaders({ preview: true }) }) },
     build: {
       outDir: demo ? 'dist-demo' : 'dist',
       // Never publish source maps (they would expose the full source and comments).

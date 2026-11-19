@@ -272,7 +272,7 @@ describe('Enviar onboarding', () => {
   it('builds the wa.me address with the edited message and the link', () => {
     const message = defaultLinkMessage('Pão Quente', 'Efficio Contabilidade');
     expect(message).toContain('{{link}}');
-    const url = openTarget(created, message, 'Onboarding');
+    const url = openTarget(created, message, 'Onboarding')!;
     expect(url.startsWith('https://wa.me/5519998765432?text=')).toBe(true);
     const text = decodeURIComponent(url.split('?text=')[1]!);
     expect(text).toContain('Pão Quente com a Efficio Contabilidade');

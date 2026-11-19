@@ -58,7 +58,7 @@ export function openTarget(
   created: OnboardingLinkCreated,
   message: string,
   subject: string,
-): string {
+): string | null {
   const text = fillLinkMessage(message, created.url);
   return created.channel === 'whatsapp'
     ? whatsappUrl(created.to, text)
@@ -114,7 +114,10 @@ export function SendOnboardingDialog({ client, open, onOpenChange }: SendOnboard
       const link = await create.mutateAsync({ channel, contact });
       setCreated(link);
       const target = openTarget(link, text, subject);
-      if (tab) {
+      if (!target) {
+        tab?.close();
+        setError('Telefone do WhatsApp inválido. Corrija em "Editar dados" ou copie o link.');
+      } else if (tab) {
         tab.opener = null;
         tab.location.href = target;
       } else if (channel === 'email') {
@@ -166,14 +169,21 @@ export function SendOnboardingDialog({ client, open, onOpenChange }: SendOnboard
               </Button>
             </div>
           </Field>
-          <Button variant="outline" asChild className="self-start">
-            <a href={target} target="_blank" rel="noopener noreferrer">
-              <ExternalLink />{' '}
-              {created.channel === 'whatsapp'
-                ? 'Abrir o WhatsApp de novo'
-                : 'Abrir o e-mail de novo'}
-            </a>
-          </Button>
+          {target ? (
+            <Button variant="outline" asChild className="self-start">
+              <a href={target} target="_blank" rel="noopener noreferrer">
+                <ExternalLink />{' '}
+                {created.channel === 'whatsapp'
+                  ? 'Abrir o WhatsApp de novo'
+                  : 'Abrir o e-mail de novo'}
+              </a>
+            </Button>
+          ) : null}
+          {error ? (
+            <p role="alert" className="text-sm font-medium text-danger">
+              {error}
+            </p>
+          ) : null}
         </div>
       </Modal>
     );

@@ -432,6 +432,18 @@ export async function removeMember(
   const members = await loadMembers(db, access.workspaceId);
   const target = members.get(userId);
   if (!target || target.role === 'owner') throw new NotFoundError('Membro não encontrado');
+  // Nobody revokes a key they do not hold (`resolvePermissionChange`): removing a member takes all of
+  // theirs away, so a manager may only remove someone whose every key they hold too (the owner holds all).
+  if (!leaving) {
+    const held = effectivePermissions(target.role, target.permissionOverrides ?? {});
+    const missing = PERMISSION_KEYS.filter((k) => held[k] && !access.permissions[k]);
+    if (missing.length > 0) {
+      throw new ForbiddenError(
+        `Você não pode remover quem tem uma permissão que você não tem: ${missing.map((k) => PERMISSION_LABELS[k]).join(', ')}.`,
+        { keys: missing },
+      );
+    }
+  }
   if (replacementId !== undefined) {
     if (replacementId === userId) throw new ValidationError('Escolha outra pessoa para assumir as tarefas.');
     if (!members.has(replacementId)) throw new ValidationError('Quem assume as tarefas precisa ser membro deste espaço.');
