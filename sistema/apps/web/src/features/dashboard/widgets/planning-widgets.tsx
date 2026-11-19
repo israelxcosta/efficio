@@ -99,7 +99,7 @@ function FixedWidget({ type, d, loading, month, size, alert }: WidgetProps & { t
           moreLabel={['lançamento', 'lançamentos']}
           moreHref={href}
           className="flex flex-col"
-          renderItem={(tx) => <TransactionRow tx={tx} density="line" />}
+          renderItem={(tx) => <TransactionRow tx={tx} density="line" neutralAmount />}
         />
       </>
     );

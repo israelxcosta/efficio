@@ -293,7 +293,7 @@ export function UpcomingWidget({ d, loading, prefs, setPref, alert }: WidgetProp
         moreHref={moreHref}
         className="flex flex-col"
         contentKey={filter}
-        renderItem={(tx) => <TransactionRow tx={tx} density="line" />}
+        renderItem={(tx) => <TransactionRow tx={tx} density="line" neutralAmount />}
       />
     );
   }

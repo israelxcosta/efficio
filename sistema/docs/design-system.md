@@ -151,7 +151,31 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 - Sombra: `xs 0 1px 2px rgb(16 24 40 / .04)`; `sm 0 1px 3px rgb(16 24 40 / .06)`;
   `lg 0 12px 32px -8px rgb(16 24 40 / .18)` (sheets, popovers, barra flutuante).
 - Espaçamento: escala de 4px; padding de card 20–24px; gap de grid 16px (mobile 12px).
-- Movimento: 150–200ms `cubic-bezier(.2,.8,.2,1)`; sheets deslizam da direita (240ms).
+- Movimento: ver "Motion" logo abaixo.
+
+### Motion
+
+Movimento serve a feedback, estado e continuidade, nunca à decoração (fonte:
+`docs/analise-design-2026-11-19/animacoes.md` §3). Tokens em `styles/index.css`:
+
+- **Durações** (`--dur-*`, use `duration-(--dur-state)` no Tailwind): hover 100ms (padrão de `transition-colors`),
+  pressão 150ms, estado 200ms, entrada de modal/popover 200ms e saída 150ms, Sheet 300/220ms,
+  gráficos 300ms (`--dur-chart`). A saída é sempre mais curta que a entrada.
+- **Curvas**: entrar e sair com `--ease-out` (`cubic-bezier(.23,1,.32,1)`, também a utility `ease-out`), mover na
+  tela com `--ease-in-out`, painéis com `--ease-drawer`, cor com `ease`. Nunca `ease-in`.
+- **Propriedades**: só `opacity`, `transform`/`translate`/`scale`/`rotate`; nunca `width`/`height`/`top`/`left`
+  (a `ProgressBar` desliza o preenchimento com `translate`). Keyframes de elementos centrados com
+  `-translate-x/y-1/2` animam `scale`, nunca `transform` (no Tailwind v4 os dois se somam e o modal entra torto).
+- **Modal/ConfirmDialog**: `animate-dialog-in`/`animate-dialog-out` (opacity + scale .96) e overlay com
+  `animate-fade-in`/`animate-fade-out`, saindo juntos.
+- **Gráficos**: toda série do Recharts recebe `{...chartMotion(resizing)}` (`components/charts/chart-motion.ts`):
+  `isAnimationActive: 'auto'` (respeita reduced motion; nunca passe `true`), `false` durante o resize do card,
+  300ms `ease-out`. Telas de impressão (relatório do cliente, evolução) ficam com `isAnimationActive={false}`.
+  O `Gauge` gira o knob junto com o arco (mesma duração e curva).
+- **Dado lido não se move por estilo**: nada de count-up; troca de período esmaece (`isPlaceholderData`).
+- **Reduced motion** (bloco global): deslocamento e escala viram crossfade (mesmo tempo, só opacity);
+  transições de cor/opacity/sombra continuam; loops decorativos (`animate-shimmer`, `animate-pulse`,
+  `ob-loading`) param em opacidade .7; o spinner continua girando, mais devagar (1,5s).
 
 ## 2. Layout (app shell)
 
@@ -194,7 +218,7 @@ e não acompanham o tamanho do card; quem cresce é o desenho.
 | PaidToggle         | botão 👍/👎: pendente (padrão) = `ThumbsDown` em `danger-soft`/`danger`; pago = `ThumbsUp` em `success-soft`/`success`; animação de "pop" ao alternar |
 | Badge              | pílula 11–12px: `brand`, `success`, `danger`, `warning`, `neutral` (soft) |
 | EmptyState         | caixa com borda tracejada raio lg, ícone em quadrado `bg-subtle`, título 14/600, descrição muted, botão outline (estados vazios de página); `framed={false}` dentro de cards (o card já é a moldura): ícone 20px `text-subtle`, título 14/600, descrição 12,5 muted, centrado — é o `BodyEmpty` dos widgets |
-| ProgressBar        | trilho `brand-100`, preenchimento `brand-800` (metas) ou `success`/`danger` (limite) |
+| ProgressBar        | trilho `brand-100`, preenchimento `brand-800` (metas) ou `success`/`danger`/`warning` (limite; `warning` usa a marca `chart-yellow`); preenchimento desliza com `translate` em 300ms |
 | InsightCard        | gradiente `brand-700 → brand-900`, texto branco, cartão interno vidro (`white/8`, borda `white/12`), chip overline |
 | BankLogo           | círculo com cor oficial aproximada do banco e sigla (Nu, Itaú, BB, Cx...) — sem marcas registradas |
 | CategoryIcon       | quadrado raio md com fundo `cor/12%` e ícone lucide na cor da categoria |
@@ -349,7 +373,7 @@ Painel financeiro e o Início da Gestão.
   ", "Competência 10/2026 · "); só o número de alerta fica vermelho; vazio sem moldura dupla.
 - **Status como barra empilhada** (`StackBar`, `StatusSummary`), nunca rosca: progresso = concluído (success) →
   atrasado (danger) → pendente (cinza); distribuição na ordem das faixas. Tons (`BandTone`): `danger`,
-  `warning`, `success` (concluída/em dia, ver "Cores de status" na §1), `data`, `dataSoft` (`bg-data/45`,
+  `warning` (ponto/barra em `chart-yellow`, texto em `text-warning`), `success` (concluída/em dia, ver "Cores de status" na §1), `data`, `dataSoft` (`bg-data/45`,
   31–60 dias) e `muted`.
 - **Gráficos:** eixo Y por `niceDomain` (3 a 5 marcas em passos 1/2/2,5/5 × 10ⁿ, começa em zero; negativo
   menor que ¼ do passo só estica o domínio); projeção sem repetir o pior dia (`projectionTiles`) e com a
