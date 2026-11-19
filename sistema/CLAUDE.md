@@ -42,6 +42,11 @@ Segurança (auditoria + correção com teste de regressão, um por linguagem/cam
 - `security-react-web` — TypeScript/React/HTML/CSS: XSS, CSP, tokens, redirects, estados de permissão.
 - `security-postgres-sql` — SQL/PostgreSQL/Drizzle: RLS, papéis, migrações, cripto em repouso.
 - `security-infra-supply-chain` — Docker/YAML/pnpm/AWS: dependências, segredos, deploy.
+- `security-authz-tenancy` — autorização e isolamento multi-tenant (BOLA/BFLA/BOPLA, permissões por chave).
+- `security-threat-model` — modelagem de ameaças (STRIDE, LINDDUN, casos de abuso); só documenta.
+- `security-pentest-dast` — teste de invasão local (WSTG, API Top 10); reporta com prova, não corrige.
+- `security-sast-sca` — SAST (semgrep), dependências (osv), segredos (gitleaks), IaC e SBOM; reporta.
+- `security-privacy-lgpd` — privacidade/LGPD: ROPA, criptografia por campo, retenção, direitos do titular.
 
 ## Regras
 
