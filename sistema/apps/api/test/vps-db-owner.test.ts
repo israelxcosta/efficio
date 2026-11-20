@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../src/db/client';
-import { runMigrations } from '../src/db/migrate';
+import { DEFERRED_CHECKS, runMigrations } from '../src/db/migrate';
 import { purgeExpiredSecurityRows } from '../src/db/retention';
 import { ADMIN_URL, IDENTITY_GRANTS, IDENTITY_TABLES } from './db-roles';
 
@@ -191,6 +191,16 @@ describe('VPS: API and migrations as the non-superuser owner of the tables', () 
     expect(moved).toEqual({ parent: 'Receitas financeiras', sub: 'Juros e multas recebidos' });
     // The other workspace (no interest or fines) got nothing.
     expect(await as(b, (tx) => tx`select count(*)::int as n from categories`)).toEqual([{ n: 0 }]);
+  });
+
+  it('the update validates the NOT VALID checks of 0026/0027 by itself (no manual step after deploy)', async () => {
+    const rows = await owner<{ conname: string; convalidated: boolean }[]>`
+      select conname, convalidated from pg_constraint
+      where conname in ${owner(DEFERRED_CHECKS.map(([, c]) => c))}`;
+    expect(rows).toHaveLength(DEFERRED_CHECKS.length);
+    expect(rows.filter((r) => !r.convalidated)).toEqual([]);
+    // Idempotent: a second update finds nothing left to validate.
+    await runMigrations(urlAs(OWNER, OWNER, DB));
   });
 });
 

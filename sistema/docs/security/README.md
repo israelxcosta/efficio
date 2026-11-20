@@ -17,7 +17,7 @@ Correções (com testes `apps/api/test/security-*.test.ts` e `apps/web/src/featu
 - **Infra** (security-infra-supply-chain): SDK AWS atualizado; log do Caddy sem tokens/IP/UA; job `osv` + SBOM no CI; `.gitignore` na raiz; OIDC do deploy corrigido; backups documentados.
 
 Pendências que dependem do dono:
-- Dados da política de privacidade: controlador, encarregado (DPO), provedor do servidor e do backup (`apps/web/src/features/legal/pages/legal.tsx`).
+- Política de privacidade: versão genérica publicada em 20/11/2026 (controlador = o Escritório identificado no contrato; canal pelo e-mail de atendimento; Hostinger + Google Drive/OneDrive). Recomendada revisão por advogado.
 - GitHub: marcar os checks `verify`/`audit`/`osv`/`secrets`/`image`/`deploy-kit` como obrigatórios na `main`.
-- Produção, após deploy: `VALIDATE CONSTRAINT` das migrações 0026/0027 (docs de deploy).
+- Produção: a validação das migrações 0026/0027 é automática no `migrate`; `VACUUM FULL` só se o log mostrar linhas cifradas pelo backfill (docs de deploy, seção 11).
 - Riscos aceitos/documentados: scrypt abaixo do mínimo OWASP (plano de rehash em `lib/password.ts`); 409 no cadastro aberto (desligado em produção); backups retêm dados por até 365 dias.

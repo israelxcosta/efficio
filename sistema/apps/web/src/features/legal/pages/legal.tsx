@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { ArrowLeft, Scale } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { GRACE_DAYS, TRIAL_DAYS } from '@effinance/shared';
 
 interface Section {
@@ -9,7 +9,7 @@ interface Section {
 
 const TERMS_UPDATED_AT = '20/10/2026';
 /** Onboarding, operators and retention as the system does them (docs/security/privacidade-lgpd-2026-11-19.md). */
-const PRIVACY_UPDATED_AT = '19/11/2026';
+const PRIVACY_UPDATED_AT = '20/11/2026';
 
 const TERMS: Section[] = [
   {
@@ -63,57 +63,88 @@ const TERMS: Section[] = [
 
 const PRIVACY: Section[] = [
   {
-    title: '1. Quem somos',
+    title: '1. Quem somos e a quem esta política se aplica',
     paragraphs: [
-      'Esta política explica como o Efficio trata dados pessoais conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018 — LGPD). Controlador: [RAZÃO SOCIAL], CNPJ [00.000.000/0000-00], [ENDEREÇO].',
-      'Encarregado (DPO): [NOME] — [e-mail do encarregado].',
+      'Esta política explica como os dados pessoais são tratados no Efficio, sistema usado pelo escritório de contabilidade que opera esta instalação ("Escritório"), conforme a Lei Geral de Proteção de Dados Pessoais (Lei 13.709/2018, "LGPD").',
+      'O Escritório é o controlador dos dados: decide para que e como eles são tratados. Sua razão social, CNPJ e endereço constam do contrato de prestação de serviços, das propostas e dos documentos que ele envia aos clientes.',
+      'Ela vale para quem usa o sistema (sócios e equipe do Escritório), para os clientes do Escritório e para as pessoas cujos dados os clientes entregam ao Escritório para a prestação dos serviços contábeis, fiscais e trabalhistas (sócios, responsáveis, empregados e dependentes).',
     ],
   },
   {
-    title: '2. Dados que tratamos',
+    title: '2. Canal de privacidade e encarregado',
     paragraphs: [
-      'Cadastro: nome, e-mail e senha (guardada apenas como hash). Dados financeiros que você registra: contas, cartões, lançamentos, metas, categorias e observações.',
-      'Contatos que você cadastra: nome, CPF/CNPJ, e-mail, telefone e endereço. Dados técnicos de segurança: endereço IP truncado (os últimos dígitos são descartados), identificador do navegador e datas de acesso das sessões e das ações registradas na auditoria.',
-      'Quando o escritório envia o onboarding, guardamos (cifrados) o nome e o telefone ou e-mail de quem recebeu o link. Cada abertura do link registra data e hora, o tipo de aparelho, o navegador e o sistema (resumidos a partir do identificador do navegador, que não é guardado inteiro) e o endereço IP truncado. Não registramos a localização. Ao confirmar a leitura, guardamos o nome e o CPF informados (cifrados), a data e hora e o IP truncado, e o registro de auditoria dessa confirmação guarda também o identificador do navegador, para comprovar a ciência das orientações. O link vale pelo prazo definido pelo escritório (30 dias por padrão, no máximo 90) e pode ser revogado a qualquer momento; esses registros seguem a guarda dos dados do cliente e são excluídos com o cadastro dele ou com o espaço.',
+      'Dúvidas e pedidos sobre dados pessoais podem ser enviados ao e-mail de atendimento do Escritório, com o assunto "Privacidade – LGPD".',
+      'Quando o Escritório se enquadra como agente de tratamento de pequeno porte (Resolução CD/ANPD nº 2/2022), a indicação de encarregado (DPO) é dispensada e esse canal cumpre a função. Quando houver encarregado indicado, seu nome e contato são informados pelo mesmo canal e no contrato.',
     ],
   },
   {
-    title: '3. Para que usamos',
+    title: '3. Dados que tratamos',
     paragraphs: [
-      'Prestar o serviço (execução de contrato), proteger sua conta e prevenir fraudes (legítimo interesse e segurança), cobrar a assinatura (execução de contrato) e cumprir obrigações legais. Não vendemos dados e não os usamos para publicidade.',
+      'Conta de acesso: nome, e-mail, senha (guardada apenas como hash, nunca em texto legível), foto opcional e configurações de segurança (verificação em duas etapas).',
+      'Clientes e contatos: razão social ou nome, CPF/CNPJ, e-mail, telefone, endereço, dados do responsável, regime tributário, honorários, contratos, documentos, certidões e anotações de atendimento.',
+      'Dados para a prestação dos serviços: informações financeiras, fiscais e contábeis da empresa cliente e, no departamento pessoal, dados de sócios, empregados e dependentes exigidos pela legislação (por exemplo, para folha de pagamento e eSocial). Atestados e exames ocupacionais podem conter dados de saúde, que são dados sensíveis e só são tratados para cumprir obrigação legal ou regulatória.',
+      'Dados técnicos de segurança: endereço IP truncado (os últimos dígitos são descartados), um resumo do navegador e do aparelho e as datas de acesso das sessões e das ações registradas na auditoria.',
+      'Onboarding de clientes: quando o Escritório envia o onboarding, guardamos (cifrados) o nome e o telefone ou e-mail de quem recebeu o link. Cada abertura registra data e hora, o tipo de aparelho, o navegador e o sistema (resumidos) e o IP truncado. Não registramos a localização. Ao confirmar a leitura, guardamos o nome e o CPF informados (cifrados), a data e hora, o IP truncado e o resumo do navegador, para comprovar a ciência das orientações. O link vale pelo prazo definido pelo Escritório (30 dias por padrão, no máximo 90) e pode ser revogado a qualquer momento.',
     ],
   },
   {
-    title: '4. Compartilhamento',
+    title: '4. Para que usamos e com que base legal',
     paragraphs: [
-      'Somente com operadores necessários ao serviço: o provedor do servidor onde o sistema e o banco de dados ficam hospedados ([PROVEDOR E PAÍS DO SERVIDOR]), o provedor da caixa de e-mail usada para enviar mensagens do sistema, o serviço de armazenamento das cópias de segurança cifradas ([SERVIÇO DE BACKUP]) e a BrasilAPI, consultada com o CNPJ informado para preencher dados públicos da empresa. Quando ativados, também o Mercado Pago (pagamento da assinatura; o Efficio não recebe dados de cartão) e o agregador de Open Finance (conexão com bancos autorizada por você). Mensagens de WhatsApp são abertas no aparelho de quem envia; o Efficio não as envia nem as lê. Membros de um espaço compartilhado veem os dados daquele espaço conforme a permissão dada pelo proprietário.',
+      'Prestar os serviços contratados e manter o relacionamento com o cliente (execução de contrato, art. 7º, V).',
+      'Cumprir obrigações legais e regulatórias contábeis, fiscais, trabalhistas e previdenciárias, como escrituração, declarações, folha de pagamento e eSocial, e guardar os documentos pelos prazos legais (obrigação legal, art. 7º, II, e art. 11, II, "a", para dados sensíveis).',
+      'Proteger as contas, prevenir fraudes e acessos indevidos e manter registros de auditoria (legítimo interesse e segurança, art. 7º, IX, e garantia de prevenção à fraude, art. 11, II, "g").',
+      'Defender direitos em processos administrativos, judiciais ou arbitrais (exercício regular de direitos, art. 7º, VI).',
+      'Não vendemos dados, não os usamos para publicidade e não fazemos decisões automatizadas que afetem os titulares.',
     ],
   },
   {
-    title: '5. Segurança',
+    title: '5. Com quem compartilhamos',
     paragraphs: [
-      'Cada espaço é isolado no banco de dados e tem chave de criptografia própria. Dados sensíveis (documentos, contatos, observações) são gravados cifrados com AES-256; a conexão usa TLS; backups são cifrados.',
-      'Oferecemos verificação em duas etapas, controle de sessões ativas e registro de auditoria das ações sensíveis.',
+      'Somente com operadores necessários ao funcionamento do sistema, que tratam os dados conforme as instruções do Escritório: a Hostinger, provedora do servidor (VPS) onde ficam o sistema e o banco de dados e do serviço de e-mail usado para enviar mensagens do sistema; o serviço de armazenamento das cópias de segurança (Google Drive ou Microsoft OneDrive), que recebe apenas arquivos cifrados antes do envio; e a BrasilAPI, consultada só com o CNPJ para preencher dados públicos da empresa.',
+      'Quando ativados pelo Escritório: o Mercado Pago (pagamento da assinatura; o sistema não recebe dados de cartão) e o agregador de Open Finance (conexão com bancos autorizada pelo titular da conta).',
+      'Com órgãos públicos (como Receita Federal, Secretarias de Fazenda, Prefeituras, eSocial, FGTS Digital e Juntas Comerciais), sempre que a prestação dos serviços ou a lei exigir, e com autoridades mediante ordem legal.',
+      'Mensagens de WhatsApp são abertas no aparelho de quem envia; o sistema não as envia nem as lê. Dentro do Escritório, cada pessoa vê apenas o que sua permissão de acesso permite.',
     ],
   },
   {
-    title: '6. Retenção',
+    title: '6. Transferência internacional',
     paragraphs: [
-      'Mantemos os dados enquanto a conta ou o espaço existir. Após a exclusão, os dados são removidos e a chave de criptografia do espaço destruída. As cópias de segurança são cifradas e expiram sozinhas: as diárias em até 60 dias e as semanais em até 1 ano; até lá, um dado excluído ainda pode existir nelas, e só é usado para recuperar o sistema após uma falha.',
-      'O registro de auditoria (ações sensíveis, com IP truncado e identificador do navegador) é guardado por 24 meses e depois apagado. Registros exigidos por lei (como os de acesso, art. 15 do Marco Civil da Internet, por 6 meses) são guardados pelo prazo legal.',
+      'As cópias de segurança no Google Drive ou no OneDrive, e o servidor quando o data center escolhido estiver fora do Brasil, podem envolver transferência internacional de dados. Ela ocorre com base no art. 33 da LGPD e nas cláusulas contratuais padrão da Resolução CD/ANPD nº 19/2024, e os arquivos de backup são cifrados antes de sair do servidor, sem que o provedor tenha acesso ao conteúdo.',
     ],
   },
   {
-    title: '7. Seus direitos',
+    title: '7. Segurança',
     paragraphs: [
-      'Você pode confirmar o tratamento, acessar, corrigir, exportar (portabilidade) e excluir seus dados diretamente nas Configurações, além de revogar consentimentos e pedir informações pelo e-mail do encarregado.',
-      'Se os seus dados foram cadastrados por um escritório que usa o Efficio (por exemplo, como cliente, responsável pela empresa ou quem recebeu o link do onboarding), o escritório decide sobre eles: faça o pedido ao escritório, que pode consultar, corrigir, exportar ou excluir esses dados no sistema, ou ao encarregado acima, que o encaminha.',
+      'Cada espaço é isolado no banco de dados e tem chave de criptografia própria. Dados pessoais e sensíveis (documentos, contatos, CPF/CNPJ, observações) são gravados cifrados com AES-256; a conexão usa TLS (HTTPS); os backups são cifrados.',
+      'Oferecemos verificação em duas etapas, pedimos a senha de novo antes de ações sensíveis (como exportar ou excluir dados), limitamos tentativas de acesso, controlamos as sessões ativas e registramos em auditoria as ações sensíveis. Incidentes de segurança que possam causar risco ou dano relevante são comunicados aos titulares e à ANPD, nos termos do art. 48 da LGPD.',
     ],
   },
   {
-    title: '8. Cookies',
+    title: '8. Por quanto tempo guardamos',
     paragraphs: [
-      'Usamos apenas cookies essenciais de sessão (autenticação), sem rastreamento de terceiros. Preferências de interface, como o tema, ficam no seu navegador.',
+      'Pelo tempo do contrato e, depois dele, pelos prazos legais de guarda: em regra, 5 anos para documentos e registros fiscais e contábeis e os prazos trabalhistas e previdenciários aplicáveis, além do necessário para o exercício regular de direitos. Encerrados esses prazos, os dados são excluídos ou anonimizados.',
+      'Os acessos aos links de onboarding são apagados 12 meses depois que o link vence. O registro de auditoria é guardado por 24 meses. Os registros de acesso a aplicações são guardados por 6 meses (art. 15 do Marco Civil da Internet).',
+      'Ao excluir um espaço, os dados são removidos e a chave de criptografia do espaço é destruída. As cópias de segurança são cifradas e expiram sozinhas (diárias em até 60 dias e semanais em até 1 ano); até lá, um dado excluído ainda pode existir nelas e só é usado para recuperar o sistema após uma falha.',
+    ],
+  },
+  {
+    title: '9. Direitos do titular',
+    paragraphs: [
+      'Você pode pedir: confirmação de que tratamos seus dados, acesso, correção de dados incompletos ou desatualizados, anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desconformidade, portabilidade, informação sobre com quem compartilhamos, informação sobre a possibilidade de não fornecer consentimento e revogação do consentimento, quando ele for a base do tratamento (art. 18 da LGPD).',
+      'Quem usa o sistema pode acessar, corrigir e exportar os próprios dados e excluir a conta nas Configurações. Os demais titulares (clientes, sócios, empregados e quem recebeu o onboarding) fazem o pedido pelo canal de privacidade do item 2. Respondemos em até 15 dias. Dados que a lei obriga a guardar são mantidos pelo prazo legal, mesmo após o pedido de exclusão, e o titular é informado disso.',
+      'Você também pode apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD), em gov.br/anpd.',
+    ],
+  },
+  {
+    title: '10. Cookies',
+    paragraphs: [
+      'Usamos apenas cookies essenciais de sessão (autenticação), sem rastreamento nem publicidade de terceiros. Preferências de interface, como o tema, ficam no seu navegador.',
+    ],
+  },
+  {
+    title: '11. Alterações',
+    paragraphs: [
+      'Esta política pode ser atualizada para refletir mudanças no sistema ou na legislação. A data da última atualização fica no topo da página, e mudanças relevantes são avisadas aos usuários.',
     ],
   },
 ];
@@ -135,13 +166,6 @@ function LegalPage({ title, sections, updatedAt }: { title: string; sections: Se
         <p className="eyebrow text-brand-text">Documentos legais</p>
         <h1 className="mt-2 text-[28px] font-semibold tracking-tight">{title}</h1>
         <p className="mt-1 text-sm text-muted">Última atualização: {updatedAt}</p>
-        <div role="note" className="mt-6 flex gap-3 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-[13px] text-fg">
-          <Scale className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-          <p>
-            <strong className="font-semibold">Modelo a ser revisado por advogado.</strong> Este texto é um ponto de partida e
-            os campos entre colchetes precisam ser preenchidos antes da publicação.
-          </p>
-        </div>
         <div className="mt-8 flex flex-col gap-7">
           {sections.map((s) => (
             <section key={s.title}>

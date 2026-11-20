@@ -517,22 +517,13 @@ próprio (43+ caracteres), `MAILER=ses`, `APP_URL`/`CORS_ORIGIN` https e valores
 `MP_ACCESS_TOKEN`/`MP_WEBHOOK_SECRET` (ela não fala com o Mercado Pago nem envia e-mails) e
 `OPEN_FINANCE_PROVIDER=disabled` (ela não fala com a Pluggy) — **nunca** os segredos reais da API.
 
-**Depois das migrações 0026/0027 (uma vez, como `effinance_owner`).** Elas criam CHECKs `NOT VALID`
-que recusam texto claro nos campos cifrados (`contacts`: CPF/CNPJ, contato, endereço, notas,
-responsável; notas de `transactions`, `goals`, `goal_contributions` e dos modelos de `recurrences`) e
-marcam todos os espaços para o backfill, que roda no mesmo `migrate.js`. Confira no log da tarefa a
-linha `✔ encryption backfill: … rows encrypted` e então valide (falha = sobrou texto claro: rode a
-migração de novo e investigue antes de seguir):
+**Migrações 0026/0027 (automático).** Elas criam CHECKs `NOT VALID` que recusam texto claro nos
+campos cifrados e marcam os espaços para o backfill; o mesmo `migrate.js` cifra o legado e depois
+valida as regras sozinho (`✔ deferred checks: 6 validated` no log; `✖ … not validated` = sobrou texto
+claro: rode a migração de novo e investigue). Só se o log mostrar `encryption backfill: … N rows
+encrypted` com N > 0, rode em janela de manutenção (bloqueia as tabelas):
 
 ```sql
-ALTER TABLE contacts VALIDATE CONSTRAINT contacts_encrypted_fields_chk;
-ALTER TABLE contacts VALIDATE CONSTRAINT contacts_blind_index_chk;
-ALTER TABLE transactions VALIDATE CONSTRAINT transactions_notes_chk;
-ALTER TABLE goals VALIDATE CONSTRAINT goals_notes_chk;
-ALTER TABLE goal_contributions VALIDATE CONSTRAINT goal_contributions_note_chk;
-ALTER TABLE recurrences VALIDATE CONSTRAINT recurrences_template_notes_chk;
--- Só se o backfill cifrou linhas (rows > 0), em janela de manutenção (bloqueia as tabelas): as versões
--- antigas em texto claro ficam em tuplas mortas até o VACUUM FULL (e no WAL/snapshots até expirarem).
 VACUUM FULL contacts, transactions, goals, goal_contributions, recurrences;
 ```
 
