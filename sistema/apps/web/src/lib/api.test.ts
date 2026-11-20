@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { api, ApiRequestError, onUnauthorized, setBearerToken } from './api';
+import { api, ApiRequestError, onReauthRequired, onUnauthorized, setBearerToken } from './api';
 
 const json = (status: number, body: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -15,6 +15,26 @@ describe('api client', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     onUnauthorized(null);
+    onReauthRequired(null);
+  });
+
+  it('asks for the step-up on 422 reauth_required and replays the request once; cancelling surfaces the error', async () => {
+    const reauth = { error: 'reauth_required', message: 'Por segurança, confirme sua senha para continuar.', details: { reauthRequired: true, mfa: false } };
+    let confirmed = false;
+    fetchMock.mockImplementation(async () => (confirmed ? json(200, { ok: true }) : json(422, reauth)));
+    const handler = vi.fn(async (error: ApiRequestError) => {
+      expect(error.details).toEqual({ reauthRequired: true, mfa: false });
+      confirmed = true;
+      return true;
+    });
+    onReauthRequired(handler);
+    await expect(api('/workspaces/current/export')).resolves.toEqual({ ok: true });
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    confirmed = false;
+    onReauthRequired(async () => false);
+    await expect(api('/workspaces/current/export')).rejects.toMatchObject({ status: 422, code: 'reauth_required' });
   });
 
   it('refuses paths that would resolve to another endpoint (client-side path traversal)', async () => {

@@ -34,6 +34,11 @@ export interface AccessClaims {
 export interface MfaClaims {
   typ: 'mfa';
   sub: string;
+  /**
+   * Id of this challenge: the session opened by its first success gets it as id, so a second success
+   * with the same token hits the primary key (single use, atomic).
+   */
+  jti: string;
 }
 
 declare module '@fastify/jwt' {
@@ -109,7 +114,11 @@ export async function issueSessionCookies(reply: FastifyReply, session: IssuedSe
 }
 
 export async function signMfaToken(reply: FastifyReply, userId: string): Promise<string> {
-  return reply.jwtSign({ typ: 'mfa', sub: userId }, { expiresIn: MFA_TTL_SECONDS });
+  return reply.jwtSign({ typ: 'mfa', sub: userId, jti: globalThis.crypto.randomUUID() }, { expiresIn: MFA_TTL_SECONDS });
+}
+
+export function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_RE.test(value);
 }
 
 export const authPlugin = fp(async (app) => {

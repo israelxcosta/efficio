@@ -17,6 +17,7 @@ import {
   onboardingMessage,
   onlyDigits,
   ONBOARDING_FACTORY_VERSION,
+  ONBOARDING_PARAMS_REQUIRED_MESSAGE,
   type OnboardingAccessView,
   type OnboardingDocument,
   type OnboardingHistoryResponse,
@@ -89,6 +90,12 @@ function onlyChanged(texts: Record<string, string>): Record<string, string> {
 async function templateRow(db: DbExecutor, workspaceId: string) {
   const [row] = await db.select().from(onboardingTemplates).where(eq(onboardingTemplates.workspaceId, workspaceId));
   return row ?? null;
+}
+
+/** Whether the office saved its Parâmetros do onboarding (a template row carrying `params`). */
+function paramsSaved(row: Awaited<ReturnType<typeof templateRow>>): boolean {
+  const content = row?.content as { params?: unknown } | null | undefined;
+  return typeof content?.params === 'object' && content.params !== null;
 }
 
 export async function getTemplate(ctx: Pick<Ctx, 'db' | 'workspaceId'>): Promise<OnboardingTemplateResponse> {
@@ -372,6 +379,8 @@ export async function createLink(
   }
   await purgeExpiredAccesses(ctx.db, ctx.workspaceId);
   const template = await templateRow(ctx.db, ctx.workspaceId);
+  // Never the factory parameters (Efficio's e-mails) in another office's link.
+  if (!paramsSaved(template)) throw new ValidationError(ONBOARDING_PARAMS_REQUIRED_MESSAGE);
   const days = normalizeOnboardingParams(template?.content).deadlines.linkDays;
   const token = randomToken(32);
   const tokenHash = await sha256Hex(token);
@@ -493,6 +502,7 @@ export async function getHistory(ctx: Pick<Ctx, 'db' | 'workspaceId' | 'cipher'>
   const lasts = perLink.map((s) => (s.last ? new Date(s.last).getTime() : -Infinity));
   const confirmed = links.filter((l) => l.confirmedAt).sort((a, b) => b.confirmedAt!.getTime() - a.confirmedAt!.getTime())[0];
   return {
+    paramsSaved: paramsSaved(await templateRow(ctx.db, ctx.workspaceId)),
     links: views,
     accesses: {
       items: await Promise.all(recent.map(toAccessView)),

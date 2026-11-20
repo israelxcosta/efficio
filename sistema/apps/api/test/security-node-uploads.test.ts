@@ -9,7 +9,7 @@ import type { App } from '../src/app';
 import { toDataUri } from '../src/lib/images';
 import { csvCell as taskCsvCell } from '../src/modules/tasks/csv';
 import { csvCell as auditCsvCell } from '../src/modules/workspaces/audit-retention';
-import { admin, createTestApp, registerUser, resetDb } from './helpers';
+import { admin, createTestApp, registerUser, resetDb, saveOnboardingParams } from './helpers';
 import { cnpj } from './task-helpers';
 
 /** A real 160×64 PNG. */
@@ -82,6 +82,7 @@ describe('onboarding link recipient is validated by the server', () => {
 
   it('refuses a WhatsApp number outside 10–13 digits (or not Brazilian) and never returns an empty recipient', async () => {
     const owner = await registerUser(app, 'Dona do Escritório');
+    await saveOnboardingParams(owner);
     const client = await owner.post('/clients', {
       name: 'Padaria Segura Ltda',
       document: cnpj(41_000_007),

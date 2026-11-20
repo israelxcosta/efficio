@@ -263,7 +263,7 @@ describe('request hardening', () => {
     const res = await app.inject({ method: 'GET', url: '/api/health' });
     expect(res.headers['content-security-policy']).toContain("default-src 'none'");
     expect(res.headers['x-content-type-options']).toBe('nosniff');
-    expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
+    expect(res.headers['x-frame-options']).toBe('DENY');
   });
 
   it('issues short-lived access tokens and httpOnly cookies scoped to their use', async () => {

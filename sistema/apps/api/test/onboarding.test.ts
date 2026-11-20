@@ -7,10 +7,10 @@
 import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ONBOARDING_DEFAULT_PARAMS, type OnboardingDocument } from '@effinance/shared';
+import { ONBOARDING_DEFAULT_PARAMS, ONBOARDING_PARAMS_REQUIRED_MESSAGE, type OnboardingDocument } from '@effinance/shared';
 import type { App } from '../src/app';
 import { executeRows } from '../src/lib/sql';
-import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
+import { admin, createTestApp, registerUser, resetDb, saveOnboardingParams, type Client } from './helpers';
 import { API_ROLE } from './db-roles';
 import { cnpj, member, workspaceOf } from './task-helpers';
 
@@ -219,6 +219,14 @@ describe('onboarding links and the public page', () => {
     const ws = await workspaceOf(owner);
     const clientId = await newClient(owner, 'simples_nacional');
 
+    // Until the office saves its Parâmetros, no link (the factory e-mails are Efficio's).
+    const unsaved = await owner.post(`/clients/${clientId}/onboarding/links`, { channel: 'whatsapp', contact: 'company' });
+    expect(unsaved.status).toBe(422);
+    expect(unsaved.body.message).toBe(ONBOARDING_PARAMS_REQUIRED_MESSAGE);
+    expect((await owner.get(`/clients/${clientId}/onboarding`)).body.paramsSaved).toBe(false);
+    await saveOnboardingParams(owner);
+    expect((await owner.get(`/clients/${clientId}/onboarding`)).body.paramsSaved).toBe(true);
+
     expect((await owner.post(`/clients/${clientId}/onboarding/links`, { channel: 'whatsapp' })).status).toBe(400);
     expect((await owner.post(`/clients/${clientId}/onboarding/links`, { channel: 'email', contact: 'responsible' })).status).toBe(422);
     const created = await viewer.post(`/clients/${clientId}/onboarding/links`, { channel: 'whatsapp', contact: 'company' });
@@ -306,11 +314,12 @@ describe('onboarding links and the public page', () => {
     const after = await owner.get(`/clients/${clientId}/onboarding`);
     expect(after.body.links.map((l: { status: string }) => l.status).sort()).toEqual(['expired', 'revoked']);
 
-    expect(await auditActions(ws)).toEqual(['onboarding.link_created', 'onboarding.link_created', 'onboarding.confirmed', 'onboarding.link_revoked']);
+    expect(await auditActions(ws)).toEqual(['onboarding.template_updated', 'onboarding.link_created', 'onboarding.link_created', 'onboarding.confirmed', 'onboarding.link_revoked']);
   });
 
   it('sending needs `clients`; another workspace sees nothing; the API login cannot read the tenant tables', async () => {
     const owner = await registerUser(app, 'Israel Dono');
+    await saveOnboardingParams(owner);
     const viewer = await member(app, owner, 'viewer', 'Carla Colaboradora');
     const clientId = await newClient(owner, 'mei');
     const adjust = await owner.put(`/workspaces/current/members/${viewer.userId}/permissions`, { overrides: { clients: false } });
@@ -372,6 +381,7 @@ describe('public onboarding rate limit', () => {
     const strict = await createTestApp({ relaxedRateLimits: false });
     try {
       const owner = await registerUser(strict, 'Israel Dono');
+      await saveOnboardingParams(owner);
       const clientId = await newClient(owner, 'simples_nacional');
       const link = await owner.post(`/clients/${clientId}/onboarding/links`, { channel: 'whatsapp', contact: 'company' });
       const token = tokenOf(link.body.path);

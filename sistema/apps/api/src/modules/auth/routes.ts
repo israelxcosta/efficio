@@ -27,6 +27,7 @@ import { audit } from '../../lib/audit';
 import {
   REFRESH_COOKIE,
   clearAuthCookies,
+  isUuid,
   issueSessionCookies,
   signMfaToken,
   type AccessClaims,
@@ -44,6 +45,7 @@ import {
   changePassword,
   checkPassword,
   deleteAccount,
+  isUniqueViolation,
   passwordResetLink,
   register,
   requestPasswordReset,
@@ -60,6 +62,8 @@ import {
   setSessionWorkspace,
 } from './sessions';
 
+const MFA_CHALLENGE_EXPIRED = 'A verificação expirou. Entre novamente.';
+
 /** Minimum duration of `POST /auth/password/forgot`, whether or not the e-mail has an account. */
 export const FORGOT_PASSWORD_MIN_MS = 250;
 
@@ -74,10 +78,23 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   const enrollmentRoute = { mfaEnrollment: true } as const;
 
   /** Opens a session on the user's preferred workspace and sets the cookies. */
-  async function startSession(req: FastifyRequest, reply: FastifyReply, user: UserRow, method: string): Promise<AuthResponse> {
+  async function startSession(
+    req: FastifyRequest,
+    reply: FastifyReply,
+    user: UserRow,
+    method: string,
+    /** The MFA challenge (jti) this login consumes: it becomes the session id (primary key = single use). */
+    challengeId?: string,
+  ): Promise<AuthResponse> {
     const workspaceId = await resolveWorkspaceFor(app.db, user.id);
     if (!workspaceId) throw new UnauthorizedError('Sua conta não participa de nenhum espaço');
-    const session = await createSession(app.db, { userId: user.id, workspaceId, ...requestContext(req) });
+    let session;
+    try {
+      session = await createSession(app.db, { userId: user.id, workspaceId, id: challengeId, ...requestContext(req) });
+    } catch (error) {
+      if (challengeId && isUniqueViolation(error)) throw new UnauthorizedError(MFA_CHALLENGE_EXPIRED);
+      throw error;
+    }
     const token = await issueSessionCookies(reply, session, workspaceId);
     await audit(app.db, { ...requestContext(req), action: 'auth.login', userId: user.id, workspaceId, metadata: { method } });
     return { user: toUser(user), token, ...enrollment(user) };
@@ -112,14 +129,18 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
     try {
       claims = app.jwt.verify<MfaClaims>(req.body.mfaToken);
     } catch {
-      throw new UnauthorizedError('A verificação expirou. Entre novamente.');
+      throw new UnauthorizedError(MFA_CHALLENGE_EXPIRED);
     }
-    if (claims.typ !== 'mfa') throw new UnauthorizedError('A verificação expirou. Entre novamente.');
+    if (claims.typ !== 'mfa' || !isUuid(claims.sub) || !isUuid(claims.jti)) throw new UnauthorizedError(MFA_CHALLENGE_EXPIRED);
+    // Single use: once a code succeeded with this challenge, the token is spent (a stolen or replayed
+    // token cannot open a second session with another code). Checked first, enforced by the insert.
+    const [spent] = await app.db.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, claims.jti)).limit(1);
+    if (spent) throw new UnauthorizedError(MFA_CHALLENGE_EXPIRED);
     const user = await getUserRow(app.db, claims.sub);
     // Per-account attempt budget and failure audit live in verifyMfaCode (429 when exhausted).
     const method = await verifyMfaCode(app.db, user, req.body.code, requestContext(req));
     if (!method) throw new UnauthorizedError('Código inválido');
-    return startSession(req, reply, user, method === 'recovery' ? 'mfa_recovery' : 'mfa');
+    return startSession(req, reply, user, method === 'recovery' ? 'mfa_recovery' : 'mfa', claims.jti);
   });
 
   app.post('/refresh', { config: limit(30) }, async (req, reply) => {

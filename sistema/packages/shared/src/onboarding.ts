@@ -511,7 +511,15 @@ export interface OnboardingConfirmationView {
 }
 
 /** GET /clients/:id/onboarding: the card and the timeline of the client's page. */
+/**
+ * A link is only created once the office saved the Parâmetros do onboarding (its e-mails, deadlines and
+ * contact): otherwise the client would receive the factory values (Efficio's e-mails) as the office's.
+ */
+export const ONBOARDING_PARAMS_REQUIRED_MESSAGE = 'Preencha os Parâmetros do onboarding em Configurações antes de enviar o link.';
+
 export interface OnboardingHistoryResponse {
+  /** Whether the office saved the Parâmetros do onboarding (false: the preview shows the factory ones and sending is refused). */
+  paramsSaved?: boolean;
   links: OnboardingLinkView[];
   accesses: { items: OnboardingAccessView[]; count: number; firstAt: string | null; lastAt: string | null };
   /** The latest confirmation (any link). */

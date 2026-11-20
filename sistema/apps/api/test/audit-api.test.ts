@@ -832,7 +832,7 @@ describe('guards: access control', () => {
     const forged = app.jwt.sign({ typ: 'access', sub: editor.userId, wid: FAKE_ID, sid: FAKE_ID });
     expect((await app.inject({ method: 'GET', url: '/api/accounts', headers: { authorization: `Bearer ${forged}` } })).statusCode).toBe(401);
     // An MFA challenge token is never an access token, and vice versa.
-    const mfa = app.jwt.sign({ typ: 'mfa', sub: editor.userId });
+    const mfa = app.jwt.sign({ typ: 'mfa', sub: editor.userId, jti: FAKE_ID });
     expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: { authorization: `Bearer ${mfa}` } })).statusCode).toBe(401);
     expect((await mfaVerify(editor.token, '123456')).statusCode).toBe(401);
   });

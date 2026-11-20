@@ -76,6 +76,15 @@ export function hstsPolicy(production: boolean) {
   return production ? { maxAge: HSTS_MAX_AGE_SECONDS, includeSubDomains: true, preload: false } : false;
 }
 
+/** Generic body of a 4xx raised by the framework or a plugin (not by our code). */
+export function clientErrorBody(statusCode: number): ApiError {
+  if (statusCode === 413) return { error: 'payload_too_large', message: 'O conteúdo enviado é grande demais.' };
+  if (statusCode === 415) return { error: 'unsupported_media_type', message: 'Envie os dados em JSON' };
+  if (statusCode === 404) return { error: 'not_found', message: 'Rota não encontrada' };
+  if (statusCode === 405) return { error: 'method_not_allowed', message: 'Método não permitido' };
+  return { error: 'bad_request', message: 'Requisição inválida.' };
+}
+
 export interface BuildAppOptions {
   logger?: FastifyServerOptions['logger'];
   /** Overrides of the services built from env (tests). */
@@ -156,6 +165,8 @@ export async function buildApp(options: BuildAppOptions = {}) {
       directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'none'"] },
     },
     crossOriginResourcePolicy: { policy: 'same-site' },
+    // Same as `frame-ancestors 'none'` for browsers that only know the old header.
+    frameguard: { action: 'deny' },
     hsts: hstsPolicy(env.NODE_ENV === 'production'),
   });
   await app.register(cors, { origin: env.CORS_ORIGIN, credentials: true });
@@ -216,7 +227,9 @@ export async function buildApp(options: BuildAppOptions = {}) {
       return reply.code(conflict.statusCode).send(body);
     }
     if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
-      return reply.code(error.statusCode).send({ error: error.code ?? 'bad_request', message: error.message });
+      // Framework errors (parser, body size, media type…): a generic answer, never Fastify's internal
+      // codes and messages (`FST_ERR_CTP_*` tell the stack and its version).
+      return reply.code(error.statusCode).send(clientErrorBody(error.statusCode));
     }
     request.log.error({ err: error }, 'unhandled error');
     const body: ApiError = { error: 'internal_error', message: 'Erro inesperado. Tente novamente.' };

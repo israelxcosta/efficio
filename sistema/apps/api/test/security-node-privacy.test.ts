@@ -11,7 +11,7 @@ import { maskIp } from '../src/lib/ip';
 import { serializeRequest } from '../src/lib/log';
 import { executeRows } from '../src/lib/sql';
 import { ACCESS_RETENTION_MONTHS } from '../src/modules/onboarding/service';
-import { admin, createTestApp, registerUser, resetDb, type Client } from './helpers';
+import { admin, createTestApp, registerUser, resetDb, saveOnboardingParams, type Client } from './helpers';
 import { cnpj } from './task-helpers';
 
 const UA_PHONE =
@@ -68,6 +68,7 @@ describe('public onboarding: minimization (LGPD)', () => {
 
   let seq = 52_000_000;
   async function clientOf(owner: Client): Promise<string> {
+    await saveOnboardingParams(owner);
     seq += 7;
     const res = await owner.post('/clients', {
       name: `Mercado Privado ${seq} Ltda`,

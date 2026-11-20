@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { ONBOARDING_DEFAULT_PARAMS } from '@effinance/shared';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll } from 'vitest';
 import { buildApp, type App } from '../src/app';
@@ -136,4 +137,13 @@ export async function legacyPersonalWorkspace(app: App, c: Client): Promise<stri
   const switched = await c.post('/auth/switch-workspace', { workspaceId });
   if (switched.status !== 200) throw new Error(`switch failed: ${JSON.stringify(switched.body)}`);
   return workspaceId;
+}
+
+/**
+ * Saves the office's Parâmetros do onboarding (the defaults): onboarding links are refused until the
+ * office saved them (never the factory e-mails in another office's link).
+ */
+export async function saveOnboardingParams(c: Client): Promise<void> {
+  const res = await c.put('/onboarding/template', { params: ONBOARDING_DEFAULT_PARAMS, texts: {}, hidden: [] });
+  if (res.status !== 200) throw new Error(`saveOnboardingParams: ${res.status} ${JSON.stringify(res.body)}`);
 }

@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ONBOARDING_DEFAULT_PARAMS } from '@effinance/shared';
 import type { App } from '../src/app';
-import { createTestApp, registerUser, resetDb } from './helpers';
+import { createTestApp, registerUser, resetDb, saveOnboardingParams } from './helpers';
 import { createClient } from './task-helpers';
 
 let app: App;
@@ -28,6 +28,7 @@ describe('LGPD export: client onboarding', () => {
     const other = await registerUser(app, 'Outro Dono');
     const clientId = await createClient(owner, { name: 'Pão Quente Ltda' });
     const otherClient = await createClient(other, { name: 'Cliente Alheio Ltda' });
+    await saveOnboardingParams(other);
 
     const saved = await owner.put('/onboarding/template', {
       params: { ...ONBOARDING_DEFAULT_PARAMS, contact: { whatsapp: '(19) 99999-0000', hours: 'Seg. a sex.', crc: 'SP-1/O' } },

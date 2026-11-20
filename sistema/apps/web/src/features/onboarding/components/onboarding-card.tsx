@@ -87,6 +87,12 @@ export function OnboardingCard({ clientId, onView, onSend }: OnboardingCardProps
           </div>
         }
       />
+      {h?.paramsSaved === false ? (
+        <p role="status" className="rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-body-sm text-fg">
+          Os Parâmetros do onboarding (e-mails, prazos e contato do escritório) ainda não foram salvos em Configurações: a prévia
+          mostra os valores de fábrica e o envio fica bloqueado até salvá-los.
+        </p>
+      ) : null}
       {history.isPending ? (
         <SkeletonRows rows={3} />
       ) : history.isError ? (

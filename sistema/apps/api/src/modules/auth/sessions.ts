@@ -35,11 +35,12 @@ function refreshExpiry(now: Date, sessionStartedAt: Date): Date {
 
 export async function createSession(
   db: DbExecutor,
-  input: { userId: string; workspaceId: string | null } & SessionContext,
+  /** `id`: a chosen session id (the MFA challenge's, so the challenge opens one session only). */
+  input: { userId: string; workspaceId: string | null; id?: string } & SessionContext,
 ): Promise<IssuedSession> {
   const refreshToken = randomToken();
   const now = new Date();
-  const id = globalThis.crypto.randomUUID();
+  const id = input.id ?? globalThis.crypto.randomUUID();
   const expiresAt = refreshExpiry(now, now);
   await db.insert(sessions).values({
     id,
