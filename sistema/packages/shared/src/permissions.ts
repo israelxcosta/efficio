@@ -5,8 +5,10 @@
 // effective map is computed on every request (the API re-reads the membership each time) and sent to
 // the web with the session (`WorkspaceSummary.permissions`) and with the task options.
 //
-// Action keys are checked by the API on each operation. Page keys (`page.*`) only hide a page of the
-// task area (menu, ⌘K, URL); the data keeps reaching the other screens (like in Effy).
+// Action keys are checked by the API on each operation. Page keys (`page.*`) hide a page of the task
+// area (menu, ⌘K, URL). `page.reports` and `page.audit` are also checked by the API (their data is
+// exclusive to those pages: GET /tasks/reports, its CSV export and GET /tasks/audit); the other page
+// keys only hide the screen, because their data also feeds selectors on other screens (like in Effy).
 // The defaults below are exactly the behavior of phases 1 and 2.
 
 import { z } from 'zod';

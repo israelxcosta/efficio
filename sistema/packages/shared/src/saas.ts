@@ -90,6 +90,17 @@ export const SIGNUP_DISABLED_MESSAGE = 'O cadastro é feito por convite do escri
 export const MFA_ENROLLMENT_REQUIRED_ERROR = 'mfa_enrollment_required';
 export const MFA_ENROLLMENT_REQUIRED_MESSAGE = 'Ative a verificação em duas etapas para continuar.';
 
+/**
+ * Step-up re-authentication: exporting the workspace, deleting it, turning 2FA off, changing the
+ * password, deleting the account and new recovery codes need the current password (plus a 2FA code when
+ * it is on) in the request itself, or a re-authentication of the same session at most
+ * `REAUTH_WINDOW_MINUTES` old (`POST /auth/reauthenticate`, or the login itself). Otherwise: 422 with this
+ * code and `details: { reauthRequired: true, mfa: boolean }` (whether a code is asked too).
+ */
+export const REAUTH_REQUIRED_ERROR = 'reauth_required';
+export const REAUTH_REQUIRED_MESSAGE = 'Por segurança, confirme sua senha para continuar.';
+export const REAUTH_WINDOW_MINUTES = 5;
+
 export const BILLING_INTERVALS = ['month', 'year'] as const;
 export type BillingInterval = (typeof BILLING_INTERVALS)[number];
 
@@ -346,15 +357,34 @@ export const mfaCodeSchema = z.object({
   code: totpCode,
   /**
    * Current password. Enabling 2FA requires it unless the session logged in a few minutes ago
-   * (re-authentication before adding a factor); ignored by /mfa/disable, which checks the code.
+   * (re-authentication before adding a factor); /mfa/disable requires it too unless the session
+   * re-authenticated within `REAUTH_WINDOW_MINUTES` (step-up; the code is always checked).
    */
   password: z.string().min(1).max(1024).optional(),
 });
 export type MfaCodeInput = z.infer<typeof mfaCodeSchema>;
 
+/** Optional 2FA code of a step-up (required when 2FA is on and the session did not re-authenticate recently). */
+const stepUpCode = totpCode.optional();
+
+/** `POST /auth/reauthenticate` and the optional step-up fields of the sensitive actions. */
+export const reauthenticateSchema = z.object({
+  password: currentPasswordSchema('Informe sua senha'),
+  code: stepUpCode,
+});
+export type ReauthenticateInput = z.infer<typeof reauthenticateSchema>;
+
+/** `POST /auth/mfa/recovery-codes`: new recovery codes (the old ones stop working). */
+export const recoveryCodesSchema = z.object({
+  password: currentPasswordSchema('Informe sua senha').optional(),
+  code: stepUpCode,
+});
+export type RecoveryCodesInput = z.infer<typeof recoveryCodesSchema>;
+
 export const changePasswordSchema = z.object({
   currentPassword: currentPasswordSchema('Informe a senha atual'),
   newPassword: newPasswordSchema,
+  code: stepUpCode,
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
@@ -371,6 +401,7 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export const deleteAccountSchema = z.object({
   password: currentPasswordSchema('Informe sua senha'),
+  code: stepUpCode,
 });
 export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 
@@ -391,7 +422,10 @@ export const workspaceUpdateSchema = z.object({
 
 export const deleteWorkspaceSchema = z.object({
   /** Must match the workspace name (typed confirmation). */
-  confirmName: z.string().trim().min(1),
+  confirmName: z.string().trim().min(1).max(200),
+  /** Step-up: current password (and 2FA code), unless the session re-authenticated recently. */
+  password: currentPasswordSchema('Informe sua senha').optional(),
+  code: stepUpCode,
 });
 
 export const inviteInputSchema = z.object({
