@@ -202,7 +202,7 @@ export function groupSeries(series: readonly CategorySeries[], max = 8): { items
       key: OTHERS_KEY,
       categoryId: null,
       name: `Outras (${rest.length})`,
-      color: '#9A9EA5',
+      color: 'var(--app-chart-others)',
       total: rest.reduce((a, s) => a + s.total, 0),
       values: rest[0]!.values.map((_, i) => rest.reduce((a, s) => a + (s.values[i] ?? 0), 0)),
     });

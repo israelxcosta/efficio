@@ -10,10 +10,9 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { axisProps, moneyAxisFormatter, MoneyTooltip, SERIES_PALETTE } from '@/components/charts/chart-utils';
+import { axisProps, moneyAxisFormatter, MoneyTooltip, OTHERS_COLOR, SERIES_PALETTE } from '@/components/charts/chart-utils';
 import { chartMotion } from '@/components/charts/chart-motion';
 import { useCategoryReport } from '../api';
-import { useTone } from '@/lib/theme';
 
 export const GRANULARITY_OPTIONS: { value: Granularity; label: string }[] = [
   { value: 'day', label: 'Dia' },
@@ -32,15 +31,14 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
   const [drill, setDrill] = useState<{ id: string; name: string } | null>(null);
   const report = useCategoryReport({ from, to, type, granularity, status, categoryId: drill?.id });
   const r = report.data;
-  const tone = useTone();
 
   const { chartData, series } = useMemo(() => {
     if (!r) return { chartData: [], series: [] as { key: string; name: string; color: string }[] };
     const sorted = [...r.series].sort((a, b) => b.total - a.total);
     const head = sorted.slice(0, MAX_SERIES);
     const rest = sorted.slice(MAX_SERIES);
-    const series = head.map((s, i) => ({ key: `s${i}`, name: s.name, color: tone(SERIES_PALETTE[i % SERIES_PALETTE.length]!) }));
-    if (rest.length) series.push({ key: 'others', name: 'Outros', color: '#C9CDD4' });
+    const series = head.map((s, i) => ({ key: `s${i}`, name: s.name, color: SERIES_PALETTE[i % SERIES_PALETTE.length]! }));
+    if (rest.length) series.push({ key: 'others', name: 'Outros', color: OTHERS_COLOR });
     const chartData = r.periods.map((p, pi) => {
       const row: Record<string, number | string | boolean> = { label: p.label, projected: p.projected, total: r.totals[pi] ?? 0 };
       head.forEach((s, i) => (row[`s${i}`] = s.values[pi] ?? 0));
@@ -48,7 +46,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
       return row;
     });
     return { chartData, series };
-  }, [r, tone]);
+  }, [r]);
 
   const projected = r?.periods.filter((p) => p.projected) ?? [];
   const names = Object.fromEntries([...series.map((s) => [s.key, s.name]), ['total', 'Total']]);

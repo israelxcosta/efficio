@@ -43,42 +43,69 @@
   /* Status colours are signals (a change, an overdue fact), dark enough to be read as text. */
   --app-success: #18794a;
   --app-success-soft: #e6f4ec;
-  /* One red for every "overdue/critical/expense/negative" (owner's #cc3333; AA on white and on the soft). */
-  --app-danger: #cc3333;
+  /*
+   * Text red for "overdue/critical/error" (5.5:1 on white, 5.0:1 on the page, 5.0:1 on the soft).
+   * Chart marks use the pastel reds below, never this one.
+   */
+  --app-danger: #b3433e;
   --app-danger-soft: #fdf0ef;
   --app-warning: #95600f;
   --app-warning-soft: #fdf3dc;
 
   /*
-   * Charts: one data hue (the screen's main series or the current period) and greys for the rest.
-   * Income is the data hue; expenses and comparisons are neutral.
+   * Charts — monochrome navy + one pastel red (docs/design-system.md §Gráficos).
+   * Blue is data: one navy ramp (R1 darkest … R7 lightest) and cool greys of the same hue.
+   * Pastel red only for urgency, overdue and expenses. Marks carry no text, labels sit beside them.
    */
-  --app-data: #2f5fbf;
-  --app-data-soft: #dbe5f7;
-  --app-chart-income: #2f5fbf;
-  --app-chart-income-strong: #1e3f8a;
-  --app-chart-expense: #c3c8d1;
-  --app-chart-expense-strong: #7a818c;
-  /* Despesas no fluxo de caixa e resultado negativo do mês: the same red as `danger`. */
-  --app-chart-negative: var(--app-danger);
-  /*
-   * Resolved late, high risk, 31–60 days overdue (orange) · due soon, waiting, attention, up to 30 days
-   * overdue (yellow). Marks only: text uses `--app-orange-strong` / `--app-warning`.
-   * Risk ladder yellow → orange → red steps down in lightness (L* 78 → 64 → 46), so it still reads in
-   * grey and for red-green colour blindness. Yellow is a golden amber (not lemon); 3:1 on white would
-   * make it darker than the orange (mustard/brown), so it relies on labels next to every mark.
-   */
-  --app-chart-orange: #ee7d26;
-  --app-orange-strong: #a84b0f;
-  --app-chart-yellow: #f2b931;
-  /* Neutral series (e.g. the earlier period in comparisons). */
-  --app-chart-neutral: #d0d5dd;
-  --app-chart-grid: #e9ecf1;
-  /* Ordered data series (e.g. fixed / installments / variable): one blue ramp. */
-  --app-chart-1: #1e3f8a;
-  --app-chart-2: #2f5fbf;
-  --app-chart-3: #8fa9dd;
-  --app-chart-accent: #2f5fbf;
+  --app-chart-blue-1: #203157;
+  --app-chart-blue-2: #344976;
+  --app-chart-blue-3: #4c6291;
+  --app-chart-blue-4: #6b80ab;
+  --app-chart-blue-5: #8d9fc2;
+  --app-chart-blue-6: #b1bed8;
+  --app-chart-blue-7: #d7deec;
+  /* Cool greys (same hue), darkest first: categories after R5 and the neutral series. */
+  --app-chart-grey-1: #66696e;
+  --app-chart-grey-2: #84868b;
+  --app-chart-grey-3: #a2a5aa;
+  --app-chart-grey-4: #c1c4c9;
+  --app-chart-grey-5: #dbdee3;
+  /* Pastel red: expense bars/areas (soft) · expense line, negative month, 31–60 days late (red) ·
+   * most urgent: over 60 days, open overdue (strong). */
+  --app-chart-red-soft: #f3b5b1;
+  --app-chart-red: #e08883;
+  --app-chart-red-strong: #c95d58;
+
+  --app-data: var(--app-chart-blue-3);
+  --app-data-soft: var(--app-chart-blue-7);
+  --app-chart-income: var(--app-chart-blue-3);
+  --app-chart-income-strong: var(--app-chart-blue-1);
+  --app-chart-expense: var(--app-chart-red-soft);
+  --app-chart-expense-strong: var(--app-chart-red);
+  --app-chart-negative: var(--app-chart-red);
+  /* On time / done in charts: light blue (the success text stays green). */
+  --app-chart-success: var(--app-chart-blue-6);
+  /* Neutral series (e.g. the earlier period, billed amount) and its line/stroke. */
+  --app-chart-neutral: #caced4;
+  --app-chart-neutral-strong: #868c99;
+  --app-chart-grid: #e7e9ee;
+  /* Ordered data series (e.g. fixed / installments / variable). */
+  --app-chart-1: var(--app-chart-blue-1);
+  --app-chart-2: var(--app-chart-blue-3);
+  --app-chart-3: var(--app-chart-blue-5);
+  --app-chart-accent: var(--app-chart-blue-3);
+  /* Categories by rank (SERIES_PALETTE): R1…R5, then the greys; "Outras" is grey-4. */
+  --app-chart-series-1: var(--app-chart-blue-1);
+  --app-chart-series-2: var(--app-chart-blue-2);
+  --app-chart-series-3: var(--app-chart-blue-3);
+  --app-chart-series-4: var(--app-chart-blue-4);
+  --app-chart-series-5: var(--app-chart-blue-5);
+  --app-chart-series-6: var(--app-chart-grey-1);
+  --app-chart-series-7: var(--app-chart-grey-2);
+  --app-chart-series-8: var(--app-chart-grey-3);
+  --app-chart-series-9: var(--app-chart-grey-4);
+  --app-chart-series-10: var(--app-chart-grey-5);
+  --app-chart-others: var(--app-chart-grey-4);
 
   /* Former gradient "hero" cards now use a flat brand surface. */
   --app-hero-from: var(--brand-800);
@@ -135,28 +162,32 @@
 
   --app-success: #4fcb85;
   --app-success-soft: #27392d;
-  --app-danger: #f27a7d;
+  /* 6.1:1 on the surface, 7.1:1 on the page, 5.6:1 on the soft. */
+  --app-danger: #ef8f8a;
   --app-danger-soft: #432a2b;
   --app-warning: #e2b257;
   --app-warning-soft: #3d3422;
 
-  --app-data: #8fb0ee;
-  --app-data-soft: #2c3546;
-  --app-chart-income: #8fb0ee;
-  --app-chart-income-strong: #c3d4f6;
-  --app-chart-expense: #5d5d5b;
-  --app-chart-expense-strong: #96958f;
-  --app-chart-negative: var(--app-danger);
-  /* Same ladder on the dark surface (L* 80 → 66; the red sits apart by hue). */
-  --app-chart-orange: #ee8634;
-  --app-orange-strong: #ffa652;
-  --app-chart-yellow: #f2c14e;
-  --app-chart-neutral: #5d5d5b;
+  /* Same roles on the dark surface: R1 is the lightest step, the greys invert. */
+  --app-chart-blue-1: #dde5f4;
+  --app-chart-blue-2: #bdcbe5;
+  --app-chart-blue-3: #9baed4;
+  --app-chart-blue-4: #7d92bd;
+  --app-chart-blue-5: #6277a1;
+  --app-chart-blue-6: #4c5d81;
+  --app-chart-blue-7: #343d50;
+  --app-chart-grey-1: #b5b7bd;
+  --app-chart-grey-2: #96989d;
+  --app-chart-grey-3: #787a7f;
+  --app-chart-grey-4: #5e6065;
+  --app-chart-grey-5: #484a4f;
+  --app-chart-red-soft: #6e3a38;
+  --app-chart-red: #b5615c;
+  --app-chart-red-strong: #e48a84;
+
+  --app-chart-neutral: #53555a;
+  --app-chart-neutral-strong: #7c8089;
   --app-chart-grid: #3b3b3b;
-  --app-chart-1: #c3d4f6;
-  --app-chart-2: #8fb0ee;
-  --app-chart-3: #4f6ea8;
-  --app-chart-accent: #8fb0ee;
 
   --app-hero-from: #323232;
   --app-hero-via: #323232;
@@ -243,9 +274,18 @@
   --color-data-soft: var(--app-data-soft);
   --color-chart-income: var(--app-chart-income);
   --color-chart-expense: var(--app-chart-expense);
-  --color-chart-yellow: var(--app-chart-yellow);
-  --color-chart-orange: var(--app-chart-orange);
-  --color-orange-strong: var(--app-orange-strong);
+  --color-chart-success: var(--app-chart-success);
+  --color-chart-neutral: var(--app-chart-neutral);
+  --color-chart-red-soft: var(--app-chart-red-soft);
+  --color-chart-red: var(--app-chart-red);
+  --color-chart-red-strong: var(--app-chart-red-strong);
+  --color-chart-blue-1: var(--app-chart-blue-1);
+  --color-chart-blue-2: var(--app-chart-blue-2);
+  --color-chart-blue-3: var(--app-chart-blue-3);
+  --color-chart-blue-4: var(--app-chart-blue-4);
+  --color-chart-blue-5: var(--app-chart-blue-5);
+  --color-chart-blue-6: var(--app-chart-blue-6);
+  --color-chart-blue-7: var(--app-chart-blue-7);
 
 
   --radius-sm: 8px;

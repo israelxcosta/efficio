@@ -3,7 +3,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 import { formatBRL, formatCompactBRL, formatPercent, type CategoryAmount } from '@effinance/shared';
 import { cn } from '@/lib/utils';
 import { useElementSize } from '@/lib/use-element-size';
-import { SERIES_PALETTE } from './chart-utils';
+import { OTHERS_COLOR, SERIES_PALETTE } from './chart-utils';
 import { centerFontSize } from './chart-scale';
 import { chartMotion } from './chart-motion';
 import { useTone } from '@/lib/theme';
@@ -50,7 +50,7 @@ export function DonutChart({ data, total, centerLabel = 'Total', height = 200, m
           categoryId: OTHERS_ID,
           name: `Outras (${rest.length})`,
           icon: 'tag',
-          color: '#9A9EA5',
+          color: OTHERS_COLOR,
           amount: rest.reduce((s, r) => s + r.amount, 0),
           share: rest.reduce((s, r) => s + r.share, 0),
         },
@@ -59,7 +59,8 @@ export function DonutChart({ data, total, centerLabel = 'Total', height = 200, m
   const rank = (i: number) => SERIES_PALETTE[i % SERIES_PALETTE.length]!;
   const chartData = items.map((d, i) => ({
     ...d,
-    fill: tone(d.categoryId === OTHERS_ID ? '#C9CDD4' : itemColors && d.color ? d.color : rank(i)),
+    // Rank colours and "Outras" are theme tokens; only the items' own colours go through `tone`.
+    fill: d.categoryId === OTHERS_ID ? OTHERS_COLOR : itemColors && d.color ? tone(d.color) : rank(i),
   }));
   const focused = active === null ? null : chartData[active];
   const selectable = (d: CategoryAmount) => Boolean(onSelect) && d.categoryId !== OTHERS_ID;

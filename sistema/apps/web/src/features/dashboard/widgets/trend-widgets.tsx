@@ -24,7 +24,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCategoryReport } from '@/features/reports/api';
 import { categoryListHref } from '@/features/transactions/links';
 import { useElementSize } from '@/lib/use-element-size';
-import { useTone } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import type { WidgetProps } from '../layout/types';
 import { useWidgetResizing, WidgetCard } from '../layout/widget-card';
@@ -340,7 +339,6 @@ export function CompositionWidget({ month, prefs, setPref, alert }: WidgetProps)
   const type = prefs.composicaoTipo;
   const navigate = useNavigate();
   const resizing = useWidgetResizing();
-  const tone = useTone();
   const body = useElementSize();
   const chart = useElementSize();
 
@@ -349,14 +347,14 @@ export function CompositionWidget({ month, prefs, setPref, alert }: WidgetProps)
 
   const { series, rows, grouped } = useMemo(() => {
     const { items, grouped } = groupSeries(r?.series ?? [], 8);
-    const series = items.map((s, i) => ({ ...s, color: tone(SERIES_PALETTE[i % SERIES_PALETTE.length]!) }));
+    const series = items.map((s, i) => ({ ...s, color: SERIES_PALETTE[i % SERIES_PALETTE.length]! }));
     const rows = (r?.periods ?? []).map((p, i) => ({
       month: p.key,
       label: shortMonth(p.key),
       ...Object.fromEntries(series.map((s) => [s.key, s.values[i] ?? 0])),
     }));
     return { series, rows, grouped };
-  }, [r, tone]);
+  }, [r]);
 
   const noun = type === 'expense' ? 'despesa' : 'receita';
   const names = Object.fromEntries(series.map((s) => [s.key, s.name]));

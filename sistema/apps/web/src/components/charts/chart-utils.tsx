@@ -8,24 +8,32 @@ export const CHART_COLORS = {
   incomeStrong: 'var(--app-chart-income-strong)',
   expense: 'var(--app-chart-expense)',
   expenseStrong: 'var(--app-chart-expense-strong)',
-  /** Despesas do fluxo de caixa e resultado negativo do mês. */
+  /** Linha de despesa e resultado negativo do mês (vermelho pastel). */
   negative: 'var(--app-chart-negative)',
-  /** Resolvido com atraso, risco alto (laranja) · atenção, vence em breve (amarelo): marks only. */
-  orange: 'var(--app-chart-orange)',
-  yellow: 'var(--app-chart-yellow)',
+  /** Pastel red for marks only: expense bars (soft) · 31–60 days late, paid late (red) · open overdue, over 60 days (strong). */
+  redSoft: 'var(--app-chart-red-soft)',
+  red: 'var(--app-chart-red)',
+  redStrong: 'var(--app-chart-red-strong)',
   neutral: 'var(--app-chart-neutral)',
+  neutralStrong: 'var(--app-chart-neutral-strong)',
   grid: 'var(--app-chart-grid)',
   axis: 'var(--app-subtle)',
   brand: 'var(--app-primary)',
-  success: 'var(--app-success)',
-  danger: 'var(--app-danger)',
+  /** On time / done (light blue R6); the success text stays green. */
+  success: 'var(--app-chart-success)',
+  /** Most urgent mark (open overdue): the strong pastel red, not the text red. */
+  danger: 'var(--app-chart-red-strong)',
 } as const;
 
 /**
- * Categorical series by rank: one blue ramp (largest first) then greys, so a chart reads as one
- * subject in one hue instead of a rainbow. Category colours stay for icons in their own editor.
+ * Categorical series by rank: the navy ramp R1…R5 (largest first) then cool greys, so a chart reads
+ * as one subject in one hue instead of a rainbow. Tokens, so the dark theme swaps them itself (no
+ * `useTone`). Category colours stay for icons in their own editor.
  */
-export const SERIES_PALETTE = ['#1E3F8A', '#2F5FBF', '#5B82D1', '#8FA9DD', '#B9C9EA', '#6B7280', '#8D939D', '#AEB3BC', '#C9CDD4', '#DDE1E6'];
+export const SERIES_PALETTE = Array.from({ length: 10 }, (_, i) => `var(--app-chart-series-${i + 1})`);
+
+/** The grouped "Outras" series/slice. */
+export const OTHERS_COLOR = 'var(--app-chart-others)';
 
 /** Chart text sizes (px): small and fixed, whatever the size of the chart (11px floor). */
 export const CHART_TEXT = { axis: 11, category: 11, value: 12 } as const;
