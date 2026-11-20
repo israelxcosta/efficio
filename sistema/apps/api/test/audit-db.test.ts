@@ -3,6 +3,9 @@
 // context, LGPD clean-up, encryption backfill bookkeeping and retention.
 
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { eq, ilike, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -89,6 +92,16 @@ async function pgFailure(promise: Promise<unknown>): Promise<PgFailure | null> {
 }
 
 const rows = <T>(query: ReturnType<typeof sql>) => executeRows<T>(admin(), query);
+
+const migrationsFolder = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../drizzle');
+
+/** Applies a migration file again (they are re-runnable), statement by statement, as the owner. */
+async function rerunMigration(file: string) {
+  const source = await readFile(path.join(migrationsFolder, file), 'utf8');
+  for (const statement of source.split('--> statement-breakpoint')) {
+    if (statement.trim()) await admin().execute(sql.raw(statement));
+  }
+}
 
 const TEMPLATE: RecurrenceTemplate = {
   type: 'expense',
@@ -248,7 +261,8 @@ describe('catalog: row level security and privileges', () => {
                (select string_agg(rolname, ',') from pg_roles where oid = any(polroles)) as roles
           from pg_policy where polrelid = ${`public.${name}`}::regclass`);
       // The one exception (migration 0025): the public onboarding page finds its link by the token's hash,
-      // read-only, for the tenant role, only with the transaction setting that route alone sets.
+      // read-only, for the tenant role, only with the transaction setting that route alone sets — and,
+      // since 0027, only while the link can be used (not revoked, not expired).
       const extra = all.filter((p) => p.name === 'onboarding_links_public_token');
       if (name === 'onboarding_links') {
         expect(extra).toEqual([
@@ -256,7 +270,7 @@ describe('catalog: row level security and privileges', () => {
             name: 'onboarding_links_public_token',
             cmd: 'r',
             permissive: true,
-            qual: "(token_hash = NULLIF(current_setting('app.onboarding_token'::text, true), ''::text))",
+            qual: "((token_hash = NULLIF(current_setting('app.onboarding_token'::text, true), ''::text)) AND (revoked_at IS NULL) AND (expires_at > now()))",
             check: null,
             roles: 'effinance_app',
           },
@@ -751,20 +765,31 @@ describe('data protection', () => {
     // Workspaces created by the API are born encrypted.
     expect(await needsBackfill(app.db)).toBe(false);
 
-    // A legacy row (written before field encryption) in a workspace whose key exists already.
-    const [legacy] = await admin()
-      .insert(transactions)
-      .values({ workspaceId: ws, type: 'expense', description: 'Legado', amount: 100, date: '2026-10-01', notes: 'segredo antigo' })
-      .returning();
-    await admin().update(workspaces).set({ encryptionBackfilledAt: null }).where(eq(workspaces.id, ws));
-    expect(await needsBackfill(app.db)).toBe(true);
+    // A legacy row (written before field encryption) in a workspace whose key exists already. Since 0027
+    // the database refuses clear notes: the row is written as before that migration (its CHECK dropped),
+    // then 0027 is re-run (NOT VALID over the clear text) and validated once the backfill is done.
+    await admin().execute(sql.raw('alter table transactions drop constraint transactions_notes_chk'));
+    let restored = false;
+    try {
+      const [legacy] = await admin()
+        .insert(transactions)
+        .values({ workspaceId: ws, type: 'expense', description: 'Legado', amount: 100, date: '2026-10-01', notes: 'segredo antigo' })
+        .returning();
+      await rerunMigration('0027_encrypted_notes_public_token.sql');
+      restored = true;
+      await admin().update(workspaces).set({ encryptionBackfilledAt: null }).where(eq(workspaces.id, ws));
+      expect(await needsBackfill(app.db)).toBe(true);
 
-    const result = await backfillEncryption(app.db);
-    expect(result).toEqual({ workspaces: 1, rows: 1 });
-    const [stored] = await rows<{ notes: string }>(sql`select notes from transactions where id = ${legacy!.id}`);
-    expect(stored!.notes).toMatch(/^v1\./);
-    expect(await needsBackfill(app.db)).toBe(false);
-    expect((await alice.get(`/transactions/${legacy!.id}`)).body.notes).toBe('segredo antigo');
+      const result = await backfillEncryption(app.db);
+      expect(result).toEqual({ workspaces: 1, rows: 1 });
+      const [stored] = await rows<{ notes: string }>(sql`select notes from transactions where id = ${legacy!.id}`);
+      expect(stored!.notes).toMatch(/^v1\./);
+      expect(await needsBackfill(app.db)).toBe(false);
+      await admin().execute(sql.raw('alter table transactions validate constraint transactions_notes_chk'));
+      expect((await alice.get(`/transactions/${legacy!.id}`)).body.notes).toBe('segredo antigo');
+    } finally {
+      if (!restored) await rerunMigration('0027_encrypted_notes_public_token.sql');
+    }
   });
 
   it('the retention purge removes expired sessions, used/expired reset links and stale invites only', async () => {

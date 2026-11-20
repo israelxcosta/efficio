@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import {
   bigint,
   boolean,
@@ -99,6 +99,10 @@ const tenantUnique = (table: string, t: { workspaceId: AnyPgColumn; id: AnyPgCol
 
 /** `v1.<iv>.<ct>` of FieldCipher (same shape as ENCRYPTED_TEXT_PATTERN below; used by contacts, 0026). */
 const ENCRYPTED_FIELD_PATTERN = '^v1[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]{23,}$';
+
+/** Ciphertext or empty, never clear text (migration 0027, NOT VALID: legacy rows go through the backfill). */
+const encryptedOrEmpty = (value: SQL | AnyPgColumn) =>
+  sql`(${value} = '' or ${value} ~ ${sql.raw(`'${ENCRYPTED_FIELD_PATTERN}'`)})`;
 
 // ---------------------------------------------------------------------------
 // Identity, tenancy and billing (not tenant-scoped: never touched inside a tenant transaction)
@@ -427,6 +431,7 @@ export const goals = pgTable(
   (t) => [
     index('goals_workspace_idx').on(t.workspaceId),
     check('goals_target_amount_chk', sql`${t.targetAmount} > 0`),
+    check('goals_notes_chk', encryptedOrEmpty(t.notes)),
     tenantUnique('goals', t),
     foreignKey({
       name: 'goals_account_fk',
@@ -452,6 +457,7 @@ export const goalContributions = pgTable(
     index('goal_contributions_goal_idx').on(t.goalId),
     index('goal_contributions_workspace_idx').on(t.workspaceId),
     check('goal_contributions_amount_chk', sql`${t.amount} <> 0`),
+    check('goal_contributions_note_chk', encryptedOrEmpty(t.note)),
     foreignKey({
       name: 'goal_contributions_goal_fk',
       columns: [t.workspaceId, t.goalId],
@@ -742,6 +748,7 @@ export const recurrences = pgTable(
       'recurrences_counters_chk',
       sql`${t.nextIndex} >= 0 and (${t.totalOccurrences} is null or ${t.totalOccurrences} > 0)`,
     ),
+    check('recurrences_template_notes_chk', encryptedOrEmpty(sql`(${t.template} ->> 'notes')`)),
   ],
 );
 
@@ -824,6 +831,7 @@ export const transactions = pgTable(
     index('transactions_subcategory_idx').on(t.subcategoryId).where(sql`${t.subcategoryId} is not null`),
     check('transactions_type_chk', sql`${t.type} in ('income', 'expense', 'transfer')`),
     check('transactions_amount_chk', sql`${t.amount} > 0`),
+    check('transactions_notes_chk', encryptedOrEmpty(t.notes)),
     check(
       'transactions_recurrence_kind_chk',
       sql`${t.recurrenceKind} in ('single', 'installment', 'recurring', 'fixed')`,
@@ -2291,7 +2299,8 @@ export const userPhotos = pgTable(
 // Client onboarding (migration 0025, docs/onboarding-cliente.md). Tenant tables (RLS, composite keys).
 // The public page finds its link by the SHA-256 of the token through a second, SELECT-only policy of
 // `onboarding_links` (`onboarding_links_public_token`, in the SQL file): the tenant role sees the one row
-// whose hash equals `app.onboarding_token`, set only by that route.
+// whose hash equals `app.onboarding_token`, set only by that route; since migration 0027 only while the link is
+// usable (not revoked, not expired).
 // ---------------------------------------------------------------------------
 
 /** The office's onboarding template (one per workspace): what differs from the factory content. */

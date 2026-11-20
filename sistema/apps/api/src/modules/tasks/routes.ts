@@ -50,6 +50,7 @@ import {
   taskUpdateSchema,
 } from '@effinance/shared';
 import { audit } from '../../lib/audit';
+import { requirePermission } from '../../lib/permissions';
 import { rateLimited } from '../../lib/platform';
 import { requestContext } from '../../lib/request-context';
 import { idParams } from '../common/params';
@@ -132,6 +133,14 @@ const monthQuery = z.object({ month: monthKeySchema.optional() });
 const registry = { onRequest: requireTaskPermission('registry') };
 const deleteRegistry = { onRequest: requireTaskPermission('deleteRegistry') };
 const deleteTasks = { onRequest: requireTaskPermission('deleteTasks') };
+/**
+ * Page keys checked by the API where the data exists only for that page (threat model T4): the task
+ * reports (and their CSV) and the monthly audit. The other page keys (recurring, processes, clients,
+ * registries) only hide a page: their data also feeds pickers and other screens.
+ */
+const PAGE_FORBIDDEN_MESSAGE = 'Você não tem acesso a esta página. Peça a um administrador do espaço.';
+const reportsPage = { onRequest: requirePermission('page.reports', PAGE_FORBIDDEN_MESSAGE) };
+const auditPage = { onRequest: requirePermission('page.audit', PAGE_FORBIDDEN_MESSAGE) };
 
 /** The file in base64 (4/3 of the bytes) plus the rest of the JSON. */
 export const ATTACHMENT_BODY_LIMIT = Math.ceil(MAX_ATTACHMENT_BYTES / 3) * 4 + 64 * 1024;
@@ -200,12 +209,12 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/calendar', { schema: { querystring: taskCalendarQuerySchema } }, async (req) =>
     run(req, (ctx) => taskCalendar(ctx, req.query)),
   );
-  app.get('/reports', { schema: { querystring: taskReportQuerySchema } }, async (req) =>
+  app.get('/reports', { ...reportsPage, schema: { querystring: taskReportQuerySchema } }, async (req) =>
     run(req, (ctx) => taskReport(ctx, req.query)),
   );
   app.get(
     '/reports/export.csv',
-    { schema: { querystring: taskReportExportQuerySchema }, config: rateLimited(app.platform, 30, '1 minute') },
+    { ...reportsPage, schema: { querystring: taskReportExportQuerySchema }, config: rateLimited(app.platform, 30, '1 minute') },
     async (req, reply) => {
       const { fileName, csv } = await runTasks(app.db, req, (ctx) => exportTaskReport(ctx, req.query));
       return reply
@@ -217,7 +226,7 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   );
 
   // --- monthly audit -----------------------------------------------------------------------------------
-  app.get('/audit', { schema: { querystring: taskAuditQuerySchema } }, async (req) =>
+  app.get('/audit', { ...auditPage, schema: { querystring: taskAuditQuerySchema } }, async (req) =>
     run(req, (ctx) => auditMatrix(ctx, req.query)),
   );
 

@@ -110,7 +110,7 @@ describe('permissions: adjustments change what the API accepts', () => {
     expect(list.body.find((m: { userId: string }) => m.userId === bruno.userId).permissionOverrides).toEqual({ finance: false });
   });
 
-  it('registry, deleteRegistry and deleteTasks are checked per route; page keys only hide', async () => {
+  it('registry, deleteRegistry and deleteTasks are checked per route; page keys guard their own data', async () => {
     const { ana, carla, fiscal } = await office(app);
     expect((await carla.post('/tasks/categories', { name: 'Certidões' })).status).toBe(403);
     expect((await put(ana, carla.userId, { overrides: { registry: true, 'page.reports': false } })).status).toBe(200);
@@ -120,8 +120,11 @@ describe('permissions: adjustments change what the API accepts', () => {
     expect(refused).toMatchObject({ status: 403, body: { message: TASK_ADMIN_MESSAGE } });
     // The department picker of the home page goes with `registry`.
     expect((await carla.get('/tasks/home?departmentId=all')).status).toBe(200);
-    // A page key hides the page in the web; the data keeps coming.
-    expect((await carla.get('/tasks/reports?from=2026-10-01&to=2026-10-31')).status).toBe(200);
+    // Threat model T4: where the data exists only for the page (task reports, their CSV, the monthly
+    // audit) the API checks the page key too; the other page keys only hide (their data feeds pickers).
+    expect((await carla.get('/tasks/reports?from=2026-10-01&to=2026-10-31')).status).toBe(403);
+    expect((await carla.get('/tasks/reports/export.csv?from=2026-10-01&to=2026-10-31')).status).toBe(403);
+    expect((await carla.get('/tasks/audit?month=2026-10')).status).toBe(200);
 
     const task = await ana.post('/tasks', { title: 'Balancete', assigneeId: ana.userId, departmentId: fiscal });
     const comment = await ana.post(`/tasks/${task.body.id}/comments`, { text: 'Comentário da Ana' });
