@@ -1,4 +1,4 @@
-import { MFA_ENROLLMENT_REQUIRED_ERROR, sanitizeFileName, type ApiError } from '@effinance/shared';
+import { MFA_ENROLLMENT_REQUIRED_ERROR, REAUTH_REQUIRED_ERROR, sanitizeFileName, type ApiError } from '@effinance/shared';
 import { isSafeApiPath } from './safe-url';
 
 /**
@@ -102,6 +102,17 @@ export function onMfaEnrollmentRequired(handler: ((error: ApiRequestError) => vo
   mfaEnrollmentHandler = handler;
 }
 
+let reauthHandler: ((error: ApiRequestError) => Promise<boolean>) | null = null;
+
+/**
+ * Called on 422 `reauth_required` (step-up before a sensitive action: export, deletions, password…):
+ * the app asks for the password (and the 2FA code when `details.mfa`), calls `/auth/reauthenticate` and
+ * resolves true; the request is then replayed once. Resolving false (cancelled) surfaces the error.
+ */
+export function onReauthRequired(handler: ((error: ApiRequestError) => Promise<boolean>) | null): void {
+  reauthHandler = handler;
+}
+
 /** Requests that must not trigger a session refresh on 401 (credentials are being checked). */
 const NO_REFRESH = new Set([
   '/auth/login',
@@ -170,6 +181,23 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
 }
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  try {
+    return await request<T>(path, options);
+  } catch (error) {
+    if (
+      error instanceof ApiRequestError &&
+      error.code === REAUTH_REQUIRED_ERROR &&
+      reauthHandler &&
+      path !== '/auth/reauthenticate' &&
+      (await reauthHandler(error))
+    ) {
+      return request<T>(path, options);
+    }
+    throw error;
+  }
+}
+
+async function request<T>(path: string, options: RequestOptions): Promise<T> {
   // Ids interpolated from the URL must not turn into another endpoint (`../../billing/cancel`).
   if (!isSafeApiPath(path)) {
     throw new ApiRequestError(400, { error: 'invalid_path', message: 'Endereço inválido.' });

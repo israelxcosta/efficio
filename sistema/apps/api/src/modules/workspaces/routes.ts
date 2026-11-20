@@ -26,6 +26,7 @@ import { requestContext } from '../../lib/request-context';
 import { assertOwner, assertSubscriptionAllowsWrite } from './access';
 import { prepareWorkspaceDeletion } from './deletion';
 import { exportWorkspace } from './export';
+import { assertStepUp } from '../auth/step-up';
 import {
   acceptInvite,
   changeMemberRole,
@@ -35,6 +36,7 @@ import {
   deleteWorkspaceRow,
   getMe,
   getMemberPermissions,
+  getUserRow,
   inviteUrl,
   listAudit,
   listInvites,
@@ -86,6 +88,8 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
     if (req.body.confirmName.trim() !== req.access.workspaceName.trim()) {
       throw new ValidationError('Digite o nome do espaço exatamente como aparece para confirmar');
     }
+    // Step-up (threat model T2): password (and 2FA code) or a recent re-authentication of the session.
+    await assertStepUp(app.db, await getUserRow(app.db, req.userId), req.sessionId, req.body, requestContext(req));
     await prepareWorkspaceDeletion(app.db, app.platform, [req.workspaceId], req.log);
     await deleteWorkspaceRow(app.db, req.workspaceId);
     await audit(app.db, { ...requestContext(req), action: 'workspace.deleted', userId: req.userId, entity: 'workspace', entityId: req.workspaceId });
@@ -184,6 +188,9 @@ export const workspaceRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get('/current/export', { config: rateLimited(app.platform, 5, '1 minute') }, async (req, reply) => {
     assertOwner(req.access);
+    // Everything the workspace holds, decrypted: only after a recent re-authentication of the session
+    // (POST /auth/reauthenticate; a GET carries no password) — threat model T2.
+    await assertStepUp(app.db, await getUserRow(app.db, req.userId), req.sessionId, {}, requestContext(req));
     const data = await exportWorkspace(app.db, req.access, billingEnabled(app.platform));
     // The export carries the clients' accesses decrypted (owner only): the audit record says so.
     await audit(app.db, { ...requestContext(req), action: 'data.exported', workspaceId: req.workspaceId, userId: req.userId, entity: 'workspace', entityId: req.workspaceId, metadata: { includesCredentials: true } });

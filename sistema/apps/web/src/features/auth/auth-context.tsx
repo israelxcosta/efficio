@@ -12,6 +12,7 @@ import type {
   UpdateProfileInput,
   WorkspaceSummary,
 } from '@effinance/shared';
+import { ReauthDialog } from './reauth-dialog';
 import { api, ApiRequestError, onMfaEnrollmentRequired, onUnauthorized, setBearerToken, setExpectedWorkspace } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
 import { announceSessionChange, onSessionChange } from '@/lib/session-sync';
@@ -248,7 +249,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      {/* Step-up before sensitive actions (422 `reauth_required` from any request). */}
+      <ReauthDialog />
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

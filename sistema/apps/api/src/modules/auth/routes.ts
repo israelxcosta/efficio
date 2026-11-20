@@ -10,6 +10,8 @@ import {
   loginSchema,
   mfaCodeSchema,
   mfaVerifySchema,
+  reauthenticateSchema,
+  recoveryCodesSchema,
   registerSchema,
   resetPasswordSchema,
   SIGNUP_DISABLED_ERROR,
@@ -31,12 +33,13 @@ import {
   type MfaClaims,
 } from '../../lib/auth';
 import { sha256Hex } from '../../lib/crypto/encoding';
-import { AppError, UnauthorizedError } from '../../lib/errors';
+import { AppError, NotFoundError, UnauthorizedError } from '../../lib/errors';
 import { billingEnabled, requireMfa, signupEnabled } from '../../lib/platform';
 import { requestContext } from '../../lib/request-context';
 import { prepareWorkspaceDeletion } from '../workspaces/deletion';
 import { getMe, getUserRow, resolveWorkspaceFor, switchWorkspace } from '../workspaces/service';
-import { disableMfa, enableMfa, setupMfa, verifyMfaCode } from './mfa';
+import { disableMfa, enableMfa, regenerateRecoveryCodes, setupMfa, verifyMfaCode } from './mfa';
+import { assertStepUp } from './step-up';
 import {
   changePassword,
   checkPassword,
@@ -213,7 +216,10 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
 
     authed.put('/me', { schema: { body: updateProfileSchema } }, async (req) => updateProfile(app.db, req.userId, req.body));
 
+    // Step-up (threat model T2): the password checks here and in the service; with 2FA on, also the code
+    // (unless the session re-authenticated within the window).
     authed.delete('/me', { schema: { body: deleteAccountSchema }, config: limit(5) }, async (req, reply) => {
+      await assertStepUp(app.db, await getUserRow(app.db, req.userId), req.sessionId, req.body, requestContext(req));
       const deleted = await deleteAccount(app.db, req.userId, req.body.password, (ids) =>
         prepareWorkspaceDeletion(app.db, app.platform, ids, req.log),
       );
@@ -229,6 +235,14 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
     });
 
     authed.post('/password', { schema: { body: changePasswordSchema }, config: limit(5) }, async (req, reply) => {
+      await assertStepUp(
+        app.db,
+        await getUserRow(app.db, req.userId),
+        req.sessionId,
+        { password: req.body.currentPassword, code: req.body.code },
+        requestContext(req),
+        { wrongPasswordMessage: 'Senha atual incorreta' },
+      );
       await changePassword(app.db, req.userId, req.sessionId, req.body);
       await audit(app.db, { ...requestContext(req), action: 'auth.password_changed', userId: req.userId });
       return reply.code(204).send();
@@ -237,7 +251,8 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
     authed.get('/sessions', async (req) => listSessions(app.db, req.userId, req.sessionId));
 
     authed.delete('/sessions/:id', { schema: { params: z.object({ id: idSchema }) } }, async (req, reply) => {
-      if (!(await revokeUserSession(app.db, req.userId, req.params.id))) throw new UnauthorizedError('Sessão não encontrada');
+      // 404, never 401 (the client would refresh/sign out), and the same for another user's session.
+      if (!(await revokeUserSession(app.db, req.userId, req.params.id))) throw new NotFoundError('Sessão não encontrada');
       await audit(app.db, {
         ...requestContext(req),
         action: 'auth.session_revoked',
@@ -261,9 +276,26 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
     });
 
     authed.post('/mfa/disable', { schema: { body: mfaCodeSchema }, config: limit(10) }, async (req, reply) => {
+      // The code is checked by disableMfa; the step-up asks the password (unless recent).
+      await assertStepUp(app.db, await getUserRow(app.db, req.userId), req.sessionId, { password: req.body.password }, requestContext(req), {
+        skipMfa: true,
+      });
       await disableMfa(app.db, req.userId, req.body.code, requestContext(req));
       await audit(app.db, { ...requestContext(req), action: 'auth.mfa_disabled', userId: req.userId });
       return reply.code(204).send();
+    });
+
+    // Step-up on its own (the client then repeats the sensitive action): password, plus the code with 2FA.
+    authed.post('/reauthenticate', { schema: { body: reauthenticateSchema }, config: limit(10) }, async (req, reply) => {
+      await assertStepUp(app.db, await getUserRow(app.db, req.userId), req.sessionId, req.body, requestContext(req));
+      return reply.code(204).send();
+    });
+
+    authed.post('/mfa/recovery-codes', { schema: { body: recoveryCodesSchema }, config: limit(5) }, async (req) => {
+      await assertStepUp(app.db, await getUserRow(app.db, req.userId), req.sessionId, req.body, requestContext(req));
+      const result = await regenerateRecoveryCodes(app.db, req.userId);
+      await audit(app.db, { ...requestContext(req), action: 'auth.recovery_codes_regenerated', userId: req.userId });
+      return result;
     });
 
     authed.post('/switch-workspace', { schema: { body: switchWorkspaceSchema } }, async (req, reply) => {

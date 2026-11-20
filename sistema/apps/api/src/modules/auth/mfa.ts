@@ -210,6 +210,15 @@ export async function verifyMfaCode(
   return method;
 }
 
+/** New recovery codes (the old ones stop working at once); the caller checks the step-up. */
+export async function regenerateRecoveryCodes(db: DbExecutor, userId: string): Promise<MfaEnableResponse> {
+  const user = await getUserRow(db, userId);
+  if (!user.mfaEnabled) throw new ValidationError('A verificação em duas etapas não está ativa');
+  const recoveryCodes = Array.from({ length: RECOVERY_CODES }, recoveryCode);
+  await db.update(users).set({ mfaRecoveryCodes: await hashRecoveryCodes(recoveryCodes) }).where(eq(users.id, userId));
+  return { recoveryCodes };
+}
+
 export async function disableMfa(db: DbExecutor, userId: string, code: string, ctx: AuditContext = {}): Promise<void> {
   const user = await getUserRow(db, userId);
   if (!user.mfaEnabled) throw new ValidationError('A verificação em duas etapas não está ativa');

@@ -309,6 +309,9 @@ function MfaSetupSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o
 function DisableMfaDialog({ open, onOpenChange, required }: { open: boolean; onOpenChange: (open: boolean) => void; required: boolean }) {
   const disable = useMfaDisable();
   const [code, setCode] = useState('');
+  // Step-up: the API asks for the password too (unless the login is recent) — a stolen session alone
+  // must not turn the second step off.
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
@@ -318,7 +321,7 @@ function DisableMfaDialog({ open, onOpenChange, required }: { open: boolean; onO
       return;
     }
     try {
-      await disable.mutateAsync({ code: value });
+      await disable.mutateAsync({ code: value, ...(password ? { password } : {}) });
       toast.success(required ? 'Celular anterior desvinculado. Agora cadastre o novo.' : 'Verificação em duas etapas desativada');
       onOpenChange(false);
     } catch (err) {
@@ -332,6 +335,7 @@ function DisableMfaDialog({ open, onOpenChange, required }: { open: boolean; onO
       onOpenChange={(o) => {
         if (o) {
           setCode('');
+          setPassword('');
           setError(null);
         }
         onOpenChange(o);
@@ -359,10 +363,13 @@ function DisableMfaDialog({ open, onOpenChange, required }: { open: boolean; onO
           void submit();
         }}
         noValidate
+        className="space-y-4"
       >
+        <Field label="Senha">
+          <Input autoFocus type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
         <Field label="Código" error={error ?? undefined}>
           <Input
-            autoFocus
             inputMode="text"
             autoComplete="one-time-code"
             placeholder="000000 ou xxxx-xxxx"

@@ -26,6 +26,7 @@ export interface AuditEntry extends AuditContext {
 export const SECURITY_LOG_ACTIONS: ReadonlyMap<string, 'warn' | 'info'> = new Map([
   ['auth.login_failed', 'warn'],
   ['auth.mfa_failed', 'warn'],
+  ['auth.reauth_failed', 'warn'],
   ['auth.refresh_token_reuse', 'warn'],
   ['client.credential_revealed', 'info'],
   ['data.exported', 'info'],
@@ -34,6 +35,7 @@ export const SECURITY_LOG_ACTIONS: ReadonlyMap<string, 'warn' | 'info'> = new Ma
   ['auth.password_changed', 'info'],
   ['auth.mfa_enabled', 'info'],
   ['auth.mfa_disabled', 'info'],
+  ['auth.recovery_codes_regenerated', 'info'],
   ['auth.owner_bootstrapped', 'info'],
   ['member.role_changed', 'info'],
   ['member.permissions_changed', 'info'],
