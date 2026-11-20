@@ -39,6 +39,9 @@ declare module 'fastify' {
   }
 }
 
+/** Default per-client (IP, IPv6 /64) budget of every route without a limit of its own. */
+export const GLOBAL_RATE_LIMIT_PER_MINUTE = 300;
+
 /** Readiness answers 503 when the database does not answer `select 1` within this time. */
 export const READINESS_TIMEOUT_MS = 2_000;
 
@@ -161,8 +164,16 @@ export async function buildApp(options: BuildAppOptions = {}) {
     if (!reply.hasHeader('cache-control')) reply.header('cache-control', 'no-store');
     return payload;
   });
-  // Keyed per client IP, an IPv6 client per /64 (it controls the whole prefix): lib/ip.ts.
-  await app.register(rateLimit, { global: false, keyGenerator: (req) => rateLimitKey(req.ip), ...(redis ? { redis } : {}) });
+  // Every route has a default per-client budget (threat model T9: a route without its own limit is not
+  // unlimited); routes with stricter needs set `config.rateLimit`, the health checks opt out. Keyed per
+  // client IP, an IPv6 client per /64 (it controls the whole prefix): lib/ip.ts.
+  await app.register(rateLimit, {
+    global: true,
+    max: app.platform.relaxedRateLimits ? 100_000 : GLOBAL_RATE_LIMIT_PER_MINUTE,
+    timeWindow: '1 minute',
+    keyGenerator: (req) => rateLimitKey(req.ip),
+    ...(redis ? { redis } : {}),
+  });
 
   // CSRF: cookies are SameSite, and in addition every state-changing request must come from an
   // allowed origin (when the browser says where it comes from) and carry JSON — a cross-site form
@@ -219,9 +230,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(
     async (api) => {
       // Liveness: the process answers (no dependency checked, so a database hiccup never restarts it).
-      api.get('/health', async () => ({ status: 'ok' }));
+      // Health checks (load balancer, deploy, Docker) are polled constantly: no rate limit.
+      api.get('/health', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
       // Readiness (load balancer / deploy): the database answers. No detail leaves on failure.
-      api.get('/health/ready', async (req, reply) => {
+      api.get('/health/ready', { config: { rateLimit: false } }, async (req, reply) => {
         if (await databaseReady(app.db)) return { status: 'ok' };
         req.log.warn('readiness check failed: database unavailable');
         return reply.code(503).send({ status: 'unavailable' });

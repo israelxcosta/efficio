@@ -40,6 +40,11 @@ export interface WebhookEvent {
   type: string;
   /** Subscription (preapproval) the notification is about, when it concerns one. */
   subscriptionId: string | null;
+  /**
+   * The very same signed delivery seen again within the signature's validity (a replay, maybe with the
+   * unsigned body changed to dodge the `eventId`): answered as a duplicate, never processed.
+   */
+  replay?: boolean;
 }
 
 export interface BillingProvider {

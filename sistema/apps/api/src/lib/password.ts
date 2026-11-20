@@ -1,6 +1,13 @@
 import { randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from 'node:crypto';
 
 const KEY_LENGTH = 64;
+/**
+ * Known gap (security review 19/11/2026, accepted for now): N=2^14, r=8, p=1 is below the OWASP Password
+ * Storage minimum for scrypt (N=2^17 r=8 p=1, or the same cost as N=2^14 r=8 p=5 — 16 MiB, ~160 ms here).
+ * Raising it means: new hashes with the stronger parameters, re-hash on a successful login (verify already
+ * reads the parameters from each stored hash), the same change in the demo's alias (apps/web/src/demo/
+ * password.ts) and a slower test suite. Login, reset and step-up are rate limited per IP and per account.
+ */
 const PARAMS = { N: 16384, r: 8, p: 1 } as const;
 
 function scryptAsync(password: string, salt: Buffer, keylen: number, options: ScryptOptions) {

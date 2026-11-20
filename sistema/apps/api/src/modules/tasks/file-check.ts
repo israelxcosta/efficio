@@ -5,7 +5,9 @@
 // no signature: they must not contain NUL bytes and must not look like HTML/SVG. ZIP-based files
 // (ZIP, DOCX, XLSX) are read through their central directory: the declared uncompressed total is
 // capped (a "zip bomb" would hurt whoever opens it; nothing is decompressed here), ZIP64 and broken
-// archives are refused, and DOCX/XLSX must contain the parts of a Word/Excel document.
+// archives are refused, and DOCX/XLSX must contain the parts of a Word/Excel document. Macros and
+// programs never enter (threat model T10): native executables and shebang scripts by their bytes, VBA
+// projects in DOCX/XLSX/DOC/XLS, and executables, scripts or macro-enabled Office files inside a ZIP.
 // Pure (no Node-only API): runs in the browser demo too.
 
 import { fileExtension, TASK_ATTACHMENT_TYPES, type TaskAttachmentType } from '@effinance/shared';
@@ -37,6 +39,19 @@ export interface ZipInfo {
   names: string[];
   /** Some entry would land outside the extraction folder ("zip slip": `..`, absolute or drive paths). */
   unsafePath: boolean;
+  /** Some entry (any of them, not only the first 200 names) is a macro project or a dangerous file. */
+  dangerous: boolean;
+}
+
+/**
+ * Inside an archive or an Office document: executables and scripts, macro-enabled Office files, VBA
+ * projects and ActiveX controls (threat model T10) — they run code on the computer of whoever opens them.
+ */
+const DANGEROUS_ENTRY =
+  /(?:^|\/)(?:vbaProject\.bin|vbaData\.xml)$|(?:^|\/)activeX\/|\.(?:exe|dll|com|scr|pif|msi|msp|msc|cpl|bat|cmd|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|hta|lnk|jar|apk|app|dmg|pkg|deb|rpm|sh|run|iso|img|vhd|vhdx|reg|inf|docm|dotm|xlsm|xltm|xlsb|xlam|pptm|potm|ppsm|ppam|sldm)$/i;
+
+export function isDangerousZipEntry(name: string): boolean {
+  return DANGEROUS_ENTRY.test(name.replace(/\\/g, '/'));
 }
 
 /** `../x`, `a/../../x`, `/etc/x`, `C:\x` (with either separator): escapes the folder it is extracted to. */
@@ -66,6 +81,7 @@ export function readZipDirectory(bytes: Uint8Array): ZipInfo | null {
   const decoder = new TextDecoder();
   let uncompressed = 0;
   let unsafePath = false;
+  let dangerous = false;
   let p = offset;
   for (let n = 0; n < total; n++) {
     if (p + 46 > offset + size || view.getUint32(p, true) !== 0x02014b50) return null;
@@ -77,16 +93,48 @@ export function readZipDirectory(bytes: Uint8Array): ZipInfo | null {
     uncompressed += entrySize;
     const name = decoder.decode(bytes.subarray(p + 46, p + 46 + nameLength));
     if (isUnsafeZipPath(name)) unsafePath = true;
+    if (isDangerousZipEntry(name)) dangerous = true;
     if (names.length < 200) names.push(name);
     p += 46 + nameLength + extraLength + commentLength;
   }
-  return { entries: total, uncompressed, names, unsafePath };
+  return { entries: total, uncompressed, names, unsafePath, dangerous };
 }
 
 const decodeHead = (bytes: Uint8Array, length: number) =>
   new TextDecoder('utf-8', { fatal: false }).decode(bytes.subarray(0, Math.min(bytes.length, length)));
 
 const MARKUP = /<!doctype\s+html|<\s*(html|svg|script|iframe|object|embed)\b|http:\/\/www\.w3\.org\/(1999\/xhtml|2000\/svg)/i;
+
+/** Native executables (Windows PE, ELF, Mach-O) and scripts with a shebang, whatever they claim to be. */
+function isExecutable(bytes: Uint8Array): boolean {
+  // Windows PE: "MZ" whose header points at a "PE\0\0" signature (a text starting with "MZ" is fine).
+  if (startsWith(bytes, [0x4d, 0x5a]) && bytes.length >= 0x40) {
+    const pe = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0x3c, true);
+    if (startsWith(bytes, [0x50, 0x45, 0, 0], pe)) return true;
+  }
+  return (
+    startsWith(bytes, [0x7f, 0x45, 0x4c, 0x46]) || // ELF
+    startsWith(bytes, [0xfe, 0xed, 0xfa, 0xce]) ||
+    startsWith(bytes, [0xfe, 0xed, 0xfa, 0xcf]) ||
+    startsWith(bytes, [0xce, 0xfa, 0xed, 0xfe]) ||
+    startsWith(bytes, [0xcf, 0xfa, 0xed, 0xfe]) ||
+    startsWith(bytes, [0xca, 0xfe, 0xba, 0xbe]) || // Mach-O fat / Java class
+    startsWith(bytes, [0x23, 0x21, 0x2f]) // #!/
+  );
+}
+
+/** UTF-16LE "_VBA_PROJECT": the storage of the macros of a Word/Excel 97–2003 (OLE2) document. */
+const VBA_PROJECT_UTF16 = Array.from('_VBA_PROJECT').flatMap((c) => [c.charCodeAt(0), 0]);
+
+function containsSequence(bytes: Uint8Array, sequence: readonly number[]): boolean {
+  const first = sequence[0]!;
+  for (let i = bytes.indexOf(first); i >= 0 && i <= bytes.length - sequence.length; i = bytes.indexOf(first, i + 1)) {
+    if (startsWith(bytes, sequence, i)) return true;
+  }
+  return false;
+}
+
+export const MACRO_REFUSED = 'Arquivos com macros ou programas não são aceitos. Salve sem macros (por exemplo, .docx/.xlsx) e envie de novo.';
 
 function hasNul(bytes: Uint8Array, length = 8192): boolean {
   const end = Math.min(bytes.length, length);
@@ -101,6 +149,7 @@ export function attachmentProblem(fileName: string, contentType: TaskAttachmentT
   if (!(type.extensions as readonly string[]).includes(fileExtension(fileName)))
     return `A extensão do arquivo não corresponde ao tipo ${type.label}.`;
   const mismatch = 'O conteúdo do arquivo não corresponde ao tipo informado.';
+  if (isExecutable(bytes)) return MACRO_REFUSED;
   switch (contentType) {
     case 'application/pdf':
       return startsWith(bytes, PDF) ? null : mismatch;
@@ -112,7 +161,8 @@ export function attachmentProblem(fileName: string, contentType: TaskAttachmentT
       return startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && startsWith(bytes, [0x57, 0x45, 0x42, 0x50], 8) ? null : mismatch;
     case 'application/msword':
     case 'application/vnd.ms-excel':
-      return startsWith(bytes, OLE2) ? null : mismatch;
+      if (!startsWith(bytes, OLE2)) return mismatch;
+      return containsSequence(bytes, VBA_PROJECT_UTF16) ? MACRO_REFUSED : null;
     case 'application/zip':
     case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
     case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
@@ -120,6 +170,7 @@ export function attachmentProblem(fileName: string, contentType: TaskAttachmentT
       const zip = readZipDirectory(bytes);
       if (!zip) return 'O arquivo compactado está corrompido ou usa um formato não aceito (ZIP64).';
       if (zip.unsafePath) return 'O arquivo compactado tem um caminho inválido (fora da pasta de destino).';
+      if (zip.dangerous) return MACRO_REFUSED;
       if (zip.entries > MAX_ZIP_ENTRIES || zip.uncompressed > MAX_UNCOMPRESSED_BYTES)
         return 'O arquivo expande para um tamanho muito maior que o permitido ao ser aberto. Envie um arquivo com menos conteúdo.';
       if (contentType !== 'application/zip') {

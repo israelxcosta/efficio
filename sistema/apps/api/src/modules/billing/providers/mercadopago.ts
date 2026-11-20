@@ -11,7 +11,7 @@ import type {
   WebhookEvent,
   WebhookInput,
 } from './types';
-import { verifySignature } from './signature';
+import { parseSignatureHeader, SIGNATURE_TOLERANCE_MS, verifySignature } from './signature';
 
 const API = 'https://api.mercadopago.com';
 
@@ -59,8 +59,28 @@ function asStatus(value: string): ProviderStatus {
   return value === 'authorized' || value === 'paused' || value === 'cancelled' ? value : 'pending';
 }
 
+/** Signed deliveries remembered (each for the signature's validity) to refuse their replays. */
+const MAX_REMEMBERED_SIGNATURES = 10_000;
+
 export class MercadoPagoProvider implements BillingProvider {
   readonly name = 'mercadopago' as const;
+  /**
+   * `v1` of the deliveries already accepted → when it stops being valid. Only `data.id`, `x-request-id`
+   * and `ts` are signed: a replay inside the window may change the body (its `id`, the idempotency key)
+   * and must still count as the same delivery. In memory: one API instance (VPS); behind several
+   * instances a replay could reach another one, where it is re-processed (idempotent: re-fetched).
+   */
+  private readonly seen = new Map<string, number>();
+
+  private rememberSignature(v1: string, now: number): boolean {
+    for (const [key, until] of this.seen) {
+      if (until > now && this.seen.size < MAX_REMEMBERED_SIGNATURES) break;
+      this.seen.delete(key);
+    }
+    if ((this.seen.get(v1) ?? 0) > now) return false;
+    this.seen.set(v1, now + 2 * SIGNATURE_TOLERANCE_MS);
+    return true;
+  }
 
   constructor(
     private readonly options: {
@@ -137,8 +157,11 @@ export class MercadoPagoProvider implements BillingProvider {
       now: this.options.now?.(),
     });
     if (!valid) throw new UnauthorizedError('Assinatura do webhook inválida');
+    const signature = parseSignatureHeader(header(input.headers, 'x-signature') ?? undefined)!;
+    const fresh = this.rememberSignature(signature.v1.toLowerCase(), this.options.now?.() ?? Date.now());
 
     const eventId = body.id !== undefined ? String(body.id) : `${type}:${dataId}:${requestId}`;
+    if (!fresh) return { eventId, type, subscriptionId: null, replay: true };
     return { eventId, type, subscriptionId: dataId ? await this.subscriptionIdFor(type, dataId) : null };
   }
 

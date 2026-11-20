@@ -895,7 +895,7 @@ describe('guards: access control', () => {
       });
       expect(res.statusCode, `${method} ${url}`).toBe(404);
     }
-    expect((await bob.del(`/auth/sessions/${aSession}`)).status).toBe(401);
+    expect((await bob.del(`/auth/sessions/${aSession}`)).status).toBe(404);
     expect((await alice.get('/auth/sessions')).body).toHaveLength(1);
     const filtered = await bob.get(`/transactions?accountId=${aAccount}&creditCardId=${aCard}&contactId=${aContact}`);
     expect(filtered.body.total).toBe(0);

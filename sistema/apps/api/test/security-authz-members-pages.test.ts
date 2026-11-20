@@ -58,10 +58,10 @@ describe('T3: identity routes without RLS stay inside the workspace', () => {
     const sessions = await carlos.get('/auth/sessions');
     expect(sessions.status).toBe(200);
     const foreignSession = (sessions.body as { id: string }[])[0]!.id;
-    // Today modules/auth answers 401 "Sessão não encontrada" (auth agent's domain; reported): what matters
-    // here is that nothing leaks or changes.
+    // 404 (never 401, which would make the client refresh/sign out), the same as an unknown id.
     const revoke = await ana.del(`/auth/sessions/${foreignSession}`);
-    expect([401, 404]).toContain(revoke.status);
+    expect(revoke.status).toBe(404);
+    expect(revoke.body).toMatchObject({ error: 'not_found', message: 'Sessão não encontrada' });
     expect(((await carlos.get('/auth/sessions')).body as { id: string }[]).map((x) => x.id)).toContain(foreignSession);
     expect((await carlos.get('/auth/me')).status).toBe(200);
 

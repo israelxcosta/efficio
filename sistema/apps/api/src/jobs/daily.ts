@@ -2,6 +2,8 @@
 // 1. retention of expired security rows (db/retention.ts, which also runs on every `migrate`);
 // 2. the recurring obligations of the current and the next competence for every workspace — the same
 //    idempotent generation the task screens trigger when opened (modules/tasks/generation.ts).
+// 3. onboarding accesses of links expired more than 12 months ago (LGPD: minimization), per workspace
+//    in its tenant transaction (modules/onboarding/service.ts).
 // Each part fails on its own: an error is logged and the rest goes on. Server-only (never in the demo).
 
 import { asc, eq } from 'drizzle-orm';
@@ -15,6 +17,7 @@ import { inTenant } from '../lib/tenant-scope';
 import { summarizeSubscription } from '../modules/billing/entitlements';
 import { loadMembers } from '../modules/tasks/access';
 import { ensureOccurrences } from '../modules/tasks/generation';
+import { purgeExpiredAccesses } from '../modules/onboarding/service';
 
 export interface JobLog {
   info: (obj: object, msg: string) => void;
@@ -53,6 +56,8 @@ export interface DailyJobsResult {
   failed: number;
   /** Workspaces warned by e-mail that audit records go within 30 days (`skipped`: no mailer). */
   auditNotices: number | 'skipped' | 'failed';
+  /** Onboarding accesses deleted (links expired more than 12 months ago), or `failed`. */
+  onboardingAccesses: number | 'failed';
 }
 
 const INSUFFICIENT_PRIVILEGE = '42501';
@@ -124,6 +129,20 @@ async function generateAll(o: DailyJobsOptions, at: Date, competences: MonthKey[
 }
 
 /** One maintenance run. Never throws for a failing part (each one is logged). */
+/** Every workspace: the accesses of its links expired more than 12 months ago. */
+async function purgeOnboardingAccesses(o: DailyJobsOptions): Promise<number> {
+  const rows = await o.db.select({ id: workspaces.id }).from(workspaces);
+  let deleted = 0;
+  for (const row of rows) {
+    try {
+      deleted += await inTenant(o.db, row.id, (db) => purgeExpiredAccesses(db, row.id));
+    } catch (error) {
+      o.log.warn({ job: 'onboarding-accesses', workspaceId: row.id, err: error }, 'onboarding accesses clean-up failed (retried tomorrow)');
+    }
+  }
+  return deleted;
+}
+
 export async function runDailyJobs(o: DailyJobsOptions): Promise<DailyJobsResult> {
   const at = (o.now ?? (() => new Date()))();
   const retention = await runRetention(o, at);
@@ -151,5 +170,12 @@ export async function runDailyJobs(o: DailyJobsOptions): Promise<DailyJobsResult
       auditNotices = 'failed';
     }
   }
-  return { retention, competences, ...generation, auditNotices };
+  let onboardingAccesses: DailyJobsResult['onboardingAccesses'] = 0;
+  try {
+    onboardingAccesses = await purgeOnboardingAccesses(o);
+  } catch (error) {
+    o.log.error({ job: 'onboarding-accesses', err: error }, 'onboarding accesses clean-up failed');
+    onboardingAccesses = 'failed';
+  }
+  return { retention, competences, ...generation, auditNotices, onboardingAccesses };
 }

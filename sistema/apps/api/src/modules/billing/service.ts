@@ -205,6 +205,8 @@ export async function handleWebhook(
   input: WebhookInput,
 ): Promise<{ duplicate: boolean; workspaceId: string | null }> {
   const event = await platform.billing.parseWebhook(input);
+  // A replayed signed delivery (same signature, body possibly changed): nothing stored, nothing done.
+  if (event.replay) return { duplicate: true, workspaceId: null };
   let [stored] = await db
     .insert(billingEvents)
     .values({ provider: platform.billing.name, eventId: event.eventId, type: event.type, payload: (input.body ?? {}) as object })

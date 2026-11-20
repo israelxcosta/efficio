@@ -14,6 +14,7 @@ import {
   SIGNUP_DISABLED_MESSAGE,
   switchWorkspaceSchema,
   updateProfileSchema,
+  reauthenticateSchema,
 } from '@effinance/shared';
 import type { Database } from '@api/db/client';
 import type { UserRow } from '@api/db/schema';
@@ -23,6 +24,7 @@ import { AppError, UnauthorizedError } from '@api/lib/errors';
 import { signupEnabled, type Platform } from '@api/lib/platform';
 import { requestContext } from '@api/lib/request-context';
 import { disableMfa, enableMfa, setupMfa, verifyMfaCode } from '@api/modules/auth/mfa';
+import { assertStepUp } from '@api/modules/auth/step-up';
 import {
   changePassword,
   checkPassword,
@@ -180,6 +182,12 @@ export async function demoAuthRoutes(app: Scope) {
 
     authed.post('/mfa/disable', { schema: { body: mfaCodeSchema } }, async (req: DemoRequest, reply: DemoReply) => {
       await disableMfa(app.db, req.userId, (req.body as { code: string }).code, requestContext(req));
+      return reply.code(204).send();
+    });
+
+    // Step-up of the sensitive actions (same check as the API: export and workspace deletion ask it).
+    authed.post('/reauthenticate', { schema: { body: reauthenticateSchema } }, async (req: DemoRequest, reply: DemoReply) => {
+      await assertStepUp(app.db, await getUserRow(app.db, req.userId), req.sessionId, req.body as never, requestContext(req));
       return reply.code(204).send();
     });
 
