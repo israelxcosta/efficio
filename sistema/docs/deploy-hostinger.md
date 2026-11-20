@@ -262,6 +262,27 @@ Prefira fora do expediente. As migrações do banco são aplicadas automaticamen
 do ar só alguns segundos no reinício da API. Se algo falhar, o script mostra os registros e o
 sistema anterior continua rodando quando o erro é no build.
 
+**Uma vez, na primeira atualização que trouxer as migrações 0026/0027.** Elas passam a recusar texto
+claro nos campos cifrados (dados dos clientes e notas) e o serviço `migrate` cifra o que for antigo.
+Confira em `docker compose -f docker-compose.prod.yml logs migrate` a linha
+`✔ encryption backfill: … rows encrypted` e valide (um erro aqui = sobrou texto claro: rode o
+`atualizar.sh` de novo e peça ajuda antes de seguir):
+
+```bash
+cd /opt/efficio/app/sistema/deploy
+docker compose -f docker-compose.prod.yml exec -T db psql -U postgres -d efficio -v ON_ERROR_STOP=1 -c "SET ROLE efficio_owner" -c "
+  ALTER TABLE contacts VALIDATE CONSTRAINT contacts_encrypted_fields_chk;
+  ALTER TABLE contacts VALIDATE CONSTRAINT contacts_blind_index_chk;
+  ALTER TABLE transactions VALIDATE CONSTRAINT transactions_notes_chk;
+  ALTER TABLE goals VALIDATE CONSTRAINT goals_notes_chk;
+  ALTER TABLE goal_contributions VALIDATE CONSTRAINT goal_contributions_note_chk;
+  ALTER TABLE recurrences VALIDATE CONSTRAINT recurrences_template_notes_chk;"
+# Só se o backfill cifrou linhas (rows > 0), fora do expediente (trava as tabelas por alguns segundos):
+# apaga as cópias antigas em texto claro que ficam no disco até o VACUUM FULL.
+docker compose -f docker-compose.prod.yml exec -T db psql -U postgres -d efficio -c "SET ROLE efficio_owner" \
+  -c "VACUUM FULL contacts, transactions, goals, goal_contributions, recurrences"
+```
+
 As atualizações de segurança do Ubuntu são automáticas (reinício automático às 04:30 quando o
 kernel exigir). O Docker e as imagens base (PostgreSQL, Node, Caddy) são atualizados pelo
 repositório (Dependabot) e chegam no próximo `atualizar.sh`.

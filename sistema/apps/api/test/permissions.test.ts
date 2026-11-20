@@ -124,7 +124,7 @@ describe('permissions: adjustments change what the API accepts', () => {
     // audit) the API checks the page key too; the other page keys only hide (their data feeds pickers).
     expect((await carla.get('/tasks/reports?from=2026-10-01&to=2026-10-31')).status).toBe(403);
     expect((await carla.get('/tasks/reports/export.csv?from=2026-10-01&to=2026-10-31')).status).toBe(403);
-    expect((await carla.get('/tasks/audit?month=2026-10')).status).toBe(200);
+    expect((await carla.get('/tasks/audit?competence=2026-10')).status).toBe(200);
 
     const task = await ana.post('/tasks', { title: 'Balancete', assigneeId: ana.userId, departmentId: fiscal });
     const comment = await ana.post(`/tasks/${task.body.id}/comments`, { text: 'Comentário da Ana' });

@@ -437,7 +437,8 @@ describe('demo api (PGlite)', () => {
     expect(clients.summary).toMatchObject({ active: 8, inactive: 2, monthlyFees: null, withoutCurrentFee: null, averageFee: null });
     expect(clients.items.every((c: { currentFee: unknown; latestFee: unknown }) => c.currentFee === null && c.latestFee === null)).toBe(true);
     expect((await call('GET', `/clients/${clients.items[0].id}/fees`)).status).toBe(403);
-    expect((await call('GET', '/contacts?kind=supplier')).status).toBe(200);
+    // Suppliers are financial (security review): like the web's FinanceGate and the search, 403.
+    expect((await call('GET', '/contacts?kind=supplier')).status).toBe(403);
 
     const found = (await call('GET', '/search?q=a')).body;
     expect(found).toMatchObject({ transactions: [], accounts: [], categories: [] });
