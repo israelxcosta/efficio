@@ -3,7 +3,7 @@ import { stackSegments } from './chart-scale';
 
 export interface StackSegment {
   value: number;
-  /** Fill class (`bg-data`, `bg-danger`, `bg-data/45`, `bg-border-strong`…). */
+  /** Fill class (`bg-data`, `bg-chart-red-strong`, `bg-data/45`, `bg-border-strong`…). */
   className?: string;
   /** Hatched fill (open/forecast) in this CSS colour instead of `className`. */
   hatch?: string;

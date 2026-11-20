@@ -6,14 +6,15 @@ import { cn, pluralize } from '@/lib/utils';
 import { bandNames, formatChance, reworkSummary, riskBands } from '../delinquency-view';
 
 /**
- * Colours of each risk band (tokens only, spec §5.3): low risk is neutral (colour only on the clients
- * at risk), Atenção yellow, Risco alto orange, Crítico red. No green: it is not a change.
+ * Colours of each risk band (tokens only, spec §5.3), the same ladder as the overdue age: low risk is
+ * neutral, Atenção light blue (R5), Risco alto pastel red, Crítico the strong pastel red. Badges keep
+ * AA text (warning / danger on their soft fills).
  */
 export const RISK_TONE: Record<DelinquencyRisk, { text: string; bg: string; soft: string; color: string }> = {
   baixo: { text: 'text-fg', bg: 'bg-[var(--app-chart-neutral)]', soft: 'bg-bg-subtle text-muted', color: 'var(--app-chart-neutral)' },
-  moderado: { text: 'text-warning', bg: 'bg-chart-yellow', soft: 'bg-warning-soft text-warning', color: 'var(--app-chart-yellow)' },
-  alto: { text: 'text-orange-strong', bg: 'bg-chart-orange', soft: 'bg-chart-orange/15 text-orange-strong', color: 'var(--app-chart-orange)' },
-  critico: { text: 'text-danger', bg: 'bg-danger', soft: 'bg-danger-soft text-danger', color: 'var(--app-danger)' },
+  moderado: { text: 'text-warning', bg: 'bg-chart-blue-5', soft: 'bg-warning-soft text-warning', color: 'var(--app-chart-blue-5)' },
+  alto: { text: 'text-danger', bg: 'bg-chart-red', soft: 'bg-danger-soft text-danger', color: 'var(--app-chart-red)' },
+  critico: { text: 'text-danger', bg: 'bg-chart-red-strong', soft: 'bg-danger-soft text-danger ring-1 ring-inset ring-danger/50', color: 'var(--app-chart-red-strong)' },
 };
 
 /** Worst first: the order of the bar and of the bands of "Carteira por risco". */

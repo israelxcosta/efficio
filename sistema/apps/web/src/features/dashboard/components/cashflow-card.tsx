@@ -250,7 +250,7 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
             <span className="hidden text-caption font-medium text-fg tabular @md:inline">{formatBRL(totals.receita)}</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <LegendDot size="sm" color={CHART_COLORS.negative} label="Despesas" />
+            <LegendDot size="sm" color={CHART_COLORS.expense} label="Despesas" />
             <span className="hidden text-caption font-medium text-fg tabular @md:inline">{formatBRL(totals.despesa)}</span>
           </span>
           {hasClients ? (
@@ -322,7 +322,7 @@ export function CashflowWidget({ month, d, loading, prefs, setPref, alert }: Wid
                 yAxisId="money"
                 dataKey="despesa"
                 name="despesa"
-                fill={CHART_COLORS.negative}
+                fill={CHART_COLORS.expense}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={44}
                 {...chartMotion(resizing)}

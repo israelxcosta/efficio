@@ -395,7 +395,7 @@ function BilledChart({ analysis: a, className }: { analysis: ClientAnalysis; cla
         info="Pelo mês de vencimento. Recebido inclui juros e multa e já desconta o desconto por pontualidade. O que segue em aberto aparece hachurado sobre o recebido: vencido em vermelho, a vencer em cinza."
       />
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-        <LegendDot size="sm" color={CHART_COLORS.expense} label="Faturado" />
+        <LegendDot size="sm" color={CHART_COLORS.neutral} label="Faturado" />
         <LegendDot size="sm" color="var(--app-data)" label="Recebido" />
         <LegendDot size="sm" color={CHART_COLORS.danger} label="Vencido em aberto" striped />
         <LegendDot size="sm" color={CHART_COLORS.neutral} label="A vencer" striped />
@@ -409,7 +409,7 @@ function BilledChart({ analysis: a, className }: { analysis: ClientAnalysis; cla
             <YAxis {...axisProps} domain={axis.domain} ticks={axis.ticks} interval={0} tickFormatter={moneyAxisFormatter} width={yAxisWidth(axis.ticks, moneyAxisFormatter)} />
             <ChartTooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={NAMES} hideZero />} />
             {/* No animation: printing re-lays the chart out and would catch the bars mid-growth. */}
-            <Bar dataKey="billed" name="billed" stackId="billed" fill={CHART_COLORS.expense} radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false} />
+            <Bar dataKey="billed" name="billed" stackId="billed" fill={CHART_COLORS.neutral} radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false} />
             <Bar dataKey="received" name="received" stackId="in" fill="var(--app-data)" maxBarSize={22} isAnimationActive={false} />
             {(['overdueAmount', 'upcomingAmount'] as const).map((key) => (
               <Bar key={key} dataKey={key} name={key} stackId="in" fill={stripeFill(key === 'overdueAmount' ? 'danger' : 'neutral', scope)} maxBarSize={22} isAnimationActive={false}>

@@ -40,11 +40,11 @@ export interface Band<K extends string = string> {
 
 /** Dot colour of each tone (the bands and the legends). */
 export const BAND_DOT: Record<BandTone, string> = {
-  danger: 'bg-danger',
-  warning: 'bg-chart-yellow', // marks use the chart yellow; the warning text stays text-warning
-  success: 'bg-success',
+  danger: 'bg-chart-red-strong', // overdue: the most urgent mark
+  warning: 'bg-chart-red-soft', // due soon / attention; the warning text stays text-warning
+  success: 'bg-chart-success',
   data: 'bg-data',
-  dataSoft: 'bg-data/45',
+  dataSoft: 'bg-chart-blue-4',
   muted: 'bg-border-strong',
 };
 

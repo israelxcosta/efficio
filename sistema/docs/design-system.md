@@ -38,39 +38,68 @@
 | `text-subtle`    | `#9A9EA5` | placeholders, legendas                      |
 | `success`        | `#18794A` | concluída, pago, em dia, variação positiva, 👍 pago (legível como texto) |
 | `success-soft`   | `#E6F4EC` | fundo de "Melhor 👍" e selos de "em dia"     |
-| `danger`         | `#CC3333` | o **único vermelho**: vencido em aberto, crítico, despesa, negativo, 👎 pendente (5,1:1 no branco; 4,6:1 no `danger-soft`) |
+| `danger`         | `#B3433E` | **texto** de erro, vencido, crítico, negativo, 👎 pendente (5,5:1 no branco; 5,0:1 no fundo `#f2f4f7`; 5,0:1 no `danger-soft`); fundo de botão/contador com texto branco (5,5:1). Não é cor de marca de gráfico |
 | `danger-soft`    | `#FDF0EF` | fundo de "Pior 👎" e selos de vencido        |
-| `warning`        | `#95600F` | texto de atenção / vence em breve (versão escura do amarelo) |
+| `warning`        | `#95600F` | texto de atenção / vence em breve           |
 | `warning-soft`   | `#FDF3DC` | banner de aviso                             |
-| `data`           | `#2F5FBF` | série principal, em andamento (= `chart-income`) |
-| `chart-yellow`   | `#F2B931` | marca de atenção / vence em breve (só barras e pontos); âmbar dourado, não limão (1,8:1 no branco: sempre com rótulo ao lado) |
-| `chart-orange`   | `#EE7D26` | marca de resolvido com atraso / risco alto (só barras e pontos; 2,8:1 no branco) |
-| `orange-strong`  | `#A84B0F` | texto do laranja (5,7:1 no branco)          |
-| `chart-negative` | = `danger` | despesas no fluxo de caixa e resultado negativo (alias) |
-| `chart-expense`  | `#C3C8D1` | despesas e comparações em cinza             |
-| `chart-neutral`  | `#D0D5DD` | série neutra (ex.: período anterior), cancelada |
+
+### Cores dos gráficos
+
+Monocromático azul-marinho + **um vermelho pastel**. **Azul = dado** (receitas, série principal, categorias,
+volumes); **vermelho pastel = urgência, vencido e despesa** — nada mais. Marcas (barras, áreas, pontos,
+segmentos) não levam texto e vêm sempre com rótulo/valor ao lado; texto em vermelho usa `danger` (AA), nunca
+os tons pastel. Tokens em `src/styles/index.css`, expostos no `@theme` (`bg-chart-blue-5`, `bg-chart-red-soft`,
+`bg-chart-red`, `bg-chart-red-strong`, `bg-chart-success`, `bg-chart-expense`, `bg-chart-neutral`).
+
+| Token | Claro | Escuro | Uso |
+| --- | --- | --- | --- |
+| `chart-blue-1` (R1) | `#203157` | `#DDE5F4` | série forte (`chart-income-strong`, `chart-1`), 1ª categoria |
+| `chart-blue-2` (R2) | `#344976` | `#BDCBE5` | 2ª categoria |
+| `chart-blue-3` (R3) | `#4C6291` | `#9BAED4` | `data` = `chart-income` = `chart-accent`: receitas, série principal |
+| `chart-blue-4` (R4) | `#6B80AB` | `#7D92BD` | 4ª categoria |
+| `chart-blue-5` (R5) | `#8D9FC2` | `#6277A1` | 5ª categoria, `chart-3`, até 30 dias de atraso, risco "Atenção" |
+| `chart-blue-6` (R6) | `#B1BED8` | `#4C5D81` | `chart-success`: marca de no prazo / concluída (texto de sucesso segue verde) |
+| `chart-blue-7` (R7) | `#D7DEEC` | `#343D50` | `data-soft` |
+| `chart-grey-1…5` | `#66696E` `#84868B` `#A2A5AA` `#C1C4C9` `#DBDEE3` | `#B5B7BD` `#96989D` `#787A7F` `#5E6065` `#484A4F` | categorias da 6ª em diante; "Outras" = `chart-others` (grey-4) |
+| `chart-neutral` | `#CACED4` | `#53555A` | série neutra (período anterior, faturado, cancelada, baixo risco) |
+| `chart-neutral-strong` | `#868C99` | `#7C8089` | traço neutro |
+| `chart-grid` | `#E7E9EE` | `#3B3B3B` | grade |
+| `chart-red-soft` | `#F3B5B1` | `#6E3A38` | barras e áreas de despesa (`chart-expense`), atenção/vence em breve (`BandTone warning`, `ProgressBar warning`) |
+| `chart-red` | `#E08883` | `#B5615C` | linha de despesa (`chart-expense-strong`), mês negativo (`chart-negative`), 31–60 dias de atraso, pago/concluído com atraso, risco alto, encerrados |
+| `chart-red-strong` | `#C95D58` | `#E48A84` | maior urgência: mais de 60 dias, vencido/atrasado em aberto, crítico, score < 400 (`CHART_COLORS.danger`, `stripeFill('danger')`) |
+
+`SERIES_PALETTE` (`components/charts/chart-utils.tsx`) é `var(--app-chart-series-1…10)` = R1…R5 e depois
+grey-1…5: os tokens trocam sozinhos no escuro (não passam por `useTone`/`liftForDark`, que fica só para cores
+escolhidas pelo usuário). `REGIME_COLORS` (carteira por regime) também usa a rampa.
+
+Contraste: as marcas pastel não precisam de 3:1 porque nunca são a única informação (rótulo e valor ao lado,
+hachura no vencido em aberto); o texto `danger` tem AA em todos os fundos onde aparece (claro: 5,5:1 branco,
+5,0:1 `bg`, 5,0:1 `danger-soft`, 4,6:1 sobre `chart-red-soft/35`; escuro `#EF8F8A`: 6,1:1 `surface`, 7,1:1
+`bg`, 5,6:1 `danger-soft`).
 
 ### Cores de status
 
-Uma cor por situação, em todo o sistema (ícones, selos, barras, gráficos e relatórios). Amarelo e laranja
-claros são só **marcas** (barras, pontos, faixas); texto nessas situações usa a versão escura (`text-warning`,
-`text-orange-strong`). Hachura e ícones continuam onde já existem (ex.: vencido em aberto hachurado).
+Uma cor por situação, em todo o sistema (ícones, selos, barras, gráficos e relatórios). Nas **marcas** a
+escala de urgência é azul → vermelho pastel → vermelho pastel forte; no **texto** a situação usa `text-success`,
+`text-warning` ou `text-danger`. Hachura e ícones continuam onde já existem (ex.: vencido em aberto hachurado).
 
-| Situação | Cor | Token |
+| Situação | Marca (gráfico) | Texto |
 | --- | --- | --- |
-| Concluída / pago / em dia | verde | `--app-success` (#18794a; o mesmo verde do ícone de status, legível como texto) |
-| Em andamento / série principal | azul | `--app-data` / `--app-chart-income` |
-| Vence em breve / aguardando / atenção / até 30 dias de atraso | amarelo | `--app-chart-yellow` (marca) e `text-warning` (texto) |
-| Resolvido com atraso / risco alto / 31–60 dias de atraso | laranja | `--app-chart-orange` (marca) e `text-orange-strong` (texto) |
-| Vencido em aberto / crítico / mais de 60 dias de atraso / despesa / negativo | vermelho | **um só vermelho**: `--app-danger` (#cc3333 no claro, #f27a7d no escuro: AA sobre `surface` e `danger-soft`); `--app-chart-negative` é alias de `--app-danger` |
-| Pendente sem prazo / cancelada / neutro | cinza | `--app-chart-neutral` / `text-muted` |
+| Concluída / pago / em dia / no prazo | `--app-chart-success` (R6) | `text-success` (verde) |
+| Em andamento / série principal / receitas | `--app-data` (R3) | `text-fg` |
+| Até 30 dias de atraso / risco "Atenção" | `--app-chart-blue-5` (R5) | `text-warning` |
+| Vence em breve / atenção (faixas de status, limite > 70%) | `--app-chart-red-soft` | `text-warning` |
+| Pago/concluído com atraso / 31–60 dias / risco alto / mês negativo | `--app-chart-red` | `text-danger` |
+| Vencido em aberto / crítico / mais de 60 dias | `--app-chart-red-strong` | `text-danger` |
+| Despesa (barras/áreas · linha) | `--app-chart-red-soft` · `--app-chart-red` | `text-fg` em lista de um tipo só |
+| Pendente sem prazo / cancelada / neutro | `--app-chart-neutral` | `text-muted` |
 
-Onde se aplica: "Situação das tarefas" e as faixas dos StatusCards do Início (concluída/em dia `success`),
-relatório de tarefas (no prazo verde, concluída com atraso laranja, atrasada em aberto vermelho; o atraso da
-auditoria em `text-orange-strong`), "Como cada mês foi pago" e o mapa de pagamentos do cliente (no prazo verde,
-pago com atraso laranja, vencido em aberto vermelho hachurado), faixas de atraso da Inadimplência do painel
-(até 30 dias amarelo → 31–60 laranja → mais de 60 vermelho, como a carteira por risco). Os antigos tokens
-`--app-aging-*` (bege, terracota e marrom) saíram.
+Onde se aplica: "Situação das tarefas" e as faixas dos StatusCards do Início, relatório de tarefas (no prazo
+R6, concluída com atraso `chart-red`, atrasada em aberto `chart-red-strong`; o atraso da auditoria em
+`text-danger`), "Como cada mês foi pago" e o mapa de pagamentos do cliente (no prazo R6, pago com atraso
+`chart-red`, vencido em aberto `chart-red-strong` hachurado), faixas de atraso da Inadimplência do painel e
+carteira por risco (até 30 dias R5 → 31–60 `chart-red` → mais de 60 `chart-red-strong`). Os tokens
+`--app-chart-yellow`, `--app-chart-orange` e `--app-orange-strong` saíram.
 
 **Vermelho é sinal, não textura.** Três regras valem para valores e KPIs:
 
@@ -84,12 +113,11 @@ pago com atraso laranja, vencido em aberto vermelho hachurado), faixas de atraso
 - **Só o que é problema ganha cor.** "A pagar", "A receber", "Limite utilizado" (abaixo de 70%), "Resgatado"
   ficam em tinta; `danger` para vencido > 0, resultado/saldo negativo, fatura vencida, uso de limite > 90%
   (`warning` > 70%, como as barras). Em frases de contagem, só o número leva a cor: "3 no prazo · **1** com
-  atraso · **2** atrasadas em aberto", com o número em `text-orange-strong`/`text-danger` e o resto em `text-muted`.
+  atraso · **2** atrasadas em aberto", com o número em `text-danger` e o resto em `text-muted`.
 
-Escada de risco amarelo → laranja → vermelho: a luminosidade desce a cada degrau (L\* 78 → 64 → 46 no claro;
-80 → 66 no escuro, com o vermelho separado pelo matiz), para continuar distinguível em cinza e com
-daltonismo vermelho-verde. O amarelo não chega a 3:1 no branco sem ficar mais escuro que o laranja (vira
-mostarda/marrom e quebra a escada); por isso toda marca amarela vem com rótulo e valor ao lado.
+Escada de urgência R5 → `chart-red` → `chart-red-strong`: a luminosidade desce a cada degrau no claro
+(e sobe no escuro) e o vermelho se separa do azul pelo matiz, então continua legível em cinza e com
+daltonismo vermelho-verde (não há verde nas marcas).
 
 ### Modo escuro
 
@@ -105,9 +133,8 @@ tokens `hero-*` (`from-hero-from via-hero-via to-hero-to`, destaque `text-hero-a
 | `surface` | `#2B2B2B` | `text-subtle` | `#9C9B95` |
 | `surface-muted` | `#323232` | `primary` | `#F4F3EF` com texto `#1E1E1E` |
 | `border` | `#3B3B3B` | `primary-soft` | `#3B3B3B` |
-| `border-strong` | `#4C4C4B` | `danger` (= `chart-negative`) | `#F27A7D` (5,3:1 no `surface`, 4,9:1 no `danger-soft` `#432A2B`) |
-| `success` | `#4FCB85` | `chart-orange` | `#EE8634` |
-| `chart-yellow` | `#F2C14E` | `orange-strong` | `#FFA652` |
+| `border-strong` | `#4C4C4B` | `danger` | `#EF8F8A` (6,1:1 no `surface`, 7,1:1 no `bg`, 5,6:1 no `danger-soft` `#432A2B`) |
+| `success` | `#4FCB85` | gráficos | ver "Cores dos gráficos" (coluna Escuro) |
 
 O fundo, a cor e a fonte de `html`/`body` ficam **fora** de `@layer` em `index.css`, para que estilos
 de quem hospeda o app (ex.: o esqueleto do artifact do claude.ai) não os sobrescrevam.
@@ -240,7 +267,7 @@ Movimento serve a feedback, estado e continuidade, nunca à decoração (fonte:
 | MiniStat / MiniStatGroup | KPIs de topo das telas de lista (Pagar/Receber, Metas, Cartões, Relatórios, Extrato, Contas, Transferências), no mesmo padrão da `MetricStrip`: `MiniStatGroup` é um container de borda única e raio `xl` com células separadas por divisores de 1px (passe as colunas em `className`, ex. `lg:grid-cols-4`; no celular 2 colunas; a última célula ímpar leva `col-span-2`); célula = rótulo 12,5 muted (+ ajuda), valor tabular à esquerda (18px no celular, `text-kpi` 24px a partir de `sm`), dica opcional 12,5 muted; `amount === 0` deixa o valor cinza |
 | MetricStrip        | faixa de números do topo dos dois dashboards (`components/ui/metric-strip.tsx`): um `Card` com células separadas por divisores de 1px; célula = rótulo 12,5 muted + (i), valor `text-kpi` à esquerda (32px na célula `hero`, que tem 1,3 fração), minigráfico opcional à direita e rodapé de uma linha (truncado, texto inteiro em `footerTitle`); ≥ 1000px de faixa uma fileira, 560–999px `medium` (2 ou 3) por fileira, abaixo cada célula vira linha com o valor inteiro à direita (20px, sem `truncate`); a célula inteira é link (camada por cima), e botões/links do rodapé ficam acima dela |
 | StackBar           | barra empilhada proporcional (`components/charts/stack-bar.tsx`): 6px (`sm`) ou 10px (`md`), raio cheio, 2px entre segmentos, larguras exatas e % inteiros pelo maior resto (`stackSegments`); segmento hachurado (`hatch`) para o que está em aberto; marca opcional de 2px com rótulo `text-micro` ("dia 5", "mês anterior"); `aria-hidden` |
-| Sparkline          | linha SVG de 1,5px sem eixos (`components/charts/sparkline.tsx`, 96×32), `--app-data` ou cinza (`--app-chart-expense-strong`) para despesas, ponto no último valor, comprime na horizontal em célula estreita; `aria-hidden` |
+| Sparkline          | linha SVG de 1,5px sem eixos (`components/charts/sparkline.tsx`, 96×32), `--app-data` ou vermelho pastel (`--app-chart-expense-strong` = `chart-red`) para despesas, ponto no último valor, comprime na horizontal em célula estreita; `aria-hidden` |
 | Input / Select     | altura 44, raio md, borda `border`, foco: borda `brand-500` + anel 3px `brand-500/15` |
 | CategoryPicker     | campo único de categoria: lista com busca no topo, categorias como títulos de grupo e só subcategorias selecionáveis (rádio circular); categoria sem subcategorias é selecionável; rodapé "+ Nova categoria" |
 | SplitEditor        | "Dividir" no campo Categoria: linhas categoria + valor (2–10), "Dividir igualmente", "+ Adicionar categoria" (já com o valor que falta) e faixa de conferência (Falta / Excede / Valores conferem) |
@@ -251,7 +278,7 @@ Movimento serve a feedback, estado e continuidade, nunca à decoração (fonte:
 | PaidToggle         | botão 👍/👎: pendente (padrão) = `ThumbsDown` em `danger-soft`/`danger`; pago = `ThumbsUp` em `success-soft`/`success`; animação de "pop" ao alternar |
 | Badge              | pílula 11–12px: `brand`, `success`, `danger`, `warning`, `neutral` (soft) |
 | EmptyState         | caixa com borda tracejada raio lg, ícone em quadrado `bg-subtle`, título 14/600, descrição muted, botão outline (estados vazios de página); `framed={false}` dentro de cards (o card já é a moldura): ícone 20px `text-subtle`, título 14/600, descrição 12,5 muted, centrado — é o `BodyEmpty` dos widgets |
-| ProgressBar        | trilho `brand-100`, preenchimento `brand-800` (metas) ou `success`/`danger`/`warning` (limite; `warning` usa a marca `chart-yellow`); preenchimento desliza com `translate` em 300ms |
+| ProgressBar        | trilho `brand-100`, preenchimento `brand-800` (metas) ou `success`/`danger`/`warning` (limite; marcas `chart-success`/`chart-red-strong`/`chart-red-soft`); preenchimento desliza com `translate` em 300ms |
 | InsightCard        | gradiente `brand-700 → brand-900`, texto branco, cartão interno vidro (`white/8`, borda `white/12`), chip overline |
 | BankLogo           | círculo com cor oficial aproximada do banco e sigla (Nu, Itaú, BB, Cx...) — sem marcas registradas |
 | CategoryIcon       | quadrado raio md com fundo `cor/12%` e ícone lucide na cor da categoria |
@@ -269,12 +296,12 @@ Movimento serve a feedback, estado e continuidade, nunca à decoração (fonte:
 | TasksHub           | hub de ícones nas `actions` do `PageHeader` de Tarefas, Auditoria, Recorrentes e Processos (`features/tasks/components/tasks-hub.tsx`): **Ver** é uma `nav` "Páginas de tarefas" no trilho do `SegmentedControl subtle` (itens `Link` de 36px, 40 em `pointer-coarse`, ativo `surface` + sombra xs com `aria-current`, filete entre visualizações e páginas) e **Criar** um `role="group"` de `Button size="icon"` (Plus `primary`, os outros `outline`; oculto abaixo de 640px). No computador, só ícones (pedido do dono): o nome fica no `Tooltip` (`side="bottom"`, 150ms) e no `aria-label`; em tela de toque ou estreita o nome curto aparece sob o ícone (no celular em duas fileiras, visualizações e depois páginas), sempre contido no `aria-label`. O "Mais" do celular lista Auditoria, Recorrentes e Processos logo após Tarefas. Padrão "hub de ícones": navegação e ação nunca usam a mesma forma de ícone |
 | RepeatField        | "Não se repete · Repete" (`SegmentedControl sm`) e, ligado, o bloco `rounded-lg border p-3` com Frequência + "A cada", dias da semana (7 botões `aria-pressed`), Dia/Mês (`recurrence-fields.tsx`, os mesmos do `RecurringTaskSheet`), dia não útil, Termina, "Meta e referência" recolhido, resumo `aria-live` e o aviso da primeira data (`repeat-field.tsx`, regras em `repeat-rules.ts`) |
 | AccountMenu        | menu de conta do cabeçalho de Minha área (`components/layout/account-menu.tsx`): botão `outline` com o ícone do tipo de espaço, o nome (`max-w-56`) e chevron; menu `w-72` com Conta, espaços e Nova empresa, tema, Configurações e Sair (`danger`). O avatar do trilho é um link para `/minha-area` (`AvatarLink`, anel `ring-primary` quando ativo) |
-| MiniCalendar       | mês de segunda a domingo (42 dias, dias de 40px), ponto de 5px por dia (`danger` atrasado, `data` em aberto, `border-strong` só concluídas), `Popover w-72` do dia com até 5 itens e "Novo compromisso", teclado de seletor de data (`mini-calendar.tsx`, `mini-calendar-logic.ts`) |
-| PortfolioRiskCard  | "Carteira por risco" da Inadimplência (`PortfolioRiskCardView`, `reports/components/delinquency-gauges.tsx`), no lugar do termômetro (sem degradê): número-herói "2 de 10" (`danger` só com alguém em risco) + "clientes em risco alto ou crítico", `StackBar md` na ordem Crítico → Risco alto → Atenção → Baixo risco, faixas com quadradinho, contagem, nomes (os de mais em aberto primeiro, 3 + "e mais N") e o valor em aberto à direita ("—" sem clientes, "em dia" sem aberto); rodapé com a chance média ("cerca de 1 em cada 3 mensalidades") e "N clientes com retrabalho (M tarefas em 90 dias)". Cores do risco (`RISK_TONE`): Baixo risco neutro (`--app-chart-neutral`), Atenção `chart-yellow` (texto `warning`), Risco alto `chart-orange` (texto `orange-strong`), Crítico `danger`; sem verde |
-| Gráfico "Como cada mês foi pago" | barras empilhadas por mês de vencimento (`delinquency-chart.tsx`): no prazo `--app-success`, pago com atraso `--app-chart-orange`, vencido em aberto `stripeFill('danger')`; `SegmentedControl sm` Quantidade · Valor (estado local; abaixo de 480px de card desce para baixo do título); taxa de atraso `text-micro` no topo do segmento mais alto (vermelha acima da média do período); mês corrente com opacidade 0,6, rótulo "Nov/26 / parcial" em duas linhas e sem taxa; meses iniciais vazios cortados (`trimLeadingEmpty`); um eixo (`niceDomain`); tooltip com a média de dias **só das pagas com atraso** e a idade da vencida em aberto mais antiga |
+| MiniCalendar       | mês de segunda a domingo (42 dias, dias de 40px), ponto de 5px por dia (`chart-red-strong` atrasado, `data` em aberto, `border-strong` só concluídas), `Popover w-72` do dia com até 5 itens e "Novo compromisso", teclado de seletor de data (`mini-calendar.tsx`, `mini-calendar-logic.ts`) |
+| PortfolioRiskCard  | "Carteira por risco" da Inadimplência (`PortfolioRiskCardView`, `reports/components/delinquency-gauges.tsx`), no lugar do termômetro (sem degradê): número-herói "2 de 10" (`danger` só com alguém em risco) + "clientes em risco alto ou crítico", `StackBar md` na ordem Crítico → Risco alto → Atenção → Baixo risco, faixas com quadradinho, contagem, nomes (os de mais em aberto primeiro, 3 + "e mais N") e o valor em aberto à direita ("—" sem clientes, "em dia" sem aberto); rodapé com a chance média ("cerca de 1 em cada 3 mensalidades") e "N clientes com retrabalho (M tarefas em 90 dias)". Cores do risco (`RISK_TONE`): Baixo risco neutro (`--app-chart-neutral`), Atenção `chart-blue-5` (texto `warning`), Risco alto `chart-red` (texto `danger`), Crítico `chart-red-strong` (selo `danger-soft` com anel); sem verde |
+| Gráfico "Como cada mês foi pago" | barras empilhadas por mês de vencimento (`delinquency-chart.tsx`): no prazo `--app-chart-success`, pago com atraso `--app-chart-red`, vencido em aberto `stripeFill('danger')` (`chart-red-strong`); `SegmentedControl sm` Quantidade · Valor (estado local; abaixo de 480px de card desce para baixo do título); taxa de atraso `text-micro` no topo do segmento mais alto (vermelha acima da média do período); mês corrente com opacidade 0,6, rótulo "Nov/26 / parcial" em duas linhas e sem taxa; meses iniciais vazios cortados (`trimLeadingEmpty`); um eixo (`niceDomain`); tooltip com a média de dias **só das pagas com atraso** e a idade da vencida em aberto mais antiga |
 | ScoreComposition   | partes do score em linhas com o valor à direita (`delinquency-gauges.tsx`): Pontualidade, Em aberto (N) −X, Retrabalho (2 + 1 antiga) −Y, "= score"; `tone="inverse"` no tooltip escuro da coluna Score (as partes zeradas saem) e `full` no relatório do cliente (todas as partes, rótulos longos "2 vencidas", "2 em 90 dias + 1"). Leitor de tela recebe a mesma composição numa linha (`scoreParts`) |
 | ReworkCard         | card "Retrabalho" do relatório do cliente (`client-report/rework-card.tsx`): achado "2 em 90 dias · 3 em 12 meses · −90 pontos no score"; até 5 tarefas (título, "Aberta em", selo `warning` da categoria com o ícone, situação), pontos de cada uma à direita (−40 em `danger`; −10 com "há mais de 90 dias") e "Abrir tarefa ↗" só com título legível; sem retrabalho, `EmptyState compact` "Nenhum retrabalho nos últimos 12 meses"; rodapé com a regra e "Ver categorias" (`page.registry`) |
-| Ponte do honorário | lista com sinais (+ / − / =) e barras horizontais de 4px proporcionais ao maior valor (`evolution/evolution-bridge.tsx`), não cascata: Base anterior (`--app-chart-neutral`), Novos (`data`), Reajustes (`data/45`; negativo em `danger`), Encerrados (`danger`), Base do mês (`primary`, 6px, separada por filete); abaixo "Quem entrou (N)" / "Quem saiu (N)" com iniciais, nome, "contrato iniciado em …" ou o motivo, e "+R$ …/mês" (`success`) / "−R$ …/mês" (`danger`), 5 de cada e "+ N" que expande |
+| Ponte do honorário | lista com sinais (+ / − / =) e barras horizontais de 4px proporcionais ao maior valor (`evolution/evolution-bridge.tsx`), não cascata: Base anterior (`--app-chart-neutral`), Novos (`data`), Reajustes (`data/45`; negativo em `chart-red/60`), Encerrados (`chart-red`), Base do mês (`primary`, 6px, separada por filete); abaixo "Quem entrou (N)" / "Quem saiu (N)" com iniciais, nome, "contrato iniciado em …" ou o motivo, e "+R$ …/mês" (`success`) / "−R$ …/mês" (`danger`), 5 de cada e "+ N" que expande |
 | Eixo duplo         | proibido, com **uma** exceção: a linha "Clientes ativos" do Fluxo de caixa (modo M) no eixo da direita (inteiro, sem grade própria, marcas "8 cl." alinhadas às do R$, `--app-fg` 1,5px com pontos de 3px, rótulo "8 clientes" no último ponto); o chip "Clientes ativos (eixo direito)" na legenda liga/desliga (`fluxoClientes`) |
 
 ## 4. Padrões de tela
@@ -373,8 +400,8 @@ Aplicada a partir da análise com as skills `design-taste-frontend` (telas de ap
 Prevalece sobre os itens acima quando houver conflito.
 
 - **Cor só nos dados.** Fundo `#f2f4f7` (papel de livro-razão), cartões brancos com borda `--app-border`, sem
-  sombra em repouso (sombra só em menus, diálogos e popovers). Um tom de dado, `--app-data` (`#2f5fbf`), na série
-  principal de cada gráfico; despesas e comparações em cinza. Verde/vermelho só como sinal (variação, atraso,
+  sombra em repouso (sombra só em menus, diálogos e popovers). Um tom de dado, `--app-data` (`#4c6291`), na série
+  principal de cada gráfico; comparações em cinza, despesas e urgência em vermelho pastel (§1, "Cores dos gráficos"). Verde/vermelho só como sinal (variação, atraso,
   resultado negativo) e nas situações da tabela "Cores de status" (§1); valores em tinta, zero em cinza, sinal no texto (`+R$` para receitas).
 - **Sem degradês, vidro, arco-íris ou ícones em quadradinhos coloridos.** Categorias usam a rampa azul por
   posição (`SERIES_PALETTE`); `CategoryIcon` é neutro nas listas (`tinted` só no editor/seletor de categorias).
@@ -406,7 +433,7 @@ Painel financeiro e o Início da Gestão.
   ", "Competência 10/2026 · "); só o número de alerta fica vermelho; vazio sem moldura dupla.
 - **Status como barra empilhada** (`StackBar`, `StatusSummary`), nunca rosca: progresso = concluído (success) →
   atrasado (danger) → pendente (cinza); distribuição na ordem das faixas. Tons (`BandTone`): `danger`,
-  `warning` (ponto/barra em `chart-yellow`, texto em `text-warning`), `success` (concluída/em dia, ver "Cores de status" na §1), `data`, `dataSoft` (`bg-data/45`,
+  `warning` (ponto/barra em `chart-red-soft`, texto em `text-warning`), `danger` (marca `chart-red-strong`), `success` (marca `chart-success`, ver "Cores de status" na §1), `data`, `dataSoft` (`bg-data/45`,
   31–60 dias) e `muted`.
 - **Gráficos:** eixo Y por `niceDomain` (3 a 5 marcas em passos 1/2/2,5/5 × 10ⁿ, começa em zero; negativo
   menor que ¼ do passo só estica o domínio); projeção sem repetir o pior dia (`projectionTiles`) e com a

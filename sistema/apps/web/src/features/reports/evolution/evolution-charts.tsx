@@ -10,9 +10,9 @@ import { MonthTick } from '../components/month-tick';
 import { evolutionFinding, moneyFinding, signedCount } from './evolution-logic';
 
 const NEW = 'var(--app-data)';
-const CHURNED = CHART_COLORS.danger;
+const CHURNED = CHART_COLORS.red;
 const ACTIVE = 'var(--app-fg)';
-const BILLED = CHART_COLORS.expense;
+const BILLED = CHART_COLORS.neutral;
 const RECEIVED = 'var(--app-data)';
 
 export const REACTIVATION_NOTE = 'Reativações reescrevem o histórico: o cliente conta como ativo desde o início do contrato.';

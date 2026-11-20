@@ -26,7 +26,7 @@ const COLUMN_HEADS = [
   ['D', 'domingo'],
 ] as const;
 
-const MARK_CLASS = { none: '', open: 'bg-data', overdue: 'bg-danger', done: 'bg-border-strong' } as const;
+const MARK_CLASS = { none: '', open: 'bg-data', overdue: 'bg-chart-red-strong', done: 'bg-border-strong' } as const;
 const WEEKDAY_TITLE = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 

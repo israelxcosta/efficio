@@ -14,7 +14,7 @@ const BAR: Record<BridgeRow['key'], string> = {
   previous: 'bg-[var(--app-chart-neutral)]',
   new: 'bg-data',
   adjustment: 'bg-data/45',
-  churned: 'bg-danger',
+  churned: 'bg-chart-red',
   current: 'bg-primary',
 };
 
@@ -69,7 +69,7 @@ export function EvolutionBridgeView({ current, previous, className }: { current:
                   </span>
                 </div>
                 <span className={cn('mt-1 block w-full overflow-hidden rounded-full bg-bg-subtle', total ? 'h-1.5' : 'h-1')} aria-hidden>
-                  <span className={cn('block h-full rounded-full', BAR[r.key], r.key === 'adjustment' && r.amount < 0 && 'bg-danger/60')} style={{ width: `${(Math.abs(r.amount) / max) * 100}%` }} />
+                  <span className={cn('block h-full rounded-full', BAR[r.key], r.key === 'adjustment' && r.amount < 0 && 'bg-chart-red/60')} style={{ width: `${(Math.abs(r.amount) / max) * 100}%` }} />
                 </span>
               </div>
             </li>

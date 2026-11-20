@@ -374,8 +374,8 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
               size="sm"
               className="w-12 shrink-0"
               segments={[
-                { value: t.doneOnTime, className: 'bg-success' },
-                { value: t.doneLate, className: 'bg-chart-orange' },
+                { value: t.doneOnTime, className: 'bg-chart-success' },
+                { value: t.doneLate, className: 'bg-chart-red' },
               ]}
             />
           ) : null}

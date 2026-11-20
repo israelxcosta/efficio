@@ -60,7 +60,7 @@ export function DonutChart({ data, total, centerLabel = 'Total', height = 200, m
   const chartData = items.map((d, i) => ({
     ...d,
     // Rank colours and "Outras" are theme tokens; only the items' own colours go through `tone`.
-    fill: d.categoryId === OTHERS_ID ? OTHERS_COLOR : itemColors && d.color ? tone(d.color) : rank(i),
+    fill: d.categoryId === OTHERS_ID ? OTHERS_COLOR : itemColors && d.color ? (d.color.startsWith('var(') ? d.color : tone(d.color)) : rank(i),
   }));
   const focused = active === null ? null : chartData[active];
   const selectable = (d: CategoryAmount) => Boolean(onSelect) && d.categoryId !== OTHERS_ID;

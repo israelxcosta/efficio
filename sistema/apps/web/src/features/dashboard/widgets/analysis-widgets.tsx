@@ -53,10 +53,10 @@ const CHANGE_TONE = { success: 'text-success', danger: 'text-danger', muted: 'te
 // Resumo do período
 // ---------------------------------------------------------------------------
 
-/** Paid fill and open hatch of each side (receitas in the data blue, despesas in grey). */
+/** Paid fill and open hatch of each side (receitas in the data blue, despesas in the soft pastel red). */
 const SUMMARY_FILL = {
   income: { paid: 'bg-data', hatch: 'var(--app-data)' },
-  expense: { paid: 'bg-[var(--app-chart-expense-strong)]', hatch: 'var(--app-chart-expense-strong)' },
+  expense: { paid: 'bg-chart-expense', hatch: 'var(--app-chart-expense)' },
 } as const;
 
 /**

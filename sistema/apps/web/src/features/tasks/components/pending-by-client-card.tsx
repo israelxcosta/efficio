@@ -79,7 +79,7 @@ export function PendingByClientCard({ summary, client, onClient }: PendingByClie
                     <span className="mt-1 flex h-2 min-w-0 [grid-area:bar] @md:mt-0" aria-hidden>
                       <span className="flex h-full overflow-hidden rounded-full" style={{ width: `${r.share * 100}%` }}>
                         {r.overdueShare < 1 ? <span className="h-full flex-1 bg-data" /> : null}
-                        {r.overdue > 0 ? <span className="h-full bg-danger" style={{ width: `${r.overdueShare * 100}%`, marginLeft: r.overdueShare < 1 ? 2 : 0 }} /> : null}
+                        {r.overdue > 0 ? <span className="h-full bg-chart-red-strong" style={{ width: `${r.overdueShare * 100}%`, marginLeft: r.overdueShare < 1 ? 2 : 0 }} /> : null}
                       </span>
                     </span>
                     <span className="flex flex-col items-end leading-tight [grid-area:total]">
@@ -100,7 +100,7 @@ export function PendingByClientCard({ summary, client, onClient }: PendingByClie
               <span className="size-2 rounded-full bg-data" aria-hidden /> em aberto
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-danger" aria-hidden /> atrasadas
+              <span className="size-2 rounded-full bg-chart-red-strong" aria-hidden /> atrasadas
             </span>
             {ranking.internal > 0 ? <span>{pluralize(ranking.internal, 'interna', 'internas')} (sem cliente) fora do ranking</span> : null}
             {ranking.hidden > 0 || all ? (

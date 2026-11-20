@@ -13,10 +13,11 @@ interface ProgressBarProps {
 
 const TONES = {
   brand: 'bg-primary',
-  success: 'bg-success',
-  danger: 'bg-danger',
-  // Marks use the chart yellow (visible on the track); the warning text colour stays text-warning.
-  warning: 'bg-chart-yellow',
+  // Marks: done in light blue, attention in the soft pastel red, critical in the strong one (the
+  // success/warning/danger text colours are not marks).
+  success: 'bg-chart-success',
+  danger: 'bg-chart-red-strong',
+  warning: 'bg-chart-red-soft',
 } as const;
 
 export function ProgressBar({ value, color, tone = 'brand', className, size = 'md', label }: ProgressBarProps) {

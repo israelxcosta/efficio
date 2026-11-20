@@ -12,7 +12,7 @@ const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', '
 /** "Cores de status": green paid on time, orange paid late, red overdue and still open. */
 const CELL: Record<ReceivableStatus | 'none', string> = {
   em_dia: 'bg-success-soft text-success',
-  atrasado: 'bg-chart-orange/15 text-orange-strong',
+  atrasado: 'bg-chart-red-soft/35 text-danger',
   vencido: 'bg-danger-soft text-danger',
   aberto: 'border border-dashed border-border-strong text-subtle',
   none: 'bg-bg-subtle',
@@ -144,7 +144,7 @@ export function PaymentTimingCard({ analysis: a, className, children }: { analys
               </span>
             </div>
             {/* On time in green; late in grey (the map already flags them in colour). */}
-            <ProgressBar value={b.share} size="sm" color={i < 2 ? 'var(--app-success)' : 'var(--app-chart-expense)'} label={`${b.label}: ${b.count}`} />
+            <ProgressBar value={b.share} size="sm" color={i < 2 ? 'var(--app-chart-success)' : 'var(--app-chart-neutral)'} label={`${b.label}: ${b.count}`} />
           </li>
         ))}
       </ul>

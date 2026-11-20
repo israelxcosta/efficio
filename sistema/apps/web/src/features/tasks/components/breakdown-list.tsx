@@ -41,7 +41,7 @@ export function BreakdownItem({ row, max }: { row: BreakdownRow; max: number }) 
       <span className="mt-1 flex h-2 min-w-0 overflow-hidden [grid-area:bar] @md:mt-0" aria-hidden>
         {row.open > 0 ? <span className="h-full rounded-l-full bg-data last:rounded-r-full" style={{ width: `${(row.open / max) * 100}%` }} /> : null}
         {row.overdue > 0 ? (
-          <span className="h-full rounded-r-full bg-danger first:rounded-l-full" style={{ width: `${(row.overdue / max) * 100}%`, marginLeft: row.open ? 2 : 0 }} />
+          <span className="h-full rounded-r-full bg-chart-red-strong first:rounded-l-full" style={{ width: `${(row.overdue / max) * 100}%`, marginLeft: row.open ? 2 : 0 }} />
         ) : null}
       </span>
       <span className="flex flex-col items-end leading-tight [grid-area:total]">

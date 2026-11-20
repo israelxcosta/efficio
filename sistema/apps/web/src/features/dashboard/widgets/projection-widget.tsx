@@ -76,7 +76,7 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
   // The sentence carries its own window ("hoje … em 90 dias"); only the alert is red.
   const insight = summary ? projectionInsight(summary) : null;
   const finding = insight && summary?.negativeFrom ? <span className="text-danger">{insight}</span> : insight;
-  const color = summary?.negativeFrom ? 'var(--app-danger)' : 'var(--app-data)';
+  const color = summary?.negativeFrom ? 'var(--app-chart-negative)' : 'var(--app-data)';
 
   const action = (
     <SegmentedControl

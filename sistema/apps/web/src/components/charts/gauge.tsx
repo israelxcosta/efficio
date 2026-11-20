@@ -28,7 +28,7 @@ export function Gauge({ score, size = 200 }: GaugeProps) {
       <path
         d={arc}
         fill="none"
-        stroke={clamped < 400 ? 'var(--app-danger)' : 'var(--app-data)'}
+        stroke={clamped < 400 ? 'var(--app-chart-red-strong)' : 'var(--app-data)'}
         strokeWidth="10"
         strokeLinecap="round"
         strokeDasharray={`${progress} ${length}`}

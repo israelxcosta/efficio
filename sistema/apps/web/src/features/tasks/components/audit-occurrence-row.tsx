@@ -282,7 +282,7 @@ export function AuditOccurrenceRowView({ lead, cell, column, client, today, cont
         {exception || delay ? (
           <span className="hidden min-w-0 @4xl:block">
             {exception ? <span className={cn('block truncate text-[13px]', exception.className)}>{exception.text}</span> : null}
-            {delay ? <span className="block truncate text-xs font-medium text-orange-strong">{conclusionDelayText(delay)}</span> : null}
+            {delay ? <span className="block truncate text-xs font-medium text-danger">{conclusionDelayText(delay)}</span> : null}
           </span>
         ) : null}
       </div>
@@ -344,7 +344,7 @@ function StackedSituation({ cell, today, delay }: { cell: OccurrenceCell; today:
           <span className={exception.className}>{exception.text}</span>
         ) : null}
       </span>
-      {delay ? <span className="shrink-0 font-medium text-orange-strong">· {conclusionDelayText(delay)}</span> : null}
+      {delay ? <span className="shrink-0 font-medium text-danger">· {conclusionDelayText(delay)}</span> : null}
     </p>
   );
 }

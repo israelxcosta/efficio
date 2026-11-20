@@ -140,9 +140,11 @@ describe('task cards', () => {
 });
 
 describe('status cards of the Início', () => {
-  it('paints 31–60 days in the soft data tone and concluded/up to date in green', () => {
-    expect(BAND_DOT.dataSoft).toBe('bg-data/45');
-    expect(BAND_DOT.success).toBe('bg-success');
+  it('paints marks in the navy + pastel red palette (done light blue, attention soft red, overdue strong red)', () => {
+    expect(BAND_DOT.dataSoft).toBe('bg-chart-blue-4');
+    expect(BAND_DOT.success).toBe('bg-chart-success');
+    expect(BAND_DOT.warning).toBe('bg-chart-red-soft');
+    expect(BAND_DOT.danger).toBe('bg-chart-red-strong');
   });
 
   it('orders a progress bar as concluded, overdue, pending', () => {

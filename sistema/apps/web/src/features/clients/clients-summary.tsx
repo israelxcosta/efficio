@@ -20,15 +20,15 @@ import { cn, pluralize } from '@/lib/utils';
  * One tone per tax regime where the portfolio is split into parts (the dashboard's "Carteira de
  * clientes"): four steps of the blue data ramp, alternating dark and light in the usual order of size
  * (Simples, Presumido, Real, MEI) so neighbouring slices read apart, and greys for the residual
- * regimes. All are light enough for useTone to leave them as they are, so both themes match.
+ * regimes. Theme tokens (the navy ramp and its cool greys), so the dark theme swaps them itself.
  */
 export const REGIME_COLORS: Record<TaxRegime, string> = {
-  simples_nacional: '#2F5FBF',
-  presumed_profit: '#8FA9DD',
-  real_profit: '#5B82D1',
-  mei: '#B9C9EA',
-  exempt: '#6B7280',
-  other: '#AEB3BC',
+  simples_nacional: 'var(--app-chart-blue-2)',
+  presumed_profit: 'var(--app-chart-blue-4)',
+  real_profit: 'var(--app-chart-blue-3)',
+  mei: 'var(--app-chart-blue-5)',
+  exempt: 'var(--app-chart-grey-1)',
+  other: 'var(--app-chart-grey-3)',
 };
 
 type Summary = ClientListResponse['summary'];

@@ -23,7 +23,6 @@ import { ErrorState } from '@/components/ui/misc';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
-import { useTone } from '@/lib/theme';
 import { useElementSize } from '@/lib/use-element-size';
 import { cn, pluralize } from '@/lib/utils';
 import { REGIME_COLORS } from '@/features/clients/clients-summary';
@@ -125,12 +124,11 @@ function StatTile({
 
 /** Narrow or short boxes: one stacked bar and the regimes listed below it. */
 function RegimeShares({ slices, total }: { slices: CategoryAmount[]; total: number }) {
-  const tone = useTone();
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex h-2.5 w-full shrink-0 gap-0.5 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
         {slices.map((s) => (
-          <span key={s.categoryId} className="h-full min-w-1" style={{ width: `${(s.amount / total) * 100}%`, backgroundColor: tone(s.color) }} />
+          <span key={s.categoryId} className="h-full min-w-1" style={{ width: `${(s.amount / total) * 100}%`, backgroundColor: s.color }} />
         ))}
       </div>
       <FitList
@@ -141,7 +139,7 @@ function RegimeShares({ slices, total }: { slices: CategoryAmount[]; total: numb
         className="flex flex-col"
         renderItem={(s) => (
           <div className="flex items-center gap-2 px-1.5 py-1 text-[12px]">
-            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tone(s.color) }} aria-hidden />
+            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} aria-hidden />
             <span className="min-w-0 flex-1 truncate text-fg">{s.name}</span>
             <span className="shrink-0 text-mini text-muted tabular">{Math.round(s.share * 100)}%</span>
             <span className="shrink-0 font-semibold text-fg tabular">{formatBRL(s.amount)}</span>
@@ -158,7 +156,6 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
   // The change of the base against the previous month (spec §4.1): the evolution of the current month.
   const evolution = useEvolutionReport({ months: 1 });
   const comparison = evolution.data?.comparison;
-  const tone = useTone();
   const chartBox = useElementSize();
   const data = clients.data;
   const summary = data?.summary;
@@ -262,14 +259,14 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
                 className="flex flex-col gap-1"
                 renderItem={(s) => (
                   <div className="grid grid-cols-[auto_minmax(0,8.5rem)_minmax(0,1fr)_4.5rem] items-center gap-x-2.5 px-1.5 py-0.5">
-                    <span className="size-2 rounded-full" style={{ backgroundColor: tone(REGIME_COLORS[s.regime]) }} aria-hidden />
+                    <span className="size-2 rounded-full" style={{ backgroundColor: REGIME_COLORS[s.regime] }} aria-hidden />
                     <span className="truncate text-[12px] font-medium text-fg" title={TAX_REGIME_LABELS[s.regime]}>
                       {TAX_REGIME_LABELS[s.regime]}
                     </span>
                     <span className="block h-1.5 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
                       <span
                         className="block h-full rounded-full"
-                        style={{ width: `${(s.clients / maxClients) * 100}%`, backgroundColor: tone(REGIME_COLORS[s.regime]) }}
+                        style={{ width: `${(s.clients / maxClients) * 100}%`, backgroundColor: REGIME_COLORS[s.regime] }}
                       />
                     </span>
                     <span className="text-right text-body-sm font-semibold text-fg tabular">{pluralize(s.clients, 'cliente', 'clientes')}</span>

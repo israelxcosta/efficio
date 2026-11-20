@@ -2,7 +2,7 @@ import { sparkPath } from './chart-scale';
 
 interface SparklineProps {
   values: number[];
-  /** `data` (blue) for the main series; `neutral` (grey) for expenses. */
+  /** `data` (blue) for the main series; `neutral` for expenses (the pastel red expense line). */
   tone?: 'data' | 'neutral';
   width?: number;
   height?: number;

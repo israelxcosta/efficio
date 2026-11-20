@@ -217,8 +217,8 @@ export function RhythmCardView({ overview, monthName, prevMonthName, footer }: {
           <div key={p.month} className="flex min-w-0 flex-1 flex-col items-center gap-1">
             <span className="tabular text-micro text-muted">{p.concluded || ''}</span>
             <div className="flex w-full max-w-11 flex-col-reverse overflow-hidden rounded-[4px]" style={{ height: `${Math.max(2, (p.concluded / max) * 72)}px` }}>
-              <span className="block w-full bg-success" style={{ height: `${p.concluded ? (p.onTime / p.concluded) * 100 : 0}%` }} />
-              <span className="block w-full bg-chart-orange" style={{ height: `${p.concluded ? (p.late / p.concluded) * 100 : 0}%` }} />
+              <span className="block w-full bg-chart-success" style={{ height: `${p.concluded ? (p.onTime / p.concluded) * 100 : 0}%` }} />
+              <span className="block w-full bg-chart-red" style={{ height: `${p.concluded ? (p.late / p.concluded) * 100 : 0}%` }} />
             </div>
             <span className={cn('text-micro', p.month === overview.month ? 'font-semibold text-fg' : 'text-muted')}>{MONTH_ABBR[Number(p.month.slice(5, 7)) - 1]}</span>
           </div>
@@ -296,8 +296,8 @@ export function MyDepartmentCardView({
       <StackBar
         className="mt-2"
         segments={[
-          { value: done, className: 'bg-success' },
-          { value: t.overdue, className: 'bg-danger' },
+          { value: done, className: 'bg-chart-success' },
+          { value: t.overdue, className: 'bg-chart-red-strong' },
           { value: pending, className: 'bg-border-strong' },
         ]}
         marker={{ at: day / daysInMonth, label: `hoje (dia ${day})` }}
@@ -427,7 +427,7 @@ export function ClientsPendingCardView({ rows, department, loading }: { rows: Pa
               <span className="truncate text-body-sm text-fg">{r.name}</span>
               <span className="relative block h-1.5 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
                 <span className="absolute inset-y-0 left-0 rounded-full bg-data" style={{ width: `${r.share * 100}%` }} />
-                <span className="absolute inset-y-0 left-0 rounded-full bg-danger" style={{ width: `${r.share * r.overdueShare * 100}%` }} />
+                <span className="absolute inset-y-0 left-0 rounded-full bg-chart-red-strong" style={{ width: `${r.share * r.overdueShare * 100}%` }} />
               </span>
               <span className="tabular text-right text-body-sm whitespace-nowrap text-fg">
                 {r.open}

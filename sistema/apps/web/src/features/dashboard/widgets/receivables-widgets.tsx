@@ -31,18 +31,18 @@ const BAND_ROW_WITH_BAR_PX = 56;
 /** Body width (px) from which the bands sit side by side as columns (the card's @2xl). */
 const BANDS_AS_COLUMNS_PX = 672;
 
-/** Overdue age bands like the delinquency risk: up to 30 days yellow, 31–60 orange, over 60 red. */
+/** Overdue age bands like the delinquency risk: up to 30 days light blue (R5), 31–60 pastel red, over 60 the strong red. */
 const AGING_BG: Record<AgingBucket['key'], string> = {
-  ate30: 'bg-chart-yellow',
-  ate60: 'bg-chart-orange',
-  mais60: 'bg-danger',
+  ate30: 'bg-chart-blue-5',
+  ate60: 'bg-chart-red',
+  mais60: 'bg-chart-red-strong',
 };
 
 /** Column bars on wide cards: tinted fill with a solid cap (solid blocks that big get heavy). */
 const AGING_COLUMN: Record<AgingBucket['key'], string> = {
-  ate30: 'bg-chart-yellow/30 border-chart-yellow',
-  ate60: 'bg-chart-orange/20 border-chart-orange',
-  mais60: 'bg-danger/15 border-danger',
+  ate30: 'bg-chart-blue-5/30 border-chart-blue-5',
+  ate60: 'bg-chart-red/25 border-chart-red',
+  mais60: 'bg-chart-red-strong/20 border-chart-red-strong',
 };
 
 /** Overdue receivables: total, share of what is still to receive and the aging bands. */
@@ -217,7 +217,7 @@ export function DebtorsWidget({ alert }: WidgetProps) {
               <span className="text-right text-body-sm font-semibold whitespace-nowrap text-danger tabular">{formatBRL(debtor.amount)}</span>
             </span>
             <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-bg-subtle [grid-area:bar] @2xl:mt-0 @2xl:h-2" aria-hidden>
-              <span className="block h-full min-w-0.5 rounded-full bg-danger" style={{ width: `${max > 0 ? (debtor.amount / max) * 100 : 0}%` }} />
+              <span className="block h-full min-w-0.5 rounded-full bg-chart-red-strong" style={{ width: `${max > 0 ? (debtor.amount / max) * 100 : 0}%` }} />
             </span>
             <span className="mt-0.5 truncate text-micro text-muted [grid-area:meta] @2xl:mt-0">
               {pluralize(debtor.count, 'título', 'títulos')} · mais antigo vence em {formatDateBR(debtor.oldest)}
