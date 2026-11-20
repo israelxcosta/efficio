@@ -132,3 +132,27 @@ recebido).
   backups semanais do painel Hostinger como camada extra e teste de restauração mensal (`restaurar.sh --teste`).
 - [deploy-aws.md](deploy-aws.md) fica como **alternativa não usada** (SaaS multi-assinante na AWS), mantida como
   referência de segurança.
+
+---
+
+## 6. Anotado para fazer
+
+### Entradas por forma de recebimento (conferência com o extrato) — pedido de 20/11/2026
+Objetivo: nos relatórios financeiros, ver o total que **entrou** por forma de recebimento (Pix, boleto,
+TED/DOC, dinheiro, cartão…) e por conta, para conferir com o extrato bancário depois de dar baixa nos
+honorários e lançar receitas.
+
+O que já existe (verificado em 20/11/2026):
+- O lançamento tem o campo "Forma de pagamento" (`transactions.paymentMethod`), também nas receitas; os
+  honorários gerados entram como boleto por padrão (`fee-charges/service.ts`), editável no lançamento.
+- Relatórios → Visão geral e Dashboard inteligente mostram "Formas de pagamento" **só das despesas** e pela
+  competência (não pela data em que o dinheiro entrou).
+- A baixa rápida (👍 pago) confirma data e valor (juros/multa), mas **não pergunta a forma de recebimento**.
+
+A fazer:
+1. Na baixa (honorário ou receita), perguntar/confirmar a forma de recebimento e a conta (pré-preenchidas).
+2. Relatório "Entradas por forma de recebimento": período pela **data do recebimento** (`paidAt`), totais por
+   forma e por conta, com a lista de lançamentos de cada grupo e exportação (CSV/PDF), e o saldo do extrato
+   da conta no período ao lado para conferir (diferença destacada).
+3. Opcional: marcar lançamentos como "conferido com o extrato" (conciliação simples), aproveitando as
+   importações OFX/Open Finance que já existem.
