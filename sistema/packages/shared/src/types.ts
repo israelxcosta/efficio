@@ -1184,6 +1184,39 @@ export interface CashflowReportResponse {
   periods: CashflowPeriod[];
 }
 
+/** One group of money received (a payment method or an account). */
+export interface ReceiptsGroup {
+  /** Payment method, account id, or null for "not informed" / "no account". */
+  key: string | null;
+  label: string;
+  amount: number;
+  count: number;
+  share: number;
+}
+
+/** Money received per day, split by payment method (`none` = not informed). */
+export interface ReceiptsDay {
+  date: ISODate;
+  total: number;
+  count: number;
+  byMethod: Partial<Record<PaymentMethod | 'none', number>>;
+}
+
+export interface ReceiptsReportResponse {
+  from: ISODate;
+  to: ISODate;
+  total: number;
+  count: number;
+  /** Amount received without a payment method: the gap to fill before checking the statement. */
+  notInformed: number;
+  byMethod: ReceiptsGroup[];
+  byAccount: ReceiptsGroup[];
+  days: ReceiptsDay[];
+  /** The receipts themselves, by date received (newest first), at most `RECEIPTS_ITEMS_LIMIT`. */
+  items: Transaction[];
+  truncated: boolean;
+}
+
 export interface OverviewReportResponse {
   from: ISODate;
   to: ISODate;

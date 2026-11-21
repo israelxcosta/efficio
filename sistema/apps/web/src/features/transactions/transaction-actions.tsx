@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   DISCOUNT_CATEGORY,
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
   daysLate,
   discountAmount,
   earnsDiscount,
@@ -12,6 +14,7 @@ import {
   formatMonthKey,
   suggestLateFees,
   todayISO,
+  type PaymentMethod,
   type Transaction,
   type TransactionListResponse,
 } from '@effinance/shared';
@@ -175,6 +178,7 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
             paid,
             paidAt: paid ? (extra.paidAt ?? todayISO()) : null,
             accountId: extra.accountId ?? undefined,
+            paymentMethod: extra.paymentMethod,
             interest: extra.interest,
             fine: extra.fine,
             discount: extra.discount,
@@ -211,11 +215,12 @@ export function TransactionActionsProvider({ children }: { children: ReactNode }
         setToUnpay(tx);
         return;
       }
-      // No account yet, settled after the due date (interest and fine may be charged) or a fee with a
-      // discount for paying on time (the discount is confirmed with the amount received): ask first.
+      // No account yet, settled after the due date (interest and fine may be charged), a fee with a
+      // discount for paying on time, or any receipt (the form of payment is confirmed, so the receipts
+      // report can be checked against the bank statement): ask first.
       const late = tx.type !== 'transfer' && tx.date < todayISO();
       const discount = tx.type === 'income' && Boolean(tx.feeDiscountBps) && !late;
-      if (paid && tx.type !== 'transfer' && (!tx.accountId || late || discount)) {
+      if (paid && tx.type !== 'transfer' && (!tx.accountId || late || discount || tx.type === 'income')) {
         setPayTarget(tx);
         return;
       }
@@ -337,6 +342,8 @@ function useStickyTrue(value: boolean): boolean {
 
 interface PaymentExtra {
   accountId?: string | null;
+  /** Receipts: how it was received, confirmed in the dialog. */
+  paymentMethod?: PaymentMethod;
   paidAt?: string | null;
   /** Late payment: interest (juros) and fine (multa) in cents. */
   interest?: number;
@@ -360,6 +367,7 @@ function ConfirmPaymentDialog({
 }) {
   const accounts = useAccounts();
   const [accountId, setAccountId] = useState('');
+  const [method, setMethod] = useState<PaymentMethod | ''>('');
   const [paidAt, setPaidAt] = useState(todayISO());
   const [interest, setInterest] = useState(0);
   const [fine, setFine] = useState(0);
@@ -376,6 +384,7 @@ function ConfirmPaymentDialog({
   useEffect(() => {
     if (!tx) return;
     setAccountId('');
+    setMethod(tx.paymentMethod ?? '');
     setPaidAt(todayISO());
     setInterest(0);
     setFine(0);
@@ -407,6 +416,7 @@ function ConfirmPaymentDialog({
               onClick={() =>
                 onConfirm({
                   accountId: tx?.accountId ? undefined : accountId || null,
+                  ...(income && method ? { paymentMethod: method } : {}),
                   paidAt,
                   ...(late > 0 ? { interest, fine } : {}),
                   ...(discountable ? { discount: granted } : {}),
@@ -430,6 +440,18 @@ function ConfirmPaymentDialog({
                     {a.name} · {formatBRL(a.balance)}
                   </option>
                 ))}
+            </Select>
+          </Field>
+        ) : null}
+        {income ? (
+          <Field label="Forma de recebimento" hint="Usada no relatório de Recebimentos para conferir com o extrato.">
+            <Select aria-label="Forma de recebimento" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}>
+              <option value="">Não informado</option>
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {PAYMENT_METHOD_LABELS[m]}
+                </option>
+              ))}
             </Select>
           </Field>
         ) : null}

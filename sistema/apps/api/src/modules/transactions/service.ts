@@ -476,6 +476,9 @@ export async function setPaid(
     if (row.type !== 'transfer') patch.accountId = input.accountId;
   }
 
+  // The method confirmed with the settlement (e.g. a fee generated as boleto but paid by Pix).
+  if (input.paymentMethod && input.paid && row.type !== 'transfer') patch.paymentMethod = input.paymentMethod;
+
   const discount = discountAmountOf(row, patch, input);
   const fees = lateFeeAmounts(row, patch, input);
 
@@ -582,7 +585,7 @@ async function lateFeeRows(
     categoryId,
     subcategoryId: subcategories[target.lateFee],
     contactId: row.contactId,
-    paymentMethod: row.paymentMethod,
+    paymentMethod: patch.paymentMethod ?? row.paymentMethod,
     lateFeeOf: row.id,
     lateFeeKind: kind,
   }));

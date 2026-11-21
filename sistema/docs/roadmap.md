@@ -137,7 +137,7 @@ recebido).
 
 ## 6. Anotado para fazer
 
-### Entradas por forma de recebimento (conferência com o extrato) — pedido de 20/11/2026
+### Entradas por forma de recebimento (conferência com o extrato) — pedido de 20/11/2026 · **feito em 21/11/2026** (itens 1 e 2: Relatórios → Recebimentos e forma de recebimento na baixa; item 3 segue aberto)
 Objetivo: nos relatórios financeiros, ver o total que **entrou** por forma de recebimento (Pix, boleto,
 TED/DOC, dinheiro, cartão…) e por conta, para conferir com o extrato bancário depois de dar baixa nos
 honorários e lançar receitas.

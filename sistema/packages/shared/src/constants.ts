@@ -1056,3 +1056,6 @@ export type ContractBlockRule = (typeof CONTRACT_BLOCK_RULES)[number];
 export const MAX_CONTRACT_BLOCKS = 500;
 export const MAX_CONTRACT_BLOCK_CHARS = 20_000;
 export const MAX_CONTRACT_TOTAL_CHARS = 400_000;
+
+/** Receipts listed by the receipts report (the totals always cover the whole range). */
+export const RECEIPTS_ITEMS_LIMIT = 1000;

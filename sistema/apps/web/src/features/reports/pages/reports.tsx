@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { AlarmClock, GitCompareArrows, LayoutDashboard, Tags, TrendingUp, Users, Waves } from 'lucide-react';
+import { AlarmClock, GitCompareArrows, HandCoins, LayoutDashboard, Tags, TrendingUp, Users, Waves } from 'lucide-react';
 import { PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { CashflowTab } from '../components/cashflow-tab';
@@ -11,10 +11,11 @@ import { DelinquencyTab } from '../components/delinquency-tab';
 import { ReportMonthsControl } from '../components/report-months';
 import { EvolutionTab } from '../evolution/evolution-tab';
 import { OverviewTab } from '../components/overview-tab';
+import { ReceiptsTab } from '../receipts/receipts-tab';
 import { useActiveMonth } from '@/lib/active-month';
 import { PeriodFilter, presetRange, type ReportPeriod } from '../components/period-filter';
 
-type Tab = 'overview' | 'evolucao' | 'categories' | 'contacts' | 'comparison' | 'cashflow' | 'inadimplencia';
+type Tab = 'overview' | 'evolucao' | 'categories' | 'contacts' | 'comparison' | 'cashflow' | 'recebimentos' | 'inadimplencia';
 
 /**
  * Each report keeps its own period while the app is open. "Mês" follows the active month and
@@ -36,6 +37,7 @@ const DESCRIPTIONS: Record<Tab, string> = {
   contacts: 'Movimentação por cliente e fornecedor, pelo regime de competência.',
   comparison: 'Dois períodos lado a lado, pelo regime de competência.',
   cashflow: 'Dinheiro que entrou e saiu das contas (regime de caixa), com o previsto adiante.',
+  recebimentos: 'Dinheiro que entrou, pela data do recebimento, por forma de recebimento, conta e dia: para conferir com o extrato bancário.',
   inadimplencia: 'Recebimentos em atraso, juros e multas cobrados e o risco de cada cliente.',
 };
 
@@ -89,6 +91,7 @@ export default function ReportsPage() {
             { value: 'contacts', label: 'Contatos', icon: <Users /> },
             { value: 'comparison', label: 'Comparação', icon: <GitCompareArrows /> },
             { value: 'cashflow', label: 'Fluxo de caixa', icon: <Waves /> },
+            { value: 'recebimentos', label: 'Recebimentos', icon: <HandCoins /> },
             { value: 'inadimplencia', label: 'Inadimplência', icon: <AlarmClock /> },
           ]}
         />
@@ -100,6 +103,7 @@ export default function ReportsPage() {
       {tab === 'contacts' ? <ContactsTab from={range.from} to={range.to} /> : null}
       {tab === 'comparison' ? <ComparisonTab /> : null}
       {tab === 'cashflow' ? <CashflowTab from={range.from} to={range.to} /> : null}
+      {tab === 'recebimentos' ? <ReceiptsTab from={range.from} to={range.to} /> : null}
       {tab === 'inadimplencia' ? <DelinquencyTab /> : null}
     </div>
   );

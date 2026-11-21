@@ -7,12 +7,14 @@ import {
   delinquencyReportQuerySchema,
   evolutionReportQuerySchema,
   overviewReportQuerySchema,
+  receiptsReportQuerySchema,
 } from '@effinance/shared';
 import { financeOnly } from '../../lib/finance-access';
 import { idParams } from '../common/params';
 import { cashflowReport, categoryReport, comparisonReport, contactReport, overviewReport } from './service';
 import { delinquencyReport } from './delinquency';
 import { evolutionReport } from './evolution';
+import { receiptsReport } from './receipts';
 import { clientRework } from './rework';
 
 /** No permission key gates reading tasks (every member reads them): see the rework route. */
@@ -36,6 +38,9 @@ export const reportRoutes: FastifyPluginAsyncZod = async (app) => {
   );
   app.get('/cashflow', { schema: { querystring: cashflowReportQuerySchema } }, async (req) =>
     cashflowReport(req.db, req.workspaceId, req.query),
+  );
+  app.get('/receipts', { schema: { querystring: receiptsReportQuerySchema } }, async (req) =>
+    receiptsReport(req.db, req.workspaceId, req.query),
   );
   app.get('/delinquency', { schema: { querystring: delinquencyReportQuerySchema } }, async (req) =>
     delinquencyReport(req.db, req.workspaceId, req.query),

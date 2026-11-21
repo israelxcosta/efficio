@@ -826,6 +826,8 @@ export const setPaidSchema = z.object({
   paidAt: isoDateSchema.nullish(),
   /** Account used to pay/receive when the transaction had none. */
   accountId: idSchema.nullish(),
+  /** How it was paid/received (Pix, boleto, TED…), confirmed with the settlement; omitted = unchanged. */
+  paymentMethod: z.enum(PAYMENT_METHODS).optional(),
   /**
    * Paid after the due date: interest (juros) and fine (multa) charged on top. Each becomes a paid
    * transaction linked to this one; sending them again replaces the previous ones.
@@ -963,6 +965,18 @@ export type CashflowReportQuery = z.input<typeof cashflowReportQuerySchema>;
 export const overviewReportQuerySchema = z.object({
   ...reportRange,
 });
+
+/**
+ * Money received in a range, by the day it came in (`paidAt`): totals per payment method, per account
+ * and per day, to check against the bank statement. Optional filters by account and method
+ * (`none` = method not informed).
+ */
+export const receiptsReportQuerySchema = z.object({
+  ...reportRange,
+  accountId: idSchema.optional(),
+  method: z.enum([...PAYMENT_METHODS, 'none']).optional(),
+});
+export type ReceiptsReportQuery = z.input<typeof receiptsReportQuerySchema>;
 export type OverviewReportQuery = z.input<typeof overviewReportQuerySchema>;
 
 export const searchQuerySchema = z.object({

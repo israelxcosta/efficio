@@ -14,6 +14,8 @@ import type {
   EvolutionReportResponse,
   OverviewReportQuery,
   OverviewReportResponse,
+  ReceiptsReportQuery,
+  ReceiptsReportResponse,
   Transaction,
   TransactionListResponse,
 } from '@effinance/shared';
@@ -31,6 +33,8 @@ function useReport<T>(name: string, params: object, enabled = true) {
   });
 }
 
+/** Money received by the day it came in, per method, account and day (Relatórios → Recebimentos). */
+export const useReceiptsReport = (p: ReceiptsReportQuery) => useReport<ReceiptsReportResponse>('receipts', p);
 export const useOverviewReport = (p: OverviewReportQuery) => useReport<OverviewReportResponse>('overview', p);
 export const useCategoryReport = (p: CategoryReportQuery, enabled = true) => useReport<CategoryReportResponse>('categories', p, enabled);
 export const useContactReport = (p: ContactReportQuery, enabled = true) => useReport<ContactReportResponse>('contacts', p, enabled);
