@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { DensityToggle } from '@/components/ui/density-toggle';
+import { useListDensity } from '@/lib/list-density';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ChevronLeft, ChevronRight, CircleCheck, ListChecks, SearchX } from 'lucide-react';
 import { TASK_DUE_BUCKET_LABELS, todayISO } from '@effinance/shared';
@@ -44,6 +46,7 @@ export default function TasksPage() {
   const viewKey = taskViewKey(workspace?.id ?? '', user?.id ?? '');
   const preference = useMemo(() => readTaskView(viewKey), [viewKey]);
   const options = useTaskOptions();
+  const [density] = useListDensity();
   const today = options.data?.today ?? todayISO();
   const parsed = parseTaskFilters(params, preference);
   // "Meu departamento" does not exist for a member without department.
@@ -194,17 +197,20 @@ export default function TasksPage() {
           doneHref={`/tarefas?${writeTaskFilters(params, { view: 'list', situation: 'done' }).toString()}`}
         />
       ) : (
-        <Card className="@container overflow-hidden">
-          <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
+        <Card className="@container overflow-clip">
+          <div className="sticky top-[72px] z-[2] hidden items-center gap-3 border-b border-border bg-surface/95 px-5.5 py-2.5 text-xs font-medium text-muted backdrop-blur @xl:flex">
             <span className="w-9" aria-hidden />
-            <span className="flex-1">Tarefa</span>
+            <span className="flex flex-1 items-center gap-3">
+              Tarefa
+              <DensityToggle className="mr-2 ml-auto" />
+            </span>
             <span className="hidden w-44 @3xl:block">Cliente</span>
             {filters.scope !== 'mine' ? <span className="hidden w-36 @2xl:block">Responsável</span> : null}
             <span className="hidden w-36 @4xl:block">Situação</span>
             <span className="w-48 text-right">Vencimento</span>
             <span className="w-8" aria-hidden />
           </div>
-          <div className="p-1.5">
+          <div className="p-1.5" data-density={density}>
             {list.isPending ? (
               <SkeletonRows rows={6} className="p-3" />
             ) : list.isError && !data ? (

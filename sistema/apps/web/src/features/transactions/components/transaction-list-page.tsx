@@ -22,6 +22,8 @@ import { contactOptions } from '@/features/contacts/contact-options';
 import { useTransactions } from '../api';
 import { useTransactionActions } from '../transaction-actions';
 import { TransactionRow } from './transaction-row';
+import { DensityToggle } from '@/components/ui/density-toggle';
+import { useListDensity } from '@/lib/list-density';
 import { WriteGate } from '@/features/auth/permissions';
 import { ORIGIN_PARAM, originFromParam } from '../origin';
 
@@ -46,6 +48,7 @@ interface TransactionListPageProps {
 export function TransactionListPage({ type, actions: extraActions }: TransactionListPageProps) {
   const [params, setParams] = useSearchParams();
   const actions = useTransactionActions();
+  const [density] = useListDensity();
   const isExpense = type === 'expense';
 
   const status = (params.get('status') as TransactionStatus) || 'all';
@@ -302,10 +305,14 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
         </div>
       </Sheet>
 
-      <Card className="@container overflow-hidden">
-        <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
+      {/* overflow-clip (not hidden) keeps the column header sticky while the page scrolls. */}
+      <Card className="@container overflow-clip">
+        <div className="sticky top-[72px] z-[2] hidden items-center gap-3 border-b border-border bg-surface/95 px-5.5 py-2.5 text-xs font-medium text-muted backdrop-blur @xl:flex">
           <span className="w-9">Status</span>
-          <span className="flex-1">Descrição</span>
+          <span className="flex flex-1 items-center gap-3">
+            Descrição
+            <DensityToggle className="mr-2 ml-auto" />
+          </span>
           <span className="hidden w-44 @3xl:block">Conta / Cartão</span>
           <span className="w-36 text-right">Vencimento</span>
           <span className="w-32 text-right">Valor</span>
@@ -335,7 +342,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
               }
             />
           ) : (
-            <div className={list.isPlaceholderData ? 'opacity-60 transition-opacity' : undefined}>
+            <div data-density={density} className={list.isPlaceholderData ? 'opacity-60 transition-opacity' : undefined}>
               {list.data.items.map((tx) => (
                 <TransactionRow key={tx.id} tx={tx} neutralAmount />
               ))}

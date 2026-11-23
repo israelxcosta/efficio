@@ -17,6 +17,8 @@ import { dayHeader, periodRange } from '@/lib/period';
 import { useAccounts } from '@/features/accounts/api';
 import { useTransactionActions } from '@/features/transactions/transaction-actions';
 import { TransactionRow } from '@/features/transactions/components/transaction-row';
+import { DensityToggle } from '@/components/ui/density-toggle';
+import { useListDensity } from '@/lib/list-density';
 import { useStatement } from '../api';
 import { WriteGate } from '@/features/auth/permissions';
 import { useImportActions } from '@/features/imports/import-actions';
@@ -25,6 +27,7 @@ export default function StatementPage() {
   const [params, setParams] = useSearchParams();
   const actions = useTransactionActions();
   const { openImport } = useImportActions();
+  const [density] = useListDensity();
   const accountId = params.get('conta') ?? '';
   const includePending = params.get('previstos') !== '0';
 
@@ -93,10 +96,13 @@ export default function StatementPage() {
             onChange={setPeriod}
           />
         </div>
-        <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-medium text-muted">
-          <Switch checked={includePending} onCheckedChange={(c) => update({ previstos: c ? null : '0' })} aria-label="Mostrar previstos" />
-          Mostrar previstos
-        </label>
+        <div className="flex items-center justify-between gap-3">
+          <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-medium text-muted">
+            <Switch checked={includePending} onCheckedChange={(c) => update({ previstos: c ? null : '0' })} aria-label="Mostrar previstos" />
+            Mostrar previstos
+          </label>
+          <DensityToggle className="max-sm:hidden" />
+        </div>
       </Card>
 
       <MiniStatGroup className="lg:grid-cols-5">
@@ -144,7 +150,7 @@ export default function StatementPage() {
               }
             />
           ) : (
-            <div className={cn(statement.isPlaceholderData && 'opacity-60 transition-opacity')}>
+            <div data-density={density} className={cn(statement.isPlaceholderData && 'opacity-60 transition-opacity')}>
               {groups.map(([date, entries]) => {
                 const last = entries[entries.length - 1]!;
                 return (

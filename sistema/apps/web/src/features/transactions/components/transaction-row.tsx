@@ -330,7 +330,7 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
     <div
       className={cn(
         // Phones: 10px gaps and no "⋯" (below), so the description keeps its room.
-        'group flex items-center gap-3 rounded-lg transition-colors hover:bg-surface-muted max-sm:gap-2.5',
+        'list-row group flex items-center gap-3 rounded-lg transition-colors hover:bg-surface-muted max-sm:gap-2.5',
         compact ? 'px-2 py-2' : 'px-3 py-3 @lg:px-4',
         muted && 'opacity-70',
       )}

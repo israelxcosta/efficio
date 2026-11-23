@@ -63,7 +63,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
     <div className="@container">
       <div
         className={cn(
-          'group flex items-center gap-3 rounded-lg transition-colors hover:bg-surface-muted',
+          'list-row group flex items-center gap-3 rounded-lg transition-colors hover:bg-surface-muted',
           compact ? 'px-2 py-2' : 'px-3 py-3 @lg:px-4',
           muted && 'opacity-70',
         )}
