@@ -2675,21 +2675,6 @@ export interface Office {
   updatedBy: TaskPersonRef | null;
 }
 
-/**
- * GET /office/pix-receiver (permission `finance`): what the static Pix code (BR Code with the amount)
- * needs. `missing` lists the office fields to fill ("Chave Pix", "Cidade"…); the code is built in the
- * browser with `buildPixPayload`.
- */
-export interface PixReceiver {
-  available: boolean;
-  keyType: PixKeyType | null;
-  key: string | null;
-  /** Razão social (or trade name), as the payer's bank shows it. */
-  merchantName: string | null;
-  merchantCity: string | null;
-  missing: string[];
-}
-
 /** GET /office/contract-template (permission `office`): the template in use for the editor. */
 export interface ContractTemplateResponse extends OfficeContractSummary {
   /** The stored template, or the factory one when `source = 'factory'`. */

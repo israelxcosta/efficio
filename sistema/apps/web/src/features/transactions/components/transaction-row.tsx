@@ -1,4 +1,4 @@
-import { Copy, CreditCard, Ellipsis, FastForward, FileDown, Landmark, Pencil, Plus, QrCode, ThumbsDown, ThumbsUp, Trash2, UsersRound } from 'lucide-react';
+import { Copy, CreditCard, Ellipsis, FastForward, FileDown, Landmark, Pencil, Plus, ThumbsDown, ThumbsUp, Trash2, UsersRound } from 'lucide-react';
 import {
   FREQUENCY_LABELS,
   LATE_FEE_KIND_LABELS,
@@ -21,7 +21,6 @@ import { PaidToggle } from '@/components/ui/paid-toggle';
 import { Tooltip } from '@/components/ui/tooltip';
 import { WriteGate } from '@/features/auth/permissions';
 import { useEmployeesDialog } from '@/features/fee-charges/employees-dialog';
-import { usePixChargeDialog } from '@/features/fee-charges/pix-charge';
 import { competenceLabel, isMonthKey, lateFeesSplit, lateFeesTotal, plural } from '@/features/fee-charges/fee-charges';
 import {
   DropdownMenu,
@@ -412,7 +411,6 @@ interface RowMenuProps {
 export function RowMenu({ tx, onAddEmployees }: RowMenuProps) {
   const actions = useTransactionActions();
   const ownEmployees = useEmployeesDialog(tx);
-  const pix = usePixChargeDialog(tx);
   const isCardPurchase = Boolean(tx.creditCardId) && tx.type !== 'transfer';
   // Every item changes data; keep the column width so rows stay aligned.
   if (actions.readOnlyReason) return <span className="size-8 shrink-0" aria-hidden />;
@@ -456,11 +454,6 @@ export function RowMenu({ tx, onAddEmployees }: RowMenuProps) {
                   : 'Marcar como pago'}
             </DropdownMenuItem>
           ) : null}
-          {tx.type === 'income' && !tx.paid && !isCardPurchase && tx.amount > 0 ? (
-            <DropdownMenuItem icon={<QrCode />} onSelect={pix.show}>
-              Cobrar por Pix
-            </DropdownMenuItem>
-          ) : null}
           {tx.recurrenceKind === 'installment' && (tx.installmentNumber ?? 0) < (tx.installmentTotal ?? 0) ? (
             <DropdownMenuItem icon={<FastForward />} onSelect={() => actions.anticipate(tx)}>
               Antecipar parcelas
@@ -477,7 +470,6 @@ export function RowMenu({ tx, onAddEmployees }: RowMenuProps) {
         </DropdownMenuContent>
       </DropdownMenu>
       {onAddEmployees ? null : ownEmployees.element}
-      {pix.element}
     </>
   );
 }
