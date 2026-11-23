@@ -25,6 +25,8 @@ import { contactOptions } from '@/features/contacts/contact-options';
 import { useTransactions } from '../api';
 import { useTransactionActions } from '../transaction-actions';
 import { TransactionRow } from './transaction-row';
+import { BulkSettleDialog, SelectionBar, settleable } from './bulk-settle';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DensityToggle } from '@/components/ui/density-toggle';
 import { useListDensity } from '@/lib/list-density';
 import { WriteGate } from '@/features/auth/permissions';
@@ -106,6 +108,21 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
   );
   const list = useTransactions(query);
   const [exporting, setExporting] = useState(false);
+  // Bulk selection ("Selecionar"): only rows a settlement can take; cleared when the list changes.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [settleRows, setSettleRows] = useState<Transaction[] | null>(null);
+  const pageRows = list.data?.items ?? [];
+  const selectableRows = pageRows.filter(settleable);
+  const selectedRows = selectableRows.filter((t) => selected.has(t.id));
+  useEffect(() => setSelected(new Set()), [query]);
+  const toggleRow = (id: string, on: boolean) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
   /** Every row of the current filters (all pages, up to EXPORT_LIMIT) as a CSV download. */
   async function exportCsv() {
@@ -336,10 +353,31 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
       {/* overflow-clip (not hidden) keeps the column header sticky while the page scrolls. */}
       <Card className="@container overflow-clip">
         <div className="sticky top-[72px] z-[2] hidden items-center gap-3 border-b border-border bg-surface/95 px-5.5 py-2.5 text-xs font-medium text-muted backdrop-blur @xl:flex">
+          {selecting ? (
+            <Checkbox
+              className="-mr-2 -ml-2.5"
+              aria-label="Selecionar todos os pendentes da página"
+              checked={selectableRows.length > 0 && selectedRows.length === selectableRows.length}
+              onCheckedChange={(on) => setSelected(on ? new Set(selectableRows.map((t) => t.id)) : new Set())}
+            />
+          ) : null}
           <span className="w-9">Status</span>
           <span className="flex flex-1 items-center gap-3">
             Descrição
-            <DensityToggle className="mr-2 ml-auto" />
+            <WriteGate>
+              <Button
+                variant={selecting ? 'soft' : 'ghost'}
+                size="xs"
+                className="ml-auto"
+                onClick={() => {
+                  setSelecting((v) => !v);
+                  setSelected(new Set());
+                }}
+              >
+                {selecting ? 'Cancelar seleção' : 'Selecionar'}
+              </Button>
+            </WriteGate>
+            <DensityToggle className="mr-2" />
           </span>
           <span className="hidden w-44 @3xl:block">Conta / Cartão</span>
           <span className="w-36 text-right">Vencimento</span>
@@ -371,12 +409,44 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
             />
           ) : (
             <div data-density={density} className={list.isPlaceholderData ? 'opacity-60 transition-opacity' : undefined}>
-              {list.data.items.map((tx) => (
-                <TransactionRow key={tx.id} tx={tx} neutralAmount />
-              ))}
+              {list.data.items.map((tx) =>
+                selecting ? (
+                  <div key={tx.id} className="flex items-center gap-1 pl-2">
+                    <Checkbox
+                      aria-label={`Selecionar ${tx.description}`}
+                      checked={selected.has(tx.id)}
+                      disabled={!settleable(tx)}
+                      onCheckedChange={(on) => toggleRow(tx.id, on)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <TransactionRow tx={tx} neutralAmount />
+                    </div>
+                  </div>
+                ) : (
+                  <TransactionRow key={tx.id} tx={tx} neutralAmount />
+                ),
+              )}
             </div>
           )}
         </div>
+        {selecting ? (
+          <SelectionBar
+            count={selectedRows.length}
+            total={selectedRows.reduce((a, t) => a + t.amount, 0)}
+            income={!isExpense}
+            onSettle={() => setSettleRows(selectedRows)}
+            onClear={() => setSelected(new Set())}
+          />
+        ) : null}
+        <BulkSettleDialog
+          rows={settleRows}
+          income={!isExpense}
+          onClose={() => setSettleRows(null)}
+          onDone={() => {
+            setSettleRows(null);
+            setSelected(new Set());
+          }}
+        />
         {list.data && list.data.total > PAGE_SIZE ? (
           <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted">
             <span>

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { ClipboardCheck, Ellipsis, ExternalLink, Repeat } from 'lucide-react';
-import { formatDateBR, type ISODate, type RecurringOccurrence } from '@effinance/shared';
+import { type ISODate, type RecurringOccurrence } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { CategoryIcon } from '@/components/ui/category-icon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
