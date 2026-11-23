@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { ArrowDownLeft, ArrowUpRight, FileUp, ScrollText } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Download, FileUp, ScrollText } from 'lucide-react';
+import { displayCompanyName, formatDateBR } from '@effinance/shared';
+import { saveBlob } from '@/lib/api';
+import { csvMoney, toCsv } from '@/lib/csv';
 import { ACCOUNT_TYPE_LABELS, formatBRL, type StatementEntry } from '@effinance/shared';
 import { Card } from '@/components/ui/card';
 import { BankLogo } from '@/components/ui/bank-logo';
@@ -46,6 +49,25 @@ export default function StatementPage() {
   const statement = useStatement({ accountId: accountId || undefined, from: range.from, to: range.to, includePending });
   const data = statement.data;
 
+  /** The movements on screen (account, period and "previstos" as chosen) with the running balance. */
+  function exportCsv() {
+    if (!data) return;
+    const csv = toCsv(
+      ['Data', 'Descrição', 'Categoria', 'Cliente/fornecedor', 'Conta', 'Valor', 'Saldo após', 'Situação'],
+      data.entries.map((e) => [
+        formatDateBR(e.transaction.effectiveDate),
+        e.transaction.description,
+        e.transaction.category?.name ?? '',
+        e.transaction.contact ? displayCompanyName(e.transaction.contact.name) : '',
+        e.transaction.account?.name ?? '',
+        csvMoney(e.amount),
+        csvMoney(e.balanceAfter),
+        e.pending ? 'Previsto' : 'Realizado',
+      ]),
+    );
+    saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `extrato-${range.from}-a-${range.to}.csv`);
+  }
+
   const groups = useMemo(() => {
     const map = new Map<string, StatementEntry[]>();
     for (const e of data?.entries ?? []) {
@@ -64,11 +86,16 @@ export default function StatementPage() {
       <PageHeader
         title="Extrato"
         actions={
-          <WriteGate>
-            <Button variant="outline" onClick={() => openImport({ target: accountId ? { kind: 'account', accountId } : undefined })}>
-              <FileUp /> Importar extrato
+          <>
+            <Button variant="outline" onClick={exportCsv} disabled={!data || data.entries.length === 0}>
+              <Download /> Exportar CSV
             </Button>
-          </WriteGate>
+            <WriteGate>
+              <Button variant="outline" onClick={() => openImport({ target: accountId ? { kind: 'account', accountId } : undefined })}>
+                <FileUp /> Importar extrato
+              </Button>
+            </WriteGate>
+          </>
         }
       />
 

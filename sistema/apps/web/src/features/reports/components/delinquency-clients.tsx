@@ -1,7 +1,9 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { ArrowUpRight, Building2, ChevronDown, FileChartColumn, Info, MessageCircle, RotateCcw, Search, SearchX } from 'lucide-react';
-import { formatBRL, formatCNPJ, formatDateBR, formatPhone, type DelinquencyClient } from '@effinance/shared';
+import { ArrowUpRight, Building2, ChevronDown, Download, FileChartColumn, Info, MessageCircle, RotateCcw, Search, SearchX } from 'lucide-react';
+import { displayCompanyName, formatBRL, formatCNPJ, formatDateBR, formatPhone, type DelinquencyClient } from '@effinance/shared';
+import { saveBlob } from '@/lib/api';
+import { csvMoney, toCsv } from '@/lib/csv';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -46,6 +48,26 @@ interface Props {
 }
 
 /** Companies of the report: late payments, interest/fines, days late, open amount, score and actions. */
+/** The companies as listed (search, scope and order applied): open amount, lateness and score. */
+function exportDelinquencyCsv(rows: readonly DelinquencyClient[], months: number) {
+  const csv = toCsv(
+    ['Empresa', 'Nome fantasia', 'CNPJ/CPF', 'Responsável', 'Em aberto', 'Títulos vencidos', 'Atrasos no período', 'Atraso médio (dias)', 'Maior atraso (dias)', 'Score'],
+    rows.map((c) => [
+      displayCompanyName(c.name),
+      c.tradeName ?? '',
+      c.document ?? '',
+      c.responsibleName ?? '',
+      csvMoney(c.openAmount),
+      c.openCount,
+      `${c.lateCount} de ${c.dueCount}`,
+      c.avgDaysLate === null ? '' : Math.round(c.avgDaysLate),
+      c.maxDaysLate,
+      c.score,
+    ]),
+  );
+  saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `inadimplencia-${months}-meses.csv`);
+}
+
 export function DelinquencyClients({ clients, months, onMessage }: Props) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<DelinquencySort>('open');
@@ -68,6 +90,9 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
               {hidden > 0 ? ` · ${pluralize(hidden, 'inativo em dia oculto', 'inativos em dia ocultos')}` : ''}
             </p>
           </div>
+          <Button variant="outline" size="toolbar" onClick={() => exportDelinquencyCsv(rows, months)} disabled={rows.length === 0}>
+            <Download /> Exportar CSV
+          </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-full sm:max-w-xs">

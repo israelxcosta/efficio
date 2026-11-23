@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
-import { ChevronLeft, ChevronRight, Plus, Receipt, Search, HandCoins, SlidersHorizontal, X } from 'lucide-react';
-import { formatBRL, todayISO, TRANSACTION_ORIGIN_LABELS, TRANSACTION_ORIGINS, type TransactionStatus } from '@effinance/shared';
+import { ChevronLeft, ChevronRight, Download, Plus, Receipt, Search, HandCoins, SlidersHorizontal, X } from 'lucide-react';
+import { formatBRL, todayISO, TRANSACTION_ORIGIN_LABELS, TRANSACTION_ORIGINS, type Transaction, type TransactionListResponse, type TransactionStatus } from '@effinance/shared';
+import { api, saveBlob } from '@/lib/api';
+import { toastError } from '@/lib/notify';
+import { transactionsCsv } from '../transactions-csv';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -28,6 +31,8 @@ import { WriteGate } from '@/features/auth/permissions';
 import { ORIGIN_PARAM, originFromParam } from '../origin';
 
 const PAGE_SIZE = 50;
+/** Rows in one CSV export (the filters narrow it down). */
+const EXPORT_LIMIT = 5000;
 const PERIOD_MODES: PeriodMode[] = ['day', 'week', 'month', 'year'];
 
 function useDebounced<T>(value: T, ms = 300): T {
@@ -100,6 +105,26 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
     [type, status, range.from, range.to, categoryId, contactId, sourceKind, sourceId, search, origin, page],
   );
   const list = useTransactions(query);
+  const [exporting, setExporting] = useState(false);
+
+  /** Every row of the current filters (all pages, up to EXPORT_LIMIT) as a CSV download. */
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const items: Transaction[] = [];
+      for (let p = 1; items.length < EXPORT_LIMIT; p++) {
+        const res = await api<TransactionListResponse>('/transactions', { query: { ...query, page: p, pageSize: 200 } as Record<string, string | number | undefined> });
+        items.push(...res.items);
+        if (items.length >= res.total || res.items.length === 0) break;
+      }
+      const name = `${isExpense ? 'contas-a-pagar' : 'contas-a-receber'}-${query.from ?? 'vencidas'}-a-${query.to ?? ''}.csv`;
+      saveBlob(new Blob([transactionsCsv(items.slice(0, EXPORT_LIMIT))], { type: 'text/csv;charset=utf-8' }), name);
+    } catch (error) {
+      toastError(error);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const categories = useCategories({ type });
   const contacts = useContactOptions();
@@ -180,6 +205,9 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
         title={labels.title}
         actions={
           <>
+            <Button variant="outline" onClick={exportCsv} disabled={exporting || !list.data || list.data.total === 0}>
+              <Download /> {exporting ? 'Exportando…' : 'Exportar CSV'}
+            </Button>
             {extraActions}
             <WriteGate>
               <Button onClick={() => actions.openTransaction({ type })}>
