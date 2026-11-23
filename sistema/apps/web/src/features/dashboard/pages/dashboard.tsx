@@ -130,7 +130,7 @@ export default function DashboardPage() {
           <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-fg">Painel financeiro</h1>
           <MonthLine month={month} updatedAt={dashboard.dataUpdatedAt} />
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 max-lg:basis-full lg:shrink-0">
           <SegmentedControl
             ariaLabel="Visão"
             value={tab}
