@@ -73,6 +73,7 @@ export const qk = {
   deadlineClients: ['deadlines', 'clients'] as const,
   officeBranding: ['office', 'branding'] as const,
   office: ['office', 'registry'] as const,
+  pixReceiver: ['office', 'pix-receiver'] as const,
   contractTemplate: ['office', 'contract-template'] as const,
   /** Under `clients`: a client or fee change makes it stale. */
   clientContract: (id: string) => ['clients', 'contract', id] as const,

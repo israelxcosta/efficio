@@ -1,12 +1,15 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { Copy, MessageCircle, RotateCcw } from 'lucide-react';
+import { Copy, MessageCircle, QrCode, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatBRL, formatPhone, type DelinquencyClient } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Modal } from '@/components/ui/dialog';
 import { Label, Textarea } from '@/components/ui/input';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { useAuth } from '@/features/auth/auth-context';
+import { PixChargeDialog, pixCodeFor, pixMessageBlock } from '@/features/fee-charges/pix-charge';
+import { usePixReceiver } from '@/features/office/api';
 import { copyText } from '@/lib/clipboard';
 import { pluralize } from '@/lib/utils';
 import {
@@ -46,6 +49,9 @@ export function CollectionMessageDialog({ client, onClose }: { client: Delinquen
   const textId = useId();
   const [competence, setCompetence] = useState<CompetenceMode>(readCompetence);
   const [text, setText] = useState('');
+  const [withPix, setWithPix] = useState(true);
+  const [qrOpen, setQrOpen] = useState(false);
+  const receiver = usePixReceiver(Boolean(client));
   // Each opening starts a fresh text (and greeting time); the last client stays while the dialog
   // closes, so the content does not vanish mid-animation.
   const [session, setSession] = useState<{ client: DelinquencyClient; now: Date } | null>(() => (client ? { client, now: new Date() } : null));
@@ -56,19 +62,28 @@ export function CollectionMessageDialog({ client, onClose }: { client: Delinquen
   }
   const shown = session?.client ?? null;
 
-  const generated = useMemo(
-    () =>
-      session
-        ? buildCollectionMessage({
-            clientName: collectionName(session.client),
-            items: session.client.overdue,
-            signature: workspace?.name ?? '',
-            now: session.now,
-            competence,
-          })
-        : '',
-    [session, competence, workspace?.name],
+  // The Pix code carries the sum of the listed months (interest and fines are not in it).
+  const pixAmount = session?.client.overdue.reduce((a, item) => a + item.amount, 0) ?? 0;
+  const pixCharge = useMemo(
+    () => ({ amount: pixAmount, description: `Honorarios ${session ? collectionName(session.client) : ''}`, txid: null }),
+    [pixAmount, session],
   );
+  const pixCode = pixCodeFor(receiver.data, pixCharge);
+  const generated = useMemo(() => {
+    if (!session) return '';
+    const message = buildCollectionMessage({
+      clientName: collectionName(session.client),
+      items: session.client.overdue,
+      signature: workspace?.name ?? '',
+      now: session.now,
+      competence,
+    });
+    if (!withPix || !pixCode) return message;
+    // Before the signature, so the closing stays last.
+    const cut = message.lastIndexOf('\n\nAtenciosamente,');
+    const block = pixMessageBlock(pixCode, pixAmount);
+    return cut >= 0 ? `${message.slice(0, cut)}\n\n${block}${message.slice(cut)}` : `${message}\n\n${block}`;
+  }, [session, competence, workspace?.name, withPix, pixCode, pixAmount]);
   useEffect(() => setText(generated), [generated]);
 
   const total = shown?.overdue.length ?? 0;
@@ -150,6 +165,23 @@ export function CollectionMessageDialog({ client, onClose }: { client: Delinquen
           </div>
           <Textarea id={textId} value={text} onChange={(e) => setText(e.target.value)} rows={13} className="text-body-sm leading-relaxed" spellCheck />
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+          {pixCode ? (
+            <>
+              <label className="flex items-center gap-2 text-body-sm text-fg">
+                <Checkbox checked={withPix} onCheckedChange={setWithPix} />
+                Incluir Pix copia e cola de <span className="tabular font-semibold">{formatBRL(pixAmount)}</span>
+              </label>
+              <Button variant="ghost" size="xs" onClick={() => setQrOpen(true)}>
+                <QrCode /> Ver QR Code
+              </Button>
+            </>
+          ) : (
+            <span className="text-caption text-muted">
+              {receiver.isPending ? 'Carregando a chave Pix…' : `Pix com o valor: falta ${receiver.data?.missing.join(', ').toLowerCase() || 'a chave Pix'} no cadastro do escritório.`}
+            </span>
+          )}
+        </div>
         <p className="text-caption text-muted">
           {number ? (
             <>
@@ -163,6 +195,9 @@ export function CollectionMessageDialog({ client, onClose }: { client: Delinquen
           )}
         </p>
       </div>
+      {qrOpen && pixCode ? (
+        <PixChargeDialog open onOpenChange={setQrOpen} charge={pixCharge} subtitle={shown ? collectionName(shown) : undefined} />
+      ) : null}
     </Modal>
   );
 }

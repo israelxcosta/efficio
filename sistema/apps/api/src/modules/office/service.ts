@@ -23,6 +23,8 @@ import {
   type Office,
   type OfficeBranding,
   type OfficeContractSummary,
+  type PixReceiver,
+  isUsablePixKey,
   type contractTemplateInputSchema,
   type officeInputSchema,
 } from '@effinance/shared';
@@ -101,6 +103,28 @@ export async function getBranding(ctx: Ctx): Promise<OfficeBranding> {
     logo: logoOf(row),
     registered: Boolean(row?.legalName && row.document),
   };
+}
+
+/**
+ * The receiver of the static Pix code (finance users; the key also goes in the collection message).
+ * Uses the razão social (falls back to the trade name) and the office's city, both required by the
+ * standard; a key that is not normalized for its type is reported as missing.
+ */
+export async function getPixReceiver(ctx: Ctx): Promise<PixReceiver> {
+  const [row] = await ctx.db
+    .select({ legalName: offices.legalName, tradeName: offices.tradeName, city: offices.city, pixKeyType: offices.pixKeyType, pixKey: offices.pixKey })
+    .from(offices)
+    .where(eq(offices.workspaceId, ctx.workspaceId));
+  const plain = row?.pixKey ? await ctx.cipher.decryptFields(TABLE, row, ['pixKey'] as const) : null;
+  const key = plain?.pixKey ?? null;
+  const merchantName = row?.legalName?.trim() || row?.tradeName?.trim() || null;
+  const merchantCity = row?.city?.trim() || null;
+  const missing: string[] = [];
+  if (!key) missing.push('Chave Pix');
+  else if (!isUsablePixKey(row?.pixKeyType, key)) missing.push('Chave Pix válida');
+  if (!merchantName) missing.push('Razão social');
+  if (!merchantCity) missing.push('Cidade');
+  return { available: missing.length === 0, keyType: row?.pixKeyType ?? null, key, merchantName, merchantCity, missing };
 }
 
 function contractSummary(row: OfficeLight | null): OfficeContractSummary {

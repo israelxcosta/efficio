@@ -13,6 +13,7 @@ import {
   getBranding,
   getContractTemplate,
   getOffice,
+  getPixReceiver,
   resetContractTemplate,
   saveContractTemplate,
   saveOffice,
@@ -20,6 +21,7 @@ import {
 } from './service';
 
 const office = { onRequest: requirePermission('office') };
+const finance = { onRequest: requirePermission('finance') };
 /** A 500 KB image in base64 plus the JSON around it. */
 export const OFFICE_LOGO_BODY_LIMIT = 1024 * 1024;
 /** 400 000 characters (up to 3 bytes each, escaped) plus a 500 KB watermark in base64. */
@@ -34,6 +36,9 @@ export const officeRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/branding', async (req) => run(req, (ctx) => getBranding(ctx)));
 
   app.get('/', office, async (req) => run(req, (ctx) => getOffice(ctx)));
+
+  // Receiver of the static Pix code (BR Code with the amount) for whoever charges the fees.
+  app.get('/pix-receiver', finance, async (req) => run(req, (ctx) => getPixReceiver(ctx)));
 
   app.put('/', { ...office, schema: { body: officeInputSchema } }, async (req) => {
     const result = await run(req, (ctx) => saveOffice(ctx, req.body));

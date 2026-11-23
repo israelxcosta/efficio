@@ -278,3 +278,31 @@ describe('contract of a client', () => {
     expect((await other.post(`/clients/${id}/contract/issues`, {})).status).toBe(404);
   });
 });
+
+describe('office: receiver of the static Pix code', () => {
+  it('finance users read the key, the razão social and the city; what is missing is listed', async () => {
+    const { ana, bruno, carla } = await office(app);
+    expect((await bruno.get('/office/pix-receiver')).body).toEqual({
+      available: false,
+      keyType: null,
+      key: null,
+      merchantName: null,
+      merchantCity: null,
+      missing: ['Chave Pix', 'Razão social', 'Cidade'],
+    });
+    await ana.put('/office', OFFICE);
+    const res = await bruno.get('/office/pix-receiver');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      available: true,
+      keyType: 'email',
+      key: 'financeiro@efficio.app',
+      merchantName: 'Efficio Contabilidade Ltda',
+      merchantCity: 'Mogi Guaçu',
+      missing: [],
+    });
+    // The collaborator (no `finance`) does not charge fees.
+    const denied = await carla.get('/office/pix-receiver');
+    expect(denied.status).toBe(403);
+  });
+});

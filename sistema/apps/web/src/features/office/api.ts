@@ -6,6 +6,7 @@ import type {
   Office,
   OfficeBranding,
   OfficeInput,
+  PixReceiver,
 } from '@effinance/shared';
 import { api } from '@/lib/api';
 import { qk } from '@/lib/query-keys';
@@ -25,6 +26,11 @@ export function useOfficeBranding(options: { enabled?: boolean } = {}) {
 
 export function useOffice(enabled: boolean) {
   return useQuery({ queryKey: qk.office, queryFn: () => api<Office>('/office'), enabled });
+}
+
+/** Receiver of the static Pix code (permission `finance`); refreshed when the office is saved. */
+export function usePixReceiver(enabled = true) {
+  return useQuery({ queryKey: qk.pixReceiver, queryFn: () => api<PixReceiver>('/office/pix-receiver'), enabled, staleTime: 5 * 60_000 });
 }
 
 export function useSaveOffice() {
