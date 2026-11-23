@@ -58,12 +58,11 @@ Estado do projeto para quem continuar o trabalho (pessoa ou agente). Leia junto 
 3. Subir o VPS seguindo [deploy-hostinger.md](deploy-hostinger.md). A validação pós-deploy das constraints é automática (§11).
 
 **Desenvolvimento (opcional ou a combinar):**
-1. Roadmap §6, item 3: marcar o lançamento como "conferido com o extrato" (conciliação simples, aproveitando OFX/Open Finance).
+1. ~~Conferido com o extrato~~ feito em 23/11/2026 (migração 0028). Próximo passo possível: sugerir a conferência pelo OFX/Open Finance.
 2. Opcional no relatório de Recebimentos: saldo do extrato da conta ao lado de cada total, com a diferença destacada, e exportação em PDF.
-3. Sobras de design:
-   - seções do Painel financeiro;
-   - espaço vazio em "Fixas x variáveis";
-   - setas do seletor de período com 32px (área de toque).
+3. Sobras de design: "Fixas x variáveis" e setas de período com área de toque de 44px feitos em 23/11/2026
+   (`HIT_44` em `components/ui/button.tsx`). Seções no Painel financeiro **não** foram feitas: o painel é
+   personalizável (arrastar e redimensionar) e títulos fixos brigariam com isso.
 4. Roadmap §1–§3 (OneDrive e envio por link, portal do cliente, cobrança por boleto/Pix): esperam decisões do dono, listadas em cada item.
 
 ## 4. Como rodar e validar

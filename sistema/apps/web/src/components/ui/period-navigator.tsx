@@ -3,7 +3,7 @@ import { todayISO } from '@effinance/shared';
 import { cn } from '@/lib/utils';
 import { PERIOD_MODE_LABELS, periodLabel, shiftPeriod, type PeriodMode, type PeriodValue } from '@/lib/period';
 import { SegmentedControl } from './segmented-control';
-import { Button } from './button';
+import { Button, HIT_44 } from './button';
 
 interface PeriodNavigatorProps {
   value: PeriodValue;
@@ -28,13 +28,13 @@ export function PeriodNavigator({ value, onChange, modes = ['day', 'week', 'mont
         />
       ) : null}
       <div className="flex items-center gap-1 rounded-md border border-border bg-surface p-1 shadow-xs">
-        <Button variant="ghost" size="icon-sm" aria-label="Período anterior" onClick={() => onChange(shiftPeriod(value, -1))}>
+        <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Período anterior" onClick={() => onChange(shiftPeriod(value, -1))}>
           <ChevronLeft />
         </Button>
         <span className="min-w-[150px] px-1 text-center text-[13px] font-semibold text-fg tabular" aria-live="polite">
           {periodLabel(value)}
         </span>
-        <Button variant="ghost" size="icon-sm" aria-label="Próximo período" onClick={() => onChange(shiftPeriod(value, 1))}>
+        <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Próximo período" onClick={() => onChange(shiftPeriod(value, 1))}>
           <ChevronRight />
         </Button>
       </div>

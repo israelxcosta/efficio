@@ -22,7 +22,7 @@ import {
   type TaskReportRow,
 } from '@effinance/shared';
 import { axisProps, categoryAxisProps, CHART_COLORS, ChartBox, LegendDot } from '@/components/charts/chart-utils';
-import { Button } from '@/components/ui/button';
+import { Button, HIT_44 } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -251,13 +251,13 @@ function PeriodControl({ f, onChange }: { f: ReportFilters; onChange: (p: Partia
       </Select>
       {f.preset === 'month' || f.preset === 'year' ? (
         <div className="flex items-center gap-1 rounded-md border border-border bg-surface p-1 shadow-xs">
-          <Button variant="ghost" size="icon-sm" aria-label={f.preset === 'year' ? 'Ano anterior' : 'Mês anterior'} onClick={() => onChange(f.preset === 'year' ? { year: f.year - 1 } : { month: addMonthKey(f.month, -1) })}>
+          <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label={f.preset === 'year' ? 'Ano anterior' : 'Mês anterior'} onClick={() => onChange(f.preset === 'year' ? { year: f.year - 1 } : { month: addMonthKey(f.month, -1) })}>
             <ChevronLeft />
           </Button>
           <span className="min-w-[120px] px-1 text-center text-[13px] font-semibold text-fg tabular" aria-live="polite">
             {f.preset === 'year' ? f.year : formatMonthKey(f.month)}
           </span>
-          <Button variant="ghost" size="icon-sm" aria-label={f.preset === 'year' ? 'Próximo ano' : 'Próximo mês'} onClick={() => onChange(f.preset === 'year' ? { year: f.year + 1 } : { month: addMonthKey(f.month, 1) })}>
+          <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label={f.preset === 'year' ? 'Próximo ano' : 'Próximo mês'} onClick={() => onChange(f.preset === 'year' ? { year: f.year + 1 } : { month: addMonthKey(f.month, 1) })}>
             <ChevronRight />
           </Button>
         </div>

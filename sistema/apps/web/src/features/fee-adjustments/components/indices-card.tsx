@@ -9,7 +9,7 @@ import {
   type MonthKey,
 } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, HIT_44 } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { HelpTip } from '@/components/ui/help-tip';
 import { Field, Label } from '@/components/ui/input';
@@ -60,13 +60,13 @@ export function IndicesCard(props: IndicesCardProps) {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div role="group" aria-labelledby="adjustment-month-label" className="flex items-center gap-1 rounded-md border border-border bg-surface p-1 shadow-xs">
-                <Button variant="ghost" size="icon-sm" aria-label="Mês anterior" onClick={() => onMonthChange(addMonthKey(month, -1))}>
+                <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Mês anterior" onClick={() => onMonthChange(addMonthKey(month, -1))}>
                   <ChevronLeft />
                 </Button>
                 <span className="min-w-[150px] px-1 text-center text-[13px] font-semibold text-fg tabular" aria-live="polite">
                   {formatMonthKey(month)}
                 </span>
-                <Button variant="ghost" size="icon-sm" aria-label="Próximo mês" onClick={() => onMonthChange(addMonthKey(month, 1))}>
+                <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Próximo mês" onClick={() => onMonthChange(addMonthKey(month, 1))}>
                   <ChevronRight />
                 </Button>
               </div>

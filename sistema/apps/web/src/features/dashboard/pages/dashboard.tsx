@@ -14,7 +14,7 @@ import {
   type MonthKey,
   type WorkspaceKind,
 } from '@effinance/shared';
-import { Button } from '@/components/ui/button';
+import { Button, HIT_44 } from '@/components/ui/button';
 import { MetricStrip, type MetricCell } from '@/components/ui/metric-strip';
 import { ErrorState } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -148,7 +148,7 @@ export default function DashboardPage() {
             ]}
           />
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-sm" aria-label="Mês anterior" onClick={() => setActiveMonth(addMonthKey(month, -1))}>
+            <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Mês anterior" onClick={() => setActiveMonth(addMonthKey(month, -1))}>
               <ChevronLeft />
             </Button>
             <Select aria-label="Mês" value={monthIndex} onChange={(e) => setMonth(year, Number(e.target.value))} className="h-9 w-[136px] bg-surface text-[13px] font-medium">
@@ -165,7 +165,7 @@ export default function DashboardPage() {
                 </option>
               ))}
             </Select>
-            <Button variant="ghost" size="icon-sm" aria-label="Próximo mês" onClick={() => setActiveMonth(addMonthKey(month, 1))}>
+            <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Próximo mês" onClick={() => setActiveMonth(addMonthKey(month, 1))}>
               <ChevronRight />
             </Button>
           </div>

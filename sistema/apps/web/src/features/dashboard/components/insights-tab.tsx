@@ -1,7 +1,6 @@
 import { Link, useNavigate } from 'react-router';
 import { categoryListHref } from '@/features/transactions/links';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   formatBRL,
   formatPercent,
@@ -15,8 +14,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { DonutChart } from '@/components/charts/donut-chart';
-import { axisProps, MoneyTooltip } from '@/components/charts/chart-utils';
-import { chartMotion } from '@/components/charts/chart-motion';
 import { cn } from '@/lib/utils';
 import { useOverviewReport } from '@/features/reports/api';
 import { TransactionRow } from '@/features/transactions/components/transaction-row';
@@ -52,6 +49,41 @@ export function InsightList({ insights }: { insights: Insight[] }) {
   );
 }
 
+/**
+ * Fixed × installment × variable expenses: one stacked bar (the whole month) and a row per part with the
+ * amount and the share. Replaces a 192px bar chart that was mostly empty (design review P2-5).
+ */
+function ExpenseSplit({ total, parts }: { total: number; parts: { name: string; value: number; fill: string; hint: string }[] }) {
+  const shown = parts.filter((p) => p.value > 0);
+  const fixed = parts[0]?.value ?? 0;
+  return (
+    <div className="mt-4 flex flex-col gap-4">
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-bg-subtle" role="img" aria-label={shown.map((p) => `${p.name} ${formatPercent(p.value / total, 0)}`).join(', ')}>
+        {shown.map((p) => (
+          <span key={p.name} className="h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${(p.value / total) * 100}%`, backgroundColor: p.fill }} />
+        ))}
+      </div>
+      <ul className="flex flex-col divide-y divide-border">
+        {parts.map((p) => (
+          <li key={p.name} className="flex items-center justify-between gap-3 py-2 text-body-sm">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.fill }} aria-hidden />
+              <span className="font-medium text-fg">{p.name}</span>
+              <span className="truncate text-caption text-muted">{p.hint}</span>
+            </span>
+            <span className="tabular shrink-0 font-semibold text-fg">
+              {formatBRL(p.value)} <span className="text-caption font-normal text-muted">· {formatPercent(total ? p.value / total : 0, 0)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-caption text-muted">
+        As fixas são {formatPercent(total ? fixed / total : 0, 0)} das despesas do mês: é o valor que os honorários precisam cobrir antes de sobrar resultado.
+      </p>
+    </div>
+  );
+}
+
 export function InsightsTab({ month, dashboard, loading }: { month: string; dashboard: DashboardResponse | undefined; loading: boolean }) {
   const navigate = useNavigate();
   const range = monthRange(month);
@@ -63,9 +95,9 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
 
   const split = o
     ? [
-        { name: 'Fixas', value: o.fixedExpense, fill: 'var(--app-chart-1)' },
-        { name: 'Parceladas', value: o.installmentExpense, fill: 'var(--app-chart-2)' },
-        { name: 'Variáveis', value: o.variableExpense, fill: 'var(--app-chart-3)' },
+        { name: 'Fixas', value: o.fixedExpense, fill: 'var(--app-chart-blue-1)', hint: 'recorrentes do mês' },
+        { name: 'Parceladas', value: o.installmentExpense, fill: 'var(--app-chart-blue-3)', hint: 'parcelas de compras' },
+        { name: 'Variáveis', value: o.variableExpense, fill: 'var(--app-chart-blue-5)', hint: 'avulsas' },
       ]
     : [];
 
@@ -147,23 +179,14 @@ export function InsightsTab({ month, dashboard, loading }: { month: string; dash
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <CardHeader title="Fixas x variáveis" />
-          <div className="mt-4 h-48">
-            {overview.isPending ? (
-              <Skeleton className="h-full" />
-            ) : o && o.expense > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={split} layout="vertical" margin={{ left: 8, right: 8 }}>
-                  <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" {...axisProps} width={80} />
-                  <Tooltip cursor={{ fill: 'var(--app-bg-subtle)' }} content={<MoneyTooltip names={{ value: 'Valor' }} />} />
-                  <Bar dataKey="value" name="value" radius={[6, 6, 6, 6]} barSize={22} {...chartMotion()} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState compact className="h-full" title="Sem despesas no mês" />
-            )}
-          </div>
+          <CardHeader title="Fixas x variáveis" info="Fixas são as despesas recorrentes do mês (aluguel, folha, sistemas): o mínimo que o escritório cobre todo mês." />
+          {overview.isPending ? (
+            <SkeletonRows rows={3} className="mt-4" />
+          ) : o && o.expense > 0 ? (
+            <ExpenseSplit total={o.expense} parts={split} />
+          ) : (
+            <EmptyState compact className="mt-4" title="Sem despesas no mês" />
+          )}
         </Card>
         <Card className="p-5">
           <CardHeader title="Formas de pagamento" />

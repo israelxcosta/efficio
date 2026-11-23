@@ -57,3 +57,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     </button>
   );
 });
+
+/**
+ * Extends a small icon button (32px) to a 44px touch target without changing how it looks: an invisible
+ * ::after reaches 6px past each side. Use on arrows and other icon-only controls people tap on phones.
+ */
+export const HIT_44 = "relative after:absolute after:-inset-1.5 after:content-['']";
