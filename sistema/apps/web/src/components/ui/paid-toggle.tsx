@@ -12,13 +12,16 @@ interface PaidToggleProps {
   disabledReason?: string;
   size?: 'sm' | 'md';
   loading?: boolean;
+  /** Pending and past its due date: the only state painted red (a pending row not yet due stays neutral). */
+  overdue?: boolean;
 }
 
 /**
- * 👍 paid / 👎 pending (default). Motion: the button presses to .97 and, when the state changes, the
+ * 👍 paid / 👎 pending (default). Color says what needs attention: red only when pending AND overdue;
+ * pending not yet due is neutral; paid is the green icon without a disc (the disc shows on hover). Motion: the button presses to .97 and, when the state changes, the
  * new icon crossfades in (`.icon-in`, keyed so it remounts); nothing replays on first render.
  */
-export function PaidToggle({ paid, onToggle, kind = 'expense', disabled, disabledReason, size = 'md', loading }: PaidToggleProps) {
+export function PaidToggle({ paid, onToggle, kind = 'expense', disabled, disabledReason, size = 'md', loading, overdue = false }: PaidToggleProps) {
   const changed = useHasChanged(paid);
 
   const paidLabel = kind === 'income' ? 'Recebido' : kind === 'transfer' ? 'Efetivada' : 'Pago';
@@ -40,7 +43,11 @@ export function PaidToggle({ paid, onToggle, kind = 'expense', disabled, disable
         className={cn(
           'inline-flex shrink-0 items-center justify-center rounded-full transition-[background-color,color,scale] duration-(--dur-press) ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60',
           size === 'sm' ? 'size-8' : 'size-9',
-          paid ? 'bg-success-soft text-success hover:brightness-95' : 'bg-danger-soft text-danger hover:brightness-95',
+          paid
+            ? 'text-success hover:bg-success-soft'
+            : overdue
+              ? 'bg-danger-soft text-danger hover:brightness-95'
+              : 'bg-bg-subtle text-muted hover:bg-surface-muted hover:text-fg',
           loading && 'opacity-70',
         )}
       >

@@ -153,6 +153,12 @@ const shortDate = (date: string) => {
   return y === todayISO().slice(0, 4) ? `${d}/${m}` : `${d}/${m}/${y!.slice(2)}`;
 };
 
+/** Pending and past its due date (the rule of the "Venceu há…" label and of the red toggle). */
+export function isLate(tx: Pick<Transaction, 'paid' | 'overdue' | 'date' | 'creditCardId' | 'type'>): boolean {
+  if (tx.paid || tx.type === 'transfer' || tx.creditCardId) return false;
+  return tx.overdue || diffInDays(tx.date, todayISO()) < 0;
+}
+
 /**
  * Due status of a row. Under the due date (`beside`) it never repeats the date: "Vence em 9 dias",
  * "Pago no vencimento"; inline (narrow rows, no date column) it carries the date instead.
@@ -171,7 +177,7 @@ export function DueLabel({ tx, beside = false }: { tx: Transaction; beside?: boo
     return <span className="text-xs text-muted">{verb}{when}</span>;
   }
   const days = diffInDays(tx.date, todayISO());
-  if (tx.overdue || days < 0) return <span className="text-xs font-semibold text-danger">Venceu há {daysText(Math.abs(days))}</span>;
+  if (isLate(tx)) return <span className="text-xs font-semibold text-danger">Venceu há {daysText(Math.abs(days))}</span>;
   if (days === 0) return <span className="text-xs font-semibold text-warning">Vence hoje</span>;
   if (days <= 5) return <span className="text-xs font-medium text-warning">Vence em {daysText(days)}</span>;
   return <span className="text-xs text-muted">Vence em {beside ? daysText(days) : shortDate(tx.date)}</span>;
@@ -262,6 +268,7 @@ function TransactionLine({ tx, amount, muted, neutralAmount }: TransactionRowPro
             size="sm"
             paid={tx.paid}
             kind={tx.type}
+            overdue={isLate(tx)}
             loading={actions.savingPaidId === tx.id}
             disabled={readOnly || tx.type === 'transfer'}
             disabledReason={actions.readOnlyReason ?? (tx.type === 'transfer' ? (tx.paid ? 'Efetivada' : 'Agendada') : undefined)}
@@ -321,6 +328,7 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
             size={compact ? 'sm' : 'md'}
             paid={tx.paid}
             kind={tx.type}
+            overdue={isLate(tx)}
             loading={actions.savingPaidId === tx.id}
             disabled={Boolean(actions.readOnlyReason)}
             disabledReason={actions.readOnlyReason ?? undefined}
@@ -364,7 +372,8 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
       </Main>
       {isFee ? (
         // Right after the flexible column, so the fixed columns (account, due date, amount) stay aligned.
-        <div className="hidden shrink-0 @xl:block">
+        // Shown on hover/focus of the row (the action also lives in the "⋯" menu); always on touch screens.
+        <div className="hidden shrink-0 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 @xl:block [@media(hover:none)]:opacity-100">
           <WriteGate>
             <Button
               variant="outline"
