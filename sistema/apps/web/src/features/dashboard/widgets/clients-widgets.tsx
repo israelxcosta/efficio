@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Building2, CalendarCheck, ClipboardCheck } from 'lucide-react';
+import { Building2, CalendarCheck, CircleAlert, CircleCheck, ClipboardCheck } from 'lucide-react';
 import {
   formatBRL,
   formatDateBR,
@@ -491,41 +491,54 @@ function useMonthIncome(month: MonthKey) {
 
 const share = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
-/** One step of the fees strip: label, amount and, when there is a reference, its bullet and share. */
+/**
+ * One step of the fees strip: label, amount, a bar (or a reserved empty row, so the four steps line up)
+ * and one small note. Wide cards: a column each; narrow cards: one row each (label · bar · amount).
+ */
 function FeeStep({
   label,
   value,
-  hint,
+  tone,
   bar,
+  note,
 }: {
   label: string;
   value: number;
-  hint?: string;
-  /** Bullet against a reference: filled share (0–1 of the scale), mark of the reference, text. */
-  bar?: { fill: number; mark: number; className: string; text: string };
+  tone?: 'danger';
+  /** Segments as shares of the scale (the rest stays empty), an optional reference mark, the % text. */
+  bar?: { segments: { value: number; className: string; label?: string }[]; mark?: number; text: string };
+  note?: ReactNode;
 }) {
+  const filled = bar ? bar.segments.reduce((sum, seg) => sum + seg.value, 0) : 0;
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] items-center gap-x-3 @lg:flex @lg:flex-col @lg:items-stretch @lg:justify-center @lg:gap-0.5">
-      <p className="truncate text-caption text-muted">{label}</p>
-      <p className="order-last text-right text-body-sm font-semibold whitespace-nowrap text-fg tabular @lg:order-none @lg:text-left @lg:text-[18px] @lg:leading-6">
+    <div className="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-x-2.5 @lg:flex @lg:flex-col @lg:items-stretch @lg:gap-0">
+      <p className="flex min-w-0 items-baseline justify-between gap-2 text-caption text-muted">
+        <span className="truncate">{label}</span>
+        {bar ? <span className="hidden shrink-0 text-micro font-semibold text-fg tabular @lg:inline">{bar.text}</span> : null}
+      </p>
+      <p
+        className={cn(
+          'order-last min-w-[6.5rem] text-right text-body-sm font-semibold whitespace-nowrap tabular @lg:order-none @lg:min-w-0 @lg:text-left @lg:text-[18px] @lg:leading-6',
+          tone === 'danger' ? 'text-danger' : 'text-fg',
+        )}
+      >
         {formatBRL(value)}
       </p>
-      {bar ? (
-        <div className="flex min-w-0 items-center gap-2 @lg:mt-1">
-          <StackBar
-            size="sm"
-            className="min-w-0 flex-1"
-            segments={[
-              { value: bar.fill, className: bar.className },
-              { value: Math.max(0, 1 - bar.fill), className: 'bg-transparent' },
-            ]}
-            marker={bar.mark < 1 ? { at: bar.mark, label: '' } : undefined}
-          />
-          <span className="shrink-0 text-micro font-semibold text-fg tabular">{bar.text}</span>
-        </div>
-      ) : (
-        <p className="truncate text-micro text-muted">{hint}</p>
-      )}
+      {/* The bar row is kept (empty) on steps without one, so the four columns line up. */}
+      <div className="flex min-w-0 items-center gap-2 @lg:mt-1.5 @lg:h-1.5">
+        {bar ? (
+          <>
+            <StackBar
+              size="sm"
+              className="min-w-0 flex-1"
+              segments={[...bar.segments, { value: Math.max(0, 1 - filled), className: 'bg-transparent' }]}
+              marker={bar.mark !== undefined && bar.mark < 1 ? { at: bar.mark, label: '' } : undefined}
+            />
+            <span className="w-9 shrink-0 text-right text-micro font-semibold text-fg tabular @lg:hidden">{bar.text}</span>
+          </>
+        ) : null}
+      </div>
+      {note ? <p className="hidden truncate text-micro text-muted @lg:mt-1 @lg:block">{note}</p> : null}
     </div>
   );
 }
@@ -606,37 +619,57 @@ export function FeesMonthWidget({ month, d, loading, alert }: WidgetProps) {
     const planned = summary.monthlyFees ?? 0;
     // Generated against planned (mark on 100% when it went past it); received against generated.
     const genScale = Math.max(planned, view.billed, 1);
-    const missing = view.missing.length;
+    const dueLater = Math.max(0, view.open - view.overdue);
     body = (
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 @lg:grid @lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,13rem)] @lg:gap-x-6">
-        <FeeStep label="Previsto" value={planned} hint={pluralize(withFee, 'cliente com vigência', 'clientes com vigência')} />
+      <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 @lg:grid @lg:grid-cols-4 @lg:gap-x-8">
+        <FeeStep label="Previsto" value={planned} note={pluralize(withFee, 'cliente com vigência', 'clientes com vigência')} />
         <FeeStep
           label={billedLabel}
           value={view.billed}
           bar={
             planned > 0
-              ? { fill: view.billed / genScale, mark: planned / genScale, className: 'bg-[var(--app-chart-3)]', text: `${share(view.billed, planned)}%` }
+              ? {
+                  segments: [{ value: view.billed / genScale, className: 'bg-[var(--app-chart-3)]' }],
+                  mark: planned / genScale,
+                  text: `${share(view.billed, planned)}%`,
+                }
               : undefined
           }
-          hint={planned > 0 ? undefined : 'nada previsto'}
+          note={planned > 0 ? (view.billed >= planned ? 'acima do previsto' : `falta ${formatBRL(planned - view.billed)}`) : 'nada previsto'}
         />
         <FeeStep
           label="Recebido"
           value={view.received}
-          bar={view.billed > 0 ? { fill: Math.min(1, view.received / view.billed), mark: 1, className: 'bg-data', text: `${share(view.received, view.billed)}%` } : undefined}
-          hint={view.billed > 0 ? undefined : `nada ${billedLabel.toLowerCase()}`}
+          bar={view.billed > 0 ? { segments: [{ value: Math.min(1, view.received / view.billed), className: 'bg-data' }], text: `${share(view.received, view.billed)}%` } : undefined}
+          note={view.billed > 0 ? `do ${billedLabel.toLowerCase()}` : `nada ${billedLabel.toLowerCase()}`}
         />
-        <dl className="hidden min-w-0 flex-col justify-center gap-1 border-l border-border pl-5 text-caption @lg:flex">
-          <div className="flex items-baseline justify-between gap-3">
-            <dt className="truncate text-muted">Em aberto</dt>
-            <dd className={cn('font-semibold whitespace-nowrap tabular', view.overdue > 0 ? 'text-danger' : 'text-fg')}>{formatBRL(view.open)}</dd>
-          </div>
-          {view.overdue > 0 ? <p className="-mt-1 text-right text-micro text-danger">{formatBRL(view.overdue)} vencido</p> : null}
-          <div className="flex items-baseline justify-between gap-3">
-            <dt className="truncate text-muted">{feeAware ? 'Sem honorário gerado' : 'Sem lançamento'}</dt>
-            <dd className={cn('font-semibold tabular', missing > 0 ? 'text-warning' : 'text-fg')}>{missing}</dd>
-          </div>
-        </dl>
+        <FeeStep
+          label="Em aberto"
+          value={view.open}
+          tone={view.overdue > 0 ? 'danger' : undefined}
+          bar={
+            view.billed > 0 && view.open > 0
+              ? {
+                  segments: [
+                    { value: Math.min(1, view.overdue / view.billed), className: 'bg-chart-red', label: 'Vencido' },
+                    { value: Math.min(1, dueLater / view.billed), className: 'bg-chart-red-soft', label: 'A vencer' },
+                  ],
+                  text: `${share(view.open, view.billed)}%`,
+                }
+              : undefined
+          }
+          note={
+            view.open <= 0 ? (
+              'nada em aberto'
+            ) : (
+              <>
+                {view.overdue > 0 ? <span className="font-medium text-danger">{formatBRL(view.overdue)} vencido</span> : null}
+                {view.overdue > 0 && dueLater > 0 ? ' · ' : null}
+                {dueLater > 0 ? `${formatBRL(dueLater)} a vencer` : null}
+              </>
+            )
+          }
+        />
       </div>
     );
   }
@@ -654,18 +687,24 @@ export function FeesMonthWidget({ month, d, loading, alert }: WidgetProps) {
       alert={alert}
       footer={
         view && data && data.items.length > 0 && !pending && !failed ? (
-          <div className="flex items-center justify-between gap-3 text-caption text-muted">
-            <p className="min-w-0 truncate">
-              <span className="@lg:hidden">
-                Em aberto <span className={cn('font-semibold tabular', view.overdue > 0 ? 'text-danger' : 'text-fg')}>{formatBRL(view.open)}</span>
-                {' · '}
-              </span>
-              {view.missing.length > 0
-                ? `${pluralize(view.missing.length, 'cliente', 'clientes')} sem ${feeAware ? 'honorário gerado' : 'lançamento no mês'}`
-                : feeAware
-                  ? 'Todos os clientes com honorário gerado'
-                  : 'Todos os clientes com lançamento'}
-            </p>
+          <div className="flex items-center justify-between gap-3 text-caption">
+            {view.missing.length > 0 ? (
+              <p className="flex min-w-0 items-center gap-1.5 text-warning">
+                <CircleAlert className="size-3.5 shrink-0" aria-hidden />
+                <span className="truncate">
+                  {pluralize(view.missing.length, 'cliente', 'clientes')} sem {feeAware ? 'honorário gerado' : 'lançamento no mês'}
+                </span>
+              </p>
+            ) : (
+              <p className="flex min-w-0 items-center gap-1.5 text-muted">
+                <CircleCheck className="size-3.5 shrink-0 text-success" aria-hidden />
+                <span className="truncate">
+                  {feeAware
+                    ? `${pluralize(view.base, 'cliente com vigência', 'clientes com vigência')}, todos com honorário gerado`
+                    : 'Todos os clientes com lançamento no mês'}
+                </span>
+              </p>
+            )}
             {feeAware && view.missing.length > 0 ? (
               <Link to="/contas-a-receber" className="shrink-0 font-medium whitespace-nowrap text-brand-text hover:underline">
                 Gerar honorários →
