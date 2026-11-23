@@ -33,10 +33,13 @@ interface PageHeaderProps {
   actionsClassName?: string;
 }
 
-/** Page title (h1) with one plain line about the data under it; no label above the title. */
+/**
+ * Page title (h1) with one plain line about the data under it; no label above the title. Top-aligned, so
+ * the title sits at the same height on every page whatever the size of the actions beside it.
+ */
 export function PageHeader({ title, description, info, actions, className, actionsClassName }: PageHeaderProps) {
   return (
-    <div className={cn('flex flex-wrap items-end justify-between gap-4', className)}>
+    <div className={cn('flex flex-wrap items-start justify-between gap-4', className)}>
       <div className="min-w-0">
         {info ? (
           <div className="flex items-center gap-1.5">

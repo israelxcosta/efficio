@@ -19,6 +19,8 @@ const VARIANTS = {
 const SIZES = {
   xs: 'h-7 gap-1 rounded-sm px-2 text-xs',
   sm: 'h-8 gap-1.5 rounded-[10px] px-3 text-[13px]',
+  /** Filter and tool bars: the 36px of `Select size_="sm"`, so one bar has one height. */
+  toolbar: 'h-9 gap-1.5 rounded-[10px] px-3 text-[13px]',
   md: 'h-10 gap-2 rounded-md px-4 text-sm',
   lg: 'h-11 gap-2 rounded-md px-5 text-[15px]',
   icon: 'size-10 rounded-md',

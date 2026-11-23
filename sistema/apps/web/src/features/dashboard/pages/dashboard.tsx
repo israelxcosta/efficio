@@ -125,7 +125,7 @@ export default function DashboardPage() {
 
   return (
     <div ref={ref} className="@container flex flex-col gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1 basis-48">
           <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-fg">Painel financeiro</h1>
           <MonthLine month={month} updatedAt={dashboard.dataUpdatedAt} />

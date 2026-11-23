@@ -112,8 +112,8 @@ export function ReceiptsTab({ from, to }: { from: string; to: string }) {
   }
 
   const filters = (
-    <div className="flex flex-wrap items-center gap-2">
-      <Select aria-label="Conta" value={accountId} onChange={(e) => setAccountId(e.target.value)} className="w-auto min-w-44">
+    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+      <Select size_="sm" aria-label="Conta" value={accountId} onChange={(e) => setAccountId(e.target.value)} className="w-full sm:w-auto sm:min-w-44">
         <option value="">Todas as contas</option>
         {(accounts.data ?? []).map((a) => (
           <option key={a.id} value={a.id}>
@@ -121,7 +121,7 @@ export function ReceiptsTab({ from, to }: { from: string; to: string }) {
           </option>
         ))}
       </Select>
-      <Select aria-label="Forma de recebimento" value={method} onChange={(e) => setMethod(e.target.value as MethodKey | '')} className="w-auto min-w-44">
+      <Select size_="sm" aria-label="Forma de recebimento" value={method} onChange={(e) => setMethod(e.target.value as MethodKey | '')} className="w-full sm:w-auto sm:min-w-44">
         <option value="">Todas as formas</option>
         {[...PAYMENT_METHODS, 'none' as const].map((m) => (
           <option key={m} value={m}>
@@ -129,12 +129,12 @@ export function ReceiptsTab({ from, to }: { from: string; to: string }) {
           </option>
         ))}
       </Select>
-      <Select aria-label="Conferência com o extrato" value={status} onChange={(e) => setStatus(e.target.value as Status)} className="w-auto min-w-40">
+      <Select size_="sm" aria-label="Conferência com o extrato" value={status} onChange={(e) => setStatus(e.target.value as Status)} className="w-full sm:w-auto sm:min-w-40">
         <option value="">Conferidos e a conferir</option>
         <option value="pending">A conferir</option>
         <option value="reconciled">Conferidos</option>
       </Select>
-      <Button variant="outline" size="sm" onClick={exportCsv} disabled={!r || r.items.length === 0}>
+      <Button variant="outline" size="toolbar" onClick={exportCsv} disabled={!r || r.items.length === 0}>
         <Download className="size-4" /> Exportar CSV
       </Button>
     </div>
