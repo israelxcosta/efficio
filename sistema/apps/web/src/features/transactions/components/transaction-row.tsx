@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { listDate } from '@/lib/list-date';
 import { useTransactionActions } from '../transaction-actions';
 import { transactionOrigin } from '../origin';
 
@@ -161,9 +162,6 @@ export function LateFeesBadge({ tx }: { tx: Transaction }) {
 }
 
 const daysText = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`;
-/** Date column of a list: "05/11" in the current year, the full date otherwise (the title has it in full). */
-const columnDate = (date: string) => (date.slice(0, 4) === todayISO().slice(0, 4) ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : formatDateBR(date));
-
 /** "05/10" in the current year, "05/10/25" otherwise (inline labels of narrow rows). */
 const shortDate = (date: string) => {
   const [y, m, d] = date.split('-');
@@ -410,7 +408,7 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
       {showDue ? (
         <div className={cn('hidden w-36 text-right', compact ? '@2xl:block' : '@xl:block')}>
           <p className="text-[13px] font-medium text-fg tabular" title={formatDateBR(tx.date)}>
-            {columnDate(tx.date)}
+            {listDate(tx.date)}
           </p>
           <DueLabel tx={tx} beside />
         </div>

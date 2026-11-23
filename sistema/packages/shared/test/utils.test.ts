@@ -207,3 +207,11 @@ describe('delinquency score', () => {
     expect([1000, 800, 799, 600, 599, 400, 399, 0].map(riskOf)).toEqual(['baixo', 'baixo', 'moderado', 'moderado', 'alto', 'alto', 'critico', 'critico']);
   });
 });
+
+describe('parseMoney with the true minus sign', () => {
+  it('reads "−R$ 610,59" as shown on screen', async () => {
+    const { parseMoney } = await import('../src');
+    expect(parseMoney('\u2212R$ 610,59')).toBe(-61059);
+    expect(parseMoney('-R$ 610,59')).toBe(-61059);
+  });
+});

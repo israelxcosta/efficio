@@ -13,3 +13,14 @@ describe('cn', () => {
     expect(cn('text-[13px]', 'text-body-sm')).toBe('text-body-sm');
   });
 });
+
+describe('displayFigure', () => {
+  it('uses the true minus sign on negative figures and leaves the rest alone', async () => {
+    const { displayFigure } = await import('./utils');
+    expect(displayFigure('-R$ 610,59')).toBe('−R$ 610,59');
+    expect(displayFigure('-4,3%')).toBe('−4,3%');
+    expect(displayFigure('R$ 10,00')).toBe('R$ 10,00');
+    expect(displayFigure('Pagar - hoje')).toBe('Pagar - hoje');
+    expect(displayFigure(12)).toBe(12);
+  });
+});

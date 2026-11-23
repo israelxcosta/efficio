@@ -9,6 +9,7 @@ import { AvatarStack, MemberAvatar } from '@/components/ui/member-avatar';
 import { Tooltip } from '@/components/ui/tooltip';
 import { hostsTaskSheets } from '@/components/layout/nav';
 import { cn, pluralize } from '@/lib/utils';
+import { listDate } from '@/lib/list-date';
 import { DUE_TONE_CLASS, shortName } from '../due';
 import { assigneesTip, auditHref, deadlineTip, doneFraction, groupDeadlineInfo, occurrenceParams, pendingText, periodLabel } from '../occurrence';
 import { NeutralIcon } from './neutral-icon';
@@ -165,7 +166,7 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
         <div className={cn('hidden min-w-0 text-right', compact ? 'w-44 @2xl:block' : 'w-48 @xl:block')}>
           <Tooltip content={deadlineTip(o, today)}>
             <p className="tabular text-[13px] font-medium text-fg" tabIndex={-1}>
-              {formatDateBR(o.targetDate)}
+              {listDate(o.targetDate, today)}
             </p>
           </Tooltip>
           <span className={cn('block truncate text-xs', DUE_TONE_CLASS[deadline.tone])} title={deadline.text}>

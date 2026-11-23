@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { ArrowRight, Info, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router';
 import { changeParts } from '@/features/dashboard/kpi-logic';
-import { cn } from '@/lib/utils';
+import { cn, displayFigure } from '@/lib/utils';
 import { Tooltip } from './tooltip';
 
 const CHANGE_TONE = { success: 'text-success', danger: 'text-danger', muted: 'text-muted' } as const;
@@ -83,7 +83,7 @@ export function KpiCard({
         ) : null}
       </div>
       {/* Label over the value, both on the left (app-screens §5, same as MetricStrip). */}
-      <div className={cn('tabular mt-1.5 text-kpi font-semibold tracking-tight text-fg', compact && 'truncate', valueClassName)}>{value}</div>
+      <div className={cn('tabular mt-1.5 text-kpi font-semibold tracking-tight text-fg', compact && 'truncate', valueClassName)}>{displayFigure(value)}</div>
       {children}
       <div className="mt-auto">{footer}</div>
     </div>

@@ -21,6 +21,7 @@ import { MemberAvatar } from '@/components/ui/member-avatar';
 import { usePermissions } from '@/features/auth/permissions';
 import { toastError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
+import { listDate } from '@/lib/list-date';
 import { useDeleteTask, useTaskOptions, useUpdateTask } from '../api';
 import { firstName, shortName } from '../due';
 import { useTaskSheetLinks } from '../task-links';
@@ -188,8 +189,8 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
         ) : null}
         <div className={cn('hidden min-w-0 text-right', compact ? 'w-44 @2xl:block' : 'w-48 @xl:block')}>
           {/* An occurrence is worked by its target (the legal deadline goes in the text below). */}
-          <p className="tabular text-[13px] font-medium text-fg">
-            {task.occurrence ? formatDateBR(task.occurrence.targetDate) : task.dueDate ? formatDateBR(task.dueDate) : '—'}
+          <p className="tabular text-[13px] font-medium text-fg" title={(task.occurrence?.targetDate ?? task.dueDate) ? formatDateBR((task.occurrence?.targetDate ?? task.dueDate)!) : undefined}>
+            {task.occurrence ? listDate(task.occurrence.targetDate, today) : task.dueDate ? listDate(task.dueDate, today) : '—'}
           </p>
           <TaskDueLabel task={task} today={today} beside />
         </div>

@@ -41,3 +41,11 @@ export function alpha(hex: string, a: number): string {
 export function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
+
+/**
+ * Display typography for a figure: a leading hyphen becomes the true minus sign "−" (same width as "+"
+ * in tabular figures, so columns align). Data, CSV and messages keep the plain hyphen of `formatBRL`.
+ */
+export function displayFigure<T>(value: T): T | string {
+  return typeof value === 'string' ? value.replace(/^-(?=\s*(R\$|\d))/, '\u2212') : value;
+}

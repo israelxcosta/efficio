@@ -811,7 +811,6 @@ function DetailTable({ r, f, today, label, onPage, onLastMonths }: { r: TaskRepo
   const totalPages = items ? Math.max(1, Math.ceil(items.total / items.pageSize)) : 1;
   // A row is one task; a recurring row is the occurrence of one client, which is a task too.
   const open = (row: TaskReportRow) => setParams(withSheetParams(params, { tarefa: row.id }));
-  const date = (d: string | null) => (d ? formatDateBR(d) : '—');
   const concludedAt = (iso: string | null) => (iso ? formatDateBR(dateInTimeZone(new Date(iso))) : '—');
   return (
     <Card className="overflow-hidden print:break-before-page">
@@ -834,29 +833,25 @@ function DetailTable({ r, f, today, label, onPage, onLastMonths }: { r: TaskRepo
         ) : (
           <>
             <div className="scrollbar-thin hidden max-h-[70vh] overflow-auto md:block print:block print:max-h-none print:overflow-visible">
-              <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-body-sm">
+              {/* First column fixed while the others scroll sideways. */}
+              <table className="w-full min-w-[960px] border-separate border-spacing-0 text-body-sm">
                 <thead className="sticky top-0 z-10 bg-surface">
                   <tr className="text-left text-xs text-muted">
                     {['Tarefa', 'Cliente', 'Departamento', 'Categoria', 'Responsável', 'Prioridade'].map((h) => (
-                      <th key={h} className="border-b border-border px-3 py-2 font-medium first:pl-5">
+                      <th key={h} className="border-b border-border px-3 py-2 font-medium first:sticky first:left-0 first:z-[1] first:bg-surface first:pl-5">
                         {h}
                       </th>
                     ))}
-                    {['Vencimento', 'Meta'].map((h) => (
-                      <th key={h} className="border-b border-border px-3 py-2 text-right font-medium">
-                        {h}
-                      </th>
-                    ))}
+                    <th className="border-b border-border px-3 py-2 text-right font-medium">Vencimento</th>
                     <th className="border-b border-border px-3 py-2 font-medium">Situação</th>
                     <th className="border-b border-border px-3 py-2 text-right font-medium">Concluída em</th>
-                    <th className="border-b border-border px-3 py-2 font-medium">No prazo</th>
                     <th className="border-b border-border px-3 py-2 pr-5 font-medium">Concluída por</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.items.map((row) => (
-                    <tr key={row.id} onClick={() => open(row)} className="cursor-pointer whitespace-nowrap hover:bg-surface-muted">
-                      <td className="max-w-64 truncate border-b border-border px-3 py-2 pl-5 font-medium text-fg">
+                    <tr key={row.id} onClick={() => open(row)} className="group cursor-pointer whitespace-nowrap hover:bg-surface-muted">
+                      <td className="sticky left-0 z-[1] max-w-64 truncate border-b border-border bg-surface px-3 py-2 pl-5 font-medium text-fg group-hover:bg-surface-muted">
                         <button type="button" className="max-w-full truncate text-left hover:underline" onClick={(e) => (e.stopPropagation(), open(row))}>
                           {row.title}
                           {row.kind === 'recurring' && row.competence ? <span className="font-normal text-muted"> · {row.competence.slice(5, 7)}/{row.competence.slice(0, 4)}</span> : null}
@@ -867,11 +862,17 @@ function DetailTable({ r, f, today, label, onPage, onLastMonths }: { r: TaskRepo
                       <td className="max-w-40 truncate border-b border-border px-3 py-2 text-fg">{row.category?.name ?? '—'}</td>
                       <td className={cn('border-b border-border px-3 py-2', row.assignee ? 'text-fg' : 'text-subtle')}>{row.assignee ? shortName(row.assignee.name) : 'Ex-membro'}</td>
                       <td className="border-b border-border px-3 py-2 text-fg">{TASK_PRIORITY_LABELS[row.priority]}</td>
-                      <td className="tabular border-b border-border px-3 py-2 text-right text-fg">{date(row.dueDate)}</td>
-                      <td className="tabular border-b border-border px-3 py-2 text-right text-fg">{row.kind === 'recurring' ? date(row.targetDate) : '—'}</td>
-                      <td className={cn('border-b border-border px-3 py-2', row.overdue ? 'font-medium text-danger' : row.targetMissed ? 'font-medium text-warning' : 'text-fg')}>{rowSituation(row)}</td>
+                      <td className="tabular border-b border-border px-3 py-2 text-right text-fg">
+                        {row.dueDate ? shortDate(row.dueDate, today) : '—'}
+                        {row.kind === 'recurring' && row.targetDate ? <span className="text-muted"> · meta {shortDate(row.targetDate, today)}</span> : null}
+                      </td>
+                      <td className={cn('border-b border-border px-3 py-2', row.overdue ? 'font-medium text-danger' : row.targetMissed ? 'font-medium text-warning' : 'text-fg')}>
+                        {rowSituation(row)}
+                        {row.completedOnTime === null ? null : (
+                          <span className={row.completedOnTime ? 'text-muted' : 'text-danger'}>{row.completedOnTime ? ' · no prazo' : ' · com atraso'}</span>
+                        )}
+                      </td>
                       <td className="tabular border-b border-border px-3 py-2 text-right text-fg">{concludedAt(row.completedAt)}</td>
-                      <td className="border-b border-border px-3 py-2 text-fg">{row.completedOnTime === null ? '' : row.completedOnTime ? 'Sim' : 'Não'}</td>
                       <td className="border-b border-border px-3 py-2 pr-5 text-fg">{row.completedBy ? shortName(row.completedBy.name) : ''}</td>
                     </tr>
                   ))}

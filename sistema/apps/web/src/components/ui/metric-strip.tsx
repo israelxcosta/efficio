@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Info } from 'lucide-react';
 import { Sparkline } from '@/components/charts/sparkline';
-import { cn } from '@/lib/utils';
+import { cn, displayFigure } from '@/lib/utils';
 import { Card } from './card';
 import { Skeleton } from './skeleton';
 import { Tooltip } from './tooltip';
@@ -99,7 +99,7 @@ function MetricCellView({ cell }: { cell: MetricCell }) {
           cell.tone ? VALUE_TONE[cell.tone] : 'text-fg',
         )}
       >
-        {cell.loading ? <Skeleton className="h-6 w-24 @[560px]:h-7 @[560px]:w-32" /> : cell.value}
+        {cell.loading ? <Skeleton className="h-6 w-24 @[560px]:h-7 @[560px]:w-32" /> : displayFigure(cell.value)}
       </div>
       {cell.spark && !cell.loading ? (
         <div className="hidden min-w-0 justify-end self-end overflow-hidden @[560px]:col-start-2 @[560px]:row-start-2 @[560px]:flex">

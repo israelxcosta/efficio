@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { RefreshCw, TriangleAlert } from 'lucide-react';
 import { formatBRL } from '@effinance/shared';
-import { cn } from '@/lib/utils';
+import { cn, displayFigure } from '@/lib/utils';
 import { errorMessage } from '@/lib/api';
 import { Button } from './button';
 import { HelpTip } from './help-tip';
@@ -79,7 +79,7 @@ export function Money({ value, signed, tone, showPlus, className }: MoneyProps) 
       )}
     >
       {showPlus && value > 0 ? '+' : ''}
-      {formatBRL(value)}
+      {displayFigure(formatBRL(value))}
     </span>
   );
 }
@@ -151,7 +151,7 @@ export function MiniStat({ label, value, tone, amount, hint, info, className }: 
           alert === 'warning' && 'text-warning',
         )}
       >
-        {value}
+        {displayFigure(value)}
       </p>
       {hint ? <p className="mt-1 text-caption text-muted">{hint}</p> : null}
     </div>

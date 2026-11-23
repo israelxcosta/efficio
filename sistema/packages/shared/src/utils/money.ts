@@ -23,9 +23,9 @@ export function formatCompactBRL(cents: number): string {
   return `${sign}R$ ${abs.toFixed(0)}`;
 }
 
-/** Parses "1.234,56", "1234.56", "R$ 10" → cents. Returns null when not a number. */
+/** Parses "1.234,56", "1234.56", "R$ 10", "−R$ 5" (true minus, as shown on screen) → cents. Null when not a number. */
 export function parseMoney(input: string): number | null {
-  const cleaned = input.replace(/[^\d,.-]/g, '');
+  const cleaned = input.replace(/\u2212/g, '-').replace(/[^\d,.-]/g, '');
   if (!cleaned) return null;
   const normalized =
     cleaned.includes(',') ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned;
