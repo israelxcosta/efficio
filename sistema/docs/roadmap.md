@@ -5,6 +5,32 @@ proposta e as decisões que faltam antes de começar.
 
 Ordem recomendada e análise completa (13/11/2026): [analise-sistema-2026-11.md](analise-sistema-2026-11.md).
 
+## Diretriz permanente: tudo pensado para o futuro portal do cliente (23/11/2026)
+
+O portal do cliente **não será disponibilizado agora**, mas chegará. Toda função nova ou alterada da gestão
+de tarefas, cadastros, processos e financeiro deve ser desenhada sabendo que o cliente, pelo portal, vai:
+
+- **solicitar** tarefas, registros (admissão), férias, rescisões, recálculos de guias e emissão de boletos/Pix;
+- **acompanhar** a situação dos pedidos e conversar pela própria solicitação;
+- **acessar a pasta com os seus documentos**.
+
+Na prática:
+- Tarefas e processos guardam **quem pediu** e **por qual canal** (equipe hoje; cliente pelo portal depois)
+  e aceitam ser criados a partir de um **tipo de solicitação** com formulário próprio.
+- Comentários, anexos e documentos têm (ou poderão ter sem migração difícil) a marca **visível ao cliente**
+  × nota interna; nada interno vaza por padrão.
+- Todo dado do cliente fica amarrado ao `client_id` além do `workspace_id`, para o RLS por cliente.
+- Cobranças (honorários, Pix) geram algo que o cliente possa ver e pagar sozinho (valor, vencimento, código Pix).
+- Ao propor uma tela ou regra, diga em uma linha como ela se comporta quando o pedido vier do portal.
+
+## Adiados pelo dono (23/11/2026)
+
+- **Portal do cliente** (§2): adiado; vale a diretriz acima.
+- **Salvar documentos no OneDrive e enviá-los** por e-mail/WhatsApp (§1): adiado.
+- **Cobrança com baixa automática** (boleto registrado, Pix com vencimento/cobv, Pix Automático) (§3): adiada.
+  O **Pix estático com o valor certo** (QR Code e copia e cola gerados pelo sistema com a chave do escritório)
+  entra agora: o valor vai dentro do código e o cliente não digita nada.
+
 ---
 
 ## 1. Anexos no OneDrive + envio por e-mail e WhatsApp

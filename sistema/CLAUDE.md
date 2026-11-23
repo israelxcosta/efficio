@@ -57,5 +57,8 @@ Segurança (auditoria + correção com teste de regressão, um por linguagem/cam
 - Toda query do backend filtra pelo espaço (`workspace_id`); o RLS é a segunda barreira. Tabelas
   financeiras só são acessíveis dentro de `withTenant`/`req.db` (o login da API não tem acesso direto).
 - UI em pt-BR; código em inglês.
+- **Portal do cliente (futuro):** ainda não existe, mas toda função de tarefas, cadastros, processos e
+  cobrança deve nascer pronta para o cliente solicitar e acompanhar pelo portal (quem pediu/canal,
+  visível ao cliente × interno, amarrado ao `client_id`). Ver `docs/roadmap.md` → "Diretriz permanente".
 - Antes de concluir: `pnpm typecheck && pnpm test` (API precisa de Postgres; veja README).
 - Migração nova: reinicie o `vite --mode demo`, senão o demo no navegador não a aplica.
