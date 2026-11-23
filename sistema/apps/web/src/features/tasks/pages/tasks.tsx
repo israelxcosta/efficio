@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ChevronLeft, ChevronRight, CircleCheck, ListChecks, SearchX } from 'lucide-react';
 import { TASK_DUE_BUCKET_LABELS, todayISO } from '@effinance/shared';
@@ -20,7 +20,6 @@ import { TaskGroup } from '../components/task-group';
 import { TaskRow } from '../components/task-row';
 import { TasksSummary } from '../components/tasks-summary';
 import { TasksHub } from '../components/tasks-hub';
-import { PendingByClientCard } from '../components/pending-by-client-card';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
 import {
@@ -54,7 +53,6 @@ export default function TasksPage() {
   const calendar = useTaskCalendar(toCalendarQuery(filters, today), { enabled: filters.view === 'calendar' });
   const { openTask, newTask } = useTaskSheetLinks();
   const navigate = useNavigate();
-  const filtersRef = useRef<HTMLDivElement>(null);
   const isAdmin = usePermissions().can('registry');
   const data = list.data;
   const filterCount = activeFilterCount(filters);
@@ -157,7 +155,7 @@ export default function TasksPage() {
         />
       )}
 
-      <div ref={filtersRef} className="scroll-mt-4">
+      <div className="scroll-mt-4">
         <TaskFiltersBar
           filters={filters}
           onChange={update}
@@ -286,16 +284,6 @@ export default function TasksPage() {
             </div>
           ) : null}
         </Card>
-      )}
-      {list.isError && !data ? null : workspaceEmpty ? null : (
-        <PendingByClientCard
-          summary={data?.summary}
-          client={filters.client}
-          onClient={(client) => {
-            update({ client });
-            filtersRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }}
-        />
       )}
     </div>
   );

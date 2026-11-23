@@ -4,7 +4,6 @@ import { ArrowLeftRight, Bell, BriefcaseBusiness, FileClock, ListChecks, ListTre
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePermissions, WriteGate } from '@/features/auth/permissions';
-import { WorkspaceList, WorkspaceSheet } from '@/features/workspaces/workspace-switcher';
 import { useTransactionActions } from '@/features/transactions/transaction-actions';
 import { useTaskSheetLinks } from '@/features/tasks/task-links';
 import { useTaskActions } from '@/features/tasks/task-actions';
@@ -38,7 +37,6 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
   // Counts what each link opens: overdue payables (administrators) and your overdue tasks.
   const overdueBills = useOverdueBills().data?.filter((t) => t.type === 'expense').length ?? 0;
   const overdueTasks = useMyOverdueTasks().data?.total ?? 0;
@@ -95,15 +93,6 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
               <span className="block text-caption text-muted">Minha área</span>
             </span>
           </Link>
-          <span className="my-1 h-px bg-border" aria-hidden />
-          <p className="eyebrow px-3 pb-1 text-subtle">Espaço</p>
-          <WorkspaceList
-            onSwitched={close}
-            onCreate={() => {
-              close();
-              setCreating(true);
-            }}
-          />
           {canAccessFinance ? (
             <>
               <span className="my-1 h-px bg-border" aria-hidden />
@@ -216,7 +205,6 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
           </button>
         </div>
       </Sheet>
-      <WorkspaceSheet open={creating} onOpenChange={setCreating} />
     </>
   );
 }

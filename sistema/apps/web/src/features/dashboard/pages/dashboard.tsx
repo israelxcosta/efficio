@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { ArrowUpToLine, Check, ChevronLeft, ChevronRight, LayoutGrid, SlidersHorizontal, Sparkles } from 'lucide-react';
 import {
@@ -7,9 +7,7 @@ import {
   addMonthKey,
   formatBRL,
   formatMonthKey,
-  monthKey,
   percentChange,
-  todayISO,
   type DashboardResponse,
   type MonthKey,
   type WorkspaceKind,
@@ -28,8 +26,6 @@ import { useAuth } from '@/features/auth/auth-context';
 import { useDashboard } from '../api';
 import { InsightsTab } from '../components/insights-tab';
 import { changeParts, marginText, monthlySeries, netWorthText, type ChangeParts } from '../kpi-logic';
-import { monthFinding, overdueFinding } from '../layout/finding';
-import { useMonthReceivables, useOverdueReceivables } from '../widgets/data';
 import { useDashboardAlerts } from '../layout/alerts';
 import { WIDGET_COMPONENTS } from '../layout/catalog';
 import { CustomizeSheet } from '../layout/customize-sheet';
@@ -129,12 +125,12 @@ export default function DashboardPage() {
 
   return (
     <div ref={ref} className="@container flex flex-col gap-6">
-      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1 basis-48">
           <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-fg">Painel financeiro</h1>
-          <FindingLine month={month} updatedAt={dashboard.dataUpdatedAt} />
+          <MonthLine month={month} updatedAt={dashboard.dataUpdatedAt} />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <SegmentedControl
             ariaLabel="Visão"
             value={tab}
@@ -266,40 +262,16 @@ function Overview({ d, loading, month, kind, width, editing, onCustomize }: Over
  * on it. The current month shows everything overdue today; another month, its own receivables
  * (still overdue, still to come, or all received).
  */
-function FindingLine({ month, updatedAt }: { month: MonthKey; updatedAt: number }) {
+/**
+ * Month and freshness under the title, in small text and on one line: the header keeps the same width
+ * every month, so the period controls beside it never jump (the overdue finding lives in the
+ * Inadimplência card).
+ */
+function MonthLine({ month, updatedAt }: { month: MonthKey; updatedAt: number }) {
   const updated = useUpdatedLabel(updatedAt);
-  const today = todayISO();
-  const current = month === monthKey(today);
-  const overdue = useOverdueReceivables(current);
-  const ofMonth = useMonthReceivables(month, !current);
-  const finding = current
-    ? overdue.data
-      ? (overdueFinding(overdue.data.items) ?? { text: 'nenhum recebimento vencido em aberto', alert: false })
-      : null
-    : ofMonth.data
-      ? monthFinding(ofMonth.data, today)
-      : null;
-  const href = current ? '/relatorios?aba=inadimplencia' : `/contas-a-receber?data=${month}-01&status=overdue`;
   return (
-    <p className="mt-1 text-sm text-muted">
-      {/* Only the finding is announced; the minute-by-minute "atualizado" stays out of the live region. */}
-      <span aria-live="polite">
-      {formatMonthKey(month)}
-      {finding ? (
-        finding.alert ? (
-          <>
-            {' · '}
-            <span className="font-medium text-danger">{finding.text}</span>
-            {' · '}
-            <Link to={href} className="font-medium text-brand-text hover:underline">
-              {current ? 'Ver inadimplência' : 'Ver vencidos'}
-            </Link>
-          </>
-        ) : (
-          ` · ${finding.text}`
-        )
-      ) : null}
-      </span>
+    <p className="mt-0.5 truncate text-caption text-muted">
+      <span aria-live="polite">{formatMonthKey(month)}</span>
       {updated ? <span className="text-subtle">{` · ${updated}`}</span> : null}
     </p>
   );

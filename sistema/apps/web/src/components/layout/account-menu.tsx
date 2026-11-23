@@ -1,4 +1,4 @@
-import { forwardRef, useState, type ComponentPropsWithoutRef } from 'react';
+import { forwardRef, type ComponentPropsWithoutRef } from 'react';
 import { useNavigate } from 'react-router';
 import { ChevronDown, LogOut, Moon, Settings, Sun } from 'lucide-react';
 import { WORKSPACE_KIND_LABELS, type WorkspaceKind } from '@effinance/shared';
@@ -13,16 +13,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/features/auth/auth-context';
 import { WORKSPACE_KIND_ICONS } from '@/features/workspaces/kind-icon';
-import { WorkspaceMenuItems, WorkspaceSheet } from '@/features/workspaces/workspace-switcher';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
-/** The button of the account menu: the workspace's kind icon, its name and a chevron (no hooks). */
+/**
+ * The button of the account menu: the office's icon, its name and a chevron (no hooks). Each person
+ * belongs to one office only, so the menu has no workspace switcher nor "Nova empresa".
+ */
 export const AccountMenuTrigger = forwardRef<HTMLButtonElement, { workspace: { name: string; kind: WorkspaceKind } } & ComponentPropsWithoutRef<'button'>>(
   function AccountMenuTrigger({ workspace, className, ...props }, ref) {
     const Icon = WORKSPACE_KIND_ICONS[workspace.kind];
     return (
-      <Button ref={ref} variant="outline" aria-label={`Conta e espaço: ${workspace.name}`} className={cn('min-w-0 justify-start', className)} {...props}>
+      <Button ref={ref} variant="outline" aria-label={`Conta: ${workspace.name}`} className={cn('min-w-0 justify-start', className)} {...props}>
         <Icon aria-hidden />
         <span className="max-w-56 min-w-0 truncate">{workspace.name}</span>
         <ChevronDown className="ml-auto text-muted" aria-hidden />
@@ -39,7 +41,7 @@ export function AccountMenuHeader({ name, email, workspace, kindLabel }: { name:
       <p className="truncate text-xs text-muted">{email}</p>
       {workspace ? (
         <p className="mt-1.5 truncate text-xs text-muted">
-          Espaço atual: <span className="font-semibold text-fg">{workspace}</span> · {kindLabel}
+          Escritório: <span className="font-semibold text-fg">{workspace}</span> · {kindLabel}
         </p>
       ) : null}
     </div>
@@ -48,13 +50,13 @@ export function AccountMenuHeader({ name, email, workspace, kindLabel }: { name:
 
 /**
  * The account menu of Minha área (spec §15.4), what the avatar's menu was minus Perfil (the button
- * beside it) and Minhas anotações (a card): workspaces and Nova empresa, theme, Configurações, Sair.
+ * beside it) and Minhas anotações (a card): theme, Configurações, Sair. No workspace switcher: each
+ * person belongs to one office.
  */
 export function AccountMenu({ className }: { className?: string }) {
   const { user, workspace, logout } = useAuth();
   const { resolved, toggle } = useTheme();
   const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
   if (!workspace) return null;
   return (
     <>
@@ -65,8 +67,6 @@ export function AccountMenu({ className }: { className?: string }) {
         <DropdownMenuContent align="end" sideOffset={6} className="w-72">
           <DropdownMenuLabel>Conta</DropdownMenuLabel>
           <AccountMenuHeader name={user?.name ?? ''} email={user?.email ?? ''} workspace={workspace.name} kindLabel={WORKSPACE_KIND_LABELS[workspace.kind]} />
-          <DropdownMenuSeparator />
-          <WorkspaceMenuItems onCreate={() => setCreating(true)} />
           <DropdownMenuSeparator />
           <DropdownMenuItem icon={resolved === 'dark' ? <Sun /> : <Moon />} onSelect={toggle}>
             {resolved === 'dark' ? 'Tema claro' : 'Tema escuro'}
@@ -87,7 +87,6 @@ export function AccountMenu({ className }: { className?: string }) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <WorkspaceSheet open={creating} onOpenChange={setCreating} />
     </>
   );
 }

@@ -24,7 +24,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { settingsSearchKeywords } from '@/components/layout/nav';
 import { resolveSettingsTab, settingsTabsFor } from '@/features/settings/pages/settings';
 import { memberLimitCopy, membersCountLine } from '@/features/settings/tabs/members-tab';
-import { newWorkspaceCreatedMessage, newWorkspaceTrialNote, workspaceAccessNote } from '@/features/workspaces/workspace-switcher';
 import { qk } from '@/lib/query-keys';
 import { SubscriptionBanner, subscriptionRequiredToast } from './subscription-banner';
 
@@ -134,23 +133,6 @@ describe('trial and inactive-subscription notices', () => {
     billing.enabled = true;
     expect(subscriptionRequiredToast(true)).toMatchObject({ title: 'Assinatura necessária', action: { label: 'Assinar', to: '/configuracoes?aba=assinatura' } });
     expect(subscriptionRequiredToast(false)?.action).toBeUndefined();
-  });
-});
-
-describe('workspace switcher and new workspace', () => {
-  it('shows no plan, trial or read-only state with billing off', () => {
-    expect(workspaceAccessNote({ subscription: lapsed })).toBe('');
-    expect(newWorkspaceTrialNote()).toBeNull();
-    expect(newWorkspaceCreatedMessage('Filial')).toBe('Filial criada. Convide quem vai participar.');
-  });
-
-  it('shows them with billing on', () => {
-    billing.enabled = true;
-    expect(workspaceAccessNote({ subscription: lapsed })).toBe(' · somente leitura');
-    expect(workspaceAccessNote({ subscription: trialing })).toBe('');
-    expect(newWorkspaceTrialNote()?.title).toBe(`${TRIAL_DAYS} dias grátis, sem cartão`);
-    expect(newWorkspaceTrialNote()?.detail).toMatch(/plano/);
-    expect(newWorkspaceCreatedMessage('Filial')).toBe(`Filial criada com ${TRIAL_DAYS} dias grátis. Convide quem vai participar.`);
   });
 });
 

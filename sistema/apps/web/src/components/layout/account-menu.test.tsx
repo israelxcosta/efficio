@@ -31,14 +31,14 @@ describe('avatar of the rail', () => {
 describe('account menu', () => {
   it('names the workspace on its trigger', () => {
     const html = wrap(<AccountMenuTrigger workspace={{ name: 'Efficio Contabilidade', kind: 'business' }} />);
-    expect(html).toContain('aria-label="Conta e espaço: Efficio Contabilidade"');
+    expect(html).toContain('aria-label="Conta: Efficio Contabilidade"');
     expect(html).toContain('>Efficio Contabilidade<');
   });
 
-  it('says who is logged in and the current workspace', () => {
+  it("says who is logged in and their office (one per person, no switcher)", () => {
     const html = wrap(<AccountMenuHeader name="Marina Costa" email="marina@efficio.com.br" workspace="Efficio Contabilidade" kindLabel="Empresarial" />);
     expect(html).toContain('Marina Costa');
     expect(html).toContain('marina@efficio.com.br');
-    expect(html.replace(/<[^>]+>/g, '')).toContain('Espaço atual: Efficio Contabilidade · Empresarial');
+    expect(html.replace(/<[^>]+>/g, '')).toContain('Escritório: Efficio Contabilidade · Empresarial');
   });
 });

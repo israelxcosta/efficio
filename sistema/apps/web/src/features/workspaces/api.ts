@@ -12,7 +12,6 @@ import type {
   MemberPermissionsInput,
   MemberRole,
   Paginated,
-  WorkspaceInput,
   WorkspaceSummary,
 } from '@effinance/shared';
 import { api, apiDownload, saveBlob } from '@/lib/api';
@@ -20,12 +19,6 @@ import { qk } from '@/lib/query-keys';
 
 // The active workspace (tenant): settings, members, invites and LGPD tools. Routes act on
 // `/workspaces/current`, i.e. the workspace in the session's access token.
-
-export function useCreateWorkspace() {
-  return useMutation({
-    mutationFn: (input: WorkspaceInput) => api<WorkspaceSummary>('/workspaces', { method: 'POST', body: input }),
-  });
-}
 
 export function useRenameWorkspace() {
   const qc = useQueryClient();
