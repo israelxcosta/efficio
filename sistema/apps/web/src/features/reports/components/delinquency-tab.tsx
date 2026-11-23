@@ -76,7 +76,7 @@ function DelinquencyKpis({ r }: { r: DelinquencyReportResponse | undefined }) {
     <div className="grid grid-cols-1 gap-3 @[420px]:grid-cols-2 @[1000px]:grid-cols-4">
       <KpiCard
         compact
-        icon={<CalendarX2 className="text-danger" />}
+        icon={<CalendarX2 />}
         label="Em atraso agora"
         info="Mensalidades vencidas e ainda não recebidas, de qualquer data"
         value={s ? formatBRL(s.openAmount) : loading}
@@ -86,7 +86,7 @@ function DelinquencyKpis({ r }: { r: DelinquencyReportResponse | undefined }) {
       />
       <KpiCard
         compact
-        icon={<Percent className="text-warning" />}
+        icon={<Percent />}
         label="Taxa de atraso"
         info="Parte das mensalidades vencidas no período que foram pagas depois do vencimento ou seguem em aberto. No rodapé, os últimos 3 meses completos contra os 3 anteriores."
         value={s ? formatPercent(s.lateRate) : loading}
@@ -108,7 +108,7 @@ function DelinquencyKpis({ r }: { r: DelinquencyReportResponse | undefined }) {
       />
       <KpiCard
         compact
-        icon={<AlarmClock className="text-danger" />}
+        icon={<AlarmClock />}
         label="Média de dias de atraso"
         info="Média de dias entre o vencimento e o pagamento das mensalidades atrasadas; as em aberto contam até hoje"
         value={s ? (s.avgDaysLate === null ? 'sem atrasos' : formatDays(s.avgDaysLate)) : loading}
@@ -118,7 +118,7 @@ function DelinquencyKpis({ r }: { r: DelinquencyReportResponse | undefined }) {
       />
       <KpiCard
         compact
-        icon={<Coins className="text-success" />}
+        icon={<Coins />}
         label="Juros e multas recebidos"
         info="Juros e multas registrados ao confirmar recebimentos em atraso de mensalidades do período"
         value={s ? formatBRL(fees) : loading}

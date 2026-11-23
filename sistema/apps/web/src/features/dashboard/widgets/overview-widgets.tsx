@@ -179,7 +179,7 @@ export function BalancesWidget({ d, loading, size, alert }: WidgetProps) {
     const available = d.balances.accounts;
     body = (
       <>
-        <div className="shrink-0 rounded-lg bg-surface-muted px-3 py-2">
+        <div className="shrink-0 border-b border-border pb-2">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3">
             <span className="text-caption text-muted">Saldo disponível</span>
             <span className={cn('ml-auto text-kpi font-semibold tracking-tight tabular', available < 0 ? 'text-danger' : 'text-fg')}>

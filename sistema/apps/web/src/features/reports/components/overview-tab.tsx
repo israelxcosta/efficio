@@ -1,4 +1,5 @@
-import { ChartPie, Receipt, Sparkles } from 'lucide-react';
+import { Link } from 'react-router';
+import { Sparkles } from 'lucide-react';
 import { formatBRL, formatPercent } from '@effinance/shared';
 import { Card, CardHeader } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -7,8 +8,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { TransactionRow } from '@/features/transactions/components/transaction-row';
-import { InsightList } from '@/features/dashboard/components/insights-tab';
-import { cn } from '@/lib/utils';
+import { cn, pluralize } from '@/lib/utils';
 import type { ChangeParts } from '@/features/dashboard/kpi-logic';
 import { useOverviewReport } from '../api';
 import { overviewChanges, previousRange } from '../period-compare';
@@ -53,22 +53,20 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
         />
       </MiniStatGroup>
 
-      <Card className="p-5">
-        <CardHeader title="Insights do período" icon={<Sparkles />} />
-        <div className="mt-4">
-          {report.isPending ? (
-            <SkeletonRows rows={2} />
-          ) : o && o.insights.length ? (
-            <InsightList insights={o.insights} />
-          ) : (
-            <EmptyState compact icon={<Sparkles />} title="Sem insights para este período" description="Registre movimentações para receber análises." />
-          )}
-        </div>
-      </Card>
+      {/* The insights live in the Dashboard inteligente: one line here instead of a third copy. */}
+      {o && o.insights.length ? (
+        <p className="flex items-center gap-2 text-body-sm text-muted">
+          <Sparkles className="size-4 text-subtle" aria-hidden />
+          {pluralize(o.insights.length, 'insight', 'insights')} neste período.
+          <Link to="/financeiro?aba=insights" className="font-medium text-brand-text hover:underline">
+            Ver no Dashboard inteligente →
+          </Link>
+        </p>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <CardHeader title="Despesas por categoria" icon={<ChartPie />} />
+          <CardHeader title="Despesas por categoria" />
           <div className="mt-4">
             {report.isPending ? (
               <Skeleton className="h-48" />
@@ -122,7 +120,7 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
 
       <Card className="overflow-hidden">
         <div className="p-5 pb-2">
-          <CardHeader title="Maiores despesas" icon={<Receipt />} />
+          <CardHeader title="Maiores despesas" />
         </div>
         <div className="p-1.5">
           {report.isPending ? (

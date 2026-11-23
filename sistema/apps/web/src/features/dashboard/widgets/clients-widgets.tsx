@@ -89,8 +89,8 @@ function StatTile({
   return (
     <div
       className={cn(
-        'flex min-w-0 items-center gap-3 rounded-lg px-3 py-1.5',
-        tone === 'danger' ? 'bg-danger-soft' : tone === 'warning' ? 'bg-warning-soft' : 'bg-surface-muted',
+        // Figures in one strip split by hairlines (the container's divide-x), no boxes inside the card.
+        'flex min-w-0 items-center gap-3 px-3 py-1 first:pl-0',
         className,
       )}
     >
@@ -207,7 +207,7 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div
           className={cn(
-            'grid shrink-0 grid-cols-3 gap-2',
+            'grid shrink-0 grid-cols-3 gap-y-2 divide-x divide-border',
             compact ? '@md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]' : '@3xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]',
           )}
         >

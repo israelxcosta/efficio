@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { CircleHelp } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { Popover } from 'radix-ui';
 import { cn } from '@/lib/utils';
 
@@ -63,7 +63,7 @@ export function HelpTip({ children, label = 'Ajuda', side = 'top', className }: 
             className,
           )}
         >
-          <CircleHelp className="size-3.5" aria-hidden />
+          <Info className="size-3.5" aria-hidden />
         </button>
       </Popover.Trigger>
       <Popover.Portal>

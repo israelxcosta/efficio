@@ -26,7 +26,7 @@ const shortDate = (date: string) => formatDateBR(date).slice(0, 5);
  */
 function Tile({ label, saldo, date, danger, className }: { label: string; saldo: number; date: ISODate; danger?: boolean; className?: string }) {
   return (
-    <div className={cn('flex min-w-[120px] flex-1 flex-col rounded-lg px-3 py-2', danger ? 'bg-danger-soft' : 'bg-surface-muted', className)}>
+    <div className={cn('flex min-w-[120px] flex-1 flex-col px-3 first:pl-0', className)}>
       <span className={`truncate text-caption ${danger ? 'text-danger' : 'text-muted'}`}>{label}</span>
       <span className={`truncate text-[15px] leading-5 font-semibold tabular ${danger || saldo < 0 ? 'text-danger' : 'text-fg'}`}>{formatBRL(saldo)}</span>
       <span className={`text-micro ${danger ? 'text-danger/80' : 'text-muted'}`}>{formatDateBR(date)}</span>
@@ -127,8 +127,12 @@ export function ProjectionWidget({ prefs, setPref, alert }: WidgetProps) {
     const yWidth = yAxisWidth(axis.ticks);
     body = (
       <>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {tiles.map((t) =>
+        {/* One strip of figures split by hairlines (no boxes inside the card). */}
+        <div className="flex shrink-0 flex-wrap divide-x divide-border">
+          {tiles
+            // The worst day is worth its own figure only when it is not one of the dated ones.
+            .filter((t) => t.key !== 'worst' || !tiles.some((o) => o.key !== 'worst' && o.date === t.date))
+            .map((t) =>
             t.key === 'worst' ? (
               <Tile key="worst" label="Pior dia do período" saldo={t.saldo} date={t.date} danger={t.saldo < 0} />
             ) : (
