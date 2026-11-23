@@ -83,3 +83,12 @@ export const BR_STATES = [
   'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
 ] as const;
 export type BRState = (typeof BR_STATES)[number];
+
+/**
+ * A company name for display: without the owner's CPF that a MEI's razão social carries at the end
+ * ("Juliana Prado Design 31847759806" → "Juliana Prado Design"). The CPF stays in the registry.
+ */
+export function displayCompanyName(name: string): string {
+  const stripped = name.replace(/\s+(?:\d{11}|\d{3}\.\d{3}\.\d{3}-\d{2})\s*$/, '').trim();
+  return stripped || name.trim();
+}

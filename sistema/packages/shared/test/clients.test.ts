@@ -74,3 +74,13 @@ describe('client schemas', () => {
     for (const feeDueDay of [0, 32, 1.5]) expect(clientInputSchema.safeParse({ ...base, feeDueDay }).success).toBe(false);
   });
 });
+
+describe('displayCompanyName', () => {
+  it('drops the CPF a MEI carries at the end of its razão social', async () => {
+    const { displayCompanyName } = await import('../src');
+    expect(displayCompanyName('Juliana Prado Design 31847759806')).toBe('Juliana Prado Design');
+    expect(displayCompanyName('Juliana Prado Design 318.477.598-06')).toBe('Juliana Prado Design');
+    expect(displayCompanyName('Padaria Pão Quente Ltda')).toBe('Padaria Pão Quente Ltda');
+    expect(displayCompanyName('12345678901')).toBe('12345678901');
+  });
+});

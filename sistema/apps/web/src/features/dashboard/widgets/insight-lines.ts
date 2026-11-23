@@ -3,7 +3,7 @@
 // returns null without data and the card falls back to its short description. Windows other than
 // the chosen month ("Hoje · ", "Próximos 15 dias · ") are added by the card, not here.
 
-import { formatBRL, formatCompactBRL, MONTH_NAMES, type DashboardResponse, type ISODate, type MonthKey, type MonthSummary } from '@effinance/shared';
+import { displayCompanyName, formatBRL, formatCompactBRL, MONTH_NAMES, type DashboardResponse, type ISODate, type MonthKey, type MonthSummary } from '@effinance/shared';
 import type { ProjectionSummary } from '@/components/charts/chart-scale';
 
 const pct = (part: number, total: number) => Math.round((part / total) * 100);
@@ -27,7 +27,7 @@ export function debtorsInsight(debtors: readonly { name: string; amount: number 
   if (debtors.length === 0 || total <= 0) return null;
   const top = [...debtors].sort((a, b) => b.amount - a.amount)[0]!;
   if (debtors.length === 1 || top.amount >= total) return `${top.name} tem todo o vencido`;
-  return `${top.name} concentra ${pct(top.amount, total)}% do vencido`;
+  return `${displayCompanyName(top.name)} concentra ${pct(top.amount, total)}% do vencido`;
 }
 
 /** "A pagar R$ 3.499,90 (4) · a receber R$ 12.565,00 (21)". */

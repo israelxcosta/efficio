@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { CalendarClock, CreditCard, HandCoins, Users } from 'lucide-react';
-import { formatBRL, formatDateBR, todayISO, type DashboardResponse } from '@effinance/shared';
+import { formatBRL, formatDateBR, todayISO, type DashboardResponse, displayCompanyName } from '@effinance/shared';
 import { agingBuckets, rankDebtors, stackSegments, type AgingBucket } from '@/components/charts/chart-scale';
 import { BankLogo } from '@/components/ui/bank-logo';
 import { Button } from '@/components/ui/button';
@@ -208,9 +208,9 @@ export function DebtorsWidget({ alert }: WidgetProps) {
               "@2xl:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_9.5rem] @2xl:gap-x-5 @2xl:[grid-template-areas:'name_bar_value'_'meta_bar_value']",
             )}
           >
-            <span className="flex min-w-0 items-baseline gap-1 [grid-area:name]" title={debtor.name}>
+            <span className="flex min-w-0 items-baseline gap-1 [grid-area:name]" title={displayCompanyName(debtor.name)}>
               <span className="shrink-0 text-micro text-subtle tabular">{i + 1}.</span>
-              <span className={cn('truncate text-[12px] font-semibold', debtor.contactId ? 'text-fg' : 'text-muted')}>{debtor.name}</span>
+              <span className={cn('truncate text-[12px] font-semibold', debtor.contactId ? 'text-fg' : 'text-muted')}>{displayCompanyName(debtor.name)}</span>
             </span>
             <span className="flex items-baseline justify-end gap-2 [grid-area:value]">
               <span className="text-micro text-muted tabular">{shares[i]?.pct ?? 0}%</span>

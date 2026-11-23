@@ -1,6 +1,7 @@
 import { Copy, CreditCard, Ellipsis, FastForward, FileDown, Landmark, Pencil, Plus, ThumbsDown, ThumbsUp, Trash2, UsersRound } from 'lucide-react';
 import {
   FREQUENCY_LABELS,
+  displayCompanyName,
   LATE_FEE_KIND_LABELS,
   TRANSACTION_ORIGIN_LABELS,
   TRANSFER_KIND_LABELS,
@@ -68,10 +69,23 @@ export function OriginBadge({ tx }: { tx: Transaction }) {
  * Rows made by "Gerar honorários" ("Ref. 10/2026", "Folha · 5 empregados") and interest/fine rows of a
  * late payment ("Juros", "Multa"). Tolerates APIs that don't send these fields yet.
  */
+/** "ref. 10/2026" already written in the description (generated fees): no badge repeating it. */
+const REF_IN_TEXT = /\bref\.?\s*\d{2}\/\d{4}/i;
+
+/**
+ * Who the row is about, for display: the company name without a MEI's CPF. Rows generated for a client
+ * (fees, payroll, their interest and discounts) already name it in the description, so they skip it.
+ */
+function rowContactName(tx: Transaction): string | null {
+  if (!tx.contact) return null;
+  if (tx.feeKind || tx.lateFeeOf || tx.discountOf) return null;
+  return displayCompanyName(tx.contact.name);
+}
+
 export function FeeBadges({ tx }: { tx: Transaction }) {
   return (
     <>
-      {tx.feeKind === 'fee' && isMonthKey(tx.feeCompetence) ? (
+      {tx.feeKind === 'fee' && isMonthKey(tx.feeCompetence) && !REF_IN_TEXT.test(tx.description) ? (
         // The description already says "ref. MM/AAAA": narrow rows keep the room for it.
         <Badge tone="neutral" title={`Honorário da competência ${competenceLabel(tx.feeCompetence)}`} className="hidden shrink-0 @md:inline-flex">
           Ref. {competenceLabel(tx.feeCompetence)}
@@ -147,6 +161,9 @@ export function LateFeesBadge({ tx }: { tx: Transaction }) {
 }
 
 const daysText = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`;
+/** Date column of a list: "05/11" in the current year, the full date otherwise (the title has it in full). */
+const columnDate = (date: string) => (date.slice(0, 4) === todayISO().slice(0, 4) ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : formatDateBR(date));
+
 /** "05/10" in the current year, "05/10/25" otherwise (inline labels of narrow rows). */
 const shortDate = (date: string) => {
   const [y, m, d] = date.split('-');
@@ -255,7 +272,7 @@ function TransactionLine({ tx, amount, muted, neutralAmount }: TransactionRowPro
   const isCardPurchase = Boolean(tx.creditCardId) && tx.type !== 'transfer';
   const readOnly = Boolean(actions.readOnlyReason);
   const Main = readOnly ? 'div' : 'button';
-  const who = tx.contact?.name ?? tx.category?.name;
+  const who = (tx.contact ? displayCompanyName(tx.contact.name) : null) ?? tx.category?.name;
   return (
     <div className="@container">
       <div className={cn('group flex h-10 items-center gap-2.5 rounded-lg px-1.5 transition-colors hover:bg-surface-muted', muted && 'opacity-70')}>
@@ -296,7 +313,7 @@ function TransactionLine({ tx, amount, muted, neutralAmount }: TransactionRowPro
 
 function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, density = 'default', neutralAmount }: TransactionRowProps) {
   const compact = density === 'compact';
-  const detail = [tx.category ? `${tx.category.name}${tx.subcategory ? ` · ${tx.subcategory.name}` : ''}` : null, tx.contact?.name]
+  const detail = [tx.category ? `${tx.category.name}${tx.subcategory ? ` · ${tx.subcategory.name}` : ''}` : null, rowContactName(tx)]
     .filter(Boolean)
     .join(' · ');
   const actions = useTransactionActions();
@@ -392,7 +409,9 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
       </div>
       {showDue ? (
         <div className={cn('hidden w-36 text-right', compact ? '@2xl:block' : '@xl:block')}>
-          <p className="text-[13px] font-medium text-fg tabular">{formatDateBR(tx.date)}</p>
+          <p className="text-[13px] font-medium text-fg tabular" title={formatDateBR(tx.date)}>
+            {columnDate(tx.date)}
+          </p>
           <DueLabel tx={tx} beside />
         </div>
       ) : null}
