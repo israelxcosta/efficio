@@ -478,6 +478,8 @@ export interface Transaction {
   effectiveDate: ISODate;
   /** !paid && date < today */
   overdue: boolean;
+  /** When it was checked against the bank statement ("conferido"); cleared if the payment changes. */
+  reconciledAt: string | null;
 
   accountId: string | null;
   /** Transfers only: destination account. */
@@ -1192,6 +1194,8 @@ export interface ReceiptsGroup {
   amount: number;
   count: number;
   share: number;
+  /** Part of `amount` already checked against the statement. */
+  reconciled: number;
 }
 
 /** Money received per day, split by payment method (`none` = not informed). */
@@ -1200,6 +1204,8 @@ export interface ReceiptsDay {
   total: number;
   count: number;
   byMethod: Partial<Record<PaymentMethod | 'none', number>>;
+  /** How many of the day's receipts were checked against the statement. */
+  reconciledCount: number;
 }
 
 export interface ReceiptsReportResponse {
@@ -1209,6 +1215,9 @@ export interface ReceiptsReportResponse {
   count: number;
   /** Amount received without a payment method: the gap to fill before checking the statement. */
   notInformed: number;
+  /** Amount and count already checked against the bank statement ("conferido"). */
+  reconciled: number;
+  reconciledCount: number;
   byMethod: ReceiptsGroup[];
   byAccount: ReceiptsGroup[];
   days: ReceiptsDay[];

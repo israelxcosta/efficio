@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import {
   anticipateInstallmentsSchema,
+  reconcileSchema,
   seriesScopeQuerySchema,
   setPaidSchema,
   transactionInputSchema,
@@ -15,6 +16,7 @@ import {
   deleteTransaction,
   getTransaction,
   listTransactions,
+  reconcileTransactions,
   setPaid,
   updateTransaction,
 } from './service';
@@ -39,6 +41,11 @@ export const transactionRoutes: FastifyPluginAsyncZod = async (app) => {
     '/:id',
     { schema: { params: idParams, querystring: seriesScopeQuerySchema, body: transactionUpdateSchema } },
     async (req) => updateTransaction(req.db, req.workspaceId, req.params.id, req.body, req.query.scope),
+  );
+
+  // Before '/:id/…' routes: "conferido com o extrato" for many rows at once.
+  app.patch('/reconcile', { schema: { body: reconcileSchema } }, async (req) =>
+    reconcileTransactions(req.db, req.workspaceId, req.userId, req.body),
   );
 
   app.patch('/:id/paid', { schema: { params: idParams, body: setPaidSchema } }, async (req) =>

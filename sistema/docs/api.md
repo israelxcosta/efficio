@@ -66,7 +66,8 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/transactions/:id` | — | `Transaction` |
 | POST | `/api/transactions` | `transactionInputSchema` | `Transaction[]` (201) — todas as ocorrências criadas (e todas as partes, se dividido) |
 | PUT | `/api/transactions/:id?scope=one\|future\|all` | `transactionUpdateSchema` | `Transaction` |
-| PATCH | `/api/transactions/:id/paid` | `setPaidSchema` (`paid`, `paidAt`, `accountId`, `interest`, `fine`, `discount`) | `Transaction` — juros, multa e desconto viram lançamentos vinculados (veja "Juros e multa" e "Desconto por pontualidade") |
+| PATCH | `/api/transactions/reconcile` | `reconcileSchema` (`ids` até 500, `reconciled`) | `{ updated }` — "conferido com o extrato": só lançamentos pagos fora do cartão; a marca sai sozinha (gatilho da migração 0028) se o pagamento for reaberto ou mudar valor, data do pagamento ou conta |
+| PATCH | `/api/transactions/:id/paid` | `setPaidSchema` (`paid`, `paidAt`, `accountId`, `paymentMethod`, `interest`, `fine`, `discount`) | `Transaction` — juros, multa e desconto viram lançamentos vinculados (veja "Juros e multa" e "Desconto por pontualidade") |
 | DELETE | `/api/transactions/:id?scope=one\|future\|all` | — | 204 |
 | POST | `/api/transactions/:id/anticipate` | `anticipateInstallmentsSchema` | `Transaction[]` — parcelas antecipadas |
 | POST | `/api/fee-charges/generate` | `generateFeesSchema` (`competence`, `dryRun`) | `GenerateFeesResponse` (201 se criou algo; 200 na simulação ou sem novidades) — cada item com `dueDate` (dia do cliente) e `discountBps` |
@@ -78,6 +79,7 @@ Erros: `{ error, message, details? }` com status HTTP adequado (400, 401, 402, 4
 | GET | `/api/statement` | `statementQuerySchema` | `StatementResponse` |
 | GET | `/api/dashboard?month=YYYY-MM` | `dashboardQuerySchema` | `DashboardResponse` |
 | GET | `/api/reports/overview` | `overviewReportQuerySchema` | `OverviewReportResponse` |
+| GET | `/api/reports/receipts` | `receiptsReportQuerySchema` (`from`, `to`, `accountId`, `method`, `status=reconciled\|pending`) | `ReceiptsReportResponse` — entradas pela data do recebimento, por forma, conta e dia, com o total conferido com o extrato |
 | GET | `/api/reports/categories` | `categoryReportQuerySchema` | `CategoryReportResponse` |
 | GET | `/api/reports/contacts` | `contactReportQuerySchema` | `ContactReportResponse` |
 | GET | `/api/reports/comparison` | `comparisonReportQuerySchema` | `ComparisonReportResponse` |

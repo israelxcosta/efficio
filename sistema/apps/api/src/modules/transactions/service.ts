@@ -503,6 +503,34 @@ export async function setPaid(
   return getTransaction(db, workspaceId, id);
 }
 
+/**
+ * "Conferido com o extrato": marks paid rows (not card purchases) as checked against the bank statement,
+ * or clears the mark. Ids of unpaid rows or of other workspaces are ignored. A database trigger clears
+ * the mark when the payment changes afterwards (migration 0028).
+ */
+export async function reconcileTransactions(
+  db: DbExecutor,
+  workspaceId: string,
+  userId: string,
+  input: { ids: string[]; reconciled: boolean },
+): Promise<{ updated: number }> {
+  const ids = [...new Set(input.ids)];
+  const rows = await db
+    .update(transactions)
+    .set(input.reconciled ? { reconciledAt: new Date(), reconciledBy: userId } : { reconciledAt: null, reconciledBy: null })
+    .where(
+      and(
+        eq(transactions.workspaceId, workspaceId),
+        inArray(transactions.id, ids),
+        eq(transactions.paid, true),
+        sql`${transactions.creditCardId} is null`,
+        input.reconciled ? sql`${transactions.reconciledAt} is null` : sql`${transactions.reconciledAt} is not null`,
+      ),
+    )
+    .returning({ id: transactions.id });
+  return { updated: rows.length };
+}
+
 /** The interest/fine rows charged on a transaction. */
 function lateFeesOf(workspaceId: string, id: string): SQL {
   return and(eq(transactions.workspaceId, workspaceId), eq(transactions.lateFeeOf, id))!;

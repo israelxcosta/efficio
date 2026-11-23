@@ -159,6 +159,7 @@ export function toTransaction(row: TransactionRow, refs: RefMaps, now: string = 
     paidAt: row.paidAt,
     effectiveDate: effectiveDateOf(row),
     overdue: isOverdue(row, refs, now),
+    reconciledAt: row.reconciledAt?.toISOString() ?? null,
     accountId: row.accountId,
     toAccountId: row.toAccountId,
     creditCardId: row.creditCardId,

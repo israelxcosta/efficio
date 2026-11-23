@@ -23,7 +23,7 @@ describe('receipts CSV', () => {
     } as unknown as Transaction;
     const report = { items: [tx] } as ReceiptsReportResponse;
     const lines = receiptsCsv(report).replace(/^﻿/, '').trim().split('\r\n');
-    expect(lines[0]).toBe('"Recebido em";"Vencimento";"Descrição";"Cliente/contato";"Conta";"Forma de recebimento";"Valor"');
-    expect(lines[1]).toBe('"10/03/2026";"05/03/2026";"Honorários A";"Padaria";"Banco";"Pix";"1000,00"');
+    expect(lines[0]).toBe('"Recebido em";"Vencimento";"Descrição";"Cliente/contato";"Conta";"Forma de recebimento";"Valor";"Conferido com o extrato"');
+    expect(lines[1]).toBe('"10/03/2026";"05/03/2026";"Honorários A";"Padaria";"Banco";"Pix";"1000,00";"Não"');
   });
 });

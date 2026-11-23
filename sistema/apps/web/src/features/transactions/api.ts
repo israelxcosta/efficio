@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  ReconcileInput,
   AnticipateInstallmentsInput,
   SeriesScope,
   SetPaidInput,
@@ -52,6 +53,15 @@ export function useAnticipateInstallments() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: AnticipateInstallmentsInput }) =>
       api<Transaction[]>(`/transactions/${id}/anticipate`, { method: 'POST', body: input }),
+    onSuccess: () => invalidateFinancialData(qc),
+  });
+}
+
+/** "Conferido com o extrato" for many paid rows at once (or clears it). */
+export function useReconcile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReconcileInput) => api<{ updated: number }>('/transactions/reconcile', { method: 'PATCH', body: input }),
     onSuccess: () => invalidateFinancialData(qc),
   });
 }

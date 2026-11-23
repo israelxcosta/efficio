@@ -56,8 +56,8 @@ describe('receipts report', () => {
       ['Caixa', 20000, 1],
     ]);
     expect(r.days).toEqual([
-      { date: '2026-03-10', total: 150000, count: 2, byMethod: { pix: 100000, bank_slip: 50000 } },
-      { date: '2026-03-15', total: 20000, count: 1, byMethod: { none: 20000 } },
+      { date: '2026-03-10', total: 150000, count: 2, byMethod: { pix: 100000, bank_slip: 50000 }, reconciledCount: 0 },
+      { date: '2026-03-15', total: 20000, count: 1, byMethod: { none: 20000 }, reconciledCount: 0 },
     ]);
     expect(r.items.map((t: any) => t.description)).toEqual(['Serviço avulso', 'Honorários B', 'Honorários A']);
     expect(r.truncated).toBe(false);
@@ -96,5 +96,49 @@ describe('receipts report', () => {
     // Every reports route is behind financeOnly; a member without it gets 403 (covered for all
     // reports in finance-access.test.ts). Here: the route exists and answers for the owner.
     expect((await c.get('/reports/receipts?from=2026-03-01&to=2026-03-31')).status).toBe(200);
+  });
+
+  it('marks receipts as checked against the statement ("conferido") and reports what is left', async () => {
+    const march = await c.get('/reports/receipts?from=2026-03-01&to=2026-03-31');
+    const [avulso, b, a] = march.body.items as [{ id: string }, { id: string }, { id: string }];
+    expect(march.body.reconciled).toBe(0);
+
+    const res = await c.patch('/transactions/reconcile', { ids: [a.id, b.id], reconciled: true });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ updated: 2 });
+    // Again: nothing changes.
+    expect((await c.patch('/transactions/reconcile', { ids: [a.id], reconciled: true })).body).toEqual({ updated: 0 });
+
+    const r = (await c.get('/reports/receipts?from=2026-03-01&to=2026-03-31')).body;
+    expect([r.reconciled, r.reconciledCount]).toEqual([150000, 2]);
+    expect(r.days.map((d: any) => [d.date, d.reconciledCount, d.count])).toEqual([['2026-03-10', 2, 2], ['2026-03-15', 0, 1]]);
+    expect(r.byAccount.map((g: any) => [g.label, g.reconciled])).toEqual([['Banco', 150000], ['Caixa', 0]]);
+    expect(r.items.find((t: any) => t.id === a.id).reconciledAt).toEqual(expect.any(String));
+    const pending = (await c.get('/reports/receipts?from=2026-03-01&to=2026-03-31&status=pending')).body;
+    expect(pending.items.map((t: any) => t.id)).toEqual([avulso.id]);
+
+    // Changing what was checked clears the mark (trigger): reopening, or another amount.
+    await c.patch(`/transactions/${a.id}/paid`, { paid: false });
+    await c.patch(`/transactions/${a.id}/paid`, { paid: true, paidAt: '2026-03-10' });
+    expect((await c.get(`/transactions/${a.id}`)).body.reconciledAt).toBeNull();
+    expect((await c.get(`/transactions/${b.id}`)).body.reconciledAt).toEqual(expect.any(String));
+
+    // Clearing by hand.
+    expect((await c.patch('/transactions/reconcile', { ids: [b.id], reconciled: false })).body).toEqual({ updated: 1 });
+    expect((await c.get(`/transactions/${b.id}`)).body.reconciledAt).toBeNull();
+  });
+
+  it('ignores pending rows and rows of other workspaces when reconciling', async () => {
+    const pending = (await c.get('/transactions?status=pending')).body;
+    const list = Array.isArray(pending) ? pending : pending.items;
+    const open = list.find((t: any) => !t.paid);
+    const other = await registerUser(app);
+    const otherAcc = await createAccount(other, { name: 'Outra', initialBalance: 0 });
+    const foreign = (
+      await other.post('/transactions', { type: 'income', description: 'Alheio', amount: 1000, date: '2026-03-02', accountId: otherAcc, paid: true })
+    ).body[0];
+    expect((await c.patch('/transactions/reconcile', { ids: [open.id, foreign.id], reconciled: true })).body).toEqual({ updated: 0 });
+    expect((await other.get(`/transactions/${foreign.id}`)).body.reconciledAt).toBeNull();
+    expect((await c.patch('/transactions/reconcile', { ids: [], reconciled: true })).status).toBe(400);
   });
 });

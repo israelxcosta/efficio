@@ -22,6 +22,10 @@ const receivedOn = sql<ISODate>`coalesce(${transactions.paidAt}, ${transactions.
 /** Same rule as the overview: a card purchase counts as credit card when no method was chosen. */
 const methodOf = sql<PaymentMethod | null>`coalesce(${transactions.paymentMethod}, case when ${transactions.creditCardId} is not null then 'credit_card' end)`;
 
+/** Amount / count of the rows checked against the statement ("conferido com o extrato"). */
+const reconciledSum = sql<number>`coalesce(sum(${transactions.amount}) filter (where ${transactions.reconciledAt} is not null), 0)`.mapWith(Number);
+const reconciledCountOf = sql<number>`count(*) filter (where ${transactions.reconciledAt} is not null)`.mapWith(Number);
+
 /**
  * Money received in a range by the day it came in, to check against the bank statement: income that
  * is paid (receipts, settled fees, interest and fines received), split by payment method, account and
@@ -39,18 +43,19 @@ export async function receiptsReport(db: DbExecutor, workspaceId: string, q: Rec
     between(receivedOn, q.from, q.to),
     q.accountId ? eq(transactions.accountId, q.accountId) : undefined,
     q.method === 'none' ? sql`${methodOf} is null` : q.method ? sql`${methodOf} = ${q.method}` : undefined,
+    q.status === 'reconciled' ? sql`${transactions.reconciledAt} is not null` : q.status === 'pending' ? sql`${transactions.reconciledAt} is null` : undefined,
   ];
   const where = and(...filters);
 
   const [byMethodRows, byAccountRows, byDayRows, rows, accountRows] = await Promise.all([
-    db.select({ key: methodOf, amount: sumOf(transactions.amount), count: countAll() }).from(transactions).where(where).groupBy(sql`1`),
+    db.select({ key: methodOf, amount: sumOf(transactions.amount), count: countAll(), reconciled: reconciledSum }).from(transactions).where(where).groupBy(sql`1`),
     db
-      .select({ key: transactions.accountId, amount: sumOf(transactions.amount), count: countAll() })
+      .select({ key: transactions.accountId, amount: sumOf(transactions.amount), count: countAll(), reconciled: reconciledSum })
       .from(transactions)
       .where(where)
       .groupBy(transactions.accountId),
     db
-      .select({ date: receivedOn, method: methodOf, amount: sumOf(transactions.amount), count: countAll() })
+      .select({ date: receivedOn, method: methodOf, amount: sumOf(transactions.amount), count: countAll(), reconciledCount: reconciledCountOf })
       .from(transactions)
       .where(where)
       .groupBy(sql`1`, sql`2`)
@@ -76,6 +81,7 @@ export async function receiptsReport(db: DbExecutor, workspaceId: string, q: Rec
       amount: r.amount,
       count: r.count,
       share: share(r.amount),
+      reconciled: r.reconciled,
     }))
     .sort(byAmount);
 
@@ -87,14 +93,16 @@ export async function receiptsReport(db: DbExecutor, workspaceId: string, q: Rec
       amount: r.amount,
       count: r.count,
       share: share(r.amount),
+      reconciled: r.reconciled,
     }))
     .sort(byAmount);
 
   const days = new Map<ISODate, ReceiptsReportResponse['days'][number]>();
   for (const r of byDayRows) {
-    const day = days.get(r.date) ?? { date: r.date, total: 0, count: 0, byMethod: {} };
+    const day = days.get(r.date) ?? { date: r.date, total: 0, count: 0, byMethod: {}, reconciledCount: 0 };
     day.total += r.amount;
     day.count += r.count;
+    day.reconciledCount += r.reconciledCount;
     const key = r.method ?? 'none';
     day.byMethod[key] = (day.byMethod[key] ?? 0) + r.amount;
     days.set(r.date, day);
@@ -107,6 +115,8 @@ export async function receiptsReport(db: DbExecutor, workspaceId: string, q: Rec
     total,
     count,
     notInformed: byMethod.find((m) => m.key === null)?.amount ?? 0,
+    reconciled: byMethodRows.reduce((a, r) => a + r.reconciled, 0),
+    reconciledCount: byDayRows.reduce((a, r) => a + r.reconciledCount, 0),
     byMethod,
     byAccount,
     days: [...days.values()],

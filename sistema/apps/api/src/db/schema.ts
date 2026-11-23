@@ -814,6 +814,12 @@ export const transactions = pgTable(
      */
     feeDiscountBps: integer(),
     discountOf: uuid(),
+    /**
+     * Migration 0028: "conferido com o extrato" (simple reconciliation). Only a paid row can be
+     * reconciled; reopening the payment clears it. Who did it is also in the audit log.
+     */
+    reconciledAt: timestamptz(),
+    reconciledBy: uuid().references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -953,6 +959,8 @@ export const transactions = pgTable(
     ),
     // One discount per receivable; also the index the cascade from the receivable uses.
     uniqueIndex('transactions_discount_of_uq').on(t.discountOf).where(sql`${t.discountOf} is not null`),
+    index('transactions_reconciled_by_idx').on(t.reconciledBy).where(sql`${t.reconciledBy} is not null`),
+    check('transactions_reconciled_chk', sql`(${t.reconciledAt} is null or ${t.paid}) and (${t.reconciledBy} is null or ${t.reconciledAt} is not null)`),
   ],
 );
 

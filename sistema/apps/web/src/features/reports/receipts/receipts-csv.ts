@@ -13,9 +13,9 @@ export function csvCell(value: string | number | null | undefined): string {
 /** Cents as "1234,56" (no thousands separator, so spreadsheets read it as a number). */
 export const csvMoney = (cents: number) => (cents / 100).toFixed(2).replace('.', ',');
 
-/** The receipts of the report as CSV: date received, description, contact, account, method, amount. */
+/** The receipts of the report as CSV: date received, description, contact, account, method, amount, checked. */
 export function receiptsCsv(report: ReceiptsReportResponse): string {
-  const head = ['Recebido em', 'Vencimento', 'Descrição', 'Cliente/contato', 'Conta', 'Forma de recebimento', 'Valor'];
+  const head = ['Recebido em', 'Vencimento', 'Descrição', 'Cliente/contato', 'Conta', 'Forma de recebimento', 'Valor', 'Conferido com o extrato'];
   const lines = report.items.map((t) =>
     [
       formatDateBR(t.paidAt ?? t.date),
@@ -25,6 +25,7 @@ export function receiptsCsv(report: ReceiptsReportResponse): string {
       t.account?.name ?? '',
       t.paymentMethod ? PAYMENT_METHOD_LABELS[t.paymentMethod] : 'Não informado',
       csvMoney(t.amount),
+      t.reconciledAt ? 'Sim' : 'Não',
     ]
       .map(csvCell)
       .join(';'),

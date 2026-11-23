@@ -184,5 +184,7 @@ A fazer:
 2. Relatório "Entradas por forma de recebimento": período pela **data do recebimento** (`paidAt`), totais por
    forma e por conta, com a lista de lançamentos de cada grupo e exportação (CSV/PDF), e o saldo do extrato
    da conta no período ao lado para conferir (diferença destacada).
-3. Opcional: marcar lançamentos como "conferido com o extrato" (conciliação simples), aproveitando as
-   importações OFX/Open Finance que já existem.
+3. ~~Marcar lançamentos como "conferido com o extrato" (conciliação simples)~~ — **feito em 23/11/2026**:
+   caixa em cada recebimento, "Conferir dia" e "Conferir os N exibidos" em Relatórios → Recebimentos,
+   filtro Conferidos/A conferir, total conferido por conta e coluna no CSV. A marca sai sozinha se o
+   pagamento mudar (migração 0028). Próximo passo possível: sugerir a conferência a partir do OFX/Open Finance.

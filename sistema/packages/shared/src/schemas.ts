@@ -820,6 +820,17 @@ export type FeeAdjustmentListQuery = z.input<typeof feeAdjustmentListQuerySchema
 /** Late-payment extra in cents (0 = none). */
 const lateFeeAmountSchema = z.int({ message: 'Valor inválido' }).min(0, { message: 'Valor inválido' }).max(100_000_000_000);
 
+/**
+ * PATCH /transactions/reconcile: marks paid rows as checked against the bank statement ("conferido com o
+ * extrato") or clears the mark. Rows that are not paid, card purchases and other workspaces' ids are
+ * ignored (the response says how many changed).
+ */
+export const reconcileSchema = z.object({
+  ids: z.array(idSchema).min(1).max(500),
+  reconciled: z.boolean(),
+});
+export type ReconcileInput = z.infer<typeof reconcileSchema>;
+
 /** Quick 👍/👎 toggle. */
 export const setPaidSchema = z.object({
   paid: z.boolean(),
@@ -975,6 +986,8 @@ export const receiptsReportQuerySchema = z.object({
   ...reportRange,
   accountId: idSchema.optional(),
   method: z.enum([...PAYMENT_METHODS, 'none']).optional(),
+  /** Checked against the statement or not. */
+  status: z.enum(['reconciled', 'pending']).optional(),
 });
 export type ReceiptsReportQuery = z.input<typeof receiptsReportQuerySchema>;
 export type OverviewReportQuery = z.input<typeof overviewReportQuerySchema>;
