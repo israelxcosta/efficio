@@ -27,9 +27,13 @@ Na prática:
 
 - **Portal do cliente** (§2): adiado; vale a diretriz acima.
 - **Salvar documentos no OneDrive e enviá-los** por e-mail/WhatsApp (§1): adiado.
-- **Cobrança com baixa automática** (boleto registrado, Pix com vencimento/cobv, Pix Automático) (§3): adiada.
-  O **Pix estático com o valor certo** (QR Code e copia e cola gerados pelo sistema com a chave do escritório)
-  entra agora: o valor vai dentro do código e o cliente não digita nada.
+- **Boleto e Pix** (§3): adiados para uma atualização futura, inclusive o Pix estático.
+  - O **Pix estático com o valor certo** (QR Code e copia e cola gerados com a chave aleatória do escritório; o valor
+    vai dentro do código e o cliente não digita nada) **já foi feito e guardado**: commit `2609ace`, revertido em
+    `ca47711`. Para reativar: `git revert ca47711`. Inclui `buildPixPayload` (shared, testado contra o exemplo
+    do manual do Banco Central), `GET /office/pix-receiver` (permissão `finance`), "Cobrar por Pix" no menu do
+    recebível e a opção "Incluir Pix copia e cola" na mensagem de cobrança.
+  - Cobrança com baixa automática (boleto registrado, Pix com vencimento/cobv, Pix Automático) fica para depois.
 
 ---
 
