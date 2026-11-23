@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { TaskSelectionBar, bulkSelectable } from '../components/bulk-tasks';
 import { DensityToggle } from '@/components/ui/density-toggle';
 import { useListDensity } from '@/lib/list-density';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ChevronLeft, ChevronRight, CircleCheck, ListChecks, SearchX } from 'lucide-react';
-import { TASK_DUE_BUCKET_LABELS, todayISO } from '@effinance/shared';
+import { TASK_DUE_BUCKET_LABELS, todayISO, type Task } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -47,6 +49,31 @@ export default function TasksPage() {
   const preference = useMemo(() => readTaskView(viewKey), [viewKey]);
   const options = useTaskOptions();
   const [density] = useListDensity();
+  // Bulk selection of open tasks ("Selecionar"): conclude or reassign several at once.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  // A render function (not a component defined here), so the rows are not remounted on every render.
+  const selectable = (key: string, task: Task, children: ReactNode) =>
+    selecting ? (
+      <div key={key} className="flex items-center gap-1 pl-2">
+        <Checkbox
+          aria-label={`Selecionar ${task.title}`}
+          checked={selected.has(task.id)}
+          disabled={!bulkSelectable(task)}
+          onCheckedChange={(on) =>
+            setSelected((cur) => {
+              const next = new Set(cur);
+              if (on) next.add(task.id);
+              else next.delete(task.id);
+              return next;
+            })
+          }
+        />
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    ) : (
+      <Fragment key={key}>{children}</Fragment>
+    );
   const today = options.data?.today ?? todayISO();
   const parsed = parseTaskFilters(params, preference);
   // "Meu departamento" does not exist for a member without department.
@@ -58,6 +85,7 @@ export default function TasksPage() {
   const navigate = useNavigate();
   const isAdmin = usePermissions().can('registry');
   const data = list.data;
+  const openOnPage = (data?.items ?? []).filter(bulkSelectable);
   const filterCount = activeFilterCount(filters);
   // Occurrences are listed aggregated (not paginated): they come on the first page of a flat list.
   const flatOccurrences = data && filters.page === 1 ? data.occurrences.filter((o) => o.total > 0) : [];
@@ -199,10 +227,29 @@ export default function TasksPage() {
       ) : (
         <Card className="@container overflow-clip">
           <div className="sticky top-[72px] z-[2] hidden items-center gap-3 border-b border-border bg-surface/95 px-5.5 py-2.5 text-xs font-medium text-muted backdrop-blur @xl:flex">
+            {selecting ? (
+              <Checkbox
+                className="-mr-2 -ml-2.5"
+                aria-label="Selecionar todas as abertas da página"
+                checked={openOnPage.length > 0 && openOnPage.every((t) => selected.has(t.id))}
+                onCheckedChange={(on) => setSelected(on ? new Set(openOnPage.map((t) => t.id)) : new Set())}
+              />
+            ) : null}
             <span className="w-9" aria-hidden />
             <span className="flex flex-1 items-center gap-3">
               Tarefa
-              <DensityToggle className="mr-2 ml-auto" />
+              <Button
+                variant={selecting ? 'soft' : 'ghost'}
+                size="xs"
+                className="ml-auto"
+                onClick={() => {
+                  setSelecting((v) => !v);
+                  setSelected(new Set());
+                }}
+              >
+                {selecting ? 'Cancelar seleção' : 'Selecionar'}
+              </Button>
+              <DensityToggle className="mr-2" />
             </span>
             <span className="hidden w-44 @3xl:block">Cliente</span>
             {filters.scope !== 'mine' ? <span className="hidden w-36 @2xl:block">Responsável</span> : null}
@@ -234,15 +281,16 @@ export default function TasksPage() {
                       >
                         {g.items.map((item) =>
                           item.type === 'task' ? (
-                            <TaskRow
-                              key={item.key}
-                              task={item.task}
-                              today={today}
-                              more={item.more}
-                              hideAssignee={filters.scope === 'mine'}
-                              showDepartment={filters.scope === 'all'}
-                              muted={item.task.status === 'done' || item.task.status === 'canceled'}
-                            />
+                            selectable(item.key, item.task, (
+                              <TaskRow
+                                task={item.task}
+                                today={today}
+                                more={item.more}
+                                hideAssignee={filters.scope === 'mine'}
+                                showDepartment={filters.scope === 'all'}
+                                muted={item.task.status === 'done' || item.task.status === 'canceled'}
+                              />
+                            ))
                           ) : (
                             <RecurringOccurrenceRow
                               key={item.key}
@@ -260,9 +308,9 @@ export default function TasksPage() {
                         {flatOccurrences.map((o) => (
                           <RecurringOccurrenceRow key={`${o.recurringTaskId}:${o.periodKey}`} occurrence={o} today={today} mine={filters.scope === 'mine'} showDepartment={filters.scope !== 'department'} />
                         ))}
-                        {data!.items.map((t) => (
-                          <TaskRow key={t.id} task={t} today={today} hideAssignee={filters.scope === 'mine'} showDepartment={filters.scope === 'all'} />
-                        ))}
+                        {data!.items.map((t) =>
+                          selectable(t.id, t, <TaskRow task={t} today={today} hideAssignee={filters.scope === 'mine'} showDepartment={filters.scope === 'all'} />),
+                        )}
                       </>
                     )}
               </div>
@@ -288,6 +336,9 @@ export default function TasksPage() {
                 </Button>
               </div>
             </div>
+          ) : null}
+          {selecting ? (
+            <TaskSelectionBar tasks={(data?.items ?? []).filter((t) => selected.has(t.id) && bulkSelectable(t))} onClear={() => setSelected(new Set())} />
           ) : null}
         </Card>
       )}
