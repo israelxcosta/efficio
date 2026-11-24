@@ -12,12 +12,11 @@ import { gateFor, usePermissions } from '@/features/auth/permissions';
 import { ROLE_LABELS } from '@/features/auth/roles';
 import { columnsForWidth } from '@/features/dashboard/layout/layout';
 import { WidgetCard } from '@/features/dashboard/layout/widget-card';
-import { SpotlightCard } from '@/components/ui/spotlight-card';
-import { PageWithAside } from '@/components/layout/page-with-aside';
+import { SpotlightCard, SpotlightRow } from '@/components/ui/spotlight-card';
 import { useElementSize } from '@/lib/use-element-size';
 import { useUpdatedLabel } from '@/lib/updated-label';
 import { useMyOverview, useTaskActivity, useTaskHome, useTaskNotes, useTaskOptions, useTasks } from '../api';
-import { DashColsContext, DashSlot, dashGridClass } from '../components/dash-slot';
+import { DashColsContext, SortableBoard } from '../components/dash-slot';
 import { MiniCalendar } from '../components/mini-calendar';
 import {
   ClientsPendingCardView,
@@ -92,7 +91,7 @@ export default function MyAreaPage() {
   const obligation = home.data?.obligations.items.find((x) => x.pending > 0) ?? null;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="calm-text flex flex-col gap-6">
       <PageHeader
         title={user ? greeting(officeHour(new Date()), user.name) : 'Minha área'}
         description={myAreaDescription(today, role, department?.name ?? null, overview.dataUpdatedAt ? updated : '')}
@@ -114,14 +113,32 @@ export default function MyAreaPage() {
         }
       />
 
-      <PageWithAside
-        spotlight={<MySpotlight overview={o} loading={!o && !overview.isError} onOpen={openTask} />}
-        aside={
+      <SpotlightRow spotlight={<MySpotlight overview={o} loading={!o && !overview.isError} onOpen={openTask} />}>
+        {overview.isError && !o ? <ErrorState error={overview.error} onRetry={() => overview.refetch()} /> : <MetricStrip cells={cells} />}
+      </SpotlightRow>
+
+      <div ref={page.ref} className="min-w-0">
+        <DashColsContext.Provider value={cols}>
+          <SortableBoard
+            storeKey={`effinance.tasks.my-area-cards.v1:${workspace?.id ?? ''}:${user?.id ?? ''}`}
+            label="Cards da Minha área"
+            cards={[
+              { id: 'mine', title: 'Minhas tarefas', rows: 4, node: (
           <>
-            <div className="h-[300px]">
-            {o ? <ForYouCardView insights={forYou.shown} hidden={forYou.hidden} /> : <CardLoading title="Para você" />}
-            </div>
-            <div className="min-h-[392px]">
+            <MyTasksCardView
+              data={mine.data ? { items: mine.data.items, occurrences: mine.data.occurrences, total: mine.data.total } : undefined}
+              loading={mine.isPending}
+              error={mine.isError ? mine.error : null}
+              onRetry={() => mine.refetch()}
+              today={today}
+              onNewTask={() => newTask()}
+              blockedReason={blocked}
+            />
+          </>
+        ) },
+              { id: 'for-you', title: 'Para você', rows: 4, node: o ? <ForYouCardView insights={forYou.shown} hidden={forYou.hidden} /> : <CardLoading title="Para você" /> },
+              { id: 'calendar', title: 'Calendário', rows: 4, grow: true, node: (
+          <>
             <WidgetCard
               title="Calendário"
               subtitle={calendarFinding}
@@ -153,26 +170,10 @@ export default function MyAreaPage() {
                 onFinding={setCalendarFinding}
               />
             </WidgetCard>
-            </div>
           </>
-        }
-      >
-        <div ref={page.ref} className="flex min-w-0 flex-col gap-6">
-          {overview.isError && !o ? <ErrorState error={overview.error} onRetry={() => overview.refetch()} /> : <MetricStrip cells={cells} />}
-          <DashColsContext.Provider value={cols}>
-            <div className={dashGridClass(cols)}>
-              <DashSlot rows={4} span={{ wide: 12, medium: 2 }}>
-            <MyTasksCardView
-              data={mine.data ? { items: mine.data.items, occurrences: mine.data.occurrences, total: mine.data.total } : undefined}
-              loading={mine.isPending}
-              error={mine.isError ? mine.error : null}
-              onRetry={() => mine.refetch()}
-              today={today}
-              onNewTask={() => newTask()}
-              blockedReason={blocked}
-            />
-              </DashSlot>
-              <DashSlot rows={4} span={{ wide: 6, medium: 1 }}>
+        ) },
+              { id: 'rhythm', title: 'Seu ritmo', rows: 4, node: (
+          <>
             {o ? (
               <RhythmCardView
                 overview={o}
@@ -187,8 +188,10 @@ export default function MyAreaPage() {
             ) : (
               <CardLoading title="Seu ritmo" />
             )}
-              </DashSlot>
-              <DashSlot rows={4} span={{ wide: 6, medium: 1 }}>
+          </>
+        ) },
+              { id: 'department', title: 'Meu departamento', rows: 4, node: (
+          <>
             <MyDepartmentCardView
               home={home.data && !department ? { ...home.data, view: 'mine' } : home.data}
               canRegistry={permissions.can('registry')}
@@ -201,24 +204,31 @@ export default function MyAreaPage() {
                 ) : undefined
               }
             />
-              </DashSlot>
-          <DashSlot rows={3} span={{ wide: 4, medium: 1 }}>
+          </>
+        ) },
+              { id: 'notes', title: 'Anotações', rows: 3, node: (
+          <>
             <NotesCardView notes={notes.data} onOpen={editNote} onNew={newNote} onAll={openNotes} blockedReason={blocked} />
-          </DashSlot>
-          <DashSlot rows={3} span={{ wide: 4, medium: 1 }}>
+          </>
+        ) },
+              { id: 'clients', title: 'Clientes com mais pendências', rows: 3, node: (
+          <>
             <ClientsPendingCardView
               rows={department ? home.data?.byClient : mine.data?.summary.openByClient}
               department={department?.name ?? null}
               loading={department ? home.isPending : mine.isPending}
             />
-          </DashSlot>
-          <DashSlot rows={3} span={{ wide: 4, medium: 2 }}>
+          </>
+        ) },
+              { id: 'comments', title: 'Comentários recentes', rows: 3, node: (
+          <>
             <RecentCommentsCardView items={activity.data} onOpen={openTask} />
-          </DashSlot>
-            </div>
-          </DashColsContext.Provider>
-        </div>
-      </PageWithAside>
+          </>
+        ) },
+            ]}
+          />
+        </DashColsContext.Provider>
+      </div>
     </div>
   );
 }
@@ -246,23 +256,17 @@ function MySpotlight({ overview, loading, onOpen }: { overview: TaskMyOverviewRe
         label="Seu dia"
         title={open.dueToday ? `${open.dueToday} ${open.dueToday === 1 ? 'tarefa vence' : 'tarefas vencem'} hoje` : 'Nada atrasado'}
         caption={open.next7Days ? `${open.next7Days} nos próximos 7 dias` : 'Nenhuma tarefa sua passou do prazo.'}
-        action={{ label: 'Ver minhas tarefas', to: '/tarefas?escopo=minhas' }}
+        to="/tarefas?escopo=minhas"
       />
     );
   }
   return (
     <SpotlightCard
-      label={open.overdue > 1 ? `Atrasada · a mais antiga de ${open.overdue}` : 'Atrasada'}
+      label={open.overdue > 1 ? `Suas atrasadas · a mais antiga de ${open.overdue}` : 'Sua atrasada'}
       badge={`há ${oldest.daysOverdue} ${oldest.daysOverdue === 1 ? 'dia' : 'dias'}`}
-      badgeDanger
       title={oldest.title}
       caption={`${oldest.client ? `${oldest.client.name} · ` : ''}venceu em ${formatDateBR(oldest.dueDate)}`}
-      rows={[
-        { label: 'Vencem hoje', value: open.dueToday },
-        { label: 'Próximos 7 dias', value: open.next7Days },
-        ...(open.waitingClient ? [{ label: 'Aguardando cliente', value: open.waitingClient }] : []),
-      ]}
-      action={{ label: 'Abrir tarefa', onClick: () => onOpen(oldest.id) }}
+      onClick={() => onOpen(oldest.id)}
     />
   );
 }

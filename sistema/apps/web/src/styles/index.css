@@ -573,3 +573,11 @@ html:root > body {
   padding-top: 0.375rem;
   padding-bottom: 0.375rem;
 }
+
+/*
+ * Dashboards (Início, Minha área, Painel financeiro): colour lives on the marks only (bars, dots, the
+ * solid card). Figures and words keep the ink of the rest of the page, red and amber included.
+ */
+.calm-text :is(.text-danger, .text-warning) {
+  color: var(--app-fg);
+}

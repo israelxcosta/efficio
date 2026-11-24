@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { PageWithAside } from '@/components/layout/page-with-aside';
-import { AccountsAsideCard, OverdueSpotlight } from '../components/finance-aside';
+import { SpotlightRow } from '@/components/ui/spotlight-card';
+import { OverdueSpotlight } from '../components/finance-aside';
 import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { ArrowUpToLine, Check, ChevronLeft, ChevronRight, LayoutGrid, SlidersHorizontal, Sparkles } from 'lucide-react';
@@ -126,7 +126,7 @@ export default function DashboardPage() {
   const setMonth = (y: number, m: number) => setActiveMonth(`${y}-${String(m).padStart(2, '0')}`);
 
   return (
-    <div className="@container flex flex-col gap-6">
+    <div ref={ref} className="calm-text @container flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1 basis-48">
           <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-fg">Painel financeiro</h1>
@@ -210,12 +210,7 @@ export default function DashboardPage() {
           {tab === 'insights' ? (
             <InsightsTab month={month} dashboard={d} loading={dashboard.isPending} />
           ) : (
-            <PageWithAside spotlight={<OverdueSpotlight />} aside={<AccountsAsideCard d={d} loading={dashboard.isPending} />}>
-              {/* The board measures this column (beside the 300px right column), not the page. */}
-              <div ref={ref} className="flex min-w-0 flex-col gap-6">
-                <Overview d={d} loading={dashboard.isPending} month={month} kind={kind} width={width} editing={editing} onCustomize={() => startEditing(true)} />
-              </div>
-            </PageWithAside>
+            <Overview d={d} loading={dashboard.isPending} month={month} kind={kind} width={width} editing={editing} onCustomize={() => startEditing(true)} />
           )}
         </div>
       )}
@@ -248,7 +243,10 @@ function Overview({ d, loading, month, kind, width, editing, onCustomize }: Over
   const alerts = useDashboardAlerts({ d, kind, layout, prefs });
   return (
     <>
-      <DashboardKpis d={d} loading={loading} />
+      {/* First row: the number strip and the solid card beside it; the board below keeps the full width. */}
+      <SpotlightRow spotlight={<OverdueSpotlight />}>
+        <DashboardKpis d={d} loading={loading} />
+      </SpotlightRow>
       <DashboardBoard
         width={width}
         month={month}

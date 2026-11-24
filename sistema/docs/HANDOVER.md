@@ -51,14 +51,15 @@ Estado do projeto para quem continuar o trabalho (pessoa ou agente). Leia junto 
 ## 2b. Rodada de 23–24/11/2026
 
 - Conferido com o extrato (migração 0028), M1–M8 de design (pago/pendente, densidade, CSV, lote…).
-- **Redesign "Seu dia"** (aprovado pelo dono; ver `design-system.md` §7): `PageWithAside`, `SpotlightCard`,
-  `StackedBar`, `MiniStat solid` e o token `--app-on-solid-danger`.
-  - Gestão: Início com filtros fixos (departamento + **competência**), coluna "Escritório hoje"
-    (atrasadas por departamento, agenda, responsáveis, pedidos dos clientes) e vencimentos numa tabela;
-    Minha área com a atrasada mais antiga no sólido; Clientes com coluna Tarefas e o cliente que pede
-    atenção; Relatório de tarefas com "Por responsável" numa linha e ordenação no título das colunas.
-  - Financeiro: Painel com coluna (inadimplência + saldo) fora da grade personalizável; célula sólida de
-    Vencido (Receber/Pagar) e de Conferido (Recebimentos).
+- **Redesign "Seu dia"** (ver `design-system.md` §7). Revisto no mesmo dia: a coluna à direita saiu; fica o
+  card sólido na primeira linha (`SpotlightCard`/`SpotlightRow`), os cards do Início e da Minha área em duas
+  colunas que se arrastam (`SortableBoard`), texto sem vermelho nos painéis (`.calm-text`), sem o botão
+  "Nova tarefa" no topo do Início (fica na barra inferior). Também: `StackedBar` e `MiniStat solid`.
+  - Gestão: Início com filtros fixos (departamento + **competência**: uma competência passada é contada no
+    seu último dia, `asOf`), vencimentos numa tabela e o card "Pedidos dos clientes"; Clientes com coluna
+    Tarefas; Relatório de tarefas com "Por responsável" numa linha e ordenação no título das colunas.
+  - Financeiro: card sólido de inadimplência ao lado dos números do Painel; célula sólida de Vencido
+    (Receber/Pagar) e de Conferido (Recebimentos).
   - Tarefas: campo **"Pedido por"** (`requestChannel`, migração 0029), pronto para o portal.
 - Relatórios dessas decisões: artifacts "Redesign Seu dia — relatório consolidado" e "Análise de design".
 

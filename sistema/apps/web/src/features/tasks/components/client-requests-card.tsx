@@ -1,61 +1,49 @@
 import { TASK_REQUEST_CHANNEL_LABELS } from '@effinance/shared';
-import { AsideCard } from '@/components/layout/page-with-aside';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn, pluralize } from '@/lib/utils';
+import { BodyEmpty, ListSkeleton } from '@/features/dashboard/widgets/shared';
+import { WidgetCard } from '@/features/dashboard/layout/widget-card';
+import { pluralize } from '@/lib/utils';
 import { useTasks } from '../api';
 import { useTaskSheetLinks } from '../task-links';
+import { tasksHref } from '../url-state';
+import { SlotList } from './dash-slot';
 
-// "Pedidos dos clientes" (right column of the Início): open tasks with "Pedido por" (WhatsApp, e-mail,
-// phone…); the client portal will add its own requests there.
-
-/** Open tasks a client asked for ("Pedido por"): the portal's requests will land here too. */
+/**
+ * "Pedidos dos clientes" (a card of the Início): open tasks with "Pedido por" (WhatsApp, e-mail,
+ * phone…); the client portal will add its own requests here.
+ */
 export function ClientRequestsCard() {
-  const requests = useTasks({
-    scope: 'all',
-    situation: 'open',
-    requestChannel: 'any',
-    page: 1,
-    pageSize: 5,
-  });
+  const requests = useTasks({ scope: 'all', situation: 'open', requestChannel: 'any', page: 1, pageSize: 8 });
   const { openTask } = useTaskSheetLinks();
+  const data = requests.data;
   return (
-    <AsideCard
+    <WidgetCard
       title="Pedidos dos clientes"
-      meta={requests.data ? pluralize(requests.data.total, 'aberto', 'abertos') : undefined}
+      subtitle={data ? (data.total ? `${pluralize(data.total, 'pedido aberto', 'pedidos abertos')}` : 'Nenhum pedido em aberto') : 'Tarefas com “Pedido por”'}
+      info="Tarefas abertas que o cliente pediu (campo “Pedido por” na tarefa: WhatsApp, e-mail, telefone…). Os pedidos do futuro portal do cliente também entram aqui."
     >
-      {!requests.data ? (
-        <Skeleton className="h-16 w-full" />
-      ) : requests.data.items.length === 0 ? (
-        <p className="py-1 text-caption text-muted">
-          Nenhum pedido em aberto. Marque “Pedido por” na tarefa quando o cliente pedir por
-          WhatsApp, e-mail ou telefone.
-        </p>
+      {!data ? (
+        <ListSkeleton rowClassName="h-9" />
+      ) : data.items.length === 0 ? (
+        <BodyEmpty title="Nenhum pedido em aberto" description="Marque “Pedido por” na tarefa quando o cliente pedir por WhatsApp, e-mail ou telefone." />
       ) : (
-        <ul className="flex flex-col">
-          {requests.data.items.map((t) => (
-            <li key={t.id} className="border-t border-surface-muted first:border-t-0">
-              <button
-                type="button"
-                onClick={() => openTask(t.id)}
-                className="block w-full py-2 text-left"
-              >
-                <span
-                  className={cn(
-                    'block truncate text-caption font-semibold text-fg',
-                    t.overdue && 'text-danger',
-                  )}
-                >
-                  {t.title}
-                </span>
-                <span className="block truncate text-mini text-muted">
-                  {t.client?.name ?? 'Interna'}
-                  {t.requestChannel ? ` · ${TASK_REQUEST_CHANNEL_LABELS[t.requestChannel]}` : ''}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <SlotList
+          cap={5}
+          items={data.items}
+          total={data.total}
+          getKey={(t) => t.id}
+          moreLabel={['pedido', 'pedidos']}
+          moreHref={tasksHref({ scope: 'all', situation: 'open' })}
+          renderItem={(t) => (
+            <button type="button" onClick={() => openTask(t.id)} className="block w-full rounded-md px-1 py-1.5 text-left hover:bg-surface-muted">
+              <span className="block truncate text-body-sm font-semibold text-fg">{t.title}</span>
+              <span className="block truncate text-caption text-muted">
+                {t.client?.name ?? 'Interna'}
+                {t.requestChannel ? ` · ${TASK_REQUEST_CHANNEL_LABELS[t.requestChannel]}` : ''}
+              </span>
+            </button>
+          )}
+        />
       )}
-    </AsideCard>
+    </WidgetCard>
   );
 }

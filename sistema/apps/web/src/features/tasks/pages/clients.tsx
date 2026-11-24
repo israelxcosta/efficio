@@ -15,9 +15,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { cn, initials, pluralize } from '@/lib/utils';
 import { useAllClients, useTaskOptions, useTasks } from '../api';
-import { AsideCard, PageWithAside } from '@/components/layout/page-with-aside';
-import { SpotlightCard } from '@/components/ui/spotlight-card';
-import { StackedBar } from '@/components/ui/stacked-bar';
+import { SpotlightCard, SpotlightRow } from '@/components/ui/spotlight-card';
 import { SummaryLabel, toggleClass } from '../components/tasks-summary';
 import { tasksHref } from '../url-state';
 import { activeByRegime, filterClients, type ClientFilters, type ClientSituation } from '../client-filters';
@@ -95,14 +93,15 @@ export default function TaskClientsPage() {
   if (isUuid(openId)) return <Navigate to={clientPagePath('gestao', openId, params.get('secao') === 'documentos' ? 'documentos' : undefined)} replace />;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="calm-text flex flex-col gap-5">
       <PageHeader
         title="Clientes"
         description={ready ? pluralize(active.length, 'cliente ativo', 'clientes ativos') : undefined}
       />
 
       {clients.isError && !clients.data ? null : (
-        <section aria-label="Resumo dos clientes" aria-busy={ready ? undefined : true} className="overflow-hidden rounded-xl border border-border bg-surface">
+        <SpotlightRow spotlight={<ClientSpotlight rows={work.data?.summary.openByClient} loading={work.isPending} />}>
+        <section aria-label="Resumo dos clientes" aria-busy={ready ? undefined : true} className="h-full overflow-hidden rounded-xl border border-border bg-surface">
           <div className="grid md:grid-cols-2 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1.6fr)]">
             <div className="min-w-0 p-4 sm:p-5">
               <SummaryLabel>Clientes ativos</SummaryLabel>
@@ -199,9 +198,9 @@ export default function TaskClientsPage() {
             </div>
           </div>
         </section>
+        </SpotlightRow>
       )}
 
-      <PageWithAside spotlight={<ClientSpotlight rows={work.data?.summary.openByClient} loading={work.isPending} />} aside={<ClientWorkCard rows={work.data?.summary.openByClient} />}>
       <Card className="@container overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
           <div className="relative w-full max-w-sm">
@@ -295,14 +294,13 @@ export default function TaskClientsPage() {
           </div>
         ) : null}
       </Card>
-      </PageWithAside>
     </div>
   );
 }
 
 type ClientWork = TaskListSummary['openByClient'][number];
 
-/** The solid card: the client with the most overdue tasks (open work as tie-break). */
+/** The solid card: the client with the most overdue tasks (open work as tie-break); it opens their tasks. */
 function ClientSpotlight({ rows, loading }: { rows: ClientWork[] | undefined; loading: boolean }) {
   if (loading || !rows) return <SpotlightCard label="Cliente que pede atenção" loading />;
   const top = rows.filter((r) => r.client && r.overdue > 0).sort((a, b) => b.overdue - a.overdue || b.open - a.open)[0];
@@ -312,52 +310,10 @@ function ClientSpotlight({ rows, loading }: { rows: ClientWork[] | undefined; lo
     <SpotlightCard
       label="Cliente que pede atenção"
       badge={overdueAll ? `${Math.round((top.overdue / overdueAll) * 100)}% do atraso` : undefined}
-      badgeDanger
       title={top.client.name}
       caption={`${pluralize(top.overdue, 'tarefa atrasada', 'tarefas atrasadas')} · ${pluralize(top.open, 'aberta', 'abertas')}`}
-      rows={[
-        { label: 'Atrasadas', value: top.overdue, danger: true },
-        { label: 'Em aberto', value: top.open },
-      ]}
-      action={{ label: 'Ver tarefas', to: tasksHref({ scope: 'all', client: top.client.id }) }}
-      secondary={{ label: 'Ficha', to: clientPagePath('gestao', top.client.id) }}
+      to={tasksHref({ scope: 'all', client: top.client.id, situation: 'overdue' })}
     />
-  );
-}
-
-function ClientWorkCard({ rows }: { rows: ClientWork[] | undefined }) {
-  const top = (rows ?? []).filter((r) => r.client).slice(0, 6);
-  const max = Math.max(1, ...top.map((r) => r.open + r.overdue));
-  return (
-    <AsideCard title="Mais tarefas" meta="abertas · atrasadas">
-      {!rows ? (
-        <SkeletonRows rows={4} />
-      ) : top.length === 0 ? (
-        <p className="py-1 text-caption text-muted">Nenhum cliente com tarefas em aberto.</p>
-      ) : (
-        <ul className="flex flex-col">
-          {top.map((r) => (
-            <li key={r.client!.id}>
-              <Link to={tasksHref({ scope: 'all', client: r.client!.id })} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-md py-1.5 hover:bg-bg-subtle">
-                <span className="truncate text-caption font-semibold text-fg">{r.client!.name}</span>
-                <span className="tabular text-caption text-fg">
-                  {r.open}
-                  {r.overdue ? <span className="text-danger"> · {r.overdue}</span> : null}
-                </span>
-                <StackedBar
-                  className="col-span-2 mt-1"
-                  max={max}
-                  parts={[
-                    { value: r.open, className: 'bg-chart-blue-3', label: 'Abertas' },
-                    { value: r.overdue, className: 'bg-chart-red', label: 'Atrasadas' },
-                  ]}
-                />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </AsideCard>
   );
 }
 

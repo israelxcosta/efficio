@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Info, Plus } from 'lucide-react';
+import { Info } from 'lucide-react';
 import {
   addDays,
   diffInDays,
@@ -13,13 +13,12 @@ import {
 } from '@effinance/shared';
 import { Button } from '@/components/ui/button';
 import { StackBar } from '@/components/charts/stack-bar';
-import { Card, SectionLabel } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { MetricStrip, type MetricCell } from '@/components/ui/metric-strip';
 import { MemberAvatar } from '@/components/ui/member-avatar';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
 import { PeriodNavigator } from '@/components/ui/period-navigator';
-import { SpotlightCard, type SpotlightRow } from '@/components/ui/spotlight-card';
-import { PageWithAside } from '@/components/layout/page-with-aside';
+import { SpotlightCard, SpotlightRow } from '@/components/ui/spotlight-card';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
@@ -41,7 +40,7 @@ import { TaskStatusGlyph } from '../components/task-status';
 import { RecurringOccurrenceRow } from '../components/occurrence-row';
 import { occurrenceBucket, taskBucket } from '../occurrence';
 import { monthName } from '../components/tasks-summary';
-import { DashColsContext, DashSlot, SlotList, dashGridClass, useDashCols } from '../components/dash-slot';
+import { DashColsContext, SlotList, SortableBoard, type BoardCard } from '../components/dash-slot';
 import { daysText, shortDate, shortName } from '../due';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
@@ -72,12 +71,11 @@ export default function TaskHomePage() {
   const home = useTaskHome(departmentId, { enabled: Boolean(o), month: monthQuery });
   // Effy's dashboard cards: same department rule as the start page.
   const dash = useTaskDashboard(departmentId, { enabled: Boolean(o), month: monthQuery });
-  const cards = { data: dash.data, loading: dash.isPending, error: dash.isError ? dash.error : null, onRetry: () => void dash.refetch() };
+  const cards0 = { data: dash.data, loading: dash.isPending, error: dash.isError ? dash.error : null, onRetry: () => void dash.refetch() };
   const [list, setList] = useState<DashboardList | null>(null);
   const { can } = usePermissions();
   const showFees = can('finance') && Boolean(dash.data?.fees);
   const showIncomplete = Boolean(dash.data?.incomplete);
-  const { newTask } = useTaskSheetLinks();
   const today = o?.today ?? todayISO();
   const h = home.data;
   // The page width picks the columns of the card grid (same bands as the financial board).
@@ -115,20 +113,24 @@ export default function TaskHomePage() {
       ? `${longDay(today)} · ${o.departments.length ? `Todos os departamentos, ${pluralize(people.length, 'pessoa', 'pessoas')}` : 'todo o escritório'}`
       : `${longDay(today)} · suas tarefas`;
 
+  const cards: BoardCard[] = [
+    { id: 'mine', title: 'Minhas tarefas', rows: 4, node: <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} /> },
+    { id: 'status', title: 'Situação das tarefas', rows: 4, mediumRows: 3, node: <TaskStatusCard {...cards0} base={h ? listBase(h) : {}} /> },
+    { id: 'flow', title: 'Fluxo de tarefas por dia', rows: 3, node: <FlowCard {...cards0} base={h ? listBase(h) : {}} /> },
+    { id: 'processes', title: 'Processos por departamento', rows: 3, fit: true, node: <ProcessesCard {...cards0} /> },
+    { id: 'agenda', title: 'Agenda', rows: 3, phoneRows: 4, node: <AgendaCard {...cards0} /> },
+    { id: 'assignees', title: 'Por responsável', rows: 3, fit: true, node: <ByAssignee home={h} people={people} where={where} loading={home.isPending} /> },
+    { id: 'fiscal', title: 'Pendências fiscais', rows: 4, fit: true, node: <FiscalCard {...cards0} /> },
+    { id: 'clients', title: 'Visão geral dos clientes', rows: 4, mediumRows: 3, fit: true, node: <ClientsOverviewCard {...cards0} onList={setList} /> },
+    { id: 'due', title: 'Vencimentos', rows: 3, fit: true, node: <DueDatesCard {...cards0} onList={setList} showFees={showFees} /> },
+    ...(showIncomplete ? [{ id: 'incomplete', title: 'Cadastro incompleto', rows: 3 as const, fit: true, node: <IncompleteCard {...cards0} onList={setList} canFinance={can('finance')} /> }] : []),
+    { id: 'requests', title: 'Pedidos dos clientes', rows: 3, fit: true, node: <ClientRequestsCard /> },
+  ];
+
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Início"
-        description={updated ? `${description} · ${updated}` : description}
-        actionsClassName="max-sm:w-full"
-        actions={
-          <WriteGate scope="tasks">
-            <Button onClick={() => newTask()} className="max-sm:hidden">
-              <Plus /> Nova tarefa
-            </Button>
-          </WriteGate>
-        }
-      />
+    <div ref={page.ref} className="calm-text flex flex-col gap-6">
+      {/* "Nova tarefa" lives in the bottom bar (quick actions): no button repeated up here. */}
+      <PageHeader title="Início" description={updated ? `${description} · ${updated}` : description} />
 
       {/* Filters on their own fixed line: changing the department or the month never moves them. */}
       <div className="-mt-2 flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -144,70 +146,22 @@ export default function TaskHomePage() {
         </div>
       </div>
 
-      <PageWithAside
-        spotlight={<OverdueSpotlight home={h} options={o} loading={home.isPending} />}
-        aside={
-          <>
-            <div className="h-[300px]">
-              <AgendaCard {...cards} />
-            </div>
-            <div className="h-[340px]">
-              <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
-            </div>
-            <ClientRequestsCard />
-          </>
-        }
-      >
-        <div ref={page.ref} className="flex min-w-0 flex-col gap-6">
-          {home.isError && !h ? <ErrorState error={home.error} onRetry={() => home.refetch()} /> : <HomeSummary home={h} today={today} />}
+      <SpotlightRow spotlight={<OverdueSpotlight home={h} loading={home.isPending} />}>
+        {home.isError && !h ? <ErrorState error={home.error} onRetry={() => home.refetch()} /> : <HomeSummary home={h} today={today} />}
+      </SpotlightRow>
 
-          {o && h?.view === 'mine' && o.departments.length > 0 ? (
-            <p className="-mt-2 flex items-start gap-2 text-body-sm text-muted">
-              <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-              Você ainda não está em um departamento. Peça a um administrador para incluir você em Cadastros › Equipe.
-            </p>
-          ) : null}
+      {o && h?.view === 'mine' && o.departments.length > 0 ? (
+        <p className="-mt-2 flex items-start gap-2 text-body-sm text-muted">
+          <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+          Você ainda não está em um departamento. Peça a um administrador para incluir você em Cadastros › Equipe.
+        </p>
+      ) : null}
 
-          {o && canPickDepartment(o) ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
+      {o && canPickDepartment(o) ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
 
-          <DashColsContext.Provider value={cols}>
-            <Section title="Tarefas" first>
-              <DashSlot rows={4} span={{ wide: 8, medium: 2 }}>
-                <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
-              </DashSlot>
-              <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }}>
-                <TaskStatusCard {...cards} base={h ? listBase(h) : {}} />
-              </DashSlot>
-              <DashSlot rows={3} span={{ wide: 6, medium: 1 }}>
-                <FlowCard {...cards} base={h ? listBase(h) : {}} />
-              </DashSlot>
-              <DashSlot rows={3} span={{ wide: 6, medium: 1 }} fit>
-                <ProcessesCard {...cards} />
-              </DashSlot>
-            </Section>
-
-            <Section title="Obrigações e clientes">
-              <DashSlot rows={4} span={{ wide: 8, medium: 2 }} fit>
-                <FiscalCard {...cards} />
-              </DashSlot>
-              <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }} fit>
-                <ClientsOverviewCard {...cards} onList={setList} />
-              </DashSlot>
-            </Section>
-
-            <Section title="Vencimentos e cadastros">
-              <DashSlot rows={3} span={{ wide: showIncomplete ? 8 : 12, medium: 2 }} fit>
-                <DueDatesCard {...cards} onList={setList} showFees={showFees} />
-              </DashSlot>
-              {showIncomplete ? (
-                <DashSlot rows={3} span={{ wide: 4, medium: 2 }} fit>
-                  <IncompleteCard {...cards} onList={setList} canFinance={can('finance')} />
-                </DashSlot>
-              ) : null}
-            </Section>
-          </DashColsContext.Provider>
-        </div>
-      </PageWithAside>
+      <DashColsContext.Provider value={cols}>
+        <SortableBoard cards={cards} storeKey={`effinance.tasks.home-cards.v1:${workspace?.id ?? ''}:${user?.id ?? ''}`} label="Cards do Início" />
+      </DashColsContext.Provider>
 
       <DashboardListSheet list={list} data={dash.data} onChange={setList} />
     </div>
@@ -215,80 +169,26 @@ export default function TaskHomePage() {
 }
 
 /**
- * The solid card of the Início: the overdue tasks in view, split by department (all departments), by
- * person (one department) or just yours. Without overdue ones it says so in the same place.
+ * The solid card of the Início (first row, as tall as the number strip): the overdue tasks in view;
+ * the whole card opens them. Without overdue ones it says so in the same place.
  */
-function OverdueSpotlight({ home, options, loading }: { home: TaskHomeResponse | undefined; options: TaskOptionsResponse | undefined; loading: boolean }) {
-  const { openTask } = useTaskSheetLinks();
-  if (loading || !home || !options) return <SpotlightCard label="Atrasadas" loading />;
+function OverdueSpotlight({ home, loading }: { home: TaskHomeResponse | undefined; loading: boolean }) {
+  if (loading || !home) return <SpotlightCard label="Atrasadas" loading />;
   const base = listBase(home);
   const t = home.totals;
   const oldest = home.oldestOverdue;
   const ref = home.asOf ?? home.today;
   const on = ref < home.today ? ` em ${ref.slice(8, 10)}/${ref.slice(5, 7)}` : '';
   const label = home.view === 'all' ? `Atrasadas no escritório${on}` : home.view === 'department' && home.department ? `Atrasadas no ${home.department.name}${on}` : `Suas atrasadas${on}`;
-  if (t.overdue === 0) {
-    return <SpotlightCard label={label} title="Nada atrasado" caption="Nenhuma tarefa aberta passou do prazo." action={{ label: 'Ver tarefas', to: tasksHref(base) }} />;
-  }
-  let rows: SpotlightRow[] = [];
-  if (home.view === 'all') {
-    const byDept = new Map<string, { name: string; id: string | null; n: number }>();
-    for (const r of home.byAssignee) {
-      if (!r.overdue || !r.assignee) continue;
-      const dep = options.members.find((m) => m.id === r.assignee!.id)?.department ?? null;
-      const key = dep?.id ?? 'none';
-      const cur = byDept.get(key) ?? { name: dep?.name ?? 'Sem departamento', id: dep?.id ?? null, n: 0 };
-      cur.n += r.overdue;
-      byDept.set(key, cur);
-    }
-    rows = [...byDept.values()]
-      .sort((a, b) => b.n - a.n)
-      .slice(0, 4)
-      .map((d) => ({ label: d.name, value: d.n, to: tasksHref({ scope: 'all', situation: 'overdue', ...(d.id ? { department: d.id } : {}) }) }));
-  } else if (home.view === 'department') {
-    rows = home.byAssignee
-      .filter((r) => r.overdue > 0 && r.assignee)
-      .sort((a, b) => b.overdue - a.overdue)
-      .slice(0, 4)
-      .map((r) => ({ label: r.assignee!.name, value: r.overdue, to: tasksHref({ ...base, situation: 'overdue', assignee: r.assignee!.id }) }));
-  }
+  if (t.overdue === 0) return <SpotlightCard label={label} title="Nada atrasado" caption="Nenhuma tarefa aberta passou do prazo." to={tasksHref(base)} />;
   return (
     <SpotlightCard
       label={label}
       badge={oldest ? `há ${daysText(oldest.daysOverdue)}` : undefined}
-      badgeDanger
       value={t.overdue}
-      caption={
-        oldest ? (
-          <>
-            a mais antiga:{' '}
-            <button type="button" onClick={() => openTask(oldest.id)} className="text-left text-white underline decoration-white/40 underline-offset-2 hover:decoration-white">
-              {oldest.title}
-            </button>
-            {oldest.client ? ` · ${oldest.client.name}` : ''}
-          </>
-        ) : undefined
-      }
-      rows={rows}
-      action={{ label: 'Ver atrasadas', to: tasksHref({ ...base, situation: 'overdue' }) }}
+      caption={oldest ? `a mais antiga: ${oldest.title}${oldest.client ? ` · ${oldest.client.name}` : ''}` : undefined}
+      to={tasksHref({ ...base, situation: 'overdue' })}
     />
-  );
-}
-
-/**
- * A block of the start page: the section label (13px, brand colour; the card titles stay the title
- * level) over the card grid (12, 2 or 1 columns by width). 40px above (16 + the page's 24px gap),
- * 12px below, so the blocks read apart.
- */
-function Section({ title, first, children }: { title: string; first?: boolean; children: ReactNode }) {
-  const cols = useDashCols();
-  return (
-    <section aria-label={title} className={cn('flex flex-col gap-3', !first && 'mt-4')}>
-      <SectionLabel as="h2" level="section">
-        {title}
-      </SectionLabel>
-      <div className={dashGridClass(cols)}>{children}</div>
-    </section>
   );
 }
 

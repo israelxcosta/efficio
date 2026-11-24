@@ -2,12 +2,14 @@
 // §4): rows of 96px (88px below 4 columns) with 16px gaps, heights from `heightForRows`, and widths
 // by container band — 12 columns from 900px, 2 from 560px, 1 below.
 
-import { createContext, useContext, type ComponentProps, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import { GripHorizontal, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { heightForRows } from '@/features/dashboard/layout/layout';
 import { FitList } from '@/features/dashboard/layout/widget-card';
 import type { BoardCols } from '@/features/dashboard/layout/types';
-import { pluralize } from '@/lib/utils';
+import { cn, pluralize } from '@/lib/utils';
 
 /** Width of a card: columns of 12 on wide grids (`wide`) and of 2 on medium ones (`medium`). */
 export interface SlotSpan {
@@ -120,5 +122,192 @@ export function SlotList<T>({ cap, ...props }: SlotListProps<T>) {
         </p>
       ) : null}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sortable board: the cards of the Início and Minha área in two large columns, in the order each
+// person chose (drag a card by its title or its grip; arrow keys on the grip). Saved per workspace and
+// person in this browser.
+// ---------------------------------------------------------------------------
+
+export interface BoardCard {
+  id: string;
+  title: string;
+  rows: Rows;
+  mediumRows?: Rows;
+  phoneRows?: Rows;
+  fit?: boolean;
+  grow?: boolean;
+  node: ReactNode;
+}
+
+/** The cards in the stored order: unknown ids dropped, new cards placed after their default neighbour. */
+export function orderCards(defaults: readonly string[], stored: readonly string[] | null): string[] {
+  if (!stored) return [...defaults];
+  const out = stored.filter((id, i) => defaults.includes(id) && stored.indexOf(id) === i);
+  defaults.forEach((id, i) => {
+    if (out.includes(id)) return;
+    const prev = defaults
+      .slice(0, i)
+      .reverse()
+      .find((p) => out.includes(p));
+    out.splice(prev ? out.indexOf(prev) + 1 : 0, 0, id);
+  });
+  return out;
+}
+
+/** Moves `id` to where `target` is (after it when coming from before, before it otherwise). */
+export function moveCard(order: readonly string[], id: string, target: string): string[] {
+  const from = order.indexOf(id);
+  const to = order.indexOf(target);
+  if (from < 0 || to < 0 || from === to) return [...order];
+  const next = order.filter((x) => x !== id);
+  next.splice(to, 0, id);
+  return next;
+}
+
+/** One step earlier (-1) or later (+1): the keyboard way of moving a card. */
+export function stepCard(order: readonly string[], id: string, delta: -1 | 1): string[] {
+  const i = order.indexOf(id);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= order.length) return [...order];
+  return moveCard(order, id, order[j]!);
+}
+
+function readOrder(key: string): string[] | null {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    return Array.isArray(parsed) && parsed.every((x) => typeof x === 'string') ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function useStoredOrder(key: string): [string[] | null, (next: string[] | null) => void] {
+  const [stored, setStored] = useState<string[] | null>(() => readOrder(key));
+  const [prevKey, setPrevKey] = useState(key);
+  if (prevKey !== key) {
+    setPrevKey(key);
+    setStored(readOrder(key));
+  }
+  const save = useCallback(
+    (next: string[] | null) => {
+      setStored(next);
+      try {
+        if (next) localStorage.setItem(key, JSON.stringify(next));
+        else localStorage.removeItem(key);
+      } catch {
+        // Private mode or full storage: the order lasts until the page reloads.
+      }
+    },
+    [key],
+  );
+  return [stored, save];
+}
+
+/** Interactive parts of a card header that keep their own click (they never start a drag). */
+const NO_DRAG = 'button, a, input, select, textarea, [role="radio"], [role="tab"], [role="switch"]';
+
+export function SortableBoard({ cards, storeKey, label }: { cards: BoardCard[]; storeKey: string; label: string }) {
+  const cols = useDashCols();
+  const defaults = cards.map((c) => c.id);
+  const [stored, setStored] = useStoredOrder(storeKey);
+  const order = orderCards(defaults, stored);
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const [dragging, setDragging] = useState<string | null>(null);
+  // Where the pointer went down: a drag only starts from a card's title or grip, never from its buttons.
+  const origin = useRef<HTMLElement | null>(null);
+  const board = useRef<HTMLDivElement>(null);
+  // The browser picks the drag source when the button goes down, so each card's header is draggable
+  // from the start (the cards are not ours to render; every render may bring a new header).
+  useEffect(() => {
+    board.current?.querySelectorAll<HTMLElement>(':scope > [role="listitem"] header').forEach((h) => {
+      if (!h.draggable) h.draggable = true;
+    });
+  });
+  const [announce, setAnnounce] = useState('');
+  const custom = stored !== null && order.join('|') !== defaults.join('|');
+
+  function moveTo(next: string[]) {
+    if (next.join('|') !== order.join('|')) setStored(next);
+  }
+
+  return (
+    <>
+      <div ref={board} className={dashGridClass(cols)} role="list" aria-label={label}>
+        {order.map((id, index) => {
+          const c = byId.get(id)!;
+          const height = heightForRows(c.fit ? 2 : slotRows(c, cols), cols);
+          return (
+            <div
+              key={id}
+              role="listitem"
+              className={cn('group/card relative min-w-0 transition-opacity [&_header]:cursor-grab', dragging === id && 'opacity-40', dragging && '[&_header]:cursor-grabbing')}
+              style={{ ...(c.grow || c.fit ? { minHeight: height } : { height }), gridColumn: `span ${slotColumns({ wide: 6, medium: 1 }, cols)}` }}
+              onPointerDown={(e) => {
+                origin.current = e.target as HTMLElement;
+              }}
+              onDragStart={(e) => {
+                const from = origin.current;
+                const ok = from && (from.closest('[data-card-grip]') || (from.closest('header') && !from.closest(NO_DRAG)));
+                if (!ok) {
+                  e.preventDefault();
+                  return;
+                }
+                setDragging(id);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', id);
+                // The whole card follows the pointer, not just its header.
+                const card = e.currentTarget.getBoundingClientRect();
+                e.dataTransfer.setDragImage(e.currentTarget, e.clientX - card.left, e.clientY - card.top);
+              }}
+              onDragOver={(e) => {
+                if (!dragging) return;
+                e.preventDefault();
+                if (dragging !== id) moveTo(moveCard(order, dragging, id));
+              }}
+              onDrop={(e) => e.preventDefault()}
+              onDragEnd={() => {
+                setDragging(null);
+                origin.current = null;
+                setAnnounce(`${c.title} na posição ${order.indexOf(id) + 1} de ${order.length}.`);
+              }}
+            >
+              <button
+                type="button"
+                data-card-grip
+                draggable
+                aria-label={`Mover o card ${c.title} (posição ${index + 1} de ${order.length}). Use as setas.`}
+                title="Arraste para mudar a posição (ou use as setas)"
+                onKeyDown={(e) => {
+                  const delta = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : 0;
+                  if (!delta) return;
+                  e.preventDefault();
+                  const next = stepCard(order, id, delta);
+                  moveTo(next);
+                  setAnnounce(`${c.title} na posição ${next.indexOf(id) + 1} de ${order.length}.`);
+                }}
+                className="absolute top-1 left-1/2 z-[2] flex h-4 w-10 -translate-x-1/2 cursor-grab items-center justify-center rounded-full text-subtle opacity-0 transition-opacity group-hover/card:opacity-100 hover:bg-bg-subtle hover:text-muted focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-primary pointer-coarse:hidden"
+              >
+                <GripHorizontal className="size-4" aria-hidden />
+              </button>
+              <SlotFitContext.Provider value={Boolean(c.fit)}>{c.node}</SlotFitContext.Provider>
+            </div>
+          );
+        })}
+      </div>
+      <p aria-live="polite" className="sr-only">
+        {announce}
+      </p>
+      {custom ? (
+        <div className="-mt-2 flex justify-end">
+          <Button variant="ghost" size="sm" onClick={() => setStored(null)}>
+            <RotateCcw /> Restaurar a ordem dos cards
+          </Button>
+        </div>
+      ) : null}
+    </>
   );
 }
