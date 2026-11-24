@@ -17,6 +17,9 @@ import { Card, SectionLabel } from '@/components/ui/card';
 import { MetricStrip, type MetricCell } from '@/components/ui/metric-strip';
 import { MemberAvatar } from '@/components/ui/member-avatar';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
+import { PeriodNavigator } from '@/components/ui/period-navigator';
+import { SpotlightCard, type SpotlightRow } from '@/components/ui/spotlight-card';
+import { PageWithAside } from '@/components/layout/page-with-aside';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
@@ -29,7 +32,7 @@ import { useElementSize } from '@/lib/use-element-size';
 import { useUpdatedLabel } from '@/lib/updated-label';
 import { cn, pluralize } from '@/lib/utils';
 import { useRecurringTasks, useTaskDashboard, useTaskHome, useTaskOptions, useTasks } from '../api';
-import { AgendaCard, ClientsOverviewCard, DocumentsCard, FeesCard, FiscalCard, FlowCard, IncompleteCard, ProcessesCard, TaskStatusCard, ConventionsCard } from '../components/dashboard-cards';
+import { AgendaCard, ClientsOverviewCard, DueDatesCard, FiscalCard, FlowCard, IncompleteCard, ProcessesCard, TaskStatusCard } from '../components/dashboard-cards';
 import { DashboardListSheet, type DashboardList } from '../components/dashboard-list-sheet';
 import { BreakdownItem, type BreakdownRow } from '../components/breakdown-list';
 import { TaskRow } from '../components/task-row';
@@ -61,9 +64,13 @@ export default function TaskHomePage() {
   const o = options.data;
   const urlDept = params.get('departamento');
   const departmentId = o ? resolveHomeDepartment(o, urlDept, readHomeDepartment(storeKey)) : undefined;
-  const home = useTaskHome(departmentId, { enabled: Boolean(o) });
+  const today0 = o?.today ?? todayISO();
+  const urlMonth = params.get('competencia');
+  const month = urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) ? urlMonth : monthKey(today0);
+  const monthQuery = month === monthKey(today0) ? undefined : month;
+  const home = useTaskHome(departmentId, { enabled: Boolean(o), month: monthQuery });
   // Effy's dashboard cards: same department rule as the start page.
-  const dash = useTaskDashboard(departmentId, { enabled: Boolean(o) });
+  const dash = useTaskDashboard(departmentId, { enabled: Boolean(o), month: monthQuery });
   const cards = { data: dash.data, loading: dash.isPending, error: dash.isError ? dash.error : null, onRetry: () => void dash.refetch() };
   const [list, setList] = useState<DashboardList | null>(null);
   const { can } = usePermissions();
@@ -75,7 +82,15 @@ export default function TaskHomePage() {
   // The page width picks the columns of the card grid (same bands as the financial board).
   const page = useElementSize();
   const updated = useUpdatedLabel(home.dataUpdatedAt);
-  const cols = columnsForWidth(page.width || 1280);
+  // The centre column is ~990px at 1440px (the right column takes 300px): 4 columns from 900px there.
+  const cols = page.width >= 900 ? 4 : columnsForWidth(page.width || 1280);
+
+  function chooseMonth(value: string) {
+    const next = new URLSearchParams(params);
+    if (value === monthKey(today0)) next.delete('competencia');
+    else next.set('competencia', value);
+    setParams(next, { replace: true });
+  }
 
   function chooseDepartment(value: string) {
     writeHomeDepartment(storeKey, value);
@@ -101,98 +116,159 @@ export default function TaskHomePage() {
       : `${longDay(today)} · suas tarefas`;
 
   return (
-    <div ref={page.ref} className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title="Início"
         description={updated ? `${description} · ${updated}` : description}
         actionsClassName="max-sm:w-full"
         actions={
-          <>
-            {o && canPickDepartment(o) && o.departments.length > 0 ? (
-              <DepartmentSwitcher value={departmentId ?? 'all'} options={o} onChange={chooseDepartment} />
-            ) : null}
-            <WriteGate scope="tasks">
-              <Button onClick={() => newTask()} className="max-sm:hidden">
-                <Plus /> Nova tarefa
-              </Button>
-            </WriteGate>
-          </>
+          <WriteGate scope="tasks">
+            <Button onClick={() => newTask()} className="max-sm:hidden">
+              <Plus /> Nova tarefa
+            </Button>
+          </WriteGate>
         }
       />
 
-      {home.isError && !h ? (
-        <ErrorState error={home.error} onRetry={() => home.refetch()} />
-      ) : (
-        <HomeSummary home={h} today={today} />
-      )}
+      {/* Filters on their own fixed line: changing the department or the month never moves them. */}
+      <div className="-mt-2 flex flex-wrap items-center gap-x-4 gap-y-3">
+        {o && canPickDepartment(o) && o.departments.length > 0 ? (
+          <div className="flex min-w-0 items-center gap-2 max-sm:w-full">
+            <span className="text-caption text-muted max-sm:hidden">Departamento</span>
+            <DepartmentSwitcher value={departmentId ?? 'all'} options={o} onChange={chooseDepartment} />
+          </div>
+        ) : null}
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <span className="text-caption text-muted">Competência</span>
+          <PeriodNavigator modes={['month']} value={{ mode: 'month', anchor: `${month}-01` }} onChange={(v) => chooseMonth(monthKey(v.anchor))} />
+        </div>
+      </div>
 
-      {o && h?.view === 'mine' && o.departments.length > 0 ? (
-        <p className="-mt-2 flex items-start gap-2 text-body-sm text-muted">
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-          Você ainda não está em um departamento. Peça a um administrador para incluir você em Cadastros › Equipe.
-        </p>
-      ) : null}
+      <PageWithAside
+        spotlight={<OverdueSpotlight home={h} options={o} loading={home.isPending} />}
+        aside={
+          <>
+            <div className="h-[360px]">
+              <AgendaCard {...cards} />
+            </div>
+            <div className="h-[380px]">
+              <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
+            </div>
+          </>
+        }
+      >
+        <div ref={page.ref} className="flex min-w-0 flex-col gap-6">
+          {home.isError && !h ? <ErrorState error={home.error} onRetry={() => home.refetch()} /> : <HomeSummary home={h} today={today} />}
 
-      {o && canPickDepartment(o) ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
-
-      <DashColsContext.Provider value={cols}>
-        <Section title="Tarefas">
-          <DashSlot rows={4} span={{ wide: 8, medium: 2 }}>
-            <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
-          </DashSlot>
-          <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }}>
-            <TaskStatusCard {...cards} base={h ? listBase(h) : {}} />
-          </DashSlot>
-          <DashSlot rows={3} span={{ wide: 6, medium: 1 }}>
-            <FlowCard {...cards} base={h ? listBase(h) : {}} />
-          </DashSlot>
-          <DashSlot rows={3} phoneRows={4} span={{ wide: 6, medium: 1 }}>
-            <AgendaCard {...cards} />
-          </DashSlot>
-          <DashSlot rows={3} span={{ wide: 6, medium: 1 }} fit>
-            <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
-          </DashSlot>
-          <DashSlot rows={3} span={{ wide: 6, medium: 1 }} fit>
-            <ProcessesCard {...cards} />
-          </DashSlot>
-        </Section>
-
-        <Section title="Vencimentos">
-          <DashSlot rows={3} span={{ wide: showFees ? 3 : 4, medium: 1 }}>
-            <DocumentsCard {...cards} kind="certificates" onList={setList} />
-          </DashSlot>
-          <DashSlot rows={3} span={{ wide: showFees ? 3 : 4, medium: 1 }}>
-            <DocumentsCard {...cards} kind="documents" onList={setList} />
-          </DashSlot>
-          {/* Five bands in 32px rows at 320px, 28px rows at 296px (below 4 columns): always M. */}
-          <DashSlot rows={3} span={{ wide: showFees ? 3 : 4, medium: showFees ? 1 : 2 }}>
-            <ConventionsCard {...cards} />
-          </DashSlot>
-          {showFees ? (
-            <DashSlot rows={3} span={{ wide: 3, medium: 1 }}>
-              <FeesCard {...cards} onList={setList} />
-            </DashSlot>
+          {o && h?.view === 'mine' && o.departments.length > 0 ? (
+            <p className="-mt-2 flex items-start gap-2 text-body-sm text-muted">
+              <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+              Você ainda não está em um departamento. Peça a um administrador para incluir você em Cadastros › Equipe.
+            </p>
           ) : null}
-        </Section>
 
-        <Section title="Obrigações e clientes">
-          <DashSlot rows={4} span={{ wide: 8, medium: 2 }} fit>
-            <FiscalCard {...cards} />
-          </DashSlot>
-          <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }} fit>
-            <ClientsOverviewCard {...cards} onList={setList} />
-          </DashSlot>
-          {showIncomplete ? (
-            // A list of up to 6 rows never spans the page (app-screens §4.2): 8 of 12 columns.
-            <DashSlot rows={3} span={{ wide: 8, medium: 2 }} fit>
-              <IncompleteCard {...cards} onList={setList} canFinance={can('finance')} />
-            </DashSlot>
-          ) : null}
-        </Section>
-      </DashColsContext.Provider>
+          {o && canPickDepartment(o) ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
+
+          <DashColsContext.Provider value={cols}>
+            <Section title="Tarefas" first>
+              <DashSlot rows={4} span={{ wide: 8, medium: 2 }}>
+                <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />
+              </DashSlot>
+              <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }}>
+                <TaskStatusCard {...cards} base={h ? listBase(h) : {}} />
+              </DashSlot>
+              <DashSlot rows={3} span={{ wide: 6, medium: 1 }}>
+                <FlowCard {...cards} base={h ? listBase(h) : {}} />
+              </DashSlot>
+              <DashSlot rows={3} span={{ wide: 6, medium: 1 }} fit>
+                <ProcessesCard {...cards} />
+              </DashSlot>
+            </Section>
+
+            <Section title="Obrigações e clientes">
+              <DashSlot rows={4} span={{ wide: 8, medium: 2 }} fit>
+                <FiscalCard {...cards} />
+              </DashSlot>
+              <DashSlot rows={4} mediumRows={3} span={{ wide: 4, medium: 2 }} fit>
+                <ClientsOverviewCard {...cards} onList={setList} />
+              </DashSlot>
+            </Section>
+
+            <Section title="Vencimentos e cadastros">
+              <DashSlot rows={3} span={{ wide: showIncomplete ? 8 : 12, medium: 2 }} fit>
+                <DueDatesCard {...cards} onList={setList} showFees={showFees} />
+              </DashSlot>
+              {showIncomplete ? (
+                <DashSlot rows={3} span={{ wide: 4, medium: 2 }} fit>
+                  <IncompleteCard {...cards} onList={setList} canFinance={can('finance')} />
+                </DashSlot>
+              ) : null}
+            </Section>
+          </DashColsContext.Provider>
+        </div>
+      </PageWithAside>
 
       <DashboardListSheet list={list} data={dash.data} onChange={setList} />
     </div>
+  );
+}
+
+/**
+ * The solid card of the Início: the overdue tasks in view, split by department (all departments), by
+ * person (one department) or just yours. Without overdue ones it says so in the same place.
+ */
+function OverdueSpotlight({ home, options, loading }: { home: TaskHomeResponse | undefined; options: TaskOptionsResponse | undefined; loading: boolean }) {
+  const { openTask } = useTaskSheetLinks();
+  if (loading || !home || !options) return <SpotlightCard label="Atrasadas" loading />;
+  const base = listBase(home);
+  const t = home.totals;
+  const oldest = home.oldestOverdue;
+  const label = home.view === 'all' ? 'Atrasadas no escritório' : home.view === 'department' && home.department ? `Atrasadas no ${home.department.name}` : 'Suas atrasadas';
+  if (t.overdue === 0) {
+    return <SpotlightCard label={label} title="Nada atrasado" caption="Nenhuma tarefa aberta passou do prazo." action={{ label: 'Ver tarefas', to: tasksHref(base) }} />;
+  }
+  let rows: SpotlightRow[] = [];
+  if (home.view === 'all') {
+    const byDept = new Map<string, { name: string; id: string | null; n: number }>();
+    for (const r of home.byAssignee) {
+      if (!r.overdue || !r.assignee) continue;
+      const dep = options.members.find((m) => m.id === r.assignee!.id)?.department ?? null;
+      const key = dep?.id ?? 'none';
+      const cur = byDept.get(key) ?? { name: dep?.name ?? 'Sem departamento', id: dep?.id ?? null, n: 0 };
+      cur.n += r.overdue;
+      byDept.set(key, cur);
+    }
+    rows = [...byDept.values()]
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 4)
+      .map((d) => ({ label: d.name, value: d.n, to: tasksHref({ scope: 'all', situation: 'overdue', ...(d.id ? { department: d.id } : {}) }) }));
+  } else if (home.view === 'department') {
+    rows = home.byAssignee
+      .filter((r) => r.overdue > 0 && r.assignee)
+      .sort((a, b) => b.overdue - a.overdue)
+      .slice(0, 4)
+      .map((r) => ({ label: r.assignee!.name, value: r.overdue, to: tasksHref({ ...base, situation: 'overdue', assignee: r.assignee!.id }) }));
+  }
+  return (
+    <SpotlightCard
+      label={label}
+      badge={oldest ? `há ${daysText(oldest.daysOverdue)}` : undefined}
+      badgeDanger
+      value={t.overdue}
+      caption={
+        oldest ? (
+          <>
+            a mais antiga:{' '}
+            <button type="button" onClick={() => openTask(oldest.id)} className="text-left text-white underline decoration-white/40 underline-offset-2 hover:decoration-white">
+              {oldest.title}
+            </button>
+            {oldest.client ? ` · ${oldest.client.name}` : ''}
+          </>
+        ) : undefined
+      }
+      rows={rows}
+      action={{ label: 'Ver atrasadas', to: tasksHref({ ...base, situation: 'overdue' }) }}
+    />
   );
 }
 
@@ -201,10 +277,10 @@ export default function TaskHomePage() {
  * level) over the card grid (12, 2 or 1 columns by width). 40px above (16 + the page's 24px gap),
  * 12px below, so the blocks read apart.
  */
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, first, children }: { title: string; first?: boolean; children: ReactNode }) {
   const cols = useDashCols();
   return (
-    <section aria-label={title} className="mt-4 flex flex-col gap-3">
+    <section aria-label={title} className={cn('flex flex-col gap-3', !first && 'mt-4')}>
       <SectionLabel as="h2" level="section">
         {title}
       </SectionLabel>
@@ -215,7 +291,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function DepartmentSwitcher({ value, options, onChange }: { value: string; options: TaskOptionsResponse; onChange: (v: string) => void }) {
   const choices = [{ value: 'all', label: 'Todos' }, ...options.departments.map((d) => ({ value: d.id, label: d.name }))];
-  if (choices.length <= 4) {
+  if (choices.length <= 6) {
     return (
       <div className="max-sm:w-full max-sm:overflow-x-auto">
         <SegmentedControl size="sm" ariaLabel="Departamento" value={value} onChange={onChange} options={choices} />
@@ -310,7 +386,6 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
       label: 'Fora da meta',
       info: 'Recorrentes abertas depois da meta interna, ainda dentro do prazo legal.',
       value: t?.targetMissed ?? 0,
-      tone: t && t.targetMissed > 0 ? 'warning' : undefined,
       href: tasksHref({ ...base, kind: 'recurring' }),
       aria: `Fora da meta${where}: ${t?.targetMissed ?? 0}. Ver na lista de tarefas.`,
       footer: targetText,

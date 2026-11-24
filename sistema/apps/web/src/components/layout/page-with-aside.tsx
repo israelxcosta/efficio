@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
  */
 export function PageWithAside({ spotlight, aside, children, className }: { spotlight?: ReactNode; aside?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <div className={cn('grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-x-6 xl:gap-y-3.5', className)}>
+    <div className={cn('grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:grid-rows-[auto_1fr] xl:gap-x-6 xl:gap-y-3.5', className)}>
       {spotlight ? <div className="min-w-0 xl:col-start-2 xl:row-start-1">{spotlight}</div> : null}
       <div className="flex min-w-0 flex-col gap-6 xl:col-start-1 xl:row-span-2 xl:row-start-1">{children}</div>
       {aside ? <aside className="grid min-w-0 gap-3.5 sm:grid-cols-2 xl:col-start-2 xl:row-start-2 xl:grid-cols-1">{aside}</aside> : null}

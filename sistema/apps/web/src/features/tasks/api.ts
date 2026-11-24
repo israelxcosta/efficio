@@ -106,8 +106,8 @@ export function useTask(id: string | null) {
   });
 }
 
-export function useTaskHome(departmentId: string | 'all' | undefined, options: { enabled?: boolean } = {}) {
-  const query = departmentId ? { departmentId } : {};
+export function useTaskHome(departmentId: string | 'all' | undefined, options: { enabled?: boolean; month?: string } = {}) {
+  const query = { ...(departmentId ? { departmentId } : {}), ...(options.month ? { month: options.month } : {}) };
   return useQuery({
     queryKey: qk.taskHome(query),
     queryFn: () => api<TaskHomeResponse>('/tasks/home', { query }),
@@ -117,8 +117,8 @@ export function useTaskHome(departmentId: string | 'all' | undefined, options: {
 }
 
 /** The cards of the start page (Effy's dashboard): same department rule as `/tasks/home`. */
-export function useTaskDashboard(departmentId: string | 'all' | undefined, options: { enabled?: boolean } = {}) {
-  const query = departmentId ? { departmentId } : {};
+export function useTaskDashboard(departmentId: string | 'all' | undefined, options: { enabled?: boolean; month?: string } = {}) {
+  const query = { ...(departmentId ? { departmentId } : {}), ...(options.month ? { month: options.month } : {}) };
   return useQuery({
     queryKey: qk.taskDashboard(query),
     queryFn: () => api<TaskDashboardResponse>('/tasks/dashboard', { query }),
