@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { Building2, ChevronLeft, ChevronRight, ClipboardCheck, Ellipsis, ExternalLink, ListChecks, Presentation, Search, Send } from 'lucide-react';
-import { formatCNPJ, formatDateBR, TAX_REGIME_LABELS, TAX_REGIMES, type Client, type ClientDocumentAlert, type TaxRegime } from '@effinance/shared';
+import { formatCNPJ, formatDateBR, TAX_REGIME_LABELS, TAX_REGIMES, type Client, type ClientDocumentAlert, type TaskListSummary, type TaxRegime } from '@effinance/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePermissions } from '@/features/auth/permissions';
@@ -14,7 +14,10 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
 import { cn, initials, pluralize } from '@/lib/utils';
-import { useAllClients, useTaskOptions } from '../api';
+import { useAllClients, useTaskOptions, useTasks } from '../api';
+import { AsideCard, PageWithAside } from '@/components/layout/page-with-aside';
+import { SpotlightCard } from '@/components/ui/spotlight-card';
+import { StackedBar } from '@/components/ui/stacked-bar';
 import { SummaryLabel, toggleClass } from '../components/tasks-summary';
 import { tasksHref } from '../url-state';
 import { activeByRegime, filterClients, type ClientFilters, type ClientSituation } from '../client-filters';
@@ -31,6 +34,9 @@ export default function TaskClientsPage() {
   const [params, setParams] = useSearchParams();
   const options = useTaskOptions();
   const clients = useAllClients();
+  // Open work per client (any department): the "Tarefas" column and the right column.
+  const work = useTasks({ scope: 'all', situation: 'open', page: 1, pageSize: 1 });
+  const workById = useMemo(() => new Map((work.data?.summary.openByClient ?? []).filter((r) => r.client).map((r) => [r.client!.id, r])), [work.data]);
   // Creating clients stays in the finances (`finance`); editing their data is on the client page (`clients`).
   const canFinance = usePermissions().can('finance');
 
@@ -195,6 +201,7 @@ export default function TaskClientsPage() {
         </section>
       )}
 
+      <PageWithAside spotlight={<ClientSpotlight rows={work.data?.summary.openByClient} loading={work.isPending} />} aside={<ClientWorkCard rows={work.data?.summary.openByClient} />}>
       <Card className="@container overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
           <div className="relative w-full max-w-sm">
@@ -233,6 +240,7 @@ export default function TaskClientsPage() {
           <span className="flex-1">Cliente</span>
           <span className="hidden w-40 @3xl:block">CNPJ</span>
           <span className="hidden w-36 @2xl:block">Regime</span>
+          <span className="hidden w-24 text-right @lg:block">Tarefas</span>
           <span className="w-8" aria-hidden />
         </div>
 
@@ -267,7 +275,7 @@ export default function TaskClientsPage() {
             />
           ) : (
             shown.map((c) => (
-              <ClientRow key={c.id} client={c} docAlert={docsFilter ? alertsById.get(c.id) : undefined} />
+              <ClientRow key={c.id} client={c} docAlert={docsFilter ? alertsById.get(c.id) : undefined} work={workById.get(c.id)} />
             ))
           )}
         </div>
@@ -287,8 +295,69 @@ export default function TaskClientsPage() {
           </div>
         ) : null}
       </Card>
-
+      </PageWithAside>
     </div>
+  );
+}
+
+type ClientWork = TaskListSummary['openByClient'][number];
+
+/** The solid card: the client with the most overdue tasks (open work as tie-break). */
+function ClientSpotlight({ rows, loading }: { rows: ClientWork[] | undefined; loading: boolean }) {
+  if (loading || !rows) return <SpotlightCard label="Cliente que pede atenção" loading />;
+  const top = rows.filter((r) => r.client && r.overdue > 0).sort((a, b) => b.overdue - a.overdue || b.open - a.open)[0];
+  if (!top || !top.client) return <SpotlightCard label="Clientes" title="Nenhum cliente com tarefa atrasada" caption="Todas as tarefas abertas estão no prazo." />;
+  const overdueAll = rows.reduce((n, r) => n + r.overdue, 0);
+  return (
+    <SpotlightCard
+      label="Cliente que pede atenção"
+      badge={overdueAll ? `${Math.round((top.overdue / overdueAll) * 100)}% do atraso` : undefined}
+      badgeDanger
+      title={top.client.name}
+      caption={`${pluralize(top.overdue, 'tarefa atrasada', 'tarefas atrasadas')} · ${pluralize(top.open, 'aberta', 'abertas')}`}
+      rows={[
+        { label: 'Atrasadas', value: top.overdue, danger: true },
+        { label: 'Em aberto', value: top.open },
+      ]}
+      action={{ label: 'Ver tarefas', to: tasksHref({ scope: 'all', client: top.client.id }) }}
+      secondary={{ label: 'Ficha', to: clientPagePath('gestao', top.client.id) }}
+    />
+  );
+}
+
+function ClientWorkCard({ rows }: { rows: ClientWork[] | undefined }) {
+  const top = (rows ?? []).filter((r) => r.client).slice(0, 6);
+  const max = Math.max(1, ...top.map((r) => r.open + r.overdue));
+  return (
+    <AsideCard title="Mais tarefas" meta="abertas · atrasadas">
+      {!rows ? (
+        <SkeletonRows rows={4} />
+      ) : top.length === 0 ? (
+        <p className="py-1 text-caption text-muted">Nenhum cliente com tarefas em aberto.</p>
+      ) : (
+        <ul className="flex flex-col">
+          {top.map((r) => (
+            <li key={r.client!.id}>
+              <Link to={tasksHref({ scope: 'all', client: r.client!.id })} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-md py-1.5 hover:bg-bg-subtle">
+                <span className="truncate text-caption font-semibold text-fg">{r.client!.name}</span>
+                <span className="tabular text-caption text-fg">
+                  {r.open}
+                  {r.overdue ? <span className="text-danger"> · {r.overdue}</span> : null}
+                </span>
+                <StackedBar
+                  className="col-span-2 mt-1"
+                  max={max}
+                  parts={[
+                    { value: r.open, className: 'bg-chart-blue-3', label: 'Abertas' },
+                    { value: r.overdue, className: 'bg-chart-red', label: 'Atrasadas' },
+                  ]}
+                />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </AsideCard>
   );
 }
 
@@ -296,10 +365,12 @@ interface ClientRowProps {
   client: Client;
   /** Under the "Documentos" filter: the most urgent document goes in the subtitle. */
   docAlert?: ClientDocumentAlert;
+  /** Open and overdue tasks of the client. */
+  work?: { open: number; overdue: number };
 }
 
 /** Client row in the pattern of the task row (spec §13.1): identification, CNPJ, regime, menu. */
-function ClientRow({ client: c, docAlert }: ClientRowProps) {
+function ClientRow({ client: c, docAlert, work }: ClientRowProps) {
   const navigate = useNavigate();
   const name = c.tradeName || c.name;
   const href = clientPagePath('gestao', c.id);
@@ -337,6 +408,10 @@ function ClientRow({ client: c, docAlert }: ClientRowProps) {
         <span className="block truncate text-body-sm text-fg">{TAX_REGIME_LABELS[c.taxRegime]}</span>
         {c.simplesAnnex ? <span className="block text-xs text-muted">Anexo {c.simplesAnnex}</span> : null}
       </span>
+      <Link to={tasksHref({ scope: 'all', client: c.id })} className="hidden w-24 text-right leading-tight @lg:block" aria-label={`Tarefas de ${name}`}>
+        <span className={cn('tabular block text-body-sm', work?.open ? 'text-fg' : 'text-subtle')}>{work?.open ?? 0} {work?.open === 1 ? 'aberta' : 'abertas'}</span>
+        {work?.overdue ? <span className="tabular block text-xs font-semibold text-danger">{work.overdue} {work.overdue === 1 ? 'atrasada' : 'atrasadas'}</span> : null}
+      </Link>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
