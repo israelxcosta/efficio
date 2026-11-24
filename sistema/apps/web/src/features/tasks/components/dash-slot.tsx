@@ -139,6 +139,8 @@ export interface BoardCard {
   phoneRows?: Rows;
   fit?: boolean;
   grow?: boolean;
+  /** `full`: a whole row of the board (a group of small cards side by side, like the due dates). */
+  span?: 'half' | 'full';
   node: ReactNode;
 }
 
@@ -236,7 +238,8 @@ export function SortableBoard({ cards, storeKey, label }: { cards: BoardCard[]; 
 
   return (
     <>
-      <div ref={board} className={dashGridClass(cols)} role="list" aria-label={label}>
+      {/* Dense flow: after a reorder, a half card fills the hole a full row may leave beside another. */}
+      <div ref={board} className={cn(dashGridClass(cols), 'grid-flow-row-dense')} role="list" aria-label={label}>
         {order.map((id, index) => {
           const c = byId.get(id)!;
           const height = heightForRows(c.fit ? 2 : slotRows(c, cols), cols);
@@ -245,7 +248,7 @@ export function SortableBoard({ cards, storeKey, label }: { cards: BoardCard[]; 
               key={id}
               role="listitem"
               className={cn('group/card relative min-w-0 transition-opacity [&_header]:cursor-grab', dragging === id && 'opacity-40', dragging && '[&_header]:cursor-grabbing')}
-              style={{ ...(c.grow || c.fit ? { minHeight: height } : { height }), gridColumn: `span ${slotColumns({ wide: 6, medium: 1 }, cols)}` }}
+              style={{ ...(c.grow || c.fit ? { minHeight: height } : { height }), gridColumn: `span ${slotColumns(c.span === 'full' ? { wide: 12, medium: 2 } : { wide: 6, medium: 1 }, cols)}` }}
               onPointerDown={(e) => {
                 origin.current = e.target as HTMLElement;
               }}
@@ -311,3 +314,24 @@ export function SortableBoard({ cards, storeKey, label }: { cards: BoardCard[]; 
     </>
   );
 }
+
+/**
+ * A row of small cards side by side (4 on wide boards, 2 on medium, 1 on phones), each `rows` tall: the
+ * due dates (certificates, "laudos", agreements, fees). It is one item of the sortable board.
+ */
+export function CardRow({ rows = 3, children }: { rows?: Rows; children: ReactNode[] }) {
+  const cols = useDashCols();
+  const items = children.filter(Boolean);
+  const per = cols === 4 ? Math.min(4, items.length) : cols === 2 ? 2 : 1;
+  const height = heightForRows(rows, cols);
+  return (
+    <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${per}, minmax(0, 1fr))` }}>
+      {items.map((child, i) => (
+        <div key={i} className="min-w-0" style={{ height }}>
+          {child}
+        </div>
+      ))}
+    </div>
+  );
+}
+

@@ -454,12 +454,14 @@ Revisto a pedido do dono: a coluna à direita foi **removida** (perdia espaço).
   tela (`bg-hero-from`), na **primeira linha**, ao lado da faixa de números e da mesma altura (17,5rem;
   abaixo de 1280px vai para baixo da faixa). Rótulo, chip neutro, número grande ou título curto e uma
   linha de contexto; o card inteiro é o link (ou abre a tarefa). Sem nada urgente, a frase calma no mesmo
-  lugar. Onde está: Início, Minha área, Clientes da gestão e Painel financeiro.
+  lugar. Onde está: Início (o **próximo prazo legal** com clientes pendentes — não repete o "Atrasadas" da
+  faixa), Minha área, Clientes da gestão e Painel financeiro (inadimplência).
 - **Cards em duas colunas que se arrastam** (`SortableBoard` em `features/tasks/components/dash-slot.tsx`):
   Início e Minha área. Arrasta-se pelo título do card ou pela alça que aparece no topo ao passar o mouse;
   pelo teclado, a alça aceita as setas. A ordem fica salva por escritório e pessoa neste navegador
   (`effinance.tasks.home-cards.v1` / `my-area-cards.v1`), com "Restaurar a ordem dos cards". O Painel
-  financeiro continua com a grade livre dele (Personalizar).
+  financeiro continua com a grade livre dele (Personalizar). `span: 'full'` + `CardRow` põe cards pequenos
+  lado a lado numa linha inteira (os quatro vencimentos: certificados, laudos, convenções, honorários).
 - **Texto sem vermelho nos painéis** (`.calm-text` em `styles/index.css`): no Início, Minha área, Clientes
   da gestão e Painel financeiro, `text-danger`/`text-warning` ficam na tinta padrão; a cor fica só nas
   marcas (barras, pontos, o card sólido). Erros de formulário e listas continuam com vermelho.

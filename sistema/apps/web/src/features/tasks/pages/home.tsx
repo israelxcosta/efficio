@@ -4,10 +4,12 @@ import { Info } from 'lucide-react';
 import {
   addDays,
   diffInDays,
+  formatDateBR,
   monthKey,
   todayISO,
   type RecurringOccurrence,
   type Task,
+  type TaskDashboardResponse,
   type TaskHomeResponse,
   type TaskOptionsResponse,
 } from '@effinance/shared';
@@ -31,16 +33,16 @@ import { useElementSize } from '@/lib/use-element-size';
 import { useUpdatedLabel } from '@/lib/updated-label';
 import { cn, pluralize } from '@/lib/utils';
 import { useRecurringTasks, useTaskDashboard, useTaskHome, useTaskOptions, useTasks } from '../api';
-import { AgendaCard, ClientsOverviewCard, DueDatesCard, FiscalCard, FlowCard, IncompleteCard, ProcessesCard, TaskStatusCard } from '../components/dashboard-cards';
+import { AgendaCard, ClientsOverviewCard, ConventionsCard, DocumentsCard, FeesCard, FiscalCard, FlowCard, IncompleteCard, ProcessesCard, TaskStatusCard } from '../components/dashboard-cards';
 import { ClientRequestsCard } from '../components/client-requests-card';
 import { DashboardListSheet, type DashboardList } from '../components/dashboard-list-sheet';
 import { BreakdownItem, type BreakdownRow } from '../components/breakdown-list';
 import { TaskRow } from '../components/task-row';
 import { TaskStatusGlyph } from '../components/task-status';
-import { RecurringOccurrenceRow } from '../components/occurrence-row';
+import { RecurringOccurrenceRow, useOccurrenceSheetLinks } from '../components/occurrence-row';
 import { occurrenceBucket, taskBucket } from '../occurrence';
 import { monthName } from '../components/tasks-summary';
-import { DashColsContext, SlotList, SortableBoard, type BoardCard } from '../components/dash-slot';
+import { CardRow, DashColsContext, SlotList, SortableBoard, type BoardCard } from '../components/dash-slot';
 import { daysText, shortDate, shortName } from '../due';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
@@ -122,7 +124,23 @@ export default function TaskHomePage() {
     { id: 'assignees', title: 'Por responsável', rows: 3, fit: true, node: <ByAssignee home={h} people={people} where={where} loading={home.isPending} /> },
     { id: 'fiscal', title: 'Pendências fiscais', rows: 4, fit: true, node: <FiscalCard {...cards0} /> },
     { id: 'clients', title: 'Visão geral dos clientes', rows: 4, mediumRows: 3, fit: true, node: <ClientsOverviewCard {...cards0} onList={setList} /> },
-    { id: 'due', title: 'Vencimentos', rows: 3, fit: true, node: <DueDatesCard {...cards0} onList={setList} showFees={showFees} /> },
+    {
+      id: 'due-row',
+      title: 'Vencimentos (certificados, laudos, convenções e honorários)',
+      rows: 3,
+      grow: true,
+      span: 'full',
+      node: (
+        <CardRow rows={3}>
+          {[
+            <DocumentsCard key="cert" {...cards0} kind="certificates" onList={setList} />,
+            <DocumentsCard key="docs" {...cards0} kind="documents" onList={setList} />,
+            <ConventionsCard key="conv" {...cards0} />,
+            showFees ? <FeesCard key="fees" {...cards0} onList={setList} /> : null,
+          ]}
+        </CardRow>
+      ),
+    },
     ...(showIncomplete ? [{ id: 'incomplete', title: 'Cadastro incompleto', rows: 3 as const, fit: true, node: <IncompleteCard {...cards0} onList={setList} canFinance={can('finance')} /> }] : []),
     { id: 'requests', title: 'Pedidos dos clientes', rows: 3, fit: true, node: <ClientRequestsCard /> },
   ];
@@ -146,7 +164,7 @@ export default function TaskHomePage() {
         </div>
       </div>
 
-      <SpotlightRow spotlight={<OverdueSpotlight home={h} loading={home.isPending} />}>
+      <SpotlightRow spotlight={<NextDeadlineSpotlight home={h} dash={dash.data} loading={home.isPending} />}>
         {home.isError && !h ? <ErrorState error={home.error} onRetry={() => home.refetch()} /> : <HomeSummary home={h} today={today} />}
       </SpotlightRow>
 
@@ -169,25 +187,29 @@ export default function TaskHomePage() {
 }
 
 /**
- * The solid card of the Início (first row, as tall as the number strip): the overdue tasks in view;
- * the whole card opens them. Without overdue ones it says so in the same place.
+ * The solid card of the Início (first row, as tall as the number strip): the next legal deadline with
+ * clients still pending (the office's risk of fines), not repeating the "Atrasadas" of the strip. From
+ * the agenda (the next 7 days from the reference day); otherwise the nearest obligation of the competence.
+ * A click opens the obligation; without any pending deadline it says so in the same place.
  */
-function OverdueSpotlight({ home, loading }: { home: TaskHomeResponse | undefined; loading: boolean }) {
-  if (loading || !home) return <SpotlightCard label="Atrasadas" loading />;
-  const base = listBase(home);
-  const t = home.totals;
-  const oldest = home.oldestOverdue;
+function NextDeadlineSpotlight({ home, dash, loading }: { home: TaskHomeResponse | undefined; dash: TaskDashboardResponse | undefined; loading: boolean }) {
+  const { openOccurrence } = useOccurrenceSheetLinks();
+  if (loading || !home) return <SpotlightCard label="Próximo prazo legal" loading />;
   const ref = home.asOf ?? home.today;
-  const on = ref < home.today ? ` em ${ref.slice(8, 10)}/${ref.slice(5, 7)}` : '';
-  const label = home.view === 'all' ? `Atrasadas no escritório${on}` : home.view === 'department' && home.department ? `Atrasadas no ${home.department.name}${on}` : `Suas atrasadas${on}`;
-  if (t.overdue === 0) return <SpotlightCard label={label} title="Nada atrasado" caption="Nenhuma tarefa aberta passou do prazo." to={tasksHref(base)} />;
+  const pending = (list: RecurringOccurrence[]) =>
+    list.filter((o) => o.pending > 0 && o.legalDueDate >= ref).sort((x, y) => x.legalDueDate.localeCompare(y.legalDueDate) || y.pending - x.pending);
+  const next = pending(dash?.agenda.upcoming ?? [])[0] ?? pending(home.obligations.items)[0];
+  if (!next) return <SpotlightCard label="Próximo prazo legal" title="Nenhum prazo pendente" caption="As obrigações em aberto da competência estão entregues." to="/tarefas/auditoria" />;
+  const days = diffInDays(next.legalDueDate, ref);
+  const when = days <= 0 ? 'hoje' : days === 1 ? 'amanhã' : `em ${days} dias`;
+  const live = next.total - next.canceled;
   return (
     <SpotlightCard
-      label={label}
-      badge={oldest ? `há ${daysText(oldest.daysOverdue)}` : undefined}
-      value={t.overdue}
-      caption={oldest ? `a mais antiga: ${oldest.title}${oldest.client ? ` · ${oldest.client.name}` : ''}` : undefined}
-      to={tasksHref({ ...base, situation: 'overdue' })}
+      label="Próximo prazo legal"
+      badge={when}
+      title={`${next.name} · ${formatDateBR(next.legalDueDate).slice(0, 5)}`}
+      caption={`${next.pending} de ${live} ${live === 1 ? 'cliente pendente' : 'clientes pendentes'} · ${next.department.name}`}
+      onClick={() => openOccurrence(next)}
     />
   );
 }

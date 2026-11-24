@@ -56,7 +56,7 @@ Estado do projeto para quem continuar o trabalho (pessoa ou agente). Leia junto 
   colunas que se arrastam (`SortableBoard`), texto sem vermelho nos painéis (`.calm-text`), sem o botão
   "Nova tarefa" no topo do Início (fica na barra inferior). Também: `StackedBar` e `MiniStat solid`.
   - Gestão: Início com filtros fixos (departamento + **competência**: uma competência passada é contada no
-    seu último dia, `asOf`), vencimentos numa tabela e o card "Pedidos dos clientes"; Clientes com coluna
+    seu último dia, `asOf`), vencimentos em quatro cards lado a lado (uma linha do quadro) e o card "Pedidos dos clientes"; Clientes com coluna
     Tarefas; Relatório de tarefas com "Por responsável" numa linha e ordenação no título das colunas.
   - Financeiro: card sólido de inadimplência ao lado dos números do Painel; célula sólida de Vencido
     (Receber/Pagar) e de Conferido (Recebimentos).
