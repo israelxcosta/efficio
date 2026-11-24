@@ -43,7 +43,7 @@ import { clientActiveIn, defaultWindow, ensureOccurrences, loadClients } from '.
 import { resolveView } from './home';
 import { aggregateOccurrences, byUrgency } from './occurrences';
 import { clientDisplayName, departmentNames } from './shared';
-import { AGGREGATED_SQL, NOT_OCCURRENCE_SQL, OCCURRENCE_SQL, OPEN_SQL, WORK_DATE } from './task-rows';
+import { AGGREGATED_SQL, asOfSql, NOT_OCCURRENCE_SQL, OCCURRENCE_SQL, referenceDay, WORK_DATE } from './task-rows';
 
 type DashboardQuery = z.output<typeof taskDashboardQuerySchema>;
 
@@ -189,23 +189,30 @@ async function incompleteCard(ctx: TaskContext): Promise<NonNullable<TaskDashboa
 }
 
 export async function taskDashboard(ctx: TaskContext, q: DashboardQuery): Promise<TaskDashboardResponse> {
-  const t = ctx.today;
+  const today = ctx.today;
+  const month: MonthKey = q.month ?? monthKey(today);
+  await ensureOccurrences(ctx, [...new Set([month, ...defaultWindow(today)])]);
+  // Reference day: today, or the last day of a past competence. Every card counts the situation on that
+  // day ("how the month ended"); the flow shows that month's last 7 days and the agenda what was ahead.
+  const t = referenceDay(month, today);
+  const past = t < today;
   const current = monthKey(t);
-  const month: MonthKey = q.month ?? current;
-  await ensureOccurrences(ctx, [...new Set([month, ...defaultWindow(t)])]);
+  const a = asOfSql(t, past);
   const { view, department } = await resolveView(ctx, q.departmentId);
   const scope = view === 'department' ? eq(tasks.departmentId, department!.id) : view === 'mine' ? eq(tasks.assigneeId, ctx.userId) : undefined;
   const { from, to } = monthRange(month);
-  const overdue = sql`${OPEN_SQL} and ${tasks.dueDate} < ${t}`;
-  const pending = sql`${OPEN_SQL} and not (${tasks.dueDate} is not null and ${tasks.dueDate} < ${t})`;
+  const overdue = a.overdue;
+  const pending = sql`${a.open} and not (${tasks.dueDate} is not null and ${tasks.dueDate} < ${t})`;
   // Obligations of the competence: the registry's occurrences (tasks' recurrences are tasks, migration 0019).
   const ofCompetence = and(eq(tasks.workspaceId, ctx.workspaceId), AGGREGATED_SQL, scope, eq(tasks.competence, month));
-  const lastFlowDay = addDays(t, FLOW_DAYS - 1);
+  // Flow: today and the next 6 days; for a past competence, its last 7 days (still open at its end).
+  const flowFrom = past ? addDays(t, -(FLOW_DAYS - 1)) : t;
+  const lastFlowDay = addDays(flowFrom, FLOW_DAYS - 1);
 
   const [[status], flowRows, processRows, fiscalItems, upcoming, pastThisMonth, perClient, clients, names, documents, certificates, conventions, fees, incomplete] =
     await Promise.all([
       ctx.db
-        .select({ total: count(), pending: count(pending), concluded: count(sql`${tasks.status} in ('done', 'canceled')`), overdue: count(overdue) })
+        .select({ total: count(), pending: count(pending), concluded: count(a.closed), overdue: count(overdue) })
         .from(tasks)
         .where(
           and(
@@ -217,28 +224,29 @@ export async function taskDashboard(ctx: TaskContext, q: DashboardQuery): Promis
       ctx.db
         .select({ date: sql<string>`(${WORK_DATE})::text`, recurring: count(OCCURRENCE_SQL), standalone: count(NOT_OCCURRENCE_SQL) })
         .from(tasks)
-        .where(and(eq(tasks.workspaceId, ctx.workspaceId), scope, OPEN_SQL, sql`${WORK_DATE} between ${t}::date and ${lastFlowDay}::date`))
+        .where(and(eq(tasks.workspaceId, ctx.workspaceId), scope, a.open, sql`${WORK_DATE} between ${flowFrom}::date and ${lastFlowDay}::date`))
         .groupBy(WORK_DATE),
       ctx.db
         .select({
           departmentId: tasks.departmentId,
           recurringCount: sql<number>`count(distinct ${tasks.recurringTaskId})`.mapWith(Number),
           total: count(),
-          done: count(sql`${tasks.status} = 'done'`),
+          done: count(a.done),
           pending: count(pending),
           overdue: count(overdue),
         })
         .from(tasks)
         .where(ofCompetence)
         .groupBy(tasks.departmentId),
-      aggregateOccurrences(ctx, and(scope, eq(tasks.competence, month))),
+      aggregateOccurrences(ctx, and(scope, eq(tasks.competence, month)), past ? { asOf: t } : {}),
       aggregateOccurrences(
         ctx,
         and(scope, inArray(tasks.competence, [current, addMonthKey(current, 1)]), gte(tasks.dueDate, t), lte(tasks.dueDate, addDays(t, AGENDA_DAYS))),
+        past ? { asOf: t } : {},
       ),
-      aggregateOccurrences(ctx, and(scope, eq(tasks.competence, current), lt(tasks.dueDate, t))),
+      aggregateOccurrences(ctx, and(scope, eq(tasks.competence, current), lt(tasks.dueDate, t)), past ? { asOf: t } : {}),
       ctx.db
-        .select({ clientId: tasks.clientId, pending: count(OPEN_SQL), overdue: count(overdue) })
+        .select({ clientId: tasks.clientId, pending: count(a.open), overdue: count(overdue) })
         .from(tasks)
         .where(ofCompetence)
         .groupBy(tasks.clientId),
@@ -264,7 +272,7 @@ export async function taskDashboard(ctx: TaskContext, q: DashboardQuery): Promis
 
   const flowByDay = new Map(flowRows.map((r) => [r.date, r]));
   const flow = Array.from({ length: FLOW_DAYS }, (_, i) => {
-    const date = addDays(t, i);
+    const date = addDays(flowFrom, i);
     const row = flowByDay.get(date);
     return { date, recurring: row?.recurring ?? 0, standalone: row?.standalone ?? 0 };
   });
@@ -288,7 +296,8 @@ export async function taskDashboard(ctx: TaskContext, q: DashboardQuery): Promis
   for (const item of overviewItems) overviewCounts[item.status] += 1;
 
   return {
-    today: t,
+    today,
+    asOf: t,
     month,
     view,
     department,

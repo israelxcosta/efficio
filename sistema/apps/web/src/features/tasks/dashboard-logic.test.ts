@@ -184,6 +184,11 @@ describe('status cards of the Início', () => {
     expect(flowInsight(days)).toBe('5 em aberto em 7 dias · pico ter 10 (4)');
     expect(flowInsight(flowDays([{ date: TODAY, recurring: 2, standalone: 0 }], TODAY))).toBe('2 em aberto em 7 dias · pico hoje (2)');
     expect(flowInsight(flowDays([], TODAY))).toBe('Nada em aberto nos próximos 7 dias');
+    // A past competence: its last 7 days, no "Hoje", and the finding says the month ended with them open.
+    const last = flowDays([{ date: '2026-10-31', recurring: 1, standalone: 1 }], '2026-10-25', TODAY);
+    expect(last.map((d) => d.label)).not.toContain('Hoje');
+    expect(last.at(-1)).toMatchObject({ date: '2026-10-31', total: 2 });
+    expect(flowInsight(last, true)).toBe('2 ficaram em aberto na última semana do mês');
   });
 
   it('says how many legal deadlines fall in the next days and the first one', () => {

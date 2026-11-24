@@ -3,7 +3,8 @@
 // Today is pinned to 2026-10-20 (vitest.config.ts).
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { TASK_PRIORITIES, TASK_REQUEST_CHANNELS, TASK_STATUSES } from '@effinance/shared';
+import { addMonthKey, monthKey, monthRange, TASK_PRIORITIES, TASK_REQUEST_CHANNELS, TASK_STATUSES } from '@effinance/shared';
+import { today } from '../src/lib/clock';
 import type { App } from '../src/app';
 import { tasks } from '../src/db/schema';
 import { executeRows } from '../src/lib/sql';
@@ -712,3 +713,31 @@ describe('tasks: request channel ("Pedido por", ready for the client portal)', (
     expect((await ana.get('/tasks?requestChannel=whatsapp')).body.items).toHaveLength(0);
   });
 });
+
+describe('tasks: start page and dashboard of a past competence', () => {
+  it('count the situation on the last day of that month, not today', async () => {
+    const ana = await registerUser(app, 'Ana Paula Ribeiro');
+    const prev = addMonthKey(monthKey(today()), -1);
+    const { from, to } = monthRange(prev);
+    // Due in the past month and concluded only now (after its end): overdue on its last day.
+    const late = await myTask(ana, { title: 'Balancete de outubro', dueDate: from });
+    expect(late.status).toBe(201);
+    expect((await ana.patch(`/tasks/${late.body.id}/status`, { status: 'done' })).status).toBe(200);
+    // Still open: overdue then and now.
+    await myTask(ana, { title: 'Conciliação bancária', dueDate: from });
+
+    const past = await ana.get(`/tasks/home?month=${prev}`);
+    expect(past.status).toBe(200);
+    expect(past.body.asOf).toBe(to);
+    expect(past.body.totals.overdue).toBe(2);
+    expect(past.body.totals.doneLate).toBe(0);
+    const pastDash = await ana.get(`/tasks/dashboard?month=${prev}`);
+    expect(pastDash.body.asOf).toBe(to);
+    expect(pastDash.body.taskStatus).toMatchObject({ total: 2, overdue: 2, concluded: 0 });
+    expect(pastDash.body.flow[6].date).toBe(to);
+
+    // The current month counts on today (the test clock pins it).
+    expect((await ana.get('/tasks/home')).body.asOf).toBe(today());
+  });
+});
+

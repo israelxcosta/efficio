@@ -148,10 +148,10 @@ export default function TaskHomePage() {
         spotlight={<OverdueSpotlight home={h} options={o} loading={home.isPending} />}
         aside={
           <>
-            <div className="h-[360px]">
+            <div className="h-[300px]">
               <AgendaCard {...cards} />
             </div>
-            <div className="h-[380px]">
+            <div className="h-[340px]">
               <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
             </div>
             <ClientRequestsCard />
@@ -224,7 +224,9 @@ function OverdueSpotlight({ home, options, loading }: { home: TaskHomeResponse |
   const base = listBase(home);
   const t = home.totals;
   const oldest = home.oldestOverdue;
-  const label = home.view === 'all' ? 'Atrasadas no escritório' : home.view === 'department' && home.department ? `Atrasadas no ${home.department.name}` : 'Suas atrasadas';
+  const ref = home.asOf ?? home.today;
+  const on = ref < home.today ? ` em ${ref.slice(8, 10)}/${ref.slice(5, 7)}` : '';
+  const label = home.view === 'all' ? `Atrasadas no escritório${on}` : home.view === 'department' && home.department ? `Atrasadas no ${home.department.name}${on}` : `Suas atrasadas${on}`;
   if (t.overdue === 0) {
     return <SpotlightCard label={label} title="Nada atrasado" caption="Nenhuma tarefa aberta passou do prazo." action={{ label: 'Ver tarefas', to: tasksHref(base) }} />;
   }
@@ -332,11 +334,15 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
   const month = monthName(home?.month ?? monthKey(today));
   const loading = !home;
   const noRecurring = home ? home.obligations.total === 0 && t!.recurring === 0 : false;
-  const legalIn = t?.targetMissedNextLegalDate ? diffInDays(t.targetMissedNextLegalDate, today) : null;
+  // A past competence is counted on its last day ("how the month ended"): labels say so.
+  const ref = home?.asOf ?? today;
+  const past = ref < today;
+  const refDay = ref.slice(8, 10) + '/' + ref.slice(5, 7);
+  const legalIn = t?.targetMissedNextLegalDate ? diffInDays(t.targetMissedNextLegalDate, ref) : null;
 
   const oldestText =
     t && t.overdue > 0 && oldest
-      ? `A mais antiga venceu há ${daysText(oldest.daysOverdue)}: ${oldest.title}${oldest.kind === 'recurring' && oldest.client ? ` · ${oldest.client.name}` : ''}${oldest.assignee ? ` · com ${shortName(oldest.assignee.name)}` : ' · sem responsável'}`
+      ? `A mais antiga ${past ? `tinha ${daysText(oldest.daysOverdue)} de atraso` : `venceu há ${daysText(oldest.daysOverdue)}`}: ${oldest.title}${oldest.kind === 'recurring' && oldest.client ? ` · ${oldest.client.name}` : ''}${oldest.assignee ? ` · com ${shortName(oldest.assignee.name)}` : ' · sem responsável'}`
       : t && t.overdue === 0
         ? `Nada atrasado${where}.`
         : '';
@@ -351,7 +357,7 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
           : 'dentro do prazo legal'
         : 'nada fora da meta'
     : '';
-  const todayText = t ? (t.appointmentsToday ? `${t.appointmentsToday} ${t.appointmentsToday === 1 ? 'compromisso' : 'compromissos'}` : t.dueToday ? 'até o fim do dia' : 'nada para hoje') : '';
+  const todayText = t ? (t.appointmentsToday ? `${t.appointmentsToday} ${t.appointmentsToday === 1 ? 'compromisso' : 'compromissos'}` : t.dueToday ? (past ? 'ainda abertas nesse dia' : 'até o fim do dia') : past ? 'nada nesse dia' : 'nada para hoje') : '';
   const openText = t ? `${t.byStatus.in_progress} em andamento${t.waitingClient > 0 ? ` · ${t.waitingClient} aguardando cliente` : ''}` : '';
   const onTime = done > 0 && t ? Math.round((t.doneOnTime / done) * 100) : null;
   const doneText = t ? (onTime === null ? 'nenhuma concluída ainda' : `${onTime}% no prazo · ${t.doneLate} com atraso`) : '';
@@ -360,7 +366,7 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
     {
       key: 'overdue',
       hero: true,
-      label: 'Atrasadas',
+      label: past ? `Atrasadas em ${refDay}` : 'Atrasadas',
       info: 'Abertas depois do prazo: o vencimento, nas avulsas, ou o prazo legal, nas recorrentes. Conta todas as abertas; a Situação das tarefas conta só as da competência.',
       value: t?.overdue ?? 0,
       tone: t && t.overdue > 0 ? 'danger' : undefined,
@@ -370,7 +376,7 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
       footer:
         t && t.overdue > 0 && oldest ? (
           <>
-            A mais antiga venceu há {daysText(oldest.daysOverdue)}:{' '}
+            A mais antiga {past ? `tinha ${daysText(oldest.daysOverdue)} de atraso` : `venceu há ${daysText(oldest.daysOverdue)}`}:{' '}
             <button type="button" onClick={() => openTask(oldest.id)} className={cn('inline text-left', linkInText)}>
               {oldest.title}
             </button>
@@ -395,10 +401,10 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
     },
     {
       key: 'today',
-      label: 'Vencem hoje',
-      info: 'Avulsas com vencimento hoje e recorrentes com meta hoje.',
+      label: past ? `Venciam em ${refDay}` : 'Vencem hoje',
+      info: past ? `Avulsas com vencimento em ${refDay} e recorrentes com meta nesse dia, ainda abertas.` : 'Avulsas com vencimento hoje e recorrentes com meta hoje.',
       value: t?.dueToday ?? 0,
-      href: tasksHref({ ...base, dueDate: today as never }),
+      href: tasksHref({ ...base, dueDate: ref as never }),
       aria: `Vencem hoje${where}: ${t?.dueToday ?? 0}. Ver na lista de tarefas.`,
       footer: todayText,
       footerTitle: todayText,
@@ -406,16 +412,16 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
     },
     {
       key: 'next7',
-      label: 'Próximos 7 dias',
+      label: past ? `7 dias após ${refDay}` : 'Próximos 7 dias',
       value: t?.dueNext7Days ?? 0,
       href: tasksHref({ ...base }),
       aria: `Vencem nos próximos 7 dias${where}: ${t?.dueNext7Days ?? 0}. Ver na lista de tarefas.`,
-      footer: `até ${shortDate(addDays(today, 7), today)}`,
+      footer: `até ${shortDate(addDays(ref, 7), today)}`,
       loading,
     },
     {
       key: 'open',
-      label: 'Em aberto',
+      label: past ? `Em aberto em ${refDay}` : 'Em aberto',
       value: t?.open ?? 0,
       href: tasksHref({ ...base }),
       aria: `Em aberto${where}: ${t?.open ?? 0}. Ver na lista de tarefas.`,

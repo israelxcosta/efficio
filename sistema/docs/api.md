@@ -1128,6 +1128,16 @@ membro do espaço → 422.
   da competência atual em diante passaram ao responsável padrão (ou à fila); as demais mantiveram a
   pessoa, agora como `manual` (nada já trabalhado trocou de mãos; sem registro no histórico).
 
+### Competência passada no Início e no dashboard (`month`)
+
+- `GET /tasks/home` e `GET /tasks/dashboard` devolvem `asOf`: o **dia de referência** das contagens — hoje no
+  mês atual (ou futuro), o **último dia** de uma competência passada. Numa competência passada tudo é contado
+  como estava nesse dia (`asOfSql` em `task-rows.ts`): aberta = não encerrada até o dia (inclusive as
+  concluídas depois dele), atrasada = aberta com vencimento antes do dia, concluída/cancelada = encerrada
+  até o dia. O fluxo mostra os últimos 7 dias do mês (o que ficou em aberto) e a agenda o que vinha depois.
+  "Minhas tarefas" é sempre sobre hoje. A data de criação não filtra (trabalho lançado depois ainda é do
+  mês em que venceu); a cancelada usa a última alteração como dia (não há data de cancelamento).
+
 ### Pedido por (`requestChannel`, migração 0029)
 
 - Campo opcional da tarefa: o canal em que o cliente pediu — `portal`, `whatsapp`, `email`, `phone`,

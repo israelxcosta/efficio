@@ -8,6 +8,7 @@ import {
   daysOverdue,
   isTargetMissed,
   isTaskOverdue,
+  monthRange,
   occurrenceSituationOf,
   type ISODate,
   type Task,
@@ -266,3 +267,30 @@ export function overdueRef(task: Task, today: ISODate): TaskOverdueRef {
   };
 }
 
+
+/**
+ * A task's situation on a reference day `r` (the last day of a past competence on the start page and
+ * the dashboard; today otherwise): open then = not closed by `r` (still open, or closed after it);
+ * done/canceled = closed by `r`. With `r` = today these are exactly OPEN_SQL / done / canceled. The
+ * creation date is not a filter on purpose: work registered late (an import, a forgotten task) still
+ * belongs to the month it was due. A canceled task's day is its last update (no cancel timestamp).
+ */
+export function asOfSql(r: ISODate, past = true) {
+  // The current competence keeps the plain "now" rules (nothing can be closed after today).
+  if (!past) {
+    const done = sql`(${tasks.status} = 'done')`;
+    const canceled = sql`(${tasks.status} = 'canceled')`;
+    return { open: sql`(${OPEN_SQL})`, done, canceled, closed: sql`(${CLOSED_SQL})`, overdue: sql`(${OPEN_SQL} and ${tasks.dueDate} < ${r})` };
+  }
+  const closedDay = sql`(coalesce(${tasks.completedAt}, ${tasks.updatedAt}) at time zone 'America/Sao_Paulo')::date`;
+  const open = sql`(${OPEN_SQL} or (${CLOSED_SQL} and ${closedDay} > ${r}))`;
+  const done = sql`(${tasks.status} = 'done' and ${COMPLETED_DAY} <= ${r})`;
+  const canceled = sql`(${tasks.status} = 'canceled' and ${closedDay} <= ${r})`;
+  return { open, done, canceled, closed: sql`(${done} or ${canceled})`, overdue: sql`(${open} and ${tasks.dueDate} < ${r})` };
+}
+
+/** Reference day of a competence: its last day when it is over, today otherwise. */
+export function referenceDay(month: string, today: ISODate): ISODate {
+  const end = monthRange(month).to;
+  return end < today ? end : today;
+}

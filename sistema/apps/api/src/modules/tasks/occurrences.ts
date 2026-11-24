@@ -13,6 +13,7 @@ import {
   occurrenceStatusOf,
   TASK_TIME_ZONE,
   type AssigneeSource,
+  type ISODate,
   type OccurrenceAssigneeCount,
   type OccurrenceCell,
   type OccurrenceClient,
@@ -26,7 +27,7 @@ import { appendTo } from '../../lib/collections';
 import { inChunks } from '../../lib/sql';
 import type { TaskContext } from './access';
 import { clientDisplayName, departmentNames, memberRef, personRef, requiredMemberRef } from './shared';
-import { AGGREGATED_SQL, COMPLETED_DAY, OPEN_SQL } from './task-rows';
+import { AGGREGATED_SQL, asOfSql, COMPLETED_DAY } from './task-rows';
 
 const count = (cond?: SQL) =>
   (cond ? sql<number>`count(*) filter (where ${cond})` : sql<number>`count(*)`).mapWith(Number);
@@ -41,13 +42,16 @@ export const MAX_OCCURRENCE_GROUPS = 200;
 export async function aggregateOccurrences(
   ctx: Pick<TaskContext, 'db' | 'workspaceId' | 'members' | 'today'>,
   where: SQL | undefined,
-  opts: { limit?: number } = {},
+  /** `asOf`: count each occurrence as it stood on that day (the last day of a past competence). */
+  opts: { limit?: number; asOf?: ISODate } = {},
 ): Promise<RecurringOccurrence[]> {
-  const t = ctx.today;
+  const t = opts.asOf ?? ctx.today;
+  const a = asOfSql(t, opts.asOf !== undefined);
+  const OPEN = a.open;
   // Only the registry's occurrences are aggregated: a task's recurrence is listed as tasks (0019).
   const base = and(eq(tasks.workspaceId, ctx.workspaceId), AGGREGATED_SQL, where);
-  const legal = sql<string>`coalesce(min(${tasks.dueDate}) filter (where ${OPEN_SQL}), min(${tasks.dueDate}))::text`;
-  const target = sql<string>`coalesce(min(${tasks.targetDate}) filter (where ${OPEN_SQL}), min(${tasks.targetDate}))::text`;
+  const legal = sql<string>`coalesce(min(${tasks.dueDate}) filter (where ${OPEN}), min(${tasks.dueDate}))::text`;
+  const target = sql<string>`coalesce(min(${tasks.targetDate}) filter (where ${OPEN}), min(${tasks.targetDate}))::text`;
   const groups = await ctx.db
     .select({
       recurringTaskId: tasks.recurringTaskId,
@@ -57,13 +61,13 @@ export async function aggregateOccurrences(
       legal,
       target,
       total: count(),
-      done: count(sql`${tasks.status} = 'done'`),
-      doneLate: count(sql`${tasks.status} = 'done' and ${COMPLETED_DAY} > ${tasks.dueDate}`),
-      canceled: count(sql`${tasks.status} = 'canceled'`),
-      inProgress: count(sql`${tasks.status} in ('in_progress', 'waiting_client')`),
-      pending: count(OPEN_SQL),
-      overduePending: count(sql`${OPEN_SQL} and ${tasks.dueDate} < ${t}`),
-      targetMissedPending: count(sql`${OPEN_SQL} and ${tasks.targetDate} < ${t} and ${tasks.dueDate} >= ${t}`),
+      done: count(a.done),
+      doneLate: count(sql`${a.done} and ${COMPLETED_DAY} > ${tasks.dueDate}`),
+      canceled: count(a.canceled),
+      inProgress: count(sql`${tasks.status} in ('in_progress', 'waiting_client') and ${OPEN}`),
+      pending: count(OPEN),
+      overduePending: count(sql`${OPEN} and ${tasks.dueDate} < ${t}`),
+      targetMissedPending: count(sql`${OPEN} and ${tasks.targetDate} < ${t} and ${tasks.dueDate} >= ${t}`),
     })
     .from(tasks)
     .where(base)
@@ -136,7 +140,7 @@ export async function aggregateOccurrences(
         inProgress: g.inProgress,
         pending: g.pending,
         overdue,
-        daysOverdue: overdue ? daysOverdue(g.legal, ctx.today) : 0,
+        daysOverdue: overdue ? daysOverdue(g.legal, t) : 0,
         targetMissed: !overdue && g.targetMissedPending > 0,
         status: occurrenceStatusOf(g),
       },

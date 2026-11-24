@@ -45,16 +45,16 @@ interface SpotlightCardProps {
 export function SpotlightCard({ label, badge, badgeDanger, value, title, caption, rows, children, action, secondary, loading, className }: SpotlightCardProps) {
   if (loading) {
     return (
-      <section className={cn('rounded-xl bg-hero-from p-5', className)} aria-busy="true">
+      <section className={cn('rounded-xl bg-hero-from p-4', className)} aria-busy="true">
         <Skeleton className="h-3 w-32 bg-white/15" />
-        <Skeleton className="mt-4 h-8 w-24 bg-white/15" />
+        <Skeleton className="mt-3 h-7 w-20 bg-white/15" />
         <Skeleton className="mt-2 h-3 w-40 bg-white/15" />
-        <Skeleton className="mt-6 h-10 w-full bg-white/15" />
+        <Skeleton className="mt-4 h-9 w-full bg-white/15" />
       </section>
     );
   }
   return (
-    <section className={cn('flex flex-col rounded-xl bg-hero-from p-5 text-white', className)}>
+    <section className={cn('flex flex-col rounded-xl bg-hero-from p-4 text-white', className)}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-caption font-medium text-hero-accent">{label}</h2>
         {badge ? (
@@ -68,10 +68,10 @@ export function SpotlightCard({ label, badge, badgeDanger, value, title, caption
           </span>
         ) : null}
       </div>
-      {value !== undefined ? <p className="tabular mt-3 text-[34px] leading-[1.1] font-bold tracking-tight">{value}</p> : null}
-      {title ? <p className="mt-3 text-[17px] leading-snug font-semibold">{title}</p> : null}
-      {caption ? <p className="mt-1 text-caption text-hero-accent">{caption}</p> : null}
-      {rows?.length || children ? <div className="my-4 h-px bg-white/14" aria-hidden /> : null}
+      {value !== undefined ? <p className="tabular mt-2 text-[28px] leading-[1.1] font-bold tracking-tight">{value}</p> : null}
+      {title ? <p className="mt-2 text-[15px] leading-snug font-semibold">{title}</p> : null}
+      {caption ? <p className="mt-1 line-clamp-2 text-mini text-hero-accent">{caption}</p> : null}
+      {rows?.length || children ? <div className="my-3 h-px bg-white/14" aria-hidden /> : null}
       {children}
       {rows?.length ? (
         <dl className="flex flex-col">
@@ -82,7 +82,7 @@ export function SpotlightCard({ label, badge, badgeDanger, value, title, caption
                 <dd className={cn('tabular shrink-0 font-semibold', r.danger ? 'text-on-solid-danger' : 'text-white')}>{r.value}</dd>
               </>
             );
-            const cls = 'flex items-baseline justify-between gap-3 py-1 text-caption';
+            const cls = 'flex items-baseline justify-between gap-3 py-0.5 text-mini';
             return r.to ? (
               <Link key={i} to={r.to} className={cn(cls, 'rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-white')}>
                 {inner}
@@ -96,7 +96,7 @@ export function SpotlightCard({ label, badge, badgeDanger, value, title, caption
         </dl>
       ) : null}
       {action || secondary ? (
-        <div className="mt-4 flex gap-2">
+        <div className="mt-3 flex gap-2">
           {action ? <SolidButton action={action} primary /> : null}
           {secondary ? <SolidButton action={secondary} /> : null}
         </div>
@@ -107,7 +107,7 @@ export function SpotlightCard({ label, badge, badgeDanger, value, title, caption
 
 function SolidButton({ action, primary }: { action: SpotlightAction; primary?: boolean }) {
   const cls = cn(
-    'inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-body-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
+    'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-caption font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
     primary ? 'flex-1 bg-white text-hero-from hover:bg-white/90' : 'text-white ring-1 ring-white/30 ring-inset hover:bg-white/10',
   );
   const content = (

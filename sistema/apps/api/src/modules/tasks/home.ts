@@ -31,6 +31,8 @@ import { defaultWindow, ensureOccurrences } from './generation';
 import { aggregateOccurrences, byUrgency } from './occurrences';
 import { clientRef, departmentNames, departmentOfMember, memberRef } from './shared';
 import {
+  asOfSql,
+  referenceDay,
   bucketSql,
   CLOSED_SQL,
   COMPLETED_DAY,
@@ -52,22 +54,17 @@ const CLOSED_DAY = sql`(coalesce(${tasks.completedAt}, ${tasks.updatedAt}) at ti
 
 const count = (cond: SQL) => sql<number>`count(*) filter (where ${cond})`.mapWith(Number);
 
-function outcomeCounts(today: string) {
-  const overdue = sql`${OPEN_SQL} and ${tasks.dueDate} < ${today}`;
+/** Outcomes on the reference day `r` (today, or the last day of a past competence). */
+function outcomeCounts(r: string, past: boolean) {
+  const a = asOfSql(r, past);
   return {
     total: sql<number>`count(*)`.mapWith(Number),
-    open: count(
-      sql`${OPEN_SQL} and not (${tasks.dueDate} is not null and ${tasks.dueDate} < ${today})`,
-    ),
-    overdue: count(overdue),
-    dueToday: count(sql`${OPEN_SQL} and ${WORK_DATE} = ${today} and ${tasks.dueDate} >= ${today}`),
-    doneOnTime: count(
-      sql`${tasks.status} = 'done' and (${tasks.dueDate} is null or ${COMPLETED_DAY} <= ${tasks.dueDate})`,
-    ),
-    doneLate: count(
-      sql`${tasks.status} = 'done' and ${tasks.dueDate} is not null and ${COMPLETED_DAY} > ${tasks.dueDate}`,
-    ),
-    canceled: count(sql`${tasks.status} = 'canceled'`),
+    open: count(sql`${a.open} and not (${tasks.dueDate} is not null and ${tasks.dueDate} < ${r})`),
+    overdue: count(a.overdue),
+    dueToday: count(sql`${a.open} and ${WORK_DATE} = ${r} and ${tasks.dueDate} >= ${r}`),
+    doneOnTime: count(sql`${a.done} and (${tasks.dueDate} is null or ${COMPLETED_DAY} <= ${tasks.dueDate})`),
+    doneLate: count(sql`${a.done} and ${tasks.dueDate} is not null and ${COMPLETED_DAY} > ${tasks.dueDate}`),
+    canceled: count(a.canceled),
   };
 }
 
@@ -108,7 +105,12 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
   const month: MonthKey = q.month ?? monthKey(ctx.today);
   await ensureOccurrences(ctx, [...new Set([month, ...defaultWindow(ctx.today)])]);
   const { from, to } = monthRange(month);
-  const t = ctx.today;
+  const today = ctx.today;
+  // Every count is taken on the reference day: today, or the last day of a past competence ("how the
+  // month ended"). "Minhas tarefas" stays about now.
+  const t = referenceDay(month, today);
+  const past = t < today;
+  const a = asOfSql(t, past);
   const { view, department } = await resolveView(ctx, q.departmentId);
   const scope =
     view === 'department'
@@ -118,21 +120,21 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
         : undefined;
   const week = addDays(t, 7);
   const inMonth = or(
-    OPEN_SQL,
+    a.open,
     and(gte(tasks.dueDate, from), lte(tasks.dueDate, to)),
     and(CLOSED_SQL, sql`${CLOSED_DAY} between ${from} and ${to}`),
   );
   // Occurrences (generated ahead) count when they are of the competence, or still open and either late
   // (an earlier competence) or due within the next 7 days.
-  const unit = sql`((${NOT_OCCURRENCE_SQL} and ${inMonth}) or (${OCCURRENCE_SQL} and (${tasks.competence} = ${month} or (${OPEN_SQL} and (${tasks.competence} < ${month} or ${tasks.dueDate} <= ${week})))))`;
+  const unit = sql`((${NOT_OCCURRENCE_SQL} and ${inMonth}) or (${OCCURRENCE_SQL} and (${tasks.competence} = ${month} or (${a.open} and (${tasks.competence} < ${month} or ${tasks.dueDate} <= ${week})))))`;
   const where = and(eq(tasks.workspaceId, ctx.workspaceId), scope, unit);
   // "Minhas tarefas": occurrences up to the next competence.
-  const horizon = sql`(${NOT_OCCURRENCE_SQL} or ${tasks.competence} <= ${addMonthKey(monthKey(t), 1)})`;
-  const outcomes = outcomeCounts(t);
-  const targetMissed = sql`${OPEN_SQL} and ${bucketSql('targetMissed', t)}`;
+  const horizon = sql`(${NOT_OCCURRENCE_SQL} or ${tasks.competence} <= ${addMonthKey(monthKey(today), 1)})`;
+  const outcomes = outcomeCounts(t, past);
+  const targetMissed = sql`${a.open} and ${bucketSql('targetMissed', t)}`;
   // My open items in any department: counted in SQL; the first tasks loaded (occurrences aggregated).
   // A task's recurrence counts its next 7 days and its next open occurrence (like the list).
-  const mineOpen = and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.assigneeId, ctx.userId), OPEN_SQL, horizon, visibleSeriesSql(t));
+  const mineOpen = and(eq(tasks.workspaceId, ctx.workspaceId), eq(tasks.assigneeId, ctx.userId), OPEN_SQL, horizon, visibleSeriesSql(today));
 
   const [[totals], perStatus, perAssignee, perClient, [oldest], mine, [mineTotals], mineOccurrences, obligations] =
     await Promise.all([
@@ -141,9 +143,10 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
           ...outcomes,
           targetMissed: count(targetMissed),
           targetMissedNext: sql<string | null>`min(${tasks.dueDate}) filter (where ${targetMissed})::text`,
-          appointmentsToday: count(sql`${OPEN_SQL} and ${tasks.dueDate} = ${t} and ${tasks.startTime} is not null`),
-          dueNext7: count(sql`${OPEN_SQL} and ${WORK_DATE} > ${t} and ${WORK_DATE} <= ${week}`),
-          waitingClient: count(sql`${tasks.status} = 'waiting_client'`),
+          appointmentsToday: count(sql`${a.open} and ${tasks.dueDate} = ${t} and ${tasks.startTime} is not null`),
+          dueNext7: count(sql`${a.open} and ${WORK_DATE} > ${t} and ${WORK_DATE} <= ${week}`),
+          // The status history is not kept: "aguardando cliente" is the current status of the items open then.
+          waitingClient: count(sql`${tasks.status} = 'waiting_client' and ${a.open}`),
           recurring: count(OCCURRENCE_SQL),
         })
         .from(tasks)
@@ -173,7 +176,7 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
         .where(where)
         .groupBy(tasks.clientId, contacts.name, contacts.tradeName),
       selectTasks(ctx, {
-        where: and(scope, OPEN_SQL, sql`${tasks.dueDate} < ${t}`),
+        where: and(scope, a.overdue),
         orderBy: [asc(tasks.dueDate), sql`${priorityRank}`],
         limit: 1,
       }),
@@ -181,13 +184,13 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
       ctx.db
         .select({
           open: sql<number>`count(*)`.mapWith(Number),
-          overdue: count(sql`${tasks.dueDate} < ${t}`),
-          dueToday: count(sql`${WORK_DATE} = ${t} and ${tasks.dueDate} >= ${t}`),
+          overdue: count(sql`${tasks.dueDate} < ${today}`),
+          dueToday: count(sql`${WORK_DATE} = ${today} and ${tasks.dueDate} >= ${today}`),
         })
         .from(tasks)
         .where(mineOpen),
       aggregateOccurrences(ctx, and(eq(tasks.assigneeId, ctx.userId), OPEN_SQL, horizon)),
-      aggregateOccurrences(ctx, and(scope, eq(tasks.competence, month))),
+      aggregateOccurrences(ctx, and(scope, eq(tasks.competence, month)), past ? { asOf: t } : {}),
     ]);
   const sum = totals!;
   const byStatus = Object.fromEntries(TASK_STATUSES.map((s) => [s, 0])) as Record<
@@ -238,12 +241,13 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
     { total: 0, done: 0, canceled: 0, pending: 0 },
   );
   const [obligationOverdue] = await ctx.db
-    .select({ n: count(sql`${OPEN_SQL} and ${tasks.dueDate} < ${t}`) })
+    .select({ n: count(a.overdue) })
     .from(tasks)
     .where(and(eq(tasks.workspaceId, ctx.workspaceId), AGGREGATED_SQL, scope, eq(tasks.competence, month)));
 
   return {
-    today: t,
+    today,
+    asOf: t,
     month,
     view,
     department,
@@ -271,7 +275,7 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
       open: mineTotals?.open ?? 0,
       overdue: mineTotals?.overdue ?? 0,
       dueToday: mineTotals?.dueToday ?? 0,
-      tasks: byDue(mine, t).slice(0, MINE_LIMIT),
+      tasks: byDue(mine, today).slice(0, MINE_LIMIT),
       occurrences: mineOccurrences.sort(byUrgency),
     },
     obligations: {

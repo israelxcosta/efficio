@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 const LAYOUT = {
   // From 1280px: content on the left, the spotlight and the small cards on the right.
   xl: {
-    grid: 'xl:grid-cols-[minmax(0,1fr)_300px] xl:grid-rows-[auto_1fr] xl:gap-x-6 xl:gap-y-3.5',
+    grid: 'xl:grid-cols-[minmax(0,1fr)_256px] xl:grid-rows-[auto_1fr] xl:gap-x-6 xl:gap-y-3.5',
     spot: 'xl:col-start-2 xl:row-start-1',
     main: 'xl:col-start-1 xl:row-span-2 xl:row-start-1',
     aside: 'sm:grid-cols-2 xl:col-start-2 xl:row-start-2 xl:grid-cols-1',
@@ -13,7 +13,7 @@ const LAYOUT = {
   },
   // From 1536px only: pages whose main list needs the whole width on laptops (the task list).
   '2xl': {
-    grid: '2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-rows-[auto_1fr] 2xl:gap-x-6 2xl:gap-y-3.5',
+    grid: '2xl:grid-cols-[minmax(0,1fr)_256px] 2xl:grid-rows-[auto_1fr] 2xl:gap-x-6 2xl:gap-y-3.5',
     spot: '2xl:col-start-2 2xl:row-start-1',
     main: '2xl:col-start-1 2xl:row-span-2 2xl:row-start-1',
     aside: '2xl:col-start-2 2xl:row-start-2 2xl:grid-cols-1',
@@ -23,7 +23,7 @@ const LAYOUT = {
 } as const;
 
 /**
- * Page body with the narrow right column (300px) of the "Seu dia" style.
+ * Page body with the narrow right column (256px) of the "Seu dia" style.
  * - From `from` (default 1280px): content on the left, the spotlight (solid card) and the small cards
  *   on the right.
  * - Below, `stack` (default): the spotlight first, then the content, then the small cards (they never

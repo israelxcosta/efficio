@@ -2147,6 +2147,8 @@ export interface TaskObligations {
  */
 export interface TaskHomeResponse {
   today: ISODate;
+  /** Reference day of the counts: today, or the last day of a past competence. "Minhas tarefas" is about today. */
+  asOf: ISODate;
   month: MonthKey;
   /** `department` = one department; `all` = every department (administrators); `mine` = member without department. */
   view: 'department' | 'all' | 'mine';
@@ -2242,6 +2244,11 @@ export interface DashboardIncompleteItem {
 
 export interface TaskDashboardResponse {
   today: ISODate;
+  /**
+   * Reference day of the counts: today, or the last day of a past competence (the cards show how that
+   * month ended; the flow shows its last 7 days and the agenda what was ahead of it).
+   */
+  asOf: ISODate;
   /** Competence of the task cards (default: the current one). */
   month: MonthKey;
   /** Same as the start page: one department, all (`registry`) or, without department, your own items. */
@@ -2249,7 +2256,7 @@ export interface TaskDashboardResponse {
   department: TaskRef | null;
   /** "Situação das tarefas": occurrences of the competence + standalone tasks due in the month. */
   taskStatus: { total: number; pending: number; concluded: number; overdue: number };
-  /** "Fluxo de tarefas por dia": open items per work date, today and the next 6 days. */
+  /** "Fluxo de tarefas por dia": open items per work date, from `asOf` and the next 6 days (a past competence: its last 7 days, open at its end). */
   flow: { date: ISODate; recurring: number; standalone: number }[];
   /** "Processos por departamento": occurrences of the competence per department. */
   processes: { department: TaskRef | null; recurringCount: number; total: number; done: number; pending: number; overdue: number }[];

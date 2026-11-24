@@ -450,7 +450,7 @@ Painel financeiro e o Início da Gestão.
 
 Aprovado pelo dono (relatório consolidado de 24/11/2026). Componentes:
 
-- **`PageWithAside`** (`components/layout/page-with-aside.tsx`): conteúdo + coluna de 300px a partir de
+- **`PageWithAside`** (`components/layout/page-with-aside.tsx`): conteúdo + coluna de 256px a partir de
   1280px (`from="2xl"` = 1536px). Abaixo: o card sólido primeiro, depois o conteúdo, depois os cards
   pequenos (`below="hide"` esconde a coluna). `AsideCard` é o card pequeno da coluna (título 14/600,
   número à direita em `text-muted`).

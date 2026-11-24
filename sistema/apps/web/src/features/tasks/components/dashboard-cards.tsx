@@ -133,12 +133,12 @@ export function FlowCard(p: CardProps & { base: TaskFilterPatch }) {
   return (
     <WidgetCard
       title="Fluxo de tarefas por dia"
-      subtitle={p.data ? flowInsight(flowDays(p.data.flow, p.data.today)) : 'Em aberto, pela data de trabalho, nos próximos 7 dias'}
+      subtitle={p.data ? flowInsight(flowDays(p.data.flow, p.data.flow[0]?.date ?? p.data.today, p.data.today), (p.data.asOf ?? p.data.today) < p.data.today) : 'Em aberto, pela data de trabalho, nos próximos 7 dias'}
       info="Tarefas em aberto pela data de trabalho (a meta interna, nas recorrentes), hoje e nos próximos 6 dias. Clique num dia para ver a lista."
     >
       <Body {...p}>
         {(d) => {
-          const days = flowDays(d.flow, d.today);
+          const days = flowDays(d.flow, d.flow[0]?.date ?? d.today, d.today);
           const max = Math.max(1, ...days.map((x) => x.total));
           return (
             <div className="flex min-h-0 flex-1 flex-col">
@@ -273,7 +273,7 @@ export function AgendaCard(p: CardProps) {
   return (
     <WidgetCard
       title="Agenda"
-      subtitle={past ? 'Vencidas neste mês, com pendências' : p.data ? agendaInsight(p.data.agenda.upcoming, p.data.today) : 'Prazos legais dos próximos 7 dias'}
+      subtitle={past ? 'Vencidas neste mês, com pendências' : p.data ? agendaInsight(p.data.agenda.upcoming, p.data.asOf ?? p.data.today) : 'Prazos legais dos próximos 7 dias'}
       info="Prazos legais das obrigações recorrentes nos próximos 7 dias (hoje incluído). O botão de vencidas mostra as deste mês que ainda têm pendências."
       action={
         overdueCount ? (
@@ -301,7 +301,7 @@ export function AgendaCard(p: CardProps) {
                   <button
                     type="button"
                     onClick={() => openOccurrence(o)}
-                    className="flex min-h-12 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-muted"
+                    className="flex min-h-12 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left @max-xs:gap-2.5 @max-xs:px-1 transition-colors hover:bg-surface-muted"
                   >
                     <span className={cn('flex w-11 shrink-0 flex-col items-center rounded-md border py-1 leading-tight', o.overdue ? 'border-danger/40 text-danger' : 'border-border text-fg')}>
                       <span className="tabular text-body-sm font-semibold">{o.legalDueDate.slice(8, 10)}</span>
@@ -313,7 +313,8 @@ export function AgendaCard(p: CardProps) {
                         {o.pending ? `${o.pending} de ${live} pendentes` : 'Concluída'} · {dl.text}
                       </span>
                     </span>
-                    <span className="tabular shrink-0 text-caption text-muted">{shortDate(o.legalDueDate, d.today)}</span>
+                    {/* The day badge already says the date: in a narrow card (the Início's right column) the name gets the room. */}
+                    <span className="tabular shrink-0 text-caption text-muted @max-xs:hidden">{shortDate(o.legalDueDate, d.today)}</span>
                   </button>
                 );
               }}

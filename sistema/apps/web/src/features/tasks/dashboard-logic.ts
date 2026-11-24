@@ -134,14 +134,15 @@ export function taskStatusBands(s: TaskDashboardResponse['taskStatus']): { bands
 const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
 /** The seven days of "Fluxo de tarefas por dia" (from today), the empty ones included. */
-export function flowDays(flow: TaskDashboardResponse['flow'], today: ISODate): { date: ISODate; label: string; total: number; recurring: number; standalone: number }[] {
+/** The 7 days of the flow from `from` (today, or a past competence's last week); "Hoje" only on today. */
+export function flowDays(flow: TaskDashboardResponse['flow'], from: ISODate, today: ISODate = from): { date: ISODate; label: string; total: number; recurring: number; standalone: number }[] {
   const byDate = new Map(flow.map((f) => [f.date, f]));
   return Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(today, i);
+    const date = addDays(from, i);
     const f = byDate.get(date);
     const recurring = f?.recurring ?? 0;
     const standalone = f?.standalone ?? 0;
-    return { date, label: i === 0 ? 'Hoje' : `${WEEKDAYS[dayOfWeek(date)]} ${date.slice(8, 10)}`, total: recurring + standalone, recurring, standalone };
+    return { date, label: date === today ? 'Hoje' : `${WEEKDAYS[dayOfWeek(date)]} ${date.slice(8, 10)}`, total: recurring + standalone, recurring, standalone };
   });
 }
 
@@ -214,8 +215,9 @@ export function monthElapsed(today: ISODate, month: MonthKey): number {
 }
 
 /** "5 em aberto em 7 dias · pico ter 10 (4)". */
-export function flowInsight(days: ReturnType<typeof flowDays>): string {
+export function flowInsight(days: ReturnType<typeof flowDays>, past = false): string {
   const total = days.reduce((a, d) => a + d.total, 0);
+  if (past) return total === 0 ? 'Nada ficou em aberto na última semana do mês' : `${total} ${total === 1 ? 'ficou' : 'ficaram'} em aberto na última semana do mês`;
   if (total === 0) return 'Nada em aberto nos próximos 7 dias';
   const peak = days.reduce((best, d) => (d.total > best.total ? d : best), days[0]!);
   return `${total} em aberto em 7 dias · pico ${lowerFirst(peak.label)} (${peak.total})`;
