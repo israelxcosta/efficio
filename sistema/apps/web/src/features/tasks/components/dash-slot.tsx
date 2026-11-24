@@ -1,6 +1,6 @@
 // Cards of the Início on the same size system as the financial board (docs/dashboards-redesign.md
 // §4): rows of 96px (88px below 4 columns) with 16px gaps, heights from `heightForRows`, and widths
-// by container band — 12 columns from 1000px, 2 from 560px, 1 below.
+// by container band — 12 columns from 900px, 2 from 560px, 1 below.
 
 import { createContext, useContext, type ComponentProps, type ReactNode } from 'react';
 import { Link } from 'react-router';

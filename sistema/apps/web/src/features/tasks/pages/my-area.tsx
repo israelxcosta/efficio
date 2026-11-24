@@ -55,7 +55,7 @@ export default function MyAreaPage() {
   const { newNote, editNote, openNotes } = useTaskActions();
   const [params, setParams] = useSearchParams();
   const page = useElementSize<HTMLDivElement>();
-  const cols = page.width >= 900 ? 4 : columnsForWidth(page.width || 1280);
+  const cols = columnsForWidth(page.width || 1280);
   const updated = useUpdatedLabel(overview.dataUpdatedAt);
   const o = overview.data;
   const today = o?.today ?? options.data?.today ?? todayISO();

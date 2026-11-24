@@ -83,8 +83,7 @@ export default function TaskHomePage() {
   // The page width picks the columns of the card grid (same bands as the financial board).
   const page = useElementSize();
   const updated = useUpdatedLabel(home.dataUpdatedAt);
-  // The centre column is ~990px at 1440px (the right column takes 300px): 4 columns from 900px there.
-  const cols = page.width >= 900 ? 4 : columnsForWidth(page.width || 1280);
+  const cols = columnsForWidth(page.width || 1280);
 
   function chooseMonth(value: string) {
     const next = new URLSearchParams(params);

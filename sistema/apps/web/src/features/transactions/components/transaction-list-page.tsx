@@ -246,6 +246,9 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
           amount={summary?.overdue}
           tone="danger"
           hint={summary?.overdueCount ? `${summary.overdueCount} em atraso` : 'Nada em atraso'}
+          solid
+          action={status === 'overdue' ? undefined : 'Ver'}
+          onClick={status === 'overdue' ? undefined : () => update({ status: 'overdue' })}
         />
       </MiniStatGroup>
 

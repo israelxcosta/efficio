@@ -106,8 +106,8 @@ describe('sizes', () => {
   it('picks columns from the grid width', () => {
     expect(columnsForWidth(559)).toBe(1);
     expect(columnsForWidth(560)).toBe(2);
-    expect(columnsForWidth(999)).toBe(2);
-    expect(columnsForWidth(1000)).toBe(4);
+    expect(columnsForWidth(899)).toBe(2);
+    expect(columnsForWidth(900)).toBe(4);
   });
 });
 

@@ -41,9 +41,12 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), h
 /** Boards by column count, widest first: a board never arranged follows the one before it. */
 export const BOARD_COLS: readonly BoardCols[] = [4, 2, 1];
 
-/** Column count from the grid's own width (the sidebar rail is not part of it). */
+/**
+ * Column count from the grid's own width (the sidebar rail is not part of it). 4 columns from 900px: the
+ * boards sit beside the 300px right column ("Seu dia" style), about 990px wide on a 1440px screen.
+ */
 export function columnsForWidth(width: number): BoardCols {
-  if (width >= 1000) return 4;
+  if (width >= 900) return 4;
   if (width >= 560) return 2;
   return 1;
 }

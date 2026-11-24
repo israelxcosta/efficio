@@ -116,6 +116,13 @@ interface MiniStatProps {
   hint?: ReactNode;
   info?: ReactNode;
   className?: string;
+  /**
+   * The solid (navy) cell of the strip, for the one figure that asks for action now ("Vencido" > 0):
+   * the "Seu dia" spotlight inside a strip. With `onClick` the cell is a button (filters the list).
+   */
+  solid?: boolean;
+  onClick?: () => void;
+  action?: string;
 }
 
 /**
@@ -133,9 +140,29 @@ export function MiniStatGroup({ className, children, ...props }: HTMLAttributes<
 }
 
 /** A cell of `MiniStatGroup`: label over the value (18px on phones, 24px `text-kpi` from `sm`), left-aligned. */
-export function MiniStat({ label, value, tone, amount, hint, info, className }: MiniStatProps) {
+export function MiniStat({ label, value, tone, amount, hint, info, className, solid, onClick, action }: MiniStatProps) {
   const isZero = amount === 0;
   const alert = isZero ? undefined : tone;
+  if (solid && !isZero) {
+    const body = (
+      <>
+        <span className="flex min-w-0 items-center justify-between gap-2">
+          <span className="truncate text-caption font-medium text-hero-accent">{label}</span>
+          {action ? <span className="shrink-0 text-caption font-semibold text-white underline decoration-white/40 underline-offset-2">{action}</span> : null}
+        </span>
+        <span className="tabular mt-1 block text-lg leading-tight font-semibold tracking-tight text-white sm:mt-1.5 sm:text-kpi">{displayFigure(value)}</span>
+        {hint ? <span className={cn('mt-1 block text-caption', tone === 'danger' ? 'text-on-solid-danger' : 'text-hero-accent')}>{hint}</span> : null}
+      </>
+    );
+    const cls = cn('min-w-0 bg-hero-from px-4 py-3 text-left sm:px-5 sm:py-4', className);
+    return onClick ? (
+      <button type="button" onClick={onClick} className={cn(cls, 'transition-colors hover:bg-hero-from/92 focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white')}>
+        {body}
+      </button>
+    ) : (
+      <div className={cls}>{body}</div>
+    );
+  }
   return (
     <div className={cn('min-w-0 bg-surface px-4 py-3 sm:px-5 sm:py-4', className)}>
       <div className="flex min-w-0 items-center gap-1">

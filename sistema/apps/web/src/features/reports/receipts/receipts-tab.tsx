@@ -154,7 +154,10 @@ export function ReceiptsTab({ from, to }: { from: string; to: string }) {
         <MiniStat
           label="Conferido com o extrato"
           value={r ? formatBRL(r.reconciled) : '—'}
-          hint={r ? `${r.reconciledCount} de ${r.count} recebimentos` : undefined}
+          hint={r ? (r.reconciledCount < r.count ? `${r.reconciledCount} de ${r.count} · faltam ${r.count - r.reconciledCount}` : `${r.reconciledCount} de ${r.count} recebimentos`) : undefined}
+          solid={Boolean(r && r.reconciledCount < r.count)}
+          action={status === 'pending' ? undefined : 'Conferir'}
+          onClick={status === 'pending' ? undefined : () => setStatus('pending')}
           info="Marque cada recebimento (ou o dia inteiro) depois de achá-lo no extrato do banco. Se o pagamento mudar, a marca sai sozinha."
         />
         <MiniStat
