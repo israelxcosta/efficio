@@ -177,14 +177,20 @@ export function onTimeRate(row: Pick<TaskBreakdownRow, 'done' | 'doneOnTime'>): 
   return row.done > 0 ? Math.round((row.doneOnTime / row.done) * 100) : null;
 }
 
-export type PunctualityOrder = 'late' | 'delivered';
+export type PunctualityOrder = 'late' | 'delivered' | 'rate';
 
-/** "Mais atrasos" (late deliveries, then overdue open ones) or "Mais entregas" (concluded). */
+/**
+ * Column sort of the ranking tables: "Atraso" (late deliveries, then overdue open ones), "Total"
+ * (concluded) or "No prazo" (on-time rate; rows without concluded tasks last).
+ */
 export function sortPunctuality(rows: TaskBreakdownRow[], order: PunctualityOrder): TaskBreakdownRow[] {
+  const rate = (r: TaskBreakdownRow) => onTimeRate(r) ?? -1;
   return [...rows].sort((a, b) =>
     order === 'late'
       ? b.doneLate - a.doneLate || b.overdue - a.overdue || b.done - a.done || a.label.localeCompare(b.label, 'pt-BR')
-      : b.done - a.done || b.doneOnTime - a.doneOnTime || a.label.localeCompare(b.label, 'pt-BR'),
+      : order === 'rate'
+        ? rate(b) - rate(a) || b.done - a.done || a.label.localeCompare(b.label, 'pt-BR')
+        : b.done - a.done || b.doneOnTime - a.doneOnTime || a.label.localeCompare(b.label, 'pt-BR'),
   );
 }
 

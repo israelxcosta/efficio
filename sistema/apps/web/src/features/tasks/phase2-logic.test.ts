@@ -678,6 +678,9 @@ describe('reports', () => {
     const rows = [r('A', { doneLate: 1, done: 10 }), r('B', { doneLate: 3, done: 2 }), r('C', { doneLate: 1, overdue: 2, done: 1 })];
     expect(sortPunctuality(rows, 'late').map((x) => x.label)).toEqual(['B', 'C', 'A']);
     expect(sortPunctuality(rows, 'delivered').map((x) => x.label)).toEqual(['A', 'B', 'C']);
+    // "No prazo": the best rate first, rows without concluded tasks last.
+    const rated = [r('A', { done: 4, doneOnTime: 2 }), r('B', { done: 0 }), r('C', { done: 2, doneOnTime: 2 })];
+    expect(sortPunctuality(rated, 'rate').map((x) => x.label)).toEqual(['C', 'A', 'B']);
     const ten = Array.from({ length: 10 }, (_, i) => r(`R${i}`, { done: 1 }));
     const capped = capRows(ten, 8);
     expect(capped).toHaveLength(9);

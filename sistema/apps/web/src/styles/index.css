@@ -112,6 +112,8 @@
   --app-hero-via: var(--brand-800);
   --app-hero-to: var(--brand-800);
   --app-hero-accent: var(--brand-200);
+  /* Red on the solid (spotlight) card: --app-danger has no contrast on navy. */
+  --app-on-solid-danger: #f6c7c4;
 
   --app-scrollbar: rgb(20 23 31 / 0.2);
   --app-scrollbar-hover: rgb(20 23 31 / 0.36);
@@ -193,6 +195,7 @@
   --app-hero-via: #323232;
   --app-hero-to: #323232;
   --app-hero-accent: #f4f3ef;
+  --app-on-solid-danger: #f2b2ad;
 
   --app-scrollbar: rgb(244 243 239 / 0.2);
   --app-scrollbar-hover: rgb(244 243 239 / 0.34);
@@ -269,6 +272,7 @@
   --color-hero-via: var(--app-hero-via);
   --color-hero-to: var(--app-hero-to);
   --color-hero-accent: var(--app-hero-accent);
+  --color-on-solid-danger: var(--app-on-solid-danger);
 
   --color-data: var(--app-data);
   --color-data-soft: var(--app-data-soft);

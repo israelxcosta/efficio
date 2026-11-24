@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { Bar, BarChart, CartesianGrid, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts';
-import { ChevronLeft, ChevronRight, Download, Ellipsis, Printer, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Download, Ellipsis, Printer, SlidersHorizontal, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   addMonthKey,
@@ -33,6 +33,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { Skeleton, SkeletonRows } from '@/components/ui/skeleton';
+import { StackedBar } from '@/components/ui/stacked-bar';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useAuth } from '@/features/auth/auth-context';
 import { toastError } from '@/lib/notify';
@@ -625,107 +626,173 @@ interface PunctualityBlockProps {
   reworkKeys?: ReadonlySet<string>;
 }
 
-function PunctualityBlock({ title, subtitle, rows, max = 8, active, onPick, className, mutedNull, reworkKeys }: PunctualityBlockProps) {
+/**
+ * Punctuality per department/client/category (§14.1). One header line (the title only): the order is
+ * picked in the column titles (Concluídas, Com atraso, No prazo), never in a second row of buttons.
+ */
+function PunctualityBlock({ title, subtitle, rows, max = 8, active, onPick, className, mutedNull = 'Ex-membro', reworkKeys }: PunctualityBlockProps) {
   const [order, setOrder] = useState<PunctualityOrder>('late');
   return (
-    <Block className={className} title={title} subtitle={subtitle} action={<OrderControl value={order} onChange={setOrder} />}>
-      {rows ? <PunctualityList rows={capRows(sortPunctuality(rows, order), max)} active={active} onPick={onPick} mutedNull={mutedNull} reworkKeys={reworkKeys} /> : <SkeletonRows rows={4} />}
+    <Block className={className} title={title} subtitle={subtitle}>
+      {rows ? (
+        <RankTable
+          order={order}
+          onOrder={setOrder}
+          rows={breakdownRanks(capRows(sortPunctuality(rows, order), max), { active, onPick, mutedNull, reworkKeys })}
+          empty="Nenhuma tarefa no período."
+        />
+      ) : (
+        <SkeletonRows rows={4} />
+      )}
     </Block>
   );
 }
 
-function OrderControl({ value, onChange }: { value: PunctualityOrder; onChange: (v: PunctualityOrder) => void }) {
+interface RankRow {
+  key: string;
+  label: string;
+  leading?: ReactNode;
+  badge?: ReactNode;
+  /** Small line under the name ("2 atrasadas em aberto", "média de 3 dias"). */
+  caption?: ReactNode;
+  total: number;
+  onTime: number;
+  late: number;
+  muted?: boolean;
+  pressed?: boolean;
+  onClick?: () => void;
+}
+
+function breakdownRanks(
+  rows: TaskBreakdownRow[],
+  o: { active: string; onPick: (key: string | null) => void; mutedNull: string; reworkKeys?: ReadonlySet<string>; avatars?: boolean },
+): RankRow[] {
+  return rows.map((r) => {
+    const others = r.key === '__others__';
+    const pressed = !others && (r.key ?? '') === o.active && o.active !== '';
+    return {
+      key: r.key ?? 'none',
+      label: r.key === null ? o.mutedNull : r.label,
+      leading: o.avatars && !others ? <MemberAvatar name={r.key ? r.label : null} unassigned={!r.key} /> : undefined,
+      badge: r.key && o.reworkKeys?.has(r.key) ? <ReworkBadge className="shrink-0" /> : undefined,
+      caption: r.overdue ? (
+        <span className="text-danger">
+          {r.overdue} {r.overdue === 1 ? 'atrasada' : 'atrasadas'} em aberto
+        </span>
+      ) : undefined,
+      total: r.done,
+      onTime: r.doneOnTime,
+      late: r.doneLate,
+      muted: r.key === null || others,
+      pressed,
+      onClick: others ? undefined : () => o.onPick(pressed ? '' : r.key),
+    };
+  });
+}
+
+const RANK_COLS = 'grid-cols-[minmax(0,1fr)_3.25rem_3.75rem_3.75rem] @lg:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_3.25rem_3.75rem_3.75rem]';
+
+/** Ranking table with a stacked bar (on time × late); a click on a column title sorts by it. */
+function RankTable({ rows, order, onOrder, empty }: { rows: RankRow[]; order: PunctualityOrder; onOrder: (o: PunctualityOrder) => void; empty: string }) {
+  if (rows.length === 0) return <p className="rounded-lg border border-dashed border-border-strong/80 px-4 py-6 text-center text-body-sm text-muted">{empty}</p>;
+  const max = Math.max(1, ...rows.filter((r) => !r.muted || r.key === 'none').map((r) => r.total));
+  const head = (key: PunctualityOrder, label: string) => (
+    <th scope="col" aria-sort={order === key ? 'descending' : 'none'} className="text-right font-semibold">
+      <button
+        type="button"
+        onClick={() => onOrder(key)}
+        className={cn('-mx-1 inline-flex items-center gap-0.5 rounded px-1 py-0.5 hover:text-fg print:pointer-events-none', order === key ? 'text-brand-text' : 'text-muted')}
+      >
+        {label}
+        {order === key ? <ChevronDown className="size-3" aria-hidden /> : null}
+      </button>
+    </th>
+  );
   return (
-    <span className="print:hidden">
-      <SegmentedControl<PunctualityOrder>
-        size="sm"
-        ariaLabel="Ordem"
-        value={value}
-        onChange={onChange}
-        options={[
-          { value: 'late', label: 'Mais atrasos' },
-          { value: 'delivered', label: 'Mais entregas' },
-        ]}
-      />
-    </span>
+    <div className="@container -mx-2">
+      <table className="w-full text-left">
+        <thead>
+          <tr className={cn('grid items-end gap-x-3 border-b border-border px-2 pb-2 text-micro', RANK_COLS)}>
+            <th scope="col" className="font-semibold text-muted">
+              Nome
+            </th>
+            <th scope="col" className="hidden font-semibold text-muted @lg:block">
+              No prazo × com atraso
+            </th>
+            {head('delivered', 'Total')}
+            {head('late', 'Atraso')}
+            {head('rate', 'No prazo')}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const rate = r.total ? Math.round((r.onTime / r.total) * 100) : null;
+            return (
+              <tr
+                key={r.key}
+                onClick={r.onClick}
+                className={cn(
+                  'grid min-h-12 items-center gap-x-3 border-b border-surface-muted px-2 py-1.5 last:border-b-0',
+                  RANK_COLS,
+                  r.onClick && cn('cursor-pointer rounded-md', toggleClass),
+                )}
+              >
+                <td className="flex min-w-0 items-center gap-2">
+                  {r.leading}
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2">
+                      {r.onClick ? (
+                        <button
+                          type="button"
+                          aria-pressed={r.pressed}
+                          onClick={(e) => (e.stopPropagation(), r.onClick?.())}
+                          className={cn('truncate text-left text-body-sm', r.muted ? 'text-subtle' : 'text-fg', r.pressed && 'font-semibold')}
+                        >
+                          {r.label}
+                        </button>
+                      ) : (
+                        <span className={cn('truncate text-body-sm', r.muted ? 'text-subtle' : 'text-fg')}>{r.label}</span>
+                      )}
+                      {r.badge}
+                    </span>
+                    {r.caption ? <span className="block truncate text-mini text-muted">{r.caption}</span> : null}
+                  </span>
+                </td>
+                <td className="hidden @lg:block">
+                  <StackedBar
+                    max={max}
+                    parts={[
+                      { value: r.onTime, className: 'bg-chart-blue-2', label: 'No prazo' },
+                      { value: r.late, className: 'bg-chart-red', label: 'Com atraso' },
+                    ]}
+                  />
+                </td>
+                <td className="tabular text-right text-[13px] font-semibold text-fg">{r.total}</td>
+                <td className={cn('tabular text-right text-[13px]', r.late ? 'font-semibold text-danger' : 'text-subtle')}>{r.late}</td>
+                <td className="tabular text-right text-[13px] text-fg">{rate === null ? '—' : `${rate}%`}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 px-2 text-mini text-muted print:hidden">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="size-2 rounded-xs bg-chart-blue-2" aria-hidden /> no prazo
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="size-2 rounded-xs bg-chart-red" aria-hidden /> com atraso
+        </span>
+        <span className="ml-auto">Clique no título da coluna para ordenar</span>
+      </p>
+    </div>
   );
 }
 
-/** Punctuality per department/person/client/category (§14.1): bar on time vs late, the rate and the counts. */
-function PunctualityList({
-  rows,
-  active,
-  onPick,
-  avatars,
-  // A null responsible is history: tasks closed by someone who left the office.
-  mutedNull = 'Ex-membro',
-  reworkKeys,
-}: {
-  rows: TaskBreakdownRow[];
-  active: string;
-  onPick: (key: string | null) => void;
-  avatars?: boolean;
-  mutedNull?: string;
-  reworkKeys?: ReadonlySet<string>;
-}) {
-  if (rows.length === 0) return <p className="rounded-lg border border-dashed border-border-strong/80 px-4 py-6 text-center text-body-sm text-muted">Nenhuma tarefa no período.</p>;
-  const maxDone = Math.max(1, ...rows.filter((r) => r.key !== '__others__').map((r) => r.done));
-  return (
-    <ul className="-mx-2 flex flex-col">
-      {rows.map((r) => {
-        const rate = onTimeRate(r);
-        const others = r.key === '__others__';
-        const pressed = !others && (r.key ?? '') === active && active !== '';
-        const label = r.key === null ? mutedNull : r.label;
-        const content = (
-          <>
-            <span className="flex min-w-0 items-center gap-2 [grid-area:name]">
-              {avatars && !others ? <MemberAvatar name={r.key ? r.label : null} unassigned={!r.key} /> : null}
-              <span className={cn('truncate text-body-sm', r.key === null || others ? 'text-subtle' : 'text-fg', pressed && 'font-semibold')}>{label}</span>
-              {r.key && reworkKeys?.has(r.key) ? <ReworkBadge className="shrink-0" /> : null}
-            </span>
-            <span className="mt-1 flex h-2 min-w-0 overflow-hidden [grid-area:bar] @md:mt-0" aria-hidden>
-              {r.doneOnTime > 0 ? <span className="h-full rounded-l-full bg-chart-success last:rounded-r-full" style={{ width: `${(r.doneOnTime / maxDone) * 100}%` }} /> : null}
-              {r.doneLate > 0 ? <span className="h-full rounded-r-full bg-chart-red first:rounded-l-full" style={{ width: `${(r.doneLate / maxDone) * 100}%`, marginLeft: r.doneOnTime ? 2 : 0 }} /> : null}
-            </span>
-            <span className="flex flex-col items-end leading-tight [grid-area:total]">
-              <span className="tabular text-[13px] font-semibold text-fg">{rate === null ? '—' : `${rate}%`}</span>
-              <span className="tabular text-mini whitespace-nowrap text-muted">
-                {/* Only the figure carries the colour; the sentence stays muted (red is a signal, not a texture). */}
-                {r.doneOnTime} no prazo · <span className={r.doneLate ? 'font-semibold text-danger' : undefined}>{r.doneLate}</span> com atraso
-                {r.overdue ? (
-                  <>
-                    {' · '}
-                    <span className="font-semibold text-danger">{r.overdue}</span> {r.overdue === 1 ? 'atrasada' : 'atrasadas'} em aberto
-                  </>
-                ) : null}
-              </span>
-            </span>
-          </>
-        );
-        const cls = cn(
-          'grid min-h-12 w-full items-center gap-x-3 rounded-md px-2 py-1.5 text-left',
-          "grid-cols-[minmax(0,1fr)_auto] [grid-template-areas:'name_total'_'bar_bar']",
-          "@md:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto] @md:[grid-template-areas:'name_bar_total']",
-          !others && toggleClass,
-        );
-        return (
-          <li key={r.key ?? 'none'} className="@container">
-            {others ? (
-              <div className={cls}>{content}</div>
-            ) : (
-              <button type="button" aria-pressed={pressed} className={cls} onClick={() => onPick(pressed ? '' : r.key)}>
-                {content}
-              </button>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-/** "Por responsável" with "Quem concluiu" (productivity: who clicked, average days to conclude). */
+/**
+ * "Por responsável": one control in the header line ("Responsável" = punctuality of the tasks each person
+ * is responsible for; "Quem concluiu" = who clicked, with the average days to conclude). Sorting lives in
+ * the column titles, so nothing wraps to a second row.
+ */
 function AssigneeBlock({ r, active, onPick, className }: { r: TaskReportResponse | undefined; active: string; onPick: (key: string | null) => void; className?: string }) {
   const [mode, setMode] = useState<'assignee' | 'concluder'>('assignee');
   const [order, setOrder] = useState<PunctualityOrder>('late');
@@ -735,7 +802,7 @@ function AssigneeBlock({ r, active, onPick, className }: { r: TaskReportResponse
       title="Por responsável"
       info={mode === 'concluder' ? 'Conclusões no período por quem clicou, com a média de dias da criação à conclusão.' : undefined}
       action={
-        <span className="flex flex-wrap justify-end gap-1.5 print:hidden">
+        <span className="shrink-0 print:hidden">
           <SegmentedControl<'assignee' | 'concluder'>
             size="sm"
             ariaLabel="Agrupar por"
@@ -752,49 +819,36 @@ function AssigneeBlock({ r, active, onPick, className }: { r: TaskReportResponse
       {!r ? (
         <SkeletonRows rows={4} />
       ) : mode === 'assignee' ? (
-        <>
-          <div className="mb-2 self-end print:hidden">
-            <OrderControl value={order} onChange={setOrder} />
-          </div>
-          <PunctualityList rows={capRows(sortPunctuality(r.byAssignee, order), 8)} active={active} onPick={onPick} avatars />
-        </>
+        <RankTable
+          order={order}
+          onOrder={setOrder}
+          rows={breakdownRanks(capRows(sortPunctuality(r.byAssignee, order), 8), { active, onPick, mutedNull: 'Ex-membro', avatars: true })}
+          empty="Nenhuma tarefa no período."
+        />
       ) : (
-        <ProductivityList rows={r.productivity} />
+        <RankTable order={order} onOrder={setOrder} rows={productivityRanks(r.productivity, order)} empty="Nenhuma conclusão no período." />
       )}
     </Block>
   );
 }
 
-function ProductivityList({ rows }: { rows: TaskProductivityRow[] }) {
-  if (rows.length === 0) return <p className="rounded-lg border border-dashed border-border-strong/80 px-4 py-6 text-center text-body-sm text-muted">Nenhuma conclusão no período.</p>;
-  const max = Math.max(1, ...rows.map((r) => r.concluded));
-  return (
-    <ul className="-mx-2 flex flex-col">
-      {[...rows]
-        .sort((a, b) => b.concluded - a.concluded)
-        .map((r, i) => (
-          <li key={r.member?.id ?? `x-${i}`} className="@container">
-            <div className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-2 py-1.5 [grid-template-areas:'name_total'_'bar_bar'] @md:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto] @md:[grid-template-areas:'name_bar_total']">
-              <span className="flex min-w-0 items-center gap-2 [grid-area:name]">
-                <MemberAvatar name={r.member?.name} unassigned={!r.member} userId={r.member?.id} />
-                <span className="truncate text-body-sm text-fg">{r.member?.name ?? 'Pessoa removida'}</span>
-              </span>
-              <span className="mt-1 flex h-2 overflow-hidden [grid-area:bar] @md:mt-0" aria-hidden>
-                {r.onTime ? <span className="h-full rounded-l-full bg-chart-success last:rounded-r-full" style={{ width: `${(r.onTime / max) * 100}%` }} /> : null}
-                {r.late ? <span className="h-full rounded-r-full bg-chart-red first:rounded-l-full" style={{ width: `${(r.late / max) * 100}%`, marginLeft: r.onTime ? 2 : 0 }} /> : null}
-              </span>
-              <span className="flex flex-col items-end leading-tight [grid-area:total]">
-                <span className="tabular text-[13px] font-semibold text-fg">{r.concluded ? `${Math.round((r.onTime / r.concluded) * 100)}%` : '—'}</span>
-                <span className="tabular text-mini whitespace-nowrap text-muted">
-                  {r.concluded} {r.concluded === 1 ? 'concluída' : 'concluídas'} · {r.onTime} no prazo · <span className={r.late ? 'text-danger' : undefined}>{r.late} com atraso</span>
-                  {r.averageDays !== null ? ` · média de ${Math.round(r.averageDays)} ${Math.round(r.averageDays) === 1 ? 'dia' : 'dias'}` : ''}
-                </span>
-              </span>
-            </div>
-          </li>
-        ))}
-    </ul>
-  );
+function productivityRanks(rows: TaskProductivityRow[], order: PunctualityOrder): RankRow[] {
+  const rate = (x: TaskProductivityRow) => (x.concluded ? x.onTime / x.concluded : -1);
+  return [...rows]
+    .sort((a, b) => (order === 'late' ? b.late - a.late : order === 'rate' ? rate(b) - rate(a) : 0) || b.concluded - a.concluded)
+    .map((x, i) => {
+      const days = x.averageDays !== null ? Math.round(x.averageDays) : null;
+      return {
+        key: x.member?.id ?? `x-${i}`,
+        label: x.member?.name ?? 'Pessoa removida',
+        leading: <MemberAvatar name={x.member?.name} unassigned={!x.member} userId={x.member?.id} />,
+        caption: days !== null ? `média de ${days} ${days === 1 ? 'dia' : 'dias'}` : undefined,
+        total: x.concluded,
+        onTime: x.onTime,
+        late: x.late,
+        muted: !x.member,
+      };
+    });
 }
 
 function rowSituation(row: TaskReportRow): string {
