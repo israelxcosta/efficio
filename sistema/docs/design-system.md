@@ -445,3 +445,29 @@ Painel financeiro e o Início da Gestão.
 
 <!-- 14/11/2026 -->
 **Ficha única do cliente** (14/11/2026): `features/clients/pages/client-page.tsx` serve `/tarefas/clientes/:id` e `/clientes/:id` (mesmo componente em cada casca); seções e ações por permissão em `client-page-logic.ts` (`clients` edita dados cadastrais via `PATCH /api/clients/:id/registration` e documentos via `PUT /api/clients/:id/documents`; `finance` vê honorários, contrato e observações; `clientCredentials` revela acessos). Abas com `SegmentedControl` em `?aba=`; `ClientSheet mode="registration"` para quem não tem `finance`.
+
+## 7. Estilo "Seu dia": coluna à direita e card sólido (24/11/2026)
+
+Aprovado pelo dono (relatório consolidado de 24/11/2026). Componentes:
+
+- **`PageWithAside`** (`components/layout/page-with-aside.tsx`): conteúdo + coluna de 300px a partir de
+  1280px (`from="2xl"` = 1536px). Abaixo: o card sólido primeiro, depois o conteúdo, depois os cards
+  pequenos (`below="hide"` esconde a coluna). `AsideCard` é o card pequeno da coluna (título 14/600,
+  número à direita em `text-muted`).
+- **`SpotlightCard`** (`components/ui/spotlight-card.tsx`): o **único** bloco sólido da tela
+  (`bg-hero-from`), para o dado que pede ação agora (atrasadas, inadimplência, vence hoje, falta conferir).
+  Rótulo, número grande **ou** título, até 4 linhas, uma ação principal branca e uma secundária com
+  contorno. Sem nada urgente, mostra a frase calma no mesmo lugar (a tela não pula).
+- **Vermelho sobre o sólido:** `--app-on-solid-danger` (`#f6c7c4` claro / `#f2b2ad` escuro); o chip usa
+  `bg-chart-red/20` + `ring-chart-red/45`. Nunca `text-danger` sobre o azul-marinho (sem contraste).
+- **`MiniStat solid`**: em listas largas (Receber/Pagar, Recebimentos) a coluna cortaria as linhas; o
+  destaque vira a célula sólida da faixa de números, clicável para filtrar.
+- **`StackedBar`** (`components/ui/stacked-bar.tsx`): barra fina em partes (no prazo × atraso, vencido ×
+  30 dias × depois), com `max` para comparar linhas.
+- **Ranking com ordenação no título da coluna** (Relatório de tarefas): uma linha de cabeçalho, um único
+  seletor no card; nunca uma segunda fileira de botões.
+
+Onde está: Início e Minha área da gestão, Clientes da gestão, Painel financeiro (coluna fora da grade
+personalizável). A lista de Tarefas **não** tem coluna (cortava os títulos mesmo a 1600px). Os painéis
+passam a ter 4 colunas a partir de 900px (`columnsForWidth`), para caber ao lado da coluna.
+

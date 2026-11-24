@@ -1128,12 +1128,20 @@ membro do espaço → 422.
   da competência atual em diante passaram ao responsável padrão (ou à fila); as demais mantiveram a
   pessoa, agora como `manual` (nada já trabalhado trocou de mãos; sem registro no histórico).
 
+### Pedido por (`requestChannel`, migração 0029)
+
+- Campo opcional da tarefa: o canal em que o cliente pediu — `portal`, `whatsapp`, `email`, `phone`,
+  `in_person`, `other` (`TASK_REQUEST_CHANNELS`); `null` = interna ou não informado. Aceito no
+  `POST /tasks` e no `PATCH /tasks/:id` (`null` limpa); CHECK `tasks_request_channel_chk` no banco.
+- Pronto para o portal do cliente: os pedidos que vierem dele nascem com `portal`. O card "Pedidos dos
+  clientes" do Início lista as abertas com `GET /tasks?situation=open&requestChannel=any`.
+
 ### Listagem (`GET /tasks`)
 
 - Filtros (`taskQuerySchema`): `scope` (`mine` = responsável sou eu; `department` = departamento do
   meu membro, vazio sem departamento; `all`), `situation` (`open`, `overdue`, `waiting`, `done` =
   concluídas + canceladas, `all`), `status` exato, `clientId` (id ou `internal`), `assigneeId` (id; `none`
-  saiu na 0024 — 400 — e só existe nos relatórios, para encerradas de ex-membros), `departmentId`, `categoryId`, `priority`, `kind` (`standalone`, `flow` = etapas de
+  saiu na 0024 — 400 — e só existe nos relatórios, para encerradas de ex-membros), `departmentId`, `categoryId`, `priority`, `requestChannel` (um canal ou `any` = toda tarefa com "Pedido por"), `kind` (`standalone`, `flow` = etapas de
   processo, `recurring` = ocorrências), `month` (mês de vencimento; prazo legal nas ocorrências),
   `dueDate`, `dueFrom`/`dueTo`, `dueBucket` (um grupo de prazo das abertas, pela **data de trabalho** —
   o vencimento, ou a meta na ocorrência: `overdue | targetMissed | today | next7Days | later |

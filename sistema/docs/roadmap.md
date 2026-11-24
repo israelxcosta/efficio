@@ -15,7 +15,9 @@ de tarefas, cadastros, processos e financeiro deve ser desenhada sabendo que o c
 - **acessar a pasta com os seus documentos**.
 
 Na prática:
-- Tarefas e processos guardam **quem pediu** e **por qual canal** (equipe hoje; cliente pelo portal depois)
+- Tarefas e processos guardam **quem pediu** e **por qual canal** (equipe hoje; cliente pelo portal depois).
+  Feito nas tarefas em 24/11/2026: campo "Pedido por" (`requestChannel`, migração 0029) e o card
+  "Pedidos dos clientes" no Início
   e aceitam ser criados a partir de um **tipo de solicitação** com formulário próprio.
 - Comentários, anexos e documentos têm (ou poderão ter sem migração difícil) a marca **visível ao cliente**
   × nota interna; nada interno vaza por padrão.

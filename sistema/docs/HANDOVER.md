@@ -1,4 +1,4 @@
-# Handover — Efficio (21/11/2026)
+# Handover — Efficio (24/11/2026)
 
 Estado do projeto para quem continuar o trabalho (pessoa ou agente). Leia junto com
 [CLAUDE.md](../CLAUDE.md), [CODEBASE_MAP.md](CODEBASE_MAP.md) e [roadmap.md](roadmap.md).
@@ -9,8 +9,8 @@ Estado do projeto para quem continuar o trabalho (pessoa ou agente). Leia junto 
 | --- | --- |
 | Repositório | `israelxcosta/efficio`, monorepo em `sistema/` |
 | Branch de trabalho | `claude/zealous-maxwell-81aseb` (sem PR aberto; só abrir se o dono pedir) |
-| Último commit | `36e6b99`: relatório de Recebimentos (CI verde, 6/6 jobs) |
-| Demo publicada | v43, PGlite no navegador (artifact "Efficio Financeiro"), login de demonstração na tela "Entrar" |
+| Último commit | ver `git log` (redesign "Seu dia" aplicado em 24/11/2026) |
+| Demo publicada | v49, PGlite no navegador (artifact "Efficio Financeiro"), login de demonstração na tela "Entrar" |
 | Produção | ainda não subiu. Destino: VPS Hostinger KVM 1, guia em [deploy-hostinger.md](deploy-hostinger.md) |
 | Idioma | UI e conversa em pt-BR, respostas curtas; código em inglês |
 
@@ -47,6 +47,20 @@ Estado do projeto para quem continuar o trabalho (pessoa ou agente). Leia junto 
     - testes: `apps/api/test/reports-receipts.test.ts`;
     - web: `apps/web/src/features/reports/receipts/` e `features/transactions/transaction-actions.tsx` (`ConfirmPaymentDialog`);
     - contrato: `receiptsReportQuerySchema`, `ReceiptsReportResponse`, `RECEIPTS_ITEMS_LIMIT` e `setPaidSchema.paymentMethod`.
+
+## 2b. Rodada de 23–24/11/2026
+
+- Conferido com o extrato (migração 0028), M1–M8 de design (pago/pendente, densidade, CSV, lote…).
+- **Redesign "Seu dia"** (aprovado pelo dono; ver `design-system.md` §7): `PageWithAside`, `SpotlightCard`,
+  `StackedBar`, `MiniStat solid` e o token `--app-on-solid-danger`.
+  - Gestão: Início com filtros fixos (departamento + **competência**), coluna "Escritório hoje"
+    (atrasadas por departamento, agenda, responsáveis, pedidos dos clientes) e vencimentos numa tabela;
+    Minha área com a atrasada mais antiga no sólido; Clientes com coluna Tarefas e o cliente que pede
+    atenção; Relatório de tarefas com "Por responsável" numa linha e ordenação no título das colunas.
+  - Financeiro: Painel com coluna (inadimplência + saldo) fora da grade personalizável; célula sólida de
+    Vencido (Receber/Pagar) e de Conferido (Recebimentos).
+  - Tarefas: campo **"Pedido por"** (`requestChannel`, migração 0029), pronto para o portal.
+- Relatórios dessas decisões: artifacts "Redesign Seu dia — relatório consolidado" e "Análise de design".
 
 ## 3. Pendências
 
