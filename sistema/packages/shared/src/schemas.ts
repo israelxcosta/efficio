@@ -47,6 +47,7 @@ import {
   TASK_DUE_BUCKETS,
   TASK_KINDS,
   TASK_PRIORITIES,
+  TASK_REQUEST_CHANNELS,
   TASK_RECURRENCE_APPLY_TO,
   TASK_SCOPES,
   TASK_SITUATIONS,
@@ -1145,6 +1146,8 @@ export const taskInputSchema = z
     departmentId: nullableId(),
     priority: z.enum(TASK_PRIORITIES).default('medium'),
     status: z.enum(TASK_STATUSES).default('todo'),
+    /** Channel the client asked through (null = internal / not informed). */
+    requestChannel: z.enum(TASK_REQUEST_CHANNELS).nullish().transform((v) => v ?? null),
     startDate: optionalDate(),
     dueDate: optionalDate(),
     /** Appointment ("compromisso") on the due date: wall-clock "HH:MM", no time zone. */
@@ -1175,6 +1178,7 @@ export const taskUpdateSchema = z
     assigneeId: requiredId(TASK_ASSIGNEE_REQUIRED_MESSAGE),
     departmentId: requiredId(TASK_DEPARTMENT_REQUIRED_MESSAGE),
     priority: z.enum(TASK_PRIORITIES),
+    requestChannel: z.enum(TASK_REQUEST_CHANNELS).nullable(),
     startDate: isoDateSchema.nullable(),
     dueDate: isoDateSchema.nullable(),
     startTime: taskTimeSchema.nullable(),
@@ -1220,6 +1224,8 @@ export const taskQuerySchema = paginationQuerySchema.extend({
   departmentId: idSchema.optional(),
   categoryId: idSchema.optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
+  /** Requests of clients: a channel, or `any` for every task with a channel ("Pedidos dos clientes"). */
+  requestChannel: z.union([z.enum(TASK_REQUEST_CHANNELS), z.literal('any')]).optional(),
   /** standalone / flow (process steps) / recurring (occurrences: only in `occurrences`, never in `items`). */
   kind: z.enum(TASK_KINDS).optional(),
   /** Due month (legal deadline of occurrences). */

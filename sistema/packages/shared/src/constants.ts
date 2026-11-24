@@ -475,6 +475,22 @@ export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
   urgent: 'Urgente',
 };
 
+/**
+ * Who asked for the task and how ("Pedido por"): ready for the client portal. null = internal work or
+ * not informed. The portal will create tasks with `portal`; the team records the other channels.
+ */
+export const TASK_REQUEST_CHANNELS = ['portal', 'whatsapp', 'email', 'phone', 'in_person', 'other'] as const;
+export type TaskRequestChannel = (typeof TASK_REQUEST_CHANNELS)[number];
+
+export const TASK_REQUEST_CHANNEL_LABELS: Record<TaskRequestChannel, string> = {
+  portal: 'Portal do cliente',
+  whatsapp: 'WhatsApp',
+  email: 'E-mail',
+  phone: 'Telefone',
+  in_person: 'Pessoalmente',
+  other: 'Outro canal',
+};
+
 /** Tie-break order (urgent first). */
 export const TASK_PRIORITY_RANK: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
 

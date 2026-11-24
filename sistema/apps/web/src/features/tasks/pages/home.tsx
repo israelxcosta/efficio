@@ -33,6 +33,7 @@ import { useUpdatedLabel } from '@/lib/updated-label';
 import { cn, pluralize } from '@/lib/utils';
 import { useRecurringTasks, useTaskDashboard, useTaskHome, useTaskOptions, useTasks } from '../api';
 import { AgendaCard, ClientsOverviewCard, DueDatesCard, FiscalCard, FlowCard, IncompleteCard, ProcessesCard, TaskStatusCard } from '../components/dashboard-cards';
+import { ClientRequestsCard } from '../components/client-requests-card';
 import { DashboardListSheet, type DashboardList } from '../components/dashboard-list-sheet';
 import { BreakdownItem, type BreakdownRow } from '../components/breakdown-list';
 import { TaskRow } from '../components/task-row';
@@ -154,6 +155,7 @@ export default function TaskHomePage() {
             <div className="h-[380px]">
               <ByAssignee home={h} people={people} where={where} loading={home.isPending} />
             </div>
+            <ClientRequestsCard />
           </>
         }
       >

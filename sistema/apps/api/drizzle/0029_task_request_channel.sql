@@ -1,0 +1,2 @@
+ALTER TABLE "tasks" ADD COLUMN "request_channel" text;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_request_channel_chk" CHECK ("tasks"."request_channel" in ('portal', 'whatsapp', 'email', 'phone', 'in_person', 'other'));

@@ -20,7 +20,7 @@
 // Every statement filters by the workspace, even after an ownership check (test/tasks-scope.test.ts);
 // free text is encrypted per field (encrypted-text.ts).
 
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, lte, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, lte, sql, type SQL } from 'drizzle-orm';
 import {
   addDays,
   addMonthKey,
@@ -263,6 +263,8 @@ function buildFilters(ctx: TaskContext, q: TaskQuery, myDepartment: string | nul
   if (q.departmentId) base.push(eq(tasks.departmentId, q.departmentId));
   if (q.categoryId) base.push(eq(tasks.categoryId, q.categoryId));
   if (q.priority) base.push(eq(tasks.priority, q.priority));
+  if (q.requestChannel)
+    base.push(q.requestChannel === 'any' ? isNotNull(tasks.requestChannel) : eq(tasks.requestChannel, q.requestChannel));
   if (q.kind === 'recurring') base.push(OCCURRENCE_SQL);
   if (q.kind === 'flow') base.push(NOT_OCCURRENCE_SQL, IN_FLOW);
   if (q.kind === 'standalone') base.push(NOT_OCCURRENCE_SQL, sql`not ${IN_FLOW}`);
@@ -606,6 +608,7 @@ export async function createTask(ctx: TaskContext, input: TaskInput): Promise<Ta
       assigneeId: input.assigneeId,
       departmentId,
       priority: input.priority,
+      requestChannel: input.requestChannel,
       startDate: input.startDate,
       dueDate: input.dueDate,
       startTime: input.startTime,

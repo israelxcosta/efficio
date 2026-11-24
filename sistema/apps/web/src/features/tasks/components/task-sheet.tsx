@@ -9,6 +9,9 @@ import {
   daysOverdue,
   isOpenTaskStatus,
   TASK_PRIORITY_LABELS,
+  TASK_REQUEST_CHANNEL_LABELS,
+  TASK_REQUEST_CHANNELS,
+  type TaskRequestChannel,
   TASK_STATUS_LABELS,
   TASK_STATUSES,
   TASK_DEPARTMENT_REQUIRED_MESSAGE,
@@ -398,6 +401,7 @@ function TaskDetailBody({
           departmentId: task.department.id,
           assigneeId: task.assignee?.id ?? '',
           clientId: task.client?.id ?? '',
+          requestChannel: task.requestChannel ?? '',
           dueDate: task.dueDate ?? '',
           categoryId: task.category?.id ?? '',
           startDate: task.startDate ?? '',
@@ -461,6 +465,8 @@ interface PropertyValues {
   departmentId: string;
   assigneeId: string;
   clientId: string;
+  /** '' = internal / not informed. */
+  requestChannel: string;
   dueDate: string;
   categoryId: string;
   startDate: string;
@@ -613,6 +619,23 @@ function TaskProperties({
           disabled={readOnly || isLocked('clientId')}
         />
       </Field>
+      {values.clientId ? (
+        // Ready for the client portal: who asked and how. Requests from the portal arrive as "Portal do cliente".
+        <Field label="Pedido por" hint="Canal em que o cliente pediu.">
+          <Select
+            value={values.requestChannel}
+            disabled={readOnly}
+            onChange={(e) => onChange({ requestChannel: (e.target.value || null) as TaskRequestChannel | null })}
+          >
+            <option value="">Interno / não informado</option>
+            {TASK_REQUEST_CHANNELS.map((c) => (
+              <option key={c} value={c}>
+                {TASK_REQUEST_CHANNEL_LABELS[c]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
       {occurrence ? (
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium text-fg">Prazo</span>
@@ -1087,6 +1110,7 @@ export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsRes
     // Every task has a responsible (migration 0024): you, unless you pick someone else.
     assigneeId: options?.me.id ?? '',
     clientId: isUuid(client) ? client : '',
+    requestChannel: '',
     dueDate: dueDay ?? (appointment ? today : ''),
     categoryId: '',
     startDate: '',
@@ -1104,6 +1128,7 @@ export function newTaskDefaults(params: URLSearchParams, options: TaskOptionsRes
     departmentId: copy.department.id,
     assigneeId: copy.assignee?.id ?? base.assigneeId,
     clientId: copy.client?.id ?? '',
+    requestChannel: copy.requestChannel ?? '',
     dueDate: copy.dueDate ?? '',
     categoryId: copy.category?.id ?? '',
     startDate: copy.startDate ?? '',
@@ -1122,6 +1147,7 @@ export function newTaskInput(v: NewTaskValues): TaskInput {
     title: v.title,
     description: v.description || null,
     clientId: v.clientId || null,
+    requestChannel: v.clientId ? ((v.requestChannel || null) as TaskRequestChannel | null) : null,
     categoryId: v.categoryId || null,
     assigneeId: v.assigneeId,
     departmentId: v.departmentId || null,

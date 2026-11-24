@@ -3,7 +3,7 @@
 // Today is pinned to 2026-10-20 (vitest.config.ts).
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { TASK_PRIORITIES, TASK_STATUSES } from '@effinance/shared';
+import { TASK_PRIORITIES, TASK_REQUEST_CHANNELS, TASK_STATUSES } from '@effinance/shared';
 import type { App } from '../src/app';
 import { tasks } from '../src/db/schema';
 import { executeRows } from '../src/lib/sql';
@@ -88,7 +88,7 @@ describe('tasks: database', () => {
   it('CHECK lists follow the contract and RLS hides other workspaces', async () => {
     const defs = await executeRows<{ name: string; def: string }>(
       admin(),
-      sql`select conname as name, pg_get_constraintdef(oid) as def from pg_constraint where conname in ('tasks_status_chk', 'tasks_priority_chk')`,
+      sql`select conname as name, pg_get_constraintdef(oid) as def from pg_constraint where conname in ('tasks_status_chk', 'tasks_priority_chk', 'tasks_request_channel_chk')`,
     );
     const values = (name: string) =>
       [...defs.find((d) => d.name === name)!.def.matchAll(/'([^']*)'::text/g)]
@@ -96,6 +96,7 @@ describe('tasks: database', () => {
         .sort();
     expect(values('tasks_status_chk')).toEqual([...TASK_STATUSES].sort());
     expect(values('tasks_priority_chk')).toEqual([...TASK_PRIORITIES].sort());
+    expect(values('tasks_request_channel_chk')).toEqual([...TASK_REQUEST_CHANNELS].sort());
 
     const a = await registerUser(app, 'Escritório A');
     const b = await registerUser(app, 'Escritório B');
@@ -684,5 +685,30 @@ describe('tasks: list, summary and start page', () => {
     expect(allHome.totals.total).toBe(9);
     // November: only what is open or due/closed in it.
     expect((await ana.get('/tasks/home?departmentId=all&month=2026-11')).body.totals.total).toBe(6);
+  });
+});
+
+describe('tasks: request channel ("Pedido por", ready for the client portal)', () => {
+  it('stores the channel on create, changes and clears it, and refuses unknown ones', async () => {
+    const ana = await registerUser(app, 'Ana Paula Ribeiro');
+    const clientId = await createClient(ana);
+    const created = await myTask(ana, { title: 'Admissão: Carla Mendes', clientId, requestChannel: 'whatsapp' });
+    expect(created.status).toBe(201);
+    expect(created.body.requestChannel).toBe('whatsapp');
+    expect(created.body.client.id).toBe(clientId);
+    const internal = await myTask(ana, { title: 'Organizar o arquivo' });
+    expect(internal.body.requestChannel).toBeNull();
+
+    const patched = await ana.patch(`/tasks/${created.body.id}`, { requestChannel: 'portal' });
+    expect(patched.status).toBe(200);
+    expect(patched.body.requestChannel).toBe('portal');
+    expect((await ana.patch(`/tasks/${created.body.id}`, { requestChannel: null })).body.requestChannel).toBeNull();
+    expect((await ana.patch(`/tasks/${created.body.id}`, { requestChannel: 'fax' })).status).toBe(400);
+
+    // "Pedidos dos clientes": the list filters by a channel or by any channel.
+    await myTask(ana, { title: 'Segunda via do boleto', clientId, requestChannel: 'email' });
+    const any = await ana.get('/tasks?requestChannel=any');
+    expect(any.body.items.map((t: { title: string }) => t.title)).toEqual(['Segunda via do boleto']);
+    expect((await ana.get('/tasks?requestChannel=whatsapp')).body.items).toHaveLength(0);
   });
 });

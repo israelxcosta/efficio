@@ -56,6 +56,7 @@ import type {
   TaskAttachmentType,
   TaskEventKind,
   TaskPriority,
+  TaskRequestChannel,
   TaskStatus,
   RegimeGroupRegime,
   TaxRegime,
@@ -1473,6 +1474,8 @@ export const tasks = pgTable(
      */
     assigneeId: uuid(),
     priority: text().$type<TaskPriority>().notNull().default('medium'),
+    /** Channel the client asked through (migration 0029); null = internal / not informed. */
+    requestChannel: text().$type<TaskRequestChannel>(),
     status: text().$type<TaskStatus>().notNull().default('todo'),
     /** Open status before concluding/canceling: where "Reabrir" goes back to. */
     reopenStatus: text().$type<OpenTaskStatus>(),
@@ -1558,6 +1561,7 @@ export const tasks = pgTable(
     check('tasks_status_chk', sql`${t.status} in ('todo', 'in_progress', 'waiting_client', 'done', 'canceled')`),
     check('tasks_reopen_status_chk', sql`${t.reopenStatus} in ('todo', 'in_progress', 'waiting_client')`),
     check('tasks_priority_chk', sql`${t.priority} in ('low', 'medium', 'high', 'urgent')`),
+    check('tasks_request_channel_chk', sql`${t.requestChannel} in ('portal', 'whatsapp', 'email', 'phone', 'in_person', 'other')`),
     check(
       'tasks_time_chk',
       sql`(${t.startTime} is null or ${t.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') and (${t.endTime} is null or (${t.endTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' and ${t.startTime} is not null and ${t.endTime} > ${t.startTime})) and (${t.startTime} is null or ${t.dueDate} is not null)`,

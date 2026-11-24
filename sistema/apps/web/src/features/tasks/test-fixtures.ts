@@ -10,6 +10,7 @@ export function makeTask(patch: Partial<Task>): Task {
     status: 'todo',
     reopenStatus: 'todo',
     priority: 'medium',
+    requestChannel: null,
     client: null,
     // Every task has a department since migration 0024.
     department: { id: 'd-fiscal', name: 'Fiscal' },

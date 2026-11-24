@@ -48,6 +48,7 @@ import type {
   TaskInsightTone,
   TaskKind,
   TaskPriority,
+  TaskRequestChannel,
   TaskSituation,
   TaskStatus,
   TaxRegime,
@@ -1423,6 +1424,8 @@ export interface Task {
   /** Status to go back to when reopening a concluded/canceled task (the one before concluding, else `todo`). */
   reopenStatus: OpenTaskStatus;
   priority: TaskPriority;
+  /** Channel the client asked through ("Pedido por"); null = internal / not informed. */
+  requestChannel: TaskRequestChannel | null;
   /** null = internal ("Interna"). */
   client: TaskClientRef | null;
   /** Always set (migration 0024): the responsible's department (or the one chosen when they have none); for occurrences, the recurring task's. */
