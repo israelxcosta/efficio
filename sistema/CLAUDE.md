@@ -36,6 +36,11 @@ Mapa detalhado (módulos, fluxo de uma requisição, armadilhas e onde mexer par
   legais e internos, DP/eSocial, CCT e multas, em linguagem simples.
 - `designer-apresentacoes` — diagramação de apresentações/onboarding em slides 16:9, celular e PDF.
 
+Verificação de lógica (testes de cenário + relatório com prova; não alteram código de produção):
+
+- `qa-logica-gestao` — recorrentes e tarefas por regime, fluxos/processos, séries, prazos e feriados, Início.
+- `qa-logica-financeiro` — contas fixas e parceladas, honorários e reajustes, juros/multa, cartão, saldos.
+
 Segurança (auditoria + correção com teste de regressão, um por linguagem/camada):
 
 - `security-node-api` — TypeScript/Node (Fastify): auth, sessões, MFA, tenancy, cripto, webhooks.
