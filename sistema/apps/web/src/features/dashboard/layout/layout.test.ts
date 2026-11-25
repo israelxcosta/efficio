@@ -31,11 +31,11 @@ import {
   withBoard,
 } from './layout';
 import { SPEC_BY_ID, WIDGET_GROUPS, WIDGET_SPECS } from './specs';
-import type { BoardItem, DashboardLayout, WidgetId } from './types';
+import type { BoardItem, CardId, DashboardLayout, WidgetId } from './types';
 
 const fluxo = SPEC_BY_ID['fluxo-caixa'];
 const board = (layout: DashboardLayout, cols: 4 | 2 | 1 = 4) => resolveBoard(layout, WIDGET_SPECS, 'business', cols);
-const cellOf = (items: readonly BoardItem[], id: WidgetId) => {
+const cellOf = (items: readonly BoardItem[], id: CardId) => {
   const item = items.find((i) => i.id === id)!;
   return { x: item.x, y: item.y };
 };

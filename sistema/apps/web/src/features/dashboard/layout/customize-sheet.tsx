@@ -9,26 +9,38 @@ import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { clampSize, hiddenCount, isVisible } from './layout';
-import { useDashboardLayout } from './layout-store';
-import { WIDGET_GROUPS, WIDGET_SPECS } from './specs';
-import type { WidgetSize } from './types';
+import { FINANCE_BOARD, useBoardLayout, type BoardConfig } from './layout-store';
+import { WIDGET_GROUPS } from './specs';
+import type { WidgetGroupSpec, WidgetSize } from './types';
 
 const sizeKey = (s: WidgetSize) => `${s.c}x${s.r}`;
 const sizeLabel = (s: WidgetSize) => `${s.c} × ${s.r}`;
 
-/** "Personalizar dashboard": turn cards on/off (a new card takes the first free space), sizes and reset. */
-export function CustomizeSheet({ open, onOpenChange, kind }: { open: boolean; onOpenChange: (open: boolean) => void; kind: WorkspaceKind | undefined }) {
-  const api = useDashboardLayout();
+interface CustomizeSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  kind: WorkspaceKind | undefined;
+  /** The board being customized (default: the Painel financeiro) and its groups of cards. */
+  board?: BoardConfig;
+  groups?: readonly WidgetGroupSpec[];
+  /** Name of the page in the texts ("Dashboard", "Minha área"). */
+  place?: string;
+}
+
+/** "Personalizar": turn cards on/off (a new card takes the first free space), sizes and reset. */
+export function CustomizeSheet({ open, onOpenChange, kind, board = FINANCE_BOARD, groups = WIDGET_GROUPS, place = 'Dashboard' }: CustomizeSheetProps) {
+  const api = useBoardLayout(board);
   const { layout } = api;
+  const specsAll = board.specs;
   const [confirmReset, setConfirmReset] = useState(false);
-  const hidden = WIDGET_SPECS.filter((s) => !isVisible(layout, s, kind));
+  const hidden = specsAll.filter((s) => !isVisible(layout, s, kind));
 
   return (
     <>
       <Sheet
         open={open}
         onOpenChange={onOpenChange}
-        title="Personalizar dashboard"
+        title={`Personalizar ${place === 'Dashboard' ? 'dashboard' : place}`}
         description="Escolha os cards e o tamanho de cada um. No painel, arraste um card para qualquer lugar e use o canto dele para redimensionar."
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
@@ -37,7 +49,7 @@ export function CustomizeSheet({ open, onOpenChange, kind }: { open: boolean; on
             </Button>
             <Button
               variant="outline"
-              disabled={hiddenCount(layout, WIDGET_SPECS, kind) === 0}
+              disabled={hiddenCount(layout, specsAll, kind) === 0}
               onClick={() => {
                 api.showAll();
                 toast.success('Todos os cards foram reexibidos.');
@@ -49,8 +61,8 @@ export function CustomizeSheet({ open, onOpenChange, kind }: { open: boolean; on
         }
       >
         <div className="flex flex-col gap-6">
-          {WIDGET_GROUPS.map((group) => {
-            const specs = WIDGET_SPECS.filter((s) => s.group === group.id);
+          {groups.map((group) => {
+            const specs = specsAll.filter((s) => s.group === group.id);
             if (specs.length === 0) return null;
             return (
               <section key={group.id} className="flex flex-col gap-2">
@@ -94,10 +106,10 @@ export function CustomizeSheet({ open, onOpenChange, kind }: { open: boolean; on
           })}
 
           <section className="flex flex-col gap-2">
-            <SectionLabel>Cards ocultos no Dashboard</SectionLabel>
+            <SectionLabel>{place === 'Dashboard' ? 'Cards ocultos no Dashboard' : `Cards ocultos na ${place}`}</SectionLabel>
             {hidden.length === 0 ? (
               <p className="text-caption text-muted">
-                Nenhum card oculto no momento. Passe o mouse sobre um card no Dashboard e clique no ícone de olho para ocultá-lo.
+                Nenhum card oculto no momento. Em Personalizar, clique no ícone de olho de um card para ocultá-lo.
               </p>
             ) : (
               <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">

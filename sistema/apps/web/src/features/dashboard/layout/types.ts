@@ -1,5 +1,12 @@
 import type { DashboardResponse } from '@effinance/shared';
 
+/**
+ * Id of a card on a free board (any board: the Painel financeiro's widgets, the Minha área's cards). The
+ * board engine (`layout.ts`, `layout-store.ts`, `widget-grid.tsx`) works on these; `WidgetId` lists the
+ * Painel financeiro's own.
+ */
+export type CardId = string;
+
 /** Subject of a widget: groups the list in "Personalizar" (the dashboard itself is one board). */
 export type WidgetGroupId = 'visao-geral' | 'receber-pagar' | 'analises' | 'clientes' | 'planejamento';
 
@@ -44,17 +51,17 @@ export interface GridCell {
 
 /** A card placed on a board: its cell and the span it shows there (columns already ≤ the board's). */
 export interface BoardItem extends GridCell, WidgetSize {
-  id: WidgetId;
+  id: CardId;
 }
 
 export interface WidgetGroupSpec {
-  id: WidgetGroupId;
+  id: string;
   title: string;
 }
 
 export interface WidgetSpec {
-  id: WidgetId;
-  group: WidgetGroupId;
+  id: CardId;
+  group: string;
   title: string;
   /** One line shown in "Personalizar". */
   description: string;
@@ -83,15 +90,15 @@ export interface DashboardPrefs {
 export interface DashboardLayout {
   v: 2;
   /** Size set by the user (desktop columns; narrower boards show at most their column count). */
-  sizes: Partial<Record<WidgetId, WidgetSize>>;
+  sizes: Partial<Record<CardId, WidgetSize>>;
   /**
    * Cell of each visible card on each board (4, 2 and 1 columns), free of overlaps. A board with
    * no cells follows the default arrangement (4) or the next wider board (2, 1); a visible card
    * without a cell takes the first free space that fits.
    */
-  cells: Partial<Record<BoardCols, Partial<Record<WidgetId, GridCell>>>>;
+  cells: Partial<Record<BoardCols, Partial<Record<CardId, GridCell>>>>;
   /** Explicit choices only; absent = the spec's default. */
-  visible: Partial<Record<WidgetId, boolean>>;
+  visible: Partial<Record<CardId, boolean>>;
   prefs: Partial<DashboardPrefs>;
 }
 

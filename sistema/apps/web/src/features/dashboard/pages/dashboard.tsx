@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { SpotlightRow } from '@/components/ui/spotlight-card';
 import { NextBillSpotlight } from '../components/finance-aside';
 import { useSearchParams } from 'react-router';
-import { toast } from 'sonner';
-import { ArrowUpToLine, Check, LayoutGrid, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { LayoutGrid, Sparkles } from 'lucide-react';
 import {
   formatBRL,
   formatMonthKey,
@@ -13,12 +12,10 @@ import {
   type MonthKey,
   type WorkspaceKind,
 } from '@effinance/shared';
-import { Button } from '@/components/ui/button';
 import { MetricStrip, type MetricCell } from '@/components/ui/metric-strip';
 import { ErrorState } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { PeriodNavigator } from '@/components/ui/period-navigator';
-import { Tooltip } from '@/components/ui/tooltip';
 import { useActiveMonth } from '@/lib/active-month';
 import { useElementSize } from '@/lib/use-element-size';
 import { useUpdatedLabel } from '@/lib/updated-label';
@@ -30,10 +27,9 @@ import { changeParts, marginText, monthlySeries, netWorthText, type ChangeParts 
 import { useDashboardAlerts } from '../layout/alerts';
 import { WIDGET_COMPONENTS } from '../layout/catalog';
 import { CustomizeSheet } from '../layout/customize-sheet';
-import { canArrange, columnsForWidth, hiddenCount, resolveBoard } from '../layout/layout';
-import { useDashboardLayout } from '../layout/layout-store';
-import { WIDGET_SPECS } from '../layout/specs';
-import { CUSTOMIZE_BUTTON_ID, DashboardBoard } from '../layout/widget-grid';
+import { BoardEditControls, useBoardEditing } from '../layout/board-editing';
+import { FINANCE_BOARD, useDashboardLayout } from '../layout/layout-store';
+import { DashboardBoard } from '../layout/widget-grid';
 
 type Tab = 'dashboard' | 'insights';
 
@@ -45,53 +41,13 @@ export default function DashboardPage() {
   const tab = (params.get('aba') as Tab) || 'dashboard';
   const dashboard = useDashboard(month);
   const d = dashboard.data;
-  const layoutApi = useDashboardLayout();
-  const [customizing, setCustomizing] = useState(false);
-  // "Personalizar" mode: the cards get their grip, hide button and corner handle.
-  const [editing, setEditing] = useState(false);
-  const [modeMessage, setModeMessage] = useState('');
-  const hidden = hiddenCount(layoutApi.layout, WIDGET_SPECS, kind);
   // The board spans the page, so the page's width picks its columns (also for "Organizar").
   const { ref, width } = useElementSize();
-  const cols = columnsForWidth(width);
-  const hasGaps = useMemo(
-    () => width > 0 && canArrange(resolveBoard(layoutApi.layout, WIDGET_SPECS, kind, cols), cols),
-    [layoutApi.layout, kind, cols, width],
-  );
-
-  function arrange() {
-    const before = layoutApi.layout;
-    layoutApi.arrange(cols);
-    // The button goes away with the gaps: keep the focus in the header.
-    requestAnimationFrame(() => document.getElementById(CUSTOMIZE_BUTTON_ID)?.focus());
-    toast('Cards organizados.', { action: { label: 'Desfazer', onClick: () => layoutApi.restore(before) } });
-  }
-
-  function startEditing(openCards = false) {
-    setEditing(true);
-    if (openCards) setCustomizing(true);
-    setModeMessage('Modo de personalização. Use a alça de cada card para mover.');
-  }
-
-  function stopEditing() {
-    setEditing(false);
-    setCustomizing(false);
-    setModeMessage('');
-    // "Concluir" goes away: the focus goes back to "Personalizar" (same id).
-    requestAnimationFrame(() => document.getElementById(CUSTOMIZE_BUTTON_ID)?.focus());
-  }
-
-  // Escape leaves the mode, unless it closed a sheet/menu or cancelled a drag (those prevent it).
-  useEffect(() => {
-    if (!editing) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented || customizing) return;
-      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
-      stopEditing();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [editing, customizing]);
+  // "Personalizar" mode: the cards get their grip, hide button and corner handle.
+  const edit = useBoardEditing(FINANCE_BOARD, kind, width);
+  const { editing, customizing, setCustomizing } = edit;
+  const startEditing = edit.start;
+  const stopEditing = edit.stop;
 
   function update(patch: Record<string, string | null>) {
     const next = new URLSearchParams(params);
@@ -140,30 +96,7 @@ export default function DashboardPage() {
           />
           {/* The same month navigator as the Gestão screens (one period control in the whole app). */}
           <PeriodNavigator modes={['month']} value={{ mode: 'month', anchor: `${month}-01` }} onChange={(v) => setActiveMonth(monthKey(v.anchor))} />
-          {tab === 'dashboard' && !editing ? (
-            <Button id={CUSTOMIZE_BUTTON_ID} variant="outline" size="sm" onClick={() => startEditing()}>
-              <SlidersHorizontal /> Personalizar
-              <HiddenBadge count={hidden} />
-            </Button>
-          ) : null}
-          {tab === 'dashboard' && editing ? (
-            <>
-              <Button id={CUSTOMIZE_BUTTON_ID} variant="outline" size="sm" onClick={() => setCustomizing(true)}>
-                <LayoutGrid /> Cards
-                <HiddenBadge count={hidden} />
-              </Button>
-              {hasGaps ? (
-                <Tooltip content="Sobe os cards para fechar os espaços vazios do painel">
-                  <Button variant="outline" size="sm" onClick={arrange}>
-                    <ArrowUpToLine /> Organizar
-                  </Button>
-                </Tooltip>
-              ) : null}
-              <Button variant="primary" size="sm" onClick={stopEditing}>
-                <Check /> Concluir
-              </Button>
-            </>
-          ) : null}
+          {tab === 'dashboard' ? <BoardEditControls editing={edit} /> : null}
         </div>
       </header>
 
@@ -189,7 +122,7 @@ export default function DashboardPage() {
       )}
       <CustomizeSheet open={customizing} onOpenChange={setCustomizing} kind={kind} />
       <p aria-live="polite" className="sr-only">
-        {modeMessage}
+        {edit.message}
       </p>
     </div>
   );
@@ -206,11 +139,6 @@ interface OverviewProps {
 }
 
 /** "N ocultos" on "Personalizar" / "Cards". */
-function HiddenBadge({ count }: { count: number }) {
-  if (count === 0) return null;
-  return <span className="tabular rounded-full bg-bg-subtle px-1.5 text-mini font-semibold text-muted">{count === 1 ? '1 oculto' : `${count} ocultos`}</span>;
-}
-
 function Overview({ d, loading, month, kind, width, editing, onCustomize }: OverviewProps) {
   const { layout, prefs } = useDashboardLayout();
   const alerts = useDashboardAlerts({ d, kind, layout, prefs });

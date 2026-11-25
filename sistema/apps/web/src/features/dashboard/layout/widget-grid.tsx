@@ -34,9 +34,8 @@ import {
   specOnBoard,
   type NudgeDirection,
 } from './layout';
-import { useDashboardLayout } from './layout-store';
-import { SPEC_BY_ID, WIDGET_SPECS } from './specs';
-import type { BoardCols, BoardItem, GridCell, WidgetAlert, WidgetId, WidgetProps, WidgetSize, WidgetSpec } from './types';
+import { FINANCE_BOARD, useBoardLayout, type BoardConfig } from './layout-store';
+import type { BoardCols, BoardItem, CardId, GridCell, WidgetAlert, WidgetId, WidgetProps, WidgetSize, WidgetSpec } from './types';
 import { WidgetChromeContext, type WidgetChrome } from './widget-card';
 
 export type WidgetComponents = Record<WidgetId, ComponentType<WidgetProps>>;
@@ -52,10 +51,36 @@ interface BoardProps {
   loading: boolean;
   kind: WorkspaceKind | undefined;
   components: WidgetComponents;
-  alerts: Partial<Record<WidgetId, WidgetAlert>>;
+  alerts: Partial<Record<CardId, WidgetAlert>>;
   onCustomize: () => void;
   /** "Personalizar" mode: drag, resize and hide exist only then. */
   editing: boolean;
+}
+
+/** Content of one card at the size it shows (keep it stable with `useCallback`: cards skip re-rendering while only positions change). */
+export type RenderCard = (id: CardId, size: WidgetSize, alert: WidgetAlert | undefined) => ReactNode;
+
+interface FreeBoardProps {
+  /** Width of the board (the page's content box); 0 until measured. */
+  width: number;
+  board: BoardConfig;
+  kind: WorkspaceKind | undefined;
+  renderCard: RenderCard;
+  alerts?: Partial<Record<CardId, WidgetAlert>>;
+  onCustomize: () => void;
+  /** "Personalizar" mode: drag, resize and hide exist only then. */
+  editing: boolean;
+}
+
+/** The Painel financeiro's board: the free board with the finance widgets. */
+export function DashboardBoard({ width, month, d, loading, kind, components, alerts, onCustomize, editing }: BoardProps) {
+  const { prefs, setPref } = useBoardLayout(FINANCE_BOARD);
+  const widgetProps = useMemo(() => ({ month, d, loading, prefs, setPref, business: kind === 'business' }), [month, d, loading, prefs, setPref, kind]);
+  const renderCard = useCallback<RenderCard>(
+    (id, size, alert) => <WidgetBody Body={components[id as WidgetId]} {...widgetProps} size={size} alert={alert} />,
+    [components, widgetProps],
+  );
+  return <FreeBoard width={width} board={FINANCE_BOARD} kind={kind} renderCard={renderCard} alerts={alerts} onCustomize={onCustomize} editing={editing} />;
 }
 
 /** Pixel geometry of a board. */
@@ -107,17 +132,20 @@ const KEY_DIRECTIONS: Partial<Record<string, NudgeDirection>> = { ArrowUp: 'up',
 
 /** Board being dragged or resized: what it would look like if the pointer were released now. */
 interface Preview {
-  id: WidgetId;
+  id: CardId;
   mode: 'move' | 'resize';
   items: BoardItem[];
 }
 
 /**
- * The dashboard board: one free grid where each card sits on any cell. Dropping a card on others
- * pushes them down; nothing rises on its own ("Organizar", in the page header, closes the gaps).
+ * A free board: one grid where each card sits on any cell. Dropping a card on others pushes them
+ * down; nothing rises on its own ("Organizar", in the page header, closes the gaps). Used by the
+ * Painel financeiro and the Minha área, each with its own cards and saved layout (`BoardConfig`).
  */
-export function DashboardBoard({ width, month, d, loading, kind, components, alerts, onCustomize, editing }: BoardProps) {
-  const api = useDashboardLayout();
+export function FreeBoard({ width, board, kind, renderCard, alerts = NO_ALERTS, onCustomize, editing }: FreeBoardProps) {
+  const api = useBoardLayout(board);
+  const { specs } = board;
+  const specById = useMemo(() => new Map(specs.map((spec) => [spec.id, spec])), [specs]);
   const g = useMemo(() => geometryFor(width), [width]);
   // The board width changed (window resize, sidebar): the cards jump to their new cells for a couple
   // of frames instead of sliding 250ms behind the resize ([data-instant] in index.css).
@@ -139,30 +167,26 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
     };
   }, [instant, width]);
   const { cols } = g;
-  const base = useMemo(() => resolveBoard(api.layout, WIDGET_SPECS, kind, cols), [api.layout, kind, cols]);
+  const base = useMemo(() => resolveBoard(api.layout, specs, kind, cols), [api.layout, specs, kind, cols]);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [announcement, setAnnouncement] = useState('');
-  const gripRefs = useRef(new Map<WidgetId, HTMLButtonElement>());
+  const gripRefs = useRef(new Map<CardId, HTMLButtonElement>());
   const shown = useMemo(() => new Map((preview?.items ?? base).map((i) => [i.id, i])), [preview, base]);
   const rows = Math.max(boardBottom(base), boardBottom(preview?.items ?? []));
-  const widgetProps = useMemo(
-    () => ({ month, d, loading, prefs: api.prefs, setPref: api.setPref, business: kind === 'business' }),
-    [month, d, loading, api.prefs, api.setPref, kind],
-  );
 
   const describe = useCallback(
-    (id: WidgetId, items: BoardItem[]) => {
+    (id: CardId, items: BoardItem[]) => {
       const item = items.find((i) => i.id === id);
       if (!item) return '';
       const where = cols === 1 ? `posição ${items.indexOf(item) + 1} de ${items.length}` : `coluna ${item.x + 1}, linha ${item.y + 1}`;
-      return `${SPEC_BY_ID[id].title}: ${where}`;
+      return `${specById.get(id)?.title ?? id}: ${where}`;
     },
-    [cols],
+    [cols, specById],
   );
 
   /** Pointer drag (mouse/pen from the header, any pointer from the grip). */
   const beginDrag = useCallback(
-    (e: ReactPointerEvent, id: WidgetId, fromGrip: boolean) => {
+    (e: ReactPointerEvent, id: CardId, fromGrip: boolean) => {
       if (e.button !== 0) return;
       if (!fromGrip && (e.pointerType === 'touch' || (e.target as HTMLElement).closest(NO_DRAG))) return;
       const card = (e.currentTarget as HTMLElement).closest<HTMLElement>('[data-widget-id]');
@@ -263,7 +287,7 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
     requestAnimationFrame(() => gripRefs.current.get(spec.id)?.focus());
   };
 
-  const previewResize = (id: WidgetId, size: WidgetSize | null) =>
+  const previewResize = (id: CardId, size: WidgetSize | null) =>
     setPreview(size ? { id, mode: 'resize', items: resizeItem(base, id, size, cols) } : null);
 
   const commitResize = (spec: WidgetSpec, displayed: WidgetSize, startCols: number) => {
@@ -320,7 +344,8 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
         />
       ) : null}
       {base.map((committed) => {
-        const spec = SPEC_BY_ID[committed.id];
+        const spec = specById.get(committed.id);
+        if (!spec) return null;
         const dragging = preview?.mode === 'move' && preview.id === spec.id;
         // The dragged card stays on its cell (moved by `translate`); the others show the preview.
         const item = dragging ? committed : (shown.get(spec.id) ?? committed);
@@ -333,8 +358,7 @@ export function DashboardBoard({ width, month, d, loading, kind, components, ale
             dragging={dragging}
             resizing={preview?.mode === 'resize' && preview.id === spec.id}
             editing={editing}
-            Body={components[spec.id]}
-            widgetProps={widgetProps}
+            renderCard={renderCard}
             alert={alerts[spec.id]}
             onResizePreview={(size) => previewResize(spec.id, size)}
             onResizeCommit={(size, startCols) => commitResize(spec, size, startCols)}
@@ -374,9 +398,16 @@ function ghostStyle(item: BoardItem, g: Geometry) {
   return { width: box.width, height: box.height, transform: `translate(${box.left}px, ${box.top}px)` };
 }
 
+const NO_ALERTS: Partial<Record<CardId, WidgetAlert>> = {};
+
 /** Widget content, skipped while only positions change (drag and resize previews). */
 const WidgetBody = memo(function WidgetBody({ Body, ...props }: WidgetProps & { Body: ComponentType<WidgetProps> }) {
   return <Body {...props} />;
+});
+
+/** A card's content: rendered again only when its size, alert or the render function change. */
+const CardBody = memo(function CardBody({ id, size, alert, renderCard }: { id: CardId; size: WidgetSize; alert: WidgetAlert | undefined; renderCard: RenderCard }) {
+  return <>{renderCard(id, size, alert)}</>;
 });
 
 interface FrameProps {
@@ -387,8 +418,7 @@ interface FrameProps {
   dragging: boolean;
   resizing: boolean;
   editing: boolean;
-  Body: ComponentType<WidgetProps>;
-  widgetProps: Omit<WidgetProps, 'size' | 'alert'>;
+  renderCard: RenderCard;
   alert: WidgetAlert | undefined;
   chrome: WidgetChrome;
   onResizePreview: (size: WidgetSize | null) => void;
@@ -396,7 +426,7 @@ interface FrameProps {
 }
 
 /** Positioned card: its box on the board and the corner resize handle (pointer drag or arrow keys). */
-function WidgetFrame({ spec, item, geometry, dragging, resizing, editing, Body, widgetProps, alert, chrome, onResizePreview, onResizeCommit }: FrameProps) {
+function WidgetFrame({ spec, item, geometry, dragging, resizing, editing, renderCard, alert, chrome, onResizePreview, onResizeCommit }: FrameProps) {
   const { cols } = geometry;
   const box = boxOf(item, geometry);
   const size = useMemo(() => ({ c: item.c, r: item.r }), [item.c, item.r]);
@@ -472,7 +502,7 @@ function WidgetFrame({ spec, item, geometry, dragging, resizing, editing, Body, 
     >
       <WidgetChromeContext.Provider value={chromeValue}>
         <WidgetErrorBoundary title={spec.title}>
-          <WidgetBody Body={Body} {...widgetProps} size={size} alert={alert} />
+          <CardBody id={spec.id} size={size} alert={alert} renderCard={renderCard} />
         </WidgetErrorBoundary>
       </WidgetChromeContext.Provider>
       {resizing ? (

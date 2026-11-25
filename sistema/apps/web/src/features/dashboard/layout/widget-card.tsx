@@ -16,11 +16,11 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { useElementSize } from '@/lib/use-element-size';
 import { cn, pluralize } from '@/lib/utils';
 import { fitCount } from './layout';
-import type { WidgetAlert, WidgetId } from './types';
+import type { WidgetAlert, CardId } from './types';
 
 /** What the grid gives each card: its title, the move/hide controls and the resize state. */
 export interface WidgetChrome {
-  id: WidgetId;
+  id: CardId;
   title: string;
   onHide: () => void;
   /** Mouse/pen drag from the header. */

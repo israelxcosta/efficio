@@ -10,7 +10,7 @@ import type {
   DashboardPrefs,
   GridCell,
   WidgetGroupId,
-  WidgetId,
+  CardId,
   WidgetSize,
   WidgetSpec,
 } from './types';
@@ -120,11 +120,11 @@ export function snapResize(start: WidgetSize, dx: number, dy: number, m: GridMet
 }
 
 /** Saved order first (unknown ids and duplicates dropped), then new widgets in default order. */
-export function mergeOrder(saved: readonly unknown[] | undefined, defaults: readonly WidgetId[]): WidgetId[] {
-  const known = new Set<WidgetId>(defaults);
-  const out: WidgetId[] = [];
+export function mergeOrder(saved: readonly unknown[] | undefined, defaults: readonly CardId[]): CardId[] {
+  const known = new Set<CardId>(defaults);
+  const out: CardId[] = [];
   for (const id of saved ?? []) {
-    if (typeof id === 'string' && known.has(id as WidgetId) && !out.includes(id as WidgetId)) out.push(id as WidgetId);
+    if (typeof id === 'string' && known.has(id as CardId) && !out.includes(id as CardId)) out.push(id as CardId);
   }
   for (const id of defaults) if (!out.includes(id)) out.push(id);
   return out;
@@ -174,7 +174,7 @@ export function firstFit(items: readonly Box[], size: WidgetSize, cols: number):
  * Removes overlaps without moving anything up: the `first` cards keep their cells (in that order),
  * then the others, top to bottom, slide down below whatever they hit. Cells are clamped to the grid.
  */
-export function settle(items: readonly BoardItem[], cols: number, first: readonly WidgetId[] = []): BoardItem[] {
+export function settle(items: readonly BoardItem[], cols: number, first: readonly CardId[] = []): BoardItem[] {
   const rank = (i: BoardItem) => (first.includes(i.id) ? first.indexOf(i.id) : first.length);
   const placed: BoardItem[] = [];
   for (const item of [...items].sort((a, b) => rank(a) - rank(b) || byReading(a, b))) {
@@ -237,7 +237,7 @@ export function sameBoard(a: readonly BoardItem[], b: readonly BoardItem[]): boo
  * the space it left stays empty). On one column the board is a list: the card passes every card
  * whose middle its leading edge (top going up, bottom going down) went past.
  */
-export function moveItem(items: readonly BoardItem[], id: WidgetId, cell: GridCell, cols: number): BoardItem[] {
+export function moveItem(items: readonly BoardItem[], id: CardId, cell: GridCell, cols: number): BoardItem[] {
   const moving = items.find((i) => i.id === id);
   if (!moving) return [...items];
   if (cols === 1) {
@@ -261,7 +261,7 @@ export function moveItem(items: readonly BoardItem[], id: WidgetId, cell: GridCe
  * Corner handle: the card keeps its cell and pushes down the cards it now covers. `size` is in
  * shown columns (what the handle snapped to on this board), not the stored 4-column width.
  */
-export function resizeItem(items: readonly BoardItem[], id: WidgetId, size: WidgetSize, cols: number): BoardItem[] {
+export function resizeItem(items: readonly BoardItem[], id: CardId, size: WidgetSize, cols: number): BoardItem[] {
   const next = settle(items.map((i) => (i.id === id ? { ...i, c: clamp(size.c, 1, cols), r: size.r } : i)), cols, [id]);
   return cols === 1 ? compact(next) : next;
 }
@@ -272,7 +272,7 @@ export type NudgeDirection = 'left' | 'right' | 'up' | 'down';
  * Keyboard move by one cell. Cards in the way trade places with the moving one instead of being
  * chased down (so the arrows can pass them); a free move down stops at the bottom of the others.
  */
-export function nudgeItem(items: readonly BoardItem[], id: WidgetId, dir: NudgeDirection, cols: number): BoardItem[] {
+export function nudgeItem(items: readonly BoardItem[], id: CardId, dir: NudgeDirection, cols: number): BoardItem[] {
   const a = items.find((i) => i.id === id);
   if (!a) return [...items];
   const others = items.filter((i) => i.id !== id);
@@ -321,7 +321,7 @@ export function resolveBoard(
   specs: readonly WidgetSpec[],
   kind: WorkspaceKind | undefined,
   cols: BoardCols,
-  first: readonly WidgetId[] = [],
+  first: readonly CardId[] = [],
 ): BoardItem[] {
   const shown = specs.filter((s) => isVisible(layout, s, kind));
   const saved = layout.cells[cols] ?? {};
@@ -350,7 +350,7 @@ export function withBoard(layout: DashboardLayout, cols: BoardCols, items: reado
 /** New size (corner handle or "Personalizar"): on every arranged board the card pushes what it now covers. */
 export function applySize(
   layout: DashboardLayout,
-  id: WidgetId,
+  id: CardId,
   size: WidgetSize,
   specs: readonly WidgetSpec[],
   kind: WorkspaceKind | undefined,
@@ -360,11 +360,11 @@ export function applySize(
   return next;
 }
 
-function withoutCells(cells: DashboardLayout['cells'], ids: readonly WidgetId[]): DashboardLayout['cells'] {
+function withoutCells(cells: DashboardLayout['cells'], ids: readonly CardId[]): DashboardLayout['cells'] {
   const out: DashboardLayout['cells'] = {};
   for (const cols of BOARD_COLS) {
     const board = cells[cols];
-    if (board) out[cols] = Object.fromEntries(Object.entries(board).filter(([id]) => !ids.includes(id as WidgetId)));
+    if (board) out[cols] = Object.fromEntries(Object.entries(board).filter(([id]) => !ids.includes(id as CardId)));
   }
   return out;
 }
@@ -375,7 +375,7 @@ function withoutCells(cells: DashboardLayout['cells'], ids: readonly WidgetId[])
  */
 function reveal(
   layout: DashboardLayout,
-  ids: readonly WidgetId[],
+  ids: readonly CardId[],
   visible: DashboardLayout['visible'],
   specs: readonly WidgetSpec[],
   kind: WorkspaceKind | undefined,
@@ -390,7 +390,7 @@ function reveal(
 /** Shows a card in the first free space, or hides it (its cells go away; the space stays empty). */
 export function setWidgetVisible(
   layout: DashboardLayout,
-  id: WidgetId,
+  id: CardId,
   visible: boolean,
   specs: readonly WidgetSpec[],
   kind: WorkspaceKind | undefined,
@@ -441,11 +441,11 @@ export function sanitizeLayout(raw: unknown, specs: readonly WidgetSpec[], kind:
   let out = emptyLayout();
 
   for (const [id, size] of Object.entries(obj(src.sizes))) {
-    const spec = specById.get(id as WidgetId);
+    const spec = specById.get(id as CardId);
     if (spec && size && typeof size === 'object') out.sizes[spec.id] = clampSize(size as WidgetSize, spec);
   }
   for (const [id, value] of Object.entries(obj(src.visible))) {
-    if (specById.has(id as WidgetId) && typeof value === 'boolean') out.visible[id as WidgetId] = value;
+    if (specById.has(id as CardId) && typeof value === 'boolean') out.visible[id as CardId] = value;
   }
   const prefs = obj(src.prefs);
   for (const key of Object.keys(PREF_VALUES) as (keyof DashboardPrefs)[]) {

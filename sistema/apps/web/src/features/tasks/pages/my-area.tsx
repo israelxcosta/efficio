@@ -6,17 +6,20 @@ import { Button } from '@/components/ui/button';
 import { MetricStrip, type MetricCell } from '@/components/ui/metric-strip';
 import { ErrorState, PageHeader } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { AccountMenu } from '@/components/layout/account-menu';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useAuth } from '@/features/auth/auth-context';
 import { gateFor, usePermissions } from '@/features/auth/permissions';
 import { ROLE_LABELS } from '@/features/auth/roles';
 import { columnsForWidth } from '@/features/dashboard/layout/layout';
+import { BoardEditControls, useBoardEditing } from '@/features/dashboard/layout/board-editing';
+import { CustomizeSheet } from '@/features/dashboard/layout/customize-sheet';
 import { WidgetCard } from '@/features/dashboard/layout/widget-card';
+import { FreeBoard, type RenderCard } from '@/features/dashboard/layout/widget-grid';
 import { SpotlightCard, SpotlightRow } from '@/components/ui/spotlight-card';
 import { useElementSize } from '@/lib/use-element-size';
 import { useUpdatedLabel } from '@/lib/updated-label';
 import { useMyOverview, useTaskActivity, useTaskHome, useTaskNotes, useTaskOptions, useTasks } from '../api';
-import { DashColsContext, SortableBoard } from '../components/dash-slot';
+import { DashColsContext } from '../components/dash-slot';
 import { MiniCalendar } from '../components/mini-calendar';
 import {
   ClientsPendingCardView,
@@ -28,6 +31,7 @@ import {
   RhythmCardView,
 } from '../components/my-area-cards';
 import { useOccurrenceSheetLinks } from '../components/occurrence-row';
+import { MY_AREA_BOARD, MY_AREA_GROUPS } from '../my-area-board';
 import { appointmentsToday, forYouInsights, greeting, myAreaDescription, myMetricCells, officeHour } from '../my-area-logic';
 import { competenceName } from '../occurrence';
 import { useTaskActions } from '../task-actions';
@@ -89,41 +93,11 @@ export default function MyAreaPage() {
     ? myMetricCells(o, appointmentsToday(o))
     : ['Atrasadas', 'Hoje', 'Próximos 7 dias', `Minhas concluídas em ${monthName}`].map((label, i) => ({ key: String(i), label, value: '', loading: true, hero: i === 0 }));
   const obligation = home.data?.obligations.items.find((x) => x.pending > 0) ?? null;
+  // "Personalizar": the same free board as the Painel financeiro (move, resize, hide, "Organizar").
+  const edit = useBoardEditing(MY_AREA_BOARD, workspace?.kind, page.width);
 
-  return (
-    <div className="calm-text flex flex-col gap-5">
-      <PageHeader
-        title={user ? greeting(officeHour(new Date()), user.name) : 'Minha área'}
-        description={myAreaDescription(today, role, department?.name ?? null, overview.dataUpdatedAt ? updated : '')}
-        actionsClassName="max-sm:w-full max-sm:flex-nowrap"
-        actions={
-          <>
-            <Button asChild variant="ghost" className="max-sm:hidden">
-              <Link to="/configuracoes?aba=perfil">
-                <UserRoundCog /> Editar perfil
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" size="icon" className="sm:hidden" aria-label="Editar perfil">
-              <Link to="/configuracoes?aba=perfil">
-                <UserRoundCog />
-              </Link>
-            </Button>
-            <AccountMenu className="max-sm:flex-1" />
-          </>
-        }
-      />
-
-      <SpotlightRow spotlight={<MySpotlight overview={o} loading={!o && !overview.isError} onOpen={openTask} />}>
-        {overview.isError && !o ? <ErrorState error={overview.error} onRetry={() => overview.refetch()} /> : <MetricStrip cells={cells} />}
-      </SpotlightRow>
-
-      <div ref={page.ref} className="min-w-0">
-        <DashColsContext.Provider value={cols}>
-          <SortableBoard
-            storeKey={`effinance.tasks.my-area-cards.v1:${workspace?.id ?? ''}:${user?.id ?? ''}`}
-            label="Cards da Minha área"
-            cards={[
-              { id: 'mine', title: 'Minhas tarefas', rows: 4, node: (
+  const cardList: { id: string; node: ReactNode }[] = [
+              { id: 'mine', node: (
           <>
             <MyTasksCardView
               data={mine.data ? { items: mine.data.items, occurrences: mine.data.occurrences, total: mine.data.total } : undefined}
@@ -136,8 +110,8 @@ export default function MyAreaPage() {
             />
           </>
         ) },
-              { id: 'for-you', title: 'Para você', rows: 4, node: o ? <ForYouCardView insights={forYou.shown} hidden={forYou.hidden} /> : <CardLoading title="Para você" /> },
-              { id: 'calendar', title: 'Calendário', rows: 4, grow: true, node: (
+              { id: 'for-you', node: o ? <ForYouCardView insights={forYou.shown} hidden={forYou.hidden} /> : <CardLoading title="Para você" /> },
+              { id: 'calendar', node: (
           <>
             <WidgetCard
               title="Calendário"
@@ -172,7 +146,7 @@ export default function MyAreaPage() {
             </WidgetCard>
           </>
         ) },
-              { id: 'rhythm', title: 'Seu ritmo', rows: 4, node: (
+              { id: 'rhythm', node: (
           <>
             {o ? (
               <RhythmCardView
@@ -190,7 +164,7 @@ export default function MyAreaPage() {
             )}
           </>
         ) },
-              { id: 'department', title: 'Meu departamento', rows: 4, node: (
+              { id: 'department', node: (
           <>
             <MyDepartmentCardView
               home={home.data && !department ? { ...home.data, view: 'mine' } : home.data}
@@ -206,12 +180,12 @@ export default function MyAreaPage() {
             />
           </>
         ) },
-              { id: 'notes', title: 'Anotações', rows: 3, node: (
+              { id: 'notes', node: (
           <>
             <NotesCardView notes={notes.data} onOpen={editNote} onNew={newNote} onAll={openNotes} blockedReason={blocked} />
           </>
         ) },
-              { id: 'clients', title: 'Clientes com mais pendências', rows: 3, node: (
+              { id: 'clients', node: (
           <>
             <ClientsPendingCardView
               rows={department ? home.data?.byClient : mine.data?.summary.openByClient}
@@ -220,15 +194,48 @@ export default function MyAreaPage() {
             />
           </>
         ) },
-              { id: 'comments', title: 'Comentários recentes', rows: 3, node: (
+              { id: 'comments', node: (
           <>
             <RecentCommentsCardView items={activity.data} onOpen={openTask} />
           </>
         ) },
-            ]}
-          />
+            ];
+  const nodes = new Map(cardList.map((c) => [c.id, c.node]));
+  const renderCard: RenderCard = (id) => nodes.get(id) ?? null;
+
+  return (
+    <div className="calm-text flex flex-col gap-5">
+      <PageHeader
+        title={user ? greeting(officeHour(new Date()), user.name) : 'Minha área'}
+        description={myAreaDescription(today, role, department?.name ?? null, overview.dataUpdatedAt ? updated : '')}
+        actions={
+          <>
+            <BoardEditControls editing={edit} />
+            {/* Only the profile button here: theme and the rest of the account live in Configurações. */}
+            <Tooltip content="Editar perfil">
+              <Button asChild variant="outline" size="icon" aria-label="Editar perfil">
+                <Link to="/configuracoes?aba=perfil">
+                  <UserRoundCog />
+                </Link>
+              </Button>
+            </Tooltip>
+          </>
+        }
+      />
+
+      <SpotlightRow spotlight={<MySpotlight overview={o} loading={!o && !overview.isError} onOpen={openTask} />}>
+        {overview.isError && !o ? <ErrorState error={overview.error} onRetry={() => overview.refetch()} /> : <MetricStrip cells={cells} />}
+      </SpotlightRow>
+
+      <div ref={page.ref} className="min-w-0">
+        <DashColsContext.Provider value={cols}>
+          <FreeBoard width={page.width} board={MY_AREA_BOARD} kind={workspace?.kind} renderCard={renderCard} onCustomize={() => edit.start(true)} editing={edit.editing} />
         </DashColsContext.Provider>
       </div>
+      <CustomizeSheet open={edit.customizing} onOpenChange={edit.setCustomizing} kind={workspace?.kind} board={MY_AREA_BOARD} groups={MY_AREA_GROUPS} place="Minha área" />
+      <p aria-live="polite" className="sr-only">
+        {edit.message}
+      </p>
     </div>
   );
 }

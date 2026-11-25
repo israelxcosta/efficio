@@ -12,7 +12,7 @@
 // Hidden by default (turned on in "Cards"): fatura, saúde, cadastro incompleto, resultado mês a
 // mês, receitas por categoria, evolução, composição and metas.
 
-import type { WidgetGroupSpec, WidgetSize, WidgetSpec } from './types';
+import type { WidgetGroupSpec, WidgetId, WidgetSize, WidgetSpec } from './types';
 
 const s = (c: number, r: number): WidgetSize => ({ c, r });
 
@@ -270,4 +270,4 @@ export const WIDGET_SPECS: WidgetSpec[] = [
   },
 ];
 
-export const SPEC_BY_ID = Object.fromEntries(WIDGET_SPECS.map((w) => [w.id, w])) as Record<WidgetSpec['id'], WidgetSpec>;
+export const SPEC_BY_ID = Object.fromEntries(WIDGET_SPECS.map((w) => [w.id, w])) as Record<WidgetId, WidgetSpec>;

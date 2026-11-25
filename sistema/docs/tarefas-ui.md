@@ -3390,18 +3390,17 @@ nenhum item do trilho fica ativo e o avatar fica com o anel `ring-primary` (§2.
      "Boa tarde, Marina" (12:00 a 17:59), "Boa noite, Marina" (18:00 em diante); o primeiro nome.
    - descrição: "Quinta-feira, 5 de novembro · Colaborador · Fiscal · atualizado às 14:32" (o papel por
      `features/auth/roles.ts`; sem departamento, sem esse trecho; o "atualizado" do `useUpdatedLabel`).
-   - `actions`: `ghost` **Editar perfil** (`UserRoundCog`, leva a `/configuracoes?aba=perfil`) e o
-     **menu de conta** (`AccountMenu`): botão `outline` com o ícone do tipo de espaço
-     (`WORKSPACE_KIND_ICONS`), o nome do espaço (trunca em `max-w-56`) e `ChevronDown`, com
-     `aria-label="Conta e espaço: Efficio Contabilidade"`. O menu (`w-72`, `align="end"`), de cima
-     para baixo: rótulo "Conta" com o nome (`text-sm font-semibold`), o e-mail (`text-xs text-muted`) e
-     "Espaço atual: **Efficio Contabilidade** · Empresarial"; separador; `WorkspaceMenuItems` (trocar de
-     espaço) e **Nova empresa** (abre o `WorkspaceSheet`); separador; **Tema escuro** ou **Tema claro**
-     (`Moon`/`Sun`); **Configurações** (`Settings`); separador; **Sair** (`LogOut`, `tone="danger"`).
-     É o conteúdo do antigo menu do avatar menos Perfil (virou o botão ao lado) e Minhas anotações
-     (virou um card).
-   - A 375px, as ações descem para uma linha própria: **Editar perfil** vira só o ícone (com
-     `aria-label`) e o menu de conta ocupa o resto da linha.
+   - `actions` (revisto em 25/11/2026 a pedido do dono): **Personalizar** (o mesmo modo do Painel
+     financeiro: Cards · Organizar · Concluir) e **um botão só de ícone** para Editar perfil
+     (`UserRoundCog`, `outline`, com tooltip e `aria-label`, leva a `/configuracoes?aba=perfil`). O
+     antigo menu de conta (nome do escritório, tema, Configurações e Sair) foi **removido**: o tema
+     escuro fica em Configurações → Perfil → Tema; Sair fica no menu "Mais" do celular e em
+     Configurações → Segurança → Sair da conta.
+   - **Cards** no quadro livre do Painel financeiro (`FreeBoard` + `MY_AREA_BOARD`,
+     `features/tasks/my-area-board.ts`): em Personalizar, arrasta-se o card para qualquer lugar,
+     redimensiona-se pelo canto (2–4 colunas × 2–7 linhas), oculta-se pelo olho e "Organizar" fecha os
+     espaços; "Cards" abre a lista para reexibir e escolher tamanhos. O layout fica salvo por escritório
+     e pessoa neste navegador (`effinance.tasks.my-area-board.v1`).
 2. **Faixa de números** (`MetricStrip`, 4 células; cada uma é link):
 
    | Célula | Valor | Rodapé (comparação) | Destino |
