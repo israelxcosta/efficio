@@ -100,7 +100,7 @@ const PRIVACY: Section[] = [
   {
     title: '5. Com quem compartilhamos',
     paragraphs: [
-      'Somente com operadores necessários ao funcionamento do sistema, que tratam os dados conforme as instruções do Escritório: a Hostinger, provedora do servidor (VPS) onde ficam o sistema e o banco de dados e do serviço de e-mail usado para enviar mensagens do sistema; o serviço de armazenamento das cópias de segurança (Google Drive ou Microsoft OneDrive), que recebe apenas arquivos cifrados antes do envio; e a BrasilAPI, consultada só com o CNPJ para preencher dados públicos da empresa.',
+      'Somente com operadores necessários ao funcionamento do sistema, que tratam os dados conforme as instruções do Escritório: a Hostinger, provedora do servidor (VPS) onde ficam o sistema e o banco de dados; o provedor de e-mail do Escritório (Google Workspace ou Hostinger), usado para enviar as mensagens do sistema, como convites, links de redefinição de senha e avisos; o serviço de armazenamento das cópias de segurança (Google Drive ou Microsoft OneDrive), que recebe apenas arquivos cifrados antes do envio; e a BrasilAPI, consultada só com o CNPJ para preencher dados públicos da empresa.',
       'Quando ativados pelo Escritório: o Mercado Pago (pagamento da assinatura; o sistema não recebe dados de cartão) e o agregador de Open Finance (conexão com bancos autorizada pelo titular da conta).',
       'Com órgãos públicos (como Receita Federal, Secretarias de Fazenda, Prefeituras, eSocial, FGTS Digital e Juntas Comerciais), sempre que a prestação dos serviços ou a lei exigir, e com autoridades mediante ordem legal.',
       'Mensagens de WhatsApp são abertas no aparelho de quem envia; o sistema não as envia nem as lê. Dentro do Escritório, cada pessoa vê apenas o que sua permissão de acesso permite.',
@@ -109,7 +109,7 @@ const PRIVACY: Section[] = [
   {
     title: '6. Transferência internacional',
     paragraphs: [
-      'As cópias de segurança no Google Drive ou no OneDrive, e o servidor quando o data center escolhido estiver fora do Brasil, podem envolver transferência internacional de dados. Ela ocorre com base no art. 33 da LGPD e nas cláusulas contratuais padrão da Resolução CD/ANPD nº 19/2024, e os arquivos de backup são cifrados antes de sair do servidor, sem que o provedor tenha acesso ao conteúdo.',
+      'As cópias de segurança no Google Drive ou no OneDrive, o envio de e-mails pelo Google Workspace e o servidor quando o data center escolhido estiver fora do Brasil podem envolver transferência internacional de dados. Ela ocorre com base no art. 33 da LGPD e nas cláusulas contratuais padrão da Resolução CD/ANPD nº 19/2024, e os arquivos de backup são cifrados antes de sair do servidor, sem que o provedor tenha acesso ao conteúdo.',
     ],
   },
   {

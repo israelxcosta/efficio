@@ -25,7 +25,7 @@ dentro do banco e o backup diário sai cifrado. Os arquivos do kit estão em `si
 | 2 | Criar a chave SSH e cadastrá-la no VPS | seu computador + hPanel | 10 min |
 | 3 | Apontar `efficio.com.br` e `www` para o IP do VPS (veja **onde** fica a zona DNS) | registro.br **ou** hPanel | 10 min + propagação |
 | 4 | Preparar o servidor (`install.sh`: firewall, fail2ban, Docker, SSH só com chave) | servidor | 20 min |
-| 5–6 | Gerar os segredos e configurar o e-mail (SMTP da Hostinger) | servidor | 10 min |
+| 5–6 | Gerar os segredos e configurar o e-mail que o sistema envia (Google: senha de app) | servidor + conta Google | 15 min |
 | 7 | Subir o sistema (`atualizar.sh`: banco, migrações até a 0029, HTTPS automático) | servidor | 5–15 min |
 | 8 | Criar o proprietário, ativar as duas etapas e convidar a equipe | servidor + navegador | 15 min |
 | 9–10 | Ligar o backup diário, testar a restauração, cópia no Drive e monitoramento | servidor + navegador | 30 min |
@@ -39,7 +39,9 @@ do escritório não é afetado em nenhum passo.
 - VPS **KVM 1** com **Ubuntu 24.04 LTS** (sistema limpo; reinstale pelo painel se tiver outro).
 - Acesso ao **registro.br** (domínio `efficio.com.br`), à conta da **Hostinger** e ao **GitHub**
   (repositório privado `israelxcosta/efficio`).
-- A caixa de e-mail do escritório na Hostinger (ex.: `contato@efficio.com.br`) e a senha dela.
+- A conta que vai **enviar os e-mails do sistema** (ex.: `nao-responda@efficio.com.br`). No Google
+  (Gmail / Google Workspace, inclusive o G Suite legado) ela precisa de **verificação em duas etapas** e
+  de uma **senha de app** (passo 6). Na Hostinger, basta a senha da caixa.
 - Um **gerenciador de senhas** (Bitwarden, 1Password…) ou um caderno guardado em local seguro.
 - Ative a **verificação em duas etapas** na Hostinger, no registro.br e no GitHub: quem entra
   nessas contas controla o servidor e o domínio.
@@ -81,6 +83,14 @@ No **registro.br**, entre com sua conta → **Domínios** → `efficio.com.br` �
 
 Na dúvida, não troque os servidores DNS: só edite os registros onde a zona já está.
 
+**E-mail no Google (Gmail / Workspace / G Suite legado):** a zona costuma ficar no **registro.br** e já
+tem os registros do Google:
+- **MX**: `ASPMX.L.GOOGLE.COM` e outros, ou um único `SMTP.GOOGLE.COM`;
+- **TXT de SPF**: `v=spf1 include:_spf.google.com ~all`;
+- talvez **DKIM** (`google._domainkey`) e **DMARC** (`_dmarc`).
+
+Eles continuam como estão: você só acrescenta os dois registros A abaixo.
+
 ### 3.2 Registros a criar ou ajustar
 
 | Tipo | Nome | Valor | TTL |
@@ -92,8 +102,8 @@ Na dúvida, não troque os servidores DNS: só edite os registros onde a zona j�
   outro lugar (hospedagem antiga, "parking", site padrão da Hostinger).
 - **Não crie AAAA (IPv6)** por enquanto. Com o Docker padrão, um acesso por IPv6 chegaria à API sem o
   IP real da pessoa, e a proteção contra tentativas de senha (limite por IP) ficaria cega.
-- **Não mexa** nos registros de e-mail: MX, TXT (SPF, DKIM, DMARC) e CNAMEs como `autodiscover` da
-  Hostinger continuam como estão.
+- **Não mexa** nos registros de e-mail: MX, TXT (SPF, DKIM, DMARC) e CNAMEs do provedor (Google,
+  Hostinger) continuam como estão.
 - Opcional, se o painel oferecer: `CAA` em `efficio.com.br` com `0 issue "letsencrypt.org"`.
 
 Conferir (pode levar de minutos a algumas horas): `PS> nslookup efficio.com.br` e
@@ -159,26 +169,61 @@ cd /opt/efficio/app/sistema/deploy
 ./scripts/gerar-segredos.sh
 ```
 
-O script pergunta o domínio (Enter = `efficio.com.br`), o e-mail do escritório e a senha dessa caixa
-de e-mail, e cria o arquivo `.env` (só o usuário `efficio` consegue ler).
+O script pergunta, com o padrão entre colchetes (Enter aceita):
+- o domínio: `efficio.com.br`;
+- o e-mail que **envia** os e-mails do sistema: `nao-responda@efficio.com.br`;
+- o e-mail que recebe os avisos do certificado HTTPS: `contato@efficio.com.br`, uma caixa que alguém lê;
+- onde ficam os e-mails: `google` ou `hostinger`;
+- a senha: no Google, a **senha de app** do passo 6, não a senha normal.
+
+Se ainda não tiver a senha de app, aperte Enter e preencha depois. O script cria o arquivo `.env`, que
+só o usuário `efficio` consegue ler.
 
 **Copie para o gerenciador de senhas as duas linhas do quadro "ATENÇÃO"** (chave mestra e senha dos
 backups) e, de preferência, o `.env` inteiro (`cat .env`). Sem a chave mestra **e** a senha dos
 backups, nenhum backup pode ser restaurado se o servidor for perdido. Depois limpe a tela: `clear`.
 
-## 6. E-mail (SMTP da Hostinger)
+## 6. E-mail que o sistema envia
 
-O sistema envia convites, redefinição de senha e avisos pela caixa do escritório:
-`smtp.hostinger.com`, porta `465`, SSL. Confira/edite com `nano .env`:
+O sistema manda convites, links de redefinição de senha e avisos. Ele **nunca envia senhas**.
 
-```
-SMTP_USER=contato@efficio.com.br
-SMTP_PASSWORD='a-senha-da-caixa'      # entre aspas simples; não use ' dentro da senha
-MAIL_FROM=contato@efficio.com.br
-```
+### 6.1 Google (Gmail / Google Workspace / G Suite legado)
 
-(`Ctrl+O`, Enter, `Ctrl+X` para salvar e sair.) Use uma caixa que exista na Hostinger; o remetente
-precisa ser a mesma caixa (ou um alias dela), senão os e-mails caem no spam ou são recusados.
+Use uma conta só para isso, como `nao-responda@efficio.com.br`.
+
+1. **Verificação em duas etapas na conta** `nao-responda@`:
+   - Entre com ela em myaccount.google.com → **Segurança** → **Verificação em duas etapas** e ative.
+   - Se a opção não aparecer, libere no Admin do Google (admin.google.com, como administrador):
+     **Segurança → Autenticação → Verificação em duas etapas → Permitir que os usuários ativem a
+     verificação em duas etapas**.
+2. **Senha de app**:
+   - Ainda nessa conta, em myaccount.google.com, procure **Senhas de app** na busca do topo.
+   - Crie uma com o nome `Efficio` e copie as 16 letras. Os espaços não importam.
+   - Ela só aparece uma vez. Guarde no gerenciador de senhas.
+3. **No servidor**, se não colou a senha no passo 5, rode `nano .env` e confira:
+   ```
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=465
+   SMTP_USER=nao-responda@efficio.com.br
+   SMTP_PASSWORD='as16letrasdasenhadeapp'   # entre aspas simples, sem espaços
+   MAIL_FROM=nao-responda@efficio.com.br
+   ```
+   Para salvar e sair: `Ctrl+O`, Enter, `Ctrl+X`.
+4. **Para não cair no spam (DKIM):**
+   - No Admin do Google: **Apps → Google Workspace → Gmail → Autenticar e-mail** → **Gerar novo
+     registro** (2048 bits).
+   - Crie no registro.br o **TXT** `google._domainkey` com o valor mostrado.
+   - Volte ao Admin e clique em **Iniciar autenticação**. Se já aparecer "Autenticando e-mail", isso já
+     está feito.
+   - Confira também se existe o TXT de SPF `v=spf1 include:_spf.google.com ~all`.
+
+Se o envio falhar com "Application-specific password required" ou "Username and Password not
+accepted", a senha usada não é a senha de app, ou a verificação em duas etapas está desligada.
+
+### 6.2 Hostinger (alternativa)
+
+Use `smtp.hostinger.com`, porta `465`, com a senha da própria caixa. O remetente precisa ser a mesma
+caixa (ou um alias dela), senão os e-mails caem no spam ou são recusados.
 
 ## 7. Subir o sistema
 
@@ -195,22 +240,30 @@ e a lista dos serviços `db`, `api` e `caddy` como `healthy` (o `migrate` e o `g
 Conferir no navegador: `https://efficio.com.br` abre a tela de login com cadeado;
 `http://efficio.com.br` e `https://www.efficio.com.br` redirecionam para `https://efficio.com.br`.
 
-## 8. Proprietário, autenticação em duas etapas e convites
+## 8. Primeiro acesso: proprietário, duas etapas e convites
 
-```bash
-cd /opt/efficio/app/sistema/deploy
-docker compose -f docker-compose.prod.yml exec api node dist/bootstrap-owner.js \
-  --email voce@efficio.com.br --name "Seu Nome" --workspace "Nome do Escritório"
-```
+**Ninguém recebe senha por e-mail.** Cada pessoa cria a própria senha por um link de uso único.
 
-Abra **em até 30 minutos** o link mostrado e defina a senha (link expirou? rode de novo com
-`--reset-link` no lugar de `--name` e `--workspace`). No primeiro acesso o sistema exige a
-**verificação em duas etapas**: leia o QR code com o Google Authenticator ou Microsoft Authenticator
-no celular (e guarde os códigos de recuperação, se forem mostrados).
-
-Depois, em **Configurações → Convidar pessoa**, convide os outros 4 usuários pelo e-mail de cada um.
-Eles recebem o convite pelo e-mail do escritório e também configuram as duas etapas. O cadastro
-público fica desligado: só entra quem for convidado.
+1. **Você (proprietário)**: no servidor, rode:
+   ```bash
+   cd /opt/efficio/app/sistema/deploy
+   docker compose -f docker-compose.prod.yml exec api node dist/bootstrap-owner.js \
+     --email voce@efficio.com.br --name "Seu Nome" --workspace "Nome do Escritório"
+   ```
+   O comando cria a sua conta **sem senha** e mostra **na tela** um link (não vai por e-mail).
+   - Abra o link em até **30 minutos** e defina a sua senha.
+   - Se ele expirou, rode de novo com `--reset-link` no lugar de `--name` e `--workspace`.
+2. **Verificação em duas etapas (obrigatória)**:
+   - No primeiro login, o sistema mostra um QR code.
+   - Leia com o Google Authenticator ou o Microsoft Authenticator no celular.
+   - Guarde os códigos de recuperação, se forem mostrados.
+3. **A equipe**:
+   - Em **Configurações → Convidar pessoa**, informe o e-mail de cada um.
+   - Cada pessoa recebe um e-mail de `nao-responda@efficio.com.br` com o link do convite, que vale
+     **7 dias**.
+   - Pelo link, ela cria a própria senha e configura as duas etapas.
+   - O cadastro público fica desligado: só entra quem for convidado.
+4. **Esqueceu a senha?** Pela tela de login, em "Esqueci minha senha", chega um link que vale 30 minutos.
 
 ## 9. Backup diário (e teste de restauração)
 
@@ -374,7 +427,8 @@ repositório (Dependabot) e chegam no próximo `atualizar.sh`.
    `./scripts/atualizar.sh --sem-git`. Se a versão nova já tinha mudado o banco, restaure o backup
    da noite anterior (item 7). Para voltar ao normal depois: `git -C /opt/efficio/app checkout main`.
 6. **E-mails não chegam**: confira `SMTP_*` no `.env`, rode `./scripts/atualizar.sh --sem-git` e veja
-   `logs api`. Teste a caixa no webmail da Hostinger.
+   `logs api`. Entre na conta remetente pelo webmail (Gmail ou Hostinger) e confira se ela funciona e se
+   a senha de app continua válida.
 7. **Restaurar um backup** (dados apagados por engano, banco corrompido):
    `./scripts/restaurar.sh` (mais recente) ou `./scripts/restaurar.sh /opt/efficio/backups/diarios/<arquivo>`.
    Ele restaura num banco novo, mostra as contagens e só troca o banco em uso se você digitar

@@ -26,17 +26,37 @@ perguntar() {
 }
 
 DOMAIN="$(perguntar 'Domínio do sistema' "${DOMAIN:-efficio.com.br}")"
-EMAIL="$(perguntar 'E-mail do escritório (envia os e-mails do sistema)' "${EMAIL:-contato@$DOMAIN}")"
+# Quem envia (convites, redefinição de senha, avisos): uma caixa só para isso, que ninguém responde.
+EMAIL="$(perguntar 'E-mail que envia os e-mails do sistema' "${EMAIL:-nao-responda@$DOMAIN}")"
+# Avisos do certificado HTTPS (Let's Encrypt): uma caixa que alguém lê.
+ACME="$(perguntar 'E-mail para avisos do certificado HTTPS (alguém lê)' "${ACME:-contato@$DOMAIN}")"
+PROVEDOR="$(perguntar 'Onde ficam os e-mails do escritório: google (Gmail/Google Workspace) ou hostinger' "${PROVEDOR:-google}")"
+case "${PROVEDOR,,}" in
+  google | g | gmail)
+    SMTP_HOST=smtp.gmail.com
+    ROTULO_SENHA="Senha de app do Google dessa conta (16 letras, sem espaços; Enter para preencher depois): "
+    ;;
+  hostinger | h)
+    SMTP_HOST=smtp.hostinger.com
+    ROTULO_SENHA="Senha dessa caixa de e-mail na Hostinger (Enter para preencher depois): "
+    ;;
+  *)
+    echo "ERRO: responda google ou hostinger." >&2
+    exit 1
+    ;;
+esac
 SMTP_PASSWORD=""
 if [[ -t 0 ]]; then
-  read -r -s -p "Senha dessa caixa de e-mail na Hostinger (Enter para preencher depois): " SMTP_PASSWORD || true
+  read -r -s -p "$ROTULO_SENHA" SMTP_PASSWORD || true
   echo
 fi
+# A senha de app do Google é mostrada em 4 blocos de 4 letras: os espaços não fazem parte dela.
+if [[ "$SMTP_HOST" == smtp.gmail.com ]]; then SMTP_PASSWORD="${SMTP_PASSWORD// /}"; fi
 if [[ "$SMTP_PASSWORD" == *"'"* ]]; then
   echo "AVISO: a senha tem aspas simples ('); preencha SMTP_PASSWORD depois com: nano $ENV_FILE" >&2
   SMTP_PASSWORD=""
 fi
-for valor in "$DOMAIN" "$EMAIL"; do
+for valor in "$DOMAIN" "$EMAIL" "$ACME"; do
   [[ "$valor" =~ ^[A-Za-z0-9.@_+-]+$ ]] || { echo "ERRO: valor inválido: $valor" >&2; exit 1; }
 done
 
@@ -54,7 +74,7 @@ cat >"$ENV_FILE" <<EOF
 # Variáveis documentadas em deploy/.env.example.
 
 DOMAIN=$DOMAIN
-ACME_EMAIL=$EMAIL
+ACME_EMAIL=$ACME
 
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 EFFICIO_OWNER_DB_PASSWORD=$EFFICIO_OWNER_DB_PASSWORD
@@ -63,7 +83,7 @@ EFFICIO_DB_PASSWORD=$EFFICIO_DB_PASSWORD
 JWT_SECRET=$JWT_SECRET
 ENCRYPTION_MASTER_KEY=$ENCRYPTION_MASTER_KEY
 
-SMTP_HOST=smtp.hostinger.com
+SMTP_HOST=$SMTP_HOST
 SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=$EMAIL
@@ -106,4 +126,7 @@ Criado: $ENV_FILE (chmod 600)
 EOF
 if [[ -z "$SMTP_PASSWORD" ]]; then
   echo "Falta a senha do e-mail: nano $ENV_FILE  (linha SMTP_PASSWORD='...')"
+  if [[ "$SMTP_HOST" == smtp.gmail.com ]]; then
+    echo "  No Google é a SENHA DE APP da conta $EMAIL (não a senha normal): docs/deploy-hostinger.md, passo 6."
+  fi
 fi
