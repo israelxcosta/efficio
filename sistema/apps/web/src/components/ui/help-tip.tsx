@@ -76,7 +76,7 @@ export function HelpTip({ children, label = 'Ajuda', side = 'top', className }: 
           onOpenAutoFocus={(e) => e.preventDefault()}
           onPointerEnter={hoverOpen}
           onPointerLeave={hoverClose}
-          className="z-[60] max-w-[280px] rounded-md bg-fg px-2.5 py-1.5 text-xs leading-snug font-medium text-bg shadow-lg data-[state=open]:animate-fade-in"
+          className="z-[60] max-w-[280px] rounded-md bg-fg px-2.5 py-1.5 text-mini leading-snug font-medium text-bg shadow-lg data-[state=open]:animate-fade-in"
         >
           {children}
           <Popover.Arrow className="fill-fg" width={10} height={5} />

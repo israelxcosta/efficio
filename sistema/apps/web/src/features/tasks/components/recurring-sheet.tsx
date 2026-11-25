@@ -324,7 +324,7 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
 
           <Group title="Quando">
             <div className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-fg">Periodicidade*</span>
+              <span className="text-caption font-medium text-fg">Periodicidade*</span>
               <div className="hidden sm:block">
                 <SegmentedControl<RecurrencePeriod>
                   size="sm"
@@ -374,9 +374,9 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
               </Field>
             </div>
             <div className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-fg">Se cair em dia não útil</span>
+              <span className="text-caption font-medium text-fg">Se cair em dia não útil</span>
               <NonBusinessField value={form.nonBusinessDayRule} onChange={(v) => set('nonBusinessDayRule', v)} disabled={readOnly} />
-              <p className="text-xs text-muted">{NON_BUSINESS_HINTS[form.nonBusinessDayRule]} Vale para o prazo legal; a meta sempre antecipa.</p>
+              <p className="text-mini text-muted">{NON_BUSINESS_HINTS[form.nonBusinessDayRule]} Vale para o prazo legal; a meta sempre antecipa.</p>
             </div>
             <Preview schedule={schedule} current={current} start={form.startCompetence} />
           </Group>
@@ -491,7 +491,7 @@ function DueFields({ form, errors, readOnly, set }: { form: RecurringForm; error
   }
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-medium text-fg">Prazo legal*</span>
+      <span className="text-caption font-medium text-fg">Prazo legal*</span>
       <div className="grid gap-2 sm:grid-cols-2">
         {daySelect}
         <AnchorMonthField
@@ -504,13 +504,13 @@ function DueFields({ form, errors, readOnly, set }: { form: RecurringForm; error
         />
       </div>
       {errors.dueDay || errors.dueMonth ? (
-        <p role="alert" className="text-xs font-medium text-danger">
+        <p role="alert" className="text-mini font-medium text-danger">
           {errors.dueDay ?? errors.dueMonth}
         </p>
       ) : hint ? (
-        <p className="text-xs text-muted">{hint}</p>
+        <p className="text-mini text-muted">{hint}</p>
       ) : form.period !== 'annual' ? (
-        <p className="text-xs text-muted">O 1º mês se repete a cada {form.period === 'bimonthly' ? 2 : form.period === 'quarterly' ? 3 : 6} meses.</p>
+        <p className="text-mini text-muted">O 1º mês se repete a cada {form.period === 'bimonthly' ? 2 : form.period === 'quarterly' ? 3 : 6} meses.</p>
       ) : null}
     </div>
   );
@@ -584,10 +584,10 @@ function ClientsField({
   return (
     <>
       <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-medium text-fg">Regimes</span>
+        <span className="text-caption font-medium text-fg">Regimes</span>
         <div className="grid gap-1 sm:grid-cols-2">
           {TAX_REGIMES.map((r) => (
-            <label key={r} className="flex min-h-9 items-center gap-2.5 rounded-md px-1 text-sm text-fg">
+            <label key={r} className="flex min-h-9 items-center gap-2.5 rounded-md px-1 text-body-sm text-fg">
               <Checkbox
                 disabled={readOnly}
                 checked={form.regimes.includes(r)}
@@ -604,7 +604,7 @@ function ClientsField({
 
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="flex items-center gap-1.5 text-[13px] font-medium text-fg">
+          <span className="flex items-center gap-1.5 text-caption font-medium text-fg">
             Clientes específicos
             <HelpTip>Somam-se aos regimes.</HelpTip>
           </span>
@@ -624,12 +624,12 @@ function ClientsField({
         </div>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar cliente específico" className="h-9 pl-9 text-[13px]" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar cliente específico" className="h-9 pl-9 text-caption" />
         </div>
         <ul className="scrollbar-thin max-h-72 overflow-y-auto rounded-lg border border-border p-1">
           {visible.map((c) => (
             <li key={c.id}>
-              <label className="flex min-h-9 items-center gap-2.5 rounded-md px-2 text-sm hover:bg-surface-muted">
+              <label className="flex min-h-9 items-center gap-2.5 rounded-md px-2 text-body-sm hover:bg-surface-muted">
                 <Checkbox
                   disabled={readOnly || form.excludedClientIds.includes(c.id)}
                   checked={form.clientIds.includes(c.id)}
@@ -646,14 +646,14 @@ function ClientsField({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-medium text-fg">Exceções</span>
+        <span className="text-caption font-medium text-fg">Exceções</span>
         {form.excludedClientIds.length ? (
           <ul className="flex flex-col">
             {form.excludedClientIds.map((id) => {
               const c = options.clients.find((x) => x.id === id);
               return (
                 <li key={id} className="flex min-h-9 items-center gap-2 rounded-md px-2 hover:bg-surface-muted">
-                  <span className="min-w-0 flex-1 truncate text-sm text-fg">{c?.name ?? 'Cliente'}</span>
+                  <span className="min-w-0 flex-1 truncate text-body-sm text-fg">{c?.name ?? 'Cliente'}</span>
                   <span className="text-caption text-muted">{c ? TAX_REGIME_LABELS[c.taxRegime] : ''}</span>
                   {!readOnly ? (
                     <Button variant="ghost" size="icon-sm" aria-label={`Tirar ${c?.name ?? 'cliente'} das exceções`} onClick={() => set('excludedClientIds', form.excludedClientIds.filter((x) => x !== id))}>
@@ -684,11 +684,11 @@ function ClientsField({
           <p className="text-body-sm text-subtle">Nenhuma exceção.</p>
         ) : null}
         {errors.excludedClientIds ? (
-          <p role="alert" className="text-xs font-medium text-danger">
+          <p role="alert" className="text-mini font-medium text-danger">
             {errors.excludedClientIds}
           </p>
         ) : (
-          <p className="text-xs text-muted">
+          <p className="text-mini text-muted">
             Clientes do regime que não fazem esta obrigação. As tarefas deles ainda não iniciadas, da competência atual em diante, são canceladas; as em andamento continuam.
           </p>
         )}

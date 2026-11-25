@@ -76,7 +76,7 @@ function Change({ from, to, kept }: { from: number | undefined; to: number | und
       </span>
       <span className="sr-only"> para </span>
       <span className="font-semibold text-fg">{formatBRL(to)}</span>
-      {kept ? <span className="ml-1 text-xs text-muted">(mantida)</span> : null}
+      {kept ? <span className="ml-1 text-mini text-muted">(mantida)</span> : null}
     </span>
   );
 }
@@ -84,12 +84,12 @@ function Change({ from, to, kept }: { from: number | undefined; to: number | und
 function NoticeLine({ item }: { item: FeeAdjustmentPreviewItem }) {
   if (item.status !== 'ready') return null;
   return item.noticeLate ? (
-    <span className="flex items-center gap-1 text-xs font-medium text-danger">
+    <span className="flex items-center gap-1 text-mini font-medium text-danger">
       <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
       Prazo do aviso já passou ({formatDateBR(item.noticeDeadline)})
     </span>
   ) : (
-    <span className="text-xs text-muted">Aviso até {formatDateBR(item.noticeDeadline)}</span>
+    <span className="text-mini text-muted">Aviso até {formatDateBR(item.noticeDeadline)}</span>
   );
 }
 
@@ -105,7 +105,7 @@ function StatusCell({ item }: { item: FeeAdjustmentPreviewItem }) {
   return (
     <span className="flex flex-col items-start gap-0.5">
       <Badge tone={STATUS_TONE[item.status]}>{STATUS_SHORT[item.status]}</Badge>
-      {hint ? <span className="text-xs text-muted">{hint}</span> : null}
+      {hint ? <span className="text-mini text-muted">{hint}</span> : null}
     </span>
   );
 }
@@ -173,13 +173,13 @@ export function ClientsCard(props: ClientsCardProps) {
                   <div className="flex items-start justify-between gap-2">
                     <span className="min-w-0">
                       <span className="block truncate font-semibold text-fg">{item.name}</span>
-                      {item.legalName !== item.name ? <span className="block truncate text-xs text-muted">{item.legalName}</span> : null}
+                      {item.legalName !== item.name ? <span className="block truncate text-mini text-muted">{item.legalName}</span> : null}
                     </span>
                     <Badge tone={STATUS_TONE[item.status]} className="shrink-0">
                       {STATUS_SHORT[item.status]}
                     </Badge>
                   </div>
-                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[13px]">
+                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-caption">
                     <dt className="text-muted">Vigência</dt>
                     <dd className="tabular">{period(item)}</dd>
                     <dt className="text-muted">Honorário</dt>
@@ -192,17 +192,17 @@ export function ClientsCard(props: ClientsCardProps) {
                     </dd>
                   </dl>
                   <NoticeLine item={item} />
-                  {item.status === 'no_previous_fee' ? <span className="text-xs text-muted">Cadastre a vigência anterior para reajustar.</span> : null}
+                  {item.status === 'no_previous_fee' ? <span className="text-mini text-muted">Cadastre a vigência anterior para reajustar.</span> : null}
                 </div>
               </li>
             );
           })}
         </ul>
         <div className="hidden @3xl:block">
-          <table className="w-full text-sm">
+          <table className="w-full text-body-sm">
             <caption className="sr-only">Clientes com vigência começando em {monthLabel}</caption>
             <thead>
-              <tr className="border-b border-border text-left text-xs font-medium text-muted">
+              <tr className="border-b border-border text-left text-mini font-medium text-muted">
                 <th scope="col" className="w-12 py-2.5 pr-2 pl-4">
                   <Checkbox checked={allState} onCheckedChange={toggleAll} disabled={ready.length === 0 || busy} aria-label="Selecionar todos os prontos" />
                 </th>
@@ -234,7 +234,7 @@ export function ClientsCard(props: ClientsCardProps) {
                         {item.name}
                       </span>
                       {item.legalName !== item.name ? (
-                        <span className="block truncate text-xs text-muted" title={item.legalName}>
+                        <span className="block truncate text-mini text-muted" title={item.legalName}>
                           {item.legalName}
                         </span>
                       ) : null}
@@ -268,14 +268,14 @@ export function ClientsCard(props: ClientsCardProps) {
         <div className="min-w-0">
           <h2 className="text-title-sm font-semibold tracking-tight text-fg">2. Clientes com vigência em {monthLabel}</h2>
           {data && items.length ? (
-            <p className="mt-0.5 text-xs text-muted">
+            <p className="mt-0.5 text-mini text-muted">
               {monthSummary(items)}
               {late ? <span className="font-medium text-danger"> · {late} com o prazo do aviso vencido</span> : null}
             </p>
           ) : null}
         </div>
         {ready.length > 0 ? (
-          <label className="flex items-center gap-2 text-[13px] font-medium text-fg @3xl:hidden">
+          <label className="flex items-center gap-2 text-caption font-medium text-fg @3xl:hidden">
             <Checkbox checked={allState} onCheckedChange={toggleAll} disabled={busy} />
             Todos os prontos
           </label>
@@ -286,7 +286,7 @@ export function ClientsCard(props: ClientsCardProps) {
 
       {ready.length > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-muted/50 p-4">
-          <div className="min-w-0 text-sm" aria-live="polite">
+          <div className="min-w-0 text-body-sm" aria-live="polite">
             {totals.count === 0 ? (
               <span className="text-muted">Nenhum cliente selecionado.</span>
             ) : (
@@ -301,7 +301,7 @@ export function ClientsCard(props: ClientsCardProps) {
                 {totals.proposed > totals.current ? <span className="text-muted tabular"> (+{formatBRL(totals.proposed - totals.current)})</span> : null}
               </>
             )}
-            {props.blockedReason ? <p className="mt-0.5 text-xs font-medium text-danger">{props.blockedReason}</p> : null}
+            {props.blockedReason ? <p className="mt-0.5 text-mini font-medium text-danger">{props.blockedReason}</p> : null}
           </div>
           <WriteGate>
             <Button onClick={props.onApply} disabled={totals.count === 0 || props.blockedReason !== null || busy}>

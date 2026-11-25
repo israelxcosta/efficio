@@ -138,7 +138,7 @@ function RegimeShares({ slices, total }: { slices: CategoryAmount[]; total: numb
         moreHref="/clientes"
         className="flex flex-col"
         renderItem={(s) => (
-          <div className="flex items-center gap-2 px-1.5 py-1 text-[12px]">
+          <div className="flex items-center gap-2 px-1.5 py-1 text-mini">
             <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} aria-hidden />
             <span className="min-w-0 flex-1 truncate text-fg">{s.name}</span>
             <span className="shrink-0 text-mini text-muted tabular">{Math.round(s.share * 100)}%</span>
@@ -260,7 +260,7 @@ export function ClientsPortfolioWidget({ size, alert }: WidgetProps) {
                 renderItem={(s) => (
                   <div className="grid grid-cols-[auto_minmax(0,8.5rem)_minmax(0,1fr)_4.5rem] items-center gap-x-2.5 px-1.5 py-0.5">
                     <span className="size-2 rounded-full" style={{ backgroundColor: REGIME_COLORS[s.regime] }} aria-hidden />
-                    <span className="truncate text-[12px] font-medium text-fg" title={TAX_REGIME_LABELS[s.regime]}>
+                    <span className="truncate text-mini font-medium text-fg" title={TAX_REGIME_LABELS[s.regime]}>
                       {TAX_REGIME_LABELS[s.regime]}
                     </span>
                     <span className="block h-1.5 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
@@ -752,7 +752,7 @@ export function IncompleteClientsWidget({ alert }: WidgetProps) {
             className="flex flex-col gap-0.5 rounded-md px-1.5 py-1 transition-colors hover:bg-surface-muted @lg:grid @lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] @lg:items-center @lg:gap-4 @2xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]"
             aria-label={`${client.name}: falta ${missing.join(', ')}`}
           >
-            <span className="min-w-0 truncate text-[12px] font-semibold text-fg" title={client.name}>
+            <span className="min-w-0 truncate text-mini font-semibold text-fg" title={client.name}>
               {client.name}
             </span>
             <span className="flex min-w-0 flex-wrap items-center gap-1">

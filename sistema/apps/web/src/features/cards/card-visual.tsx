@@ -36,7 +36,7 @@ export function CardVisual({ card, className, compact }: { card: CreditCard; cla
       />
       <div className="relative flex items-start justify-between">
         <div>
-          <p className="text-[11px] font-semibold tracking-wider text-white/70 uppercase">{bank?.name ?? 'Cartão'}</p>
+          <p className="text-micro font-semibold tracking-wider text-white/70 uppercase">{bank?.name ?? 'Cartão'}</p>
           <p className="mt-0.5 text-[15px] font-semibold">{card.name}</p>
         </div>
         <Wifi className="size-5 rotate-90 text-white/70" aria-hidden />

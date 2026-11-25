@@ -111,7 +111,7 @@ function GenerateFeesForm({ onClose }: { onClose: () => void }) {
     >
       <CompetenceField value={competence} activeMonth={activeMonth} onChange={setCompetence} />
 
-      <div className="flex items-start gap-2.5 rounded-md bg-surface-muted px-3 py-2.5 text-[13px] text-fg" aria-live="polite">
+      <div className="flex items-start gap-2.5 rounded-md bg-surface-muted px-3 py-2.5 text-caption text-fg" aria-live="polite">
         <CalendarClock className="mt-px size-4 shrink-0 text-muted" aria-hidden />
         <p>
           <span className="font-semibold">
@@ -150,13 +150,13 @@ function CompetenceField({ value, activeMonth, onChange }: { value: MonthKey; ac
   return (
     <div className="flex flex-col gap-1.5" role="group" aria-labelledby={labelId}>
       <div className="flex items-center justify-between gap-2">
-        <span id={labelId} className="text-[13px] font-medium text-fg">
+        <span id={labelId} className="text-caption font-medium text-fg">
           Competência
         </span>
         {value !== activeMonth ? (
           <button
             type="button"
-            className="rounded-sm text-xs font-medium text-brand-text underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-brand-500/25"
+            className="rounded-sm text-mini font-medium text-brand-text underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-brand-500/25"
             onClick={() => onChange(activeMonth)}
           >
             Voltar ao mês ativo
@@ -167,14 +167,14 @@ function CompetenceField({ value, activeMonth, onChange }: { value: MonthKey; ac
         <Button type="button" variant="ghost" size="icon-sm" aria-label="Competência anterior" onClick={() => onChange(addMonthKey(value, -1))}>
           <ChevronLeft />
         </Button>
-        <span className="min-w-0 truncate text-center text-sm font-semibold text-fg" aria-live="polite">
+        <span className="min-w-0 truncate text-center text-body-sm font-semibold text-fg" aria-live="polite">
           {competenceLongLabel(value)}
         </span>
         <Button type="button" variant="ghost" size="icon-sm" aria-label="Próxima competência" onClick={() => onChange(addMonthKey(value, 1))}>
           <ChevronRight />
         </Button>
       </div>
-      <p className="text-xs text-muted">{value === activeMonth ? 'Mês ativo no dashboard' : `Mês ativo: ${competenceLongLabel(activeMonth)}`}</p>
+      <p className="text-mini text-muted">{value === activeMonth ? 'Mês ativo no dashboard' : `Mês ativo: ${competenceLongLabel(activeMonth)}`}</p>
     </div>
   );
 }
@@ -200,14 +200,14 @@ function PreviewSection({ preview, dimmed, competence }: PreviewSectionProps) {
       {plan.created.length > 0 ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-[13px] font-semibold text-fg">
+            <h3 className="text-caption font-semibold text-fg">
               A gerar <span className="font-medium text-muted">· {plan.created.length}</span>
             </h3>
-            <span className="tabular text-[13px] font-semibold text-fg">{formatBRL(plan.total)}</span>
+            <span className="tabular text-caption font-semibold text-fg">{formatBRL(plan.total)}</span>
           </div>
           <ul className="max-h-[min(16rem,36dvh)] divide-y divide-border overflow-y-auto rounded-lg border border-border" aria-label="Clientes a cobrar">
             {plan.created.map((c) => (
-              <li key={c.clientId} className="flex items-center justify-between gap-3 px-3 py-2 text-[13px]">
+              <li key={c.clientId} className="flex items-center justify-between gap-3 px-3 py-2 text-caption">
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate text-fg">{c.name}</span>
                   <span className="text-caption text-muted">
@@ -280,7 +280,7 @@ function SkippedList({ skipped, defaultOpen }: { skipped: GenerateFeesResponse['
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] outline-none hover:bg-surface-muted focus-visible:ring-[3px] focus-visible:ring-brand-500/25"
+        className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-caption outline-none hover:bg-surface-muted focus-visible:ring-[3px] focus-visible:ring-brand-500/25"
       >
         <span className="font-semibold text-fg">
           Fora da geração <span className="font-medium text-muted">· {skipped.length}</span>
@@ -290,7 +290,7 @@ function SkippedList({ skipped, defaultOpen }: { skipped: GenerateFeesResponse['
       {open ? (
         <ul id={listId} className="max-h-[min(12rem,28dvh)] divide-y divide-border overflow-y-auto border-t border-border">
           {skipped.map((s) => (
-            <li key={s.clientId} className="flex flex-col gap-1 px-3 py-2 text-[13px] sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <li key={s.clientId} className="flex flex-col gap-1 px-3 py-2 text-caption sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <span className="min-w-0 truncate text-fg">{s.name}</span>
               <Badge tone={SKIP_TONE[s.reason]} className="self-start sm:self-auto">
                 {GENERATE_FEES_SKIP_LABELS[s.reason]}

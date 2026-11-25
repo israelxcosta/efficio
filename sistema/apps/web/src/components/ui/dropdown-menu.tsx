@@ -33,7 +33,7 @@ export function DropdownMenuItem({ className, icon, tone = 'default', children, 
   return (
     <DM.Item
       className={cn(
-        'flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle [&_svg]:size-4',
+        'flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm font-medium outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle [&_svg]:size-4',
         tone === 'danger' ? 'text-danger data-[highlighted]:bg-danger-soft' : 'text-fg',
         className,
       )}
@@ -51,7 +51,7 @@ export const DropdownMenuSub = DM.Sub;
 export const DropdownMenuRadioGroup = DM.RadioGroup;
 
 const itemBase =
-  'flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-fg outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle data-[state=open]:bg-bg-subtle [&_svg]:size-4';
+  'flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-body-sm font-medium text-fg outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle data-[state=open]:bg-bg-subtle [&_svg]:size-4';
 
 /** Item that opens a submenu ("Mudar situação ›"). */
 export function DropdownMenuSubTrigger({ className, icon, children, ...props }: ComponentProps<typeof DM.SubTrigger> & { icon?: ReactNode }) {

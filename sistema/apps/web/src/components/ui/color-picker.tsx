@@ -34,7 +34,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
       })}
       <label
         className={cn(
-          'relative flex size-8 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-border-strong text-xs text-muted',
+          'relative flex size-8 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-border-strong text-mini text-muted',
           custom && 'ring-2 ring-offset-2 ring-offset-surface',
         )}
         style={custom ? { backgroundColor: value, ['--tw-ring-color' as string]: value } : undefined}

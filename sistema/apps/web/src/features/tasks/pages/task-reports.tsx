@@ -255,7 +255,7 @@ function PeriodControl({ f, onChange }: { f: ReportFilters; onChange: (p: Partia
           <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label={f.preset === 'year' ? 'Ano anterior' : 'Mês anterior'} onClick={() => onChange(f.preset === 'year' ? { year: f.year - 1 } : { month: addMonthKey(f.month, -1) })}>
             <ChevronLeft />
           </Button>
-          <span className="min-w-[120px] px-1 text-center text-[13px] font-semibold text-fg tabular" aria-live="polite">
+          <span className="min-w-[120px] px-1 text-center text-caption font-semibold text-fg tabular" aria-live="polite">
             {f.preset === 'year' ? f.year : formatMonthKey(f.month)}
           </span>
           <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label={f.preset === 'year' ? 'Próximo ano' : 'Próximo mês'} onClick={() => onChange(f.preset === 'year' ? { year: f.year + 1 } : { month: addMonthKey(f.month, 1) })}>
@@ -265,11 +265,11 @@ function PeriodControl({ f, onChange }: { f: ReportFilters; onChange: (p: Partia
       ) : f.preset === 'custom' ? (
         <div className="flex items-center gap-2">
           <Input type="date" aria-label="De" className="h-10 w-[150px]" value={range.from} onChange={(e) => onChange({ from: e.target.value })} />
-          <span className="text-xs text-muted">até</span>
+          <span className="text-mini text-muted">até</span>
           <Input type="date" aria-label="Até" className="h-10 w-[150px]" value={range.to} onChange={(e) => onChange({ to: e.target.value })} />
         </div>
       ) : (
-        <span className="text-xs text-muted">
+        <span className="text-mini text-muted">
           {formatDateBR(range.from)} – {formatDateBR(range.to)}
         </span>
       )}
@@ -417,7 +417,7 @@ function ReportSummary({ r, situation, onSituation }: { r: TaskReportResponse | 
   const toggle = (v: ReportSituation) => onSituation(situation === v ? '' : v);
   const number = (value: ReactNode, tone?: 'danger' | 'late', big?: boolean) =>
     s ? (
-      <span className={cn('tabular mt-1 block leading-10 font-semibold tracking-tight', big ? 'text-[32px] lg:text-[28px] xl:text-[32px]' : 'text-kpi', tone ? 'text-danger' : 'text-fg')}>{value}</span>
+      <span className={cn('tabular mt-1 block leading-10 font-semibold tracking-tight text-fg', big ? 'text-display' : 'text-kpi')}>{value}</span>
     ) : (
       <span className="mt-1 flex h-10 items-center">
         <Skeleton className={big ? 'h-8 w-16' : 'h-6 w-10'} />
@@ -428,7 +428,7 @@ function ReportSummary({ r, situation, onSituation }: { r: TaskReportResponse | 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))]">
         <div className="col-span-2 min-w-0 p-4 sm:p-5 md:col-span-1">
           <SummaryLabel info="Concluídas até o prazo legal (ou o vencimento, nas avulsas). A meta interna não entra.">No prazo</SummaryLabel>
-          {s ? <span className={cn('tabular mt-1 block text-[32px] leading-10 font-semibold tracking-tight lg:text-[28px] xl:text-[32px]', rate === null ? 'text-subtle' : 'text-fg')}>{rate === null ? '—' : `${rate}%`}</span> : number(0, undefined, true)}
+          {s ? <span className={cn('tabular mt-1 block text-display leading-10 font-semibold tracking-tight', rate === null ? 'text-subtle' : 'text-fg')}>{rate === null ? '—' : `${rate}%`}</span> : number(0, undefined, true)}
           {s ? <p className="mt-1 text-body-sm text-muted">{s.done > 0 ? `${s.doneOnTime} de ${s.done} concluídas` : 'Nenhuma concluída no período.'}</p> : null}
         </div>
         <SummaryButton className="border-t md:border-t-0 md:border-l" pressed={situation === 'done'} label="Concluídas" aria={s ? `Concluídas: ${s.done}. Filtrar.` : 'Concluídas'} onClick={() => toggle('done')}>
@@ -767,9 +767,9 @@ function RankTable({ rows, order, onOrder, empty }: { rows: RankRow[]; order: Pu
                     ]}
                   />
                 </td>
-                <td className="tabular text-right text-[13px] font-semibold text-fg">{r.total}</td>
-                <td className={cn('tabular text-right text-[13px]', r.late ? 'font-semibold text-danger' : 'text-subtle')}>{r.late}</td>
-                <td className="tabular text-right text-[13px] text-fg">{rate === null ? '—' : `${rate}%`}</td>
+                <td className="tabular text-right text-caption font-semibold text-fg">{r.total}</td>
+                <td className={cn('tabular text-right text-caption', r.late ? 'font-semibold text-danger' : 'text-subtle')}>{r.late}</td>
+                <td className="tabular text-right text-caption text-fg">{rate === null ? '—' : `${rate}%`}</td>
               </tr>
             );
           })}
@@ -890,7 +890,7 @@ function DetailTable({ r, f, today, label, onPage, onLastMonths }: { r: TaskRepo
               {/* First column fixed while the others scroll sideways. */}
               <table className="w-full min-w-[960px] border-separate border-spacing-0 text-body-sm">
                 <thead className="sticky top-0 z-10 bg-surface">
-                  <tr className="text-left text-xs text-muted">
+                  <tr className="text-left text-mini text-muted">
                     {['Tarefa', 'Cliente', 'Departamento', 'Categoria', 'Responsável', 'Prioridade'].map((h) => (
                       <th key={h} className="border-b border-border px-3 py-2 font-medium first:sticky first:left-0 first:z-[1] first:bg-surface first:pl-5">
                         {h}
@@ -938,10 +938,10 @@ function DetailTable({ r, f, today, label, onPage, onLastMonths }: { r: TaskRepo
                 <li key={row.id}>
                   <button type="button" onClick={() => open(row)} className="flex w-full flex-col gap-0.5 px-4 py-3 text-left hover:bg-surface-muted">
                     <span className="flex items-center justify-between gap-3">
-                      <span className="min-w-0 truncate text-sm font-semibold text-fg">{row.title}</span>
-                      <span className={cn('shrink-0 text-xs', row.overdue ? 'font-semibold text-danger' : row.targetMissed ? 'font-semibold text-warning' : 'text-muted')}>{rowSituation(row)}</span>
+                      <span className="min-w-0 truncate text-body-sm font-semibold text-fg">{row.title}</span>
+                      <span className={cn('shrink-0 text-mini', row.overdue ? 'font-semibold text-danger' : row.targetMissed ? 'font-semibold text-warning' : 'text-muted')}>{rowSituation(row)}</span>
                     </span>
-                    <span className="truncate text-xs text-muted">
+                    <span className="truncate text-mini text-muted">
                       {[row.client?.name ?? 'Interna', row.assignee ? shortName(row.assignee.name) : 'Ex-membro', row.dueDate ? `vence ${shortDate(row.dueDate, today)}` : 'sem vencimento', row.completedOnTime === null ? null : row.completedOnTime ? 'no prazo' : 'com atraso']
                         .filter(Boolean)
                         .join(' · ')}
@@ -954,7 +954,7 @@ function DetailTable({ r, f, today, label, onPage, onLastMonths }: { r: TaskRepo
         )}
       </div>
       {items && items.total > REPORT_PAGE_SIZE ? (
-        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted print:hidden">
+        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-body-sm text-muted print:hidden">
           <span>
             Página {f.page} de {totalPages} · {items.total} tarefas
           </span>

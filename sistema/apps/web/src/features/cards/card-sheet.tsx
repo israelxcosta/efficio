@@ -139,8 +139,8 @@ export function CardSheet({ open, onOpenChange, card }: { open: boolean; onOpenC
         {card ? (
           <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border p-4">
             <span>
-              <span className="block text-sm font-semibold">Arquivado</span>
-              <span className="block text-xs text-muted">Oculta o cartão sem apagar o histórico.</span>
+              <span className="block text-body-sm font-semibold">Arquivado</span>
+              <span className="block text-mini text-muted">Oculta o cartão sem apagar o histórico.</span>
             </span>
             <Controller control={control} name="archived" render={({ field }) => <Switch checked={Boolean(field.value)} onCheckedChange={field.onChange} />} />
           </label>

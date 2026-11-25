@@ -131,7 +131,7 @@ export function ConventionCyclesDialog({ unionId, onClose, onEdit }: { unionId: 
                 <li key={c.year} className="flex min-h-14 items-center gap-3 px-3 py-2">
                   <Checkbox id={id} checked={c.published} disabled={!canEdit} onCheckedChange={(v) => setDraft((d) => toggleCycle(d, c.year, v))} />
                   <label htmlFor={id} className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-fg">Convenção Coletiva {conventionLabel(c.year)}</span>
+                    <span className="block text-body-sm font-semibold text-fg">Convenção Coletiva {conventionLabel(c.year)}</span>
                     <span className="block text-caption text-muted">{sub}</span>
                   </label>
                   {isTracked ? (

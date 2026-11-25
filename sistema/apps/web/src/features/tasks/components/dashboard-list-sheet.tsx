@@ -89,14 +89,14 @@ export function DashboardListSheet({ list, data, onChange }: { list: DashboardLi
             <li key={f.client.id}>
               <Link to={`/clientes?consultar=${f.client.id}`} className={rowClass}>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-fg">{f.client.name}</span>
-                  <span className="block truncate text-xs text-muted">
+                  <span className="block truncate text-body-sm font-semibold text-fg">{f.client.name}</span>
+                  <span className="block truncate text-mini text-muted">
                     {TAX_REGIME_LABELS[f.taxRegime]} · vigência até {formatDateBR(f.periodEnd)}
                   </span>
                 </span>
                 <span className="flex shrink-0 flex-col items-end text-right">
-                  <span className="tabular text-[13px] font-medium text-fg">{formatBRL(f.monthlyAmount)}</span>
-                  <span className={cn('text-xs', f.days < 0 ? 'font-semibold text-danger' : f.days <= 30 ? 'font-medium text-warning' : 'text-muted')}>
+                  <span className="tabular text-caption font-medium text-fg">{formatBRL(f.monthlyAmount)}</span>
+                  <span className={cn('text-mini', f.days < 0 ? 'font-semibold text-danger' : f.days <= 30 ? 'font-medium text-warning' : 'text-muted')}>
                     {f.days < 0 ? `Encerrou há ${pluralize(-f.days, 'dia', 'dias')}` : deadlineLabel({ days: f.days })}
                   </span>
                 </span>
@@ -127,11 +127,11 @@ export function DashboardListSheet({ list, data, onChange }: { list: DashboardLi
             <li key={c.client.id}>
               <Link to={`/tarefas/auditoria?${new URLSearchParams({ competencia: data.month, busca: c.client.name })}`} className={rowClass}>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-fg">{c.client.name}</span>
-                  <span className="block truncate text-xs text-muted">{TAX_REGIME_LABELS[c.client.taxRegime]}</span>
+                  <span className="block truncate text-body-sm font-semibold text-fg">{c.client.name}</span>
+                  <span className="block truncate text-mini text-muted">{TAX_REGIME_LABELS[c.client.taxRegime]}</span>
                 </span>
-                <span className="flex shrink-0 flex-col items-end text-right text-xs">
-                  <span className="tabular text-[13px] font-medium text-fg">{c.pending ? pluralize(c.pending, 'pendente', 'pendentes') : 'Em dia'}</span>
+                <span className="flex shrink-0 flex-col items-end text-right text-mini">
+                  <span className="tabular text-caption font-medium text-fg">{c.pending ? pluralize(c.pending, 'pendente', 'pendentes') : 'Em dia'}</span>
                   {c.overdue ? <span className="font-semibold text-danger">{pluralize(c.overdue, 'atrasada', 'atrasadas')}</span> : null}
                 </span>
                 <ClipboardCheck className="size-4 shrink-0 text-subtle" aria-hidden />
@@ -165,11 +165,11 @@ function IncompleteRows({ items }: { items: NonNullable<TaskDashboardResponse['i
         <li key={c.client.id}>
           <Link to={canFinance ? `/clientes?editar=${c.client.id}` : `/tarefas/clientes?cliente=${c.client.id}`} className={rowClass}>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-fg">{c.client.name}</span>
-              <span className="block truncate text-xs text-muted">{incompleteText(c)}</span>
+              <span className="block truncate text-body-sm font-semibold text-fg">{c.client.name}</span>
+              <span className="block truncate text-mini text-muted">{incompleteText(c)}</span>
             </span>
             <span className="flex w-24 shrink-0 flex-col items-end gap-1">
-              <span className="tabular text-[13px] font-medium text-fg">{c.percent}%</span>
+              <span className="tabular text-caption font-medium text-fg">{c.percent}%</span>
               <span className="block h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
                 <span className="block h-full rounded-full bg-data" style={{ width: `${c.percent}%` }} />
               </span>

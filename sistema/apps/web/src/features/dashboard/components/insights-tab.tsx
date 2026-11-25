@@ -34,9 +34,9 @@ export function InsightList({ insights }: { insights: Insight[] }) {
       {insights.map((ins, i) => (
         <li key={i} className="flex gap-3 border-t border-border py-3.5 first:border-t-0 md:[&:nth-child(2)]:border-t-0">
           <div className="min-w-0 flex-1">
-            <p className={cn('text-xs font-medium', KIND_TONE[ins.kind])}>{INSIGHT_LABELS[ins.kind]}</p>
-            <p className="mt-0.5 text-sm font-semibold text-fg">{ins.title}</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">{ins.description}</p>
+            <p className={cn('text-mini font-medium', KIND_TONE[ins.kind])}>{INSIGHT_LABELS[ins.kind]}</p>
+            <p className="mt-0.5 text-body-sm font-semibold text-fg">{ins.title}</p>
+            <p className="mt-1 text-mini leading-relaxed text-muted">{ins.description}</p>
           </div>
           {ins.href ? (
             <Link to={ins.href} className="text-subtle hover:text-fg" aria-label={`Abrir análise: ${ins.title}`}>

@@ -71,7 +71,7 @@ export function KpiCard({
   );
   const body = (
     <div className={cn('flex flex-1 flex-col', compact ? 'px-4 py-3.5' : 'px-5 py-4')}>
-      <div className={cn('flex items-center gap-1.5 font-medium text-muted', compact ? 'text-[12px]' : 'text-[13px]')}>
+      <div className={cn('flex items-center gap-1.5 font-medium text-muted', compact ? 'text-mini' : 'text-caption')}>
         {icon ? <span className="flex shrink-0 text-subtle [&_svg]:size-4">{icon}</span> : null}
         {label}
         {info ? (

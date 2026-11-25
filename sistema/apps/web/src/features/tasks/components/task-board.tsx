@@ -337,7 +337,7 @@ function OccurrenceBoardCard({ card, today, mine }: { card: OccurrenceCard; toda
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className={cn('min-w-0 flex-1 truncate text-xs', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span>
+            <span className={cn('min-w-0 flex-1 truncate text-mini', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span>
             {names.length && !mine ? (
               <span title={assigneesTip(o)}>
                 <AvatarStack names={names} max={3} />

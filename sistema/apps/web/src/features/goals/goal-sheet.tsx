@@ -107,8 +107,8 @@ export function GoalSheet({ open, onOpenChange, goal }: { open: boolean; onOpenC
         {goal ? (
           <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border p-4">
             <span>
-              <span className="block text-sm font-semibold">Arquivada</span>
-              <span className="block text-xs text-muted">Oculta a meta do dashboard.</span>
+              <span className="block text-body-sm font-semibold">Arquivada</span>
+              <span className="block text-mini text-muted">Oculta a meta do dashboard.</span>
             </span>
             <Controller control={control} name="archived" render={({ field }) => <Switch checked={Boolean(field.value)} onCheckedChange={field.onChange} />} />
           </label>

@@ -156,7 +156,7 @@ export function MoneyTooltip({ active, label, payload, names, footer, hideZero, 
     <div className="min-w-[148px] rounded-lg border border-border bg-surface px-2.5 py-2 text-caption shadow-lg">
       <p className="mb-1.5 flex items-center gap-2 text-caption font-semibold text-muted">
         {labelFormatter ? labelFormatter(label) : label}
-        {projected ? <span className="rounded-full bg-primary-soft px-1.5 py-0.5 text-[10px] text-primary-soft-fg">Projeção</span> : null}
+        {projected ? <span className="rounded-full bg-primary-soft px-1.5 py-0.5 text-micro text-primary-soft-fg">Projeção</span> : null}
       </p>
       <div className="flex flex-col gap-1">
         {rows.map((p, i) => {
@@ -186,7 +186,7 @@ export function MoneyTooltip({ active, label, payload, names, footer, hideZero, 
 
 export function LegendDot({ color, label, striped, size = 'md' }: { color: string; label: string; striped?: boolean; size?: 'sm' | 'md' }) {
   return (
-    <span className={cn('flex items-center gap-1.5 font-medium text-muted', size === 'sm' ? 'text-caption' : 'text-xs')}>
+    <span className={cn('flex items-center gap-1.5 font-medium text-muted', size === 'sm' ? 'text-caption' : 'text-mini')}>
       <span
         className={cn('shrink-0 rounded-full', size === 'sm' ? 'size-2' : 'size-2.5')}
         style={{

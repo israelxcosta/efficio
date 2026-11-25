@@ -64,7 +64,7 @@ export function SecretInput({
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
       {mode === 'stored' ? (
-        <div className="flex h-11 flex-wrap items-center gap-x-3 rounded-[10px] border border-border bg-surface-muted px-3 text-sm">
+        <div className="flex h-11 flex-wrap items-center gap-x-3 rounded-[10px] border border-border bg-surface-muted px-3 text-body-sm">
           <span className="tabular tracking-widest text-muted" id={id}>
             ••••••••
           </span>
@@ -96,7 +96,7 @@ export function SecretInput({
           ) : null}
         </div>
       ) : mode === 'removing' ? (
-        <div className="flex h-11 items-center gap-3 rounded-[10px] border border-danger/30 bg-danger-soft px-3 text-sm" id={id}>
+        <div className="flex h-11 items-center gap-3 rounded-[10px] border border-danger/30 bg-danger-soft px-3 text-body-sm" id={id}>
           <span className="text-danger">Será removido ao salvar.</span>
           <button
             type="button"
@@ -138,11 +138,11 @@ export function SecretInput({
         </div>
       )}
       {error ? (
-        <p role="alert" className="text-xs font-medium text-danger">
+        <p role="alert" className="text-mini font-medium text-danger">
           {error}
         </p>
       ) : (
-        <p id={`${id}-hint`} className="text-xs text-muted">
+        <p id={`${id}-hint`} className="text-mini text-muted">
           {mode === 'editing' && stored ? 'Deixe vazio para manter o valor atual. ' : ''}
           {hint}
           {mode === 'editing' && stored ? (

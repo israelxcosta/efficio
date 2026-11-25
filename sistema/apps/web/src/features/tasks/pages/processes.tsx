@@ -146,7 +146,7 @@ export default function ProcessesPage() {
 
       <Card className="@container overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5">
-          <h2 className="text-[15px] font-semibold tracking-tight text-fg">Processos</h2>
+          <h2 className="text-title-sm font-semibold tracking-tight text-fg">Processos</h2>
             <SegmentedControl<FlowStatus>
               size="sm"
               ariaLabel="Processos"
@@ -264,15 +264,15 @@ function TemplateRow({
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-sm font-semibold text-fg">{t.title}</span>
+            <span className="truncate text-body-sm font-semibold text-fg">{t.title}</span>
             <Badge tone="neutral" className="hidden @md:inline-flex">
               {steps}
             </Badge>
           </span>
-          <span className="mt-0.5 block truncate text-xs text-muted @2xl:hidden">
+          <span className="mt-0.5 block truncate text-mini text-muted @2xl:hidden">
             {steps} · até {daysText(t.totalDays)} · {usage.toLowerCase()}
           </span>
-          {t.description ? <span className="mt-0.5 hidden truncate text-xs text-muted @2xl:block">{t.description}</span> : null}
+          {t.description ? <span className="mt-0.5 hidden truncate text-mini text-muted @2xl:block">{t.description}</span> : null}
         </span>
       </button>
       <div className="hidden w-36 min-w-0 @4xl:block">
@@ -361,9 +361,9 @@ function FlowRow({
           <FlowDots flow={f} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-fg">{flowTitle(f)}</span>
-          <span className="mt-0.5 block truncate text-xs text-muted">{subtitle}</span>
-          <span className={cn('mt-0.5 block truncate text-xs @xl:hidden', due ? DUE_TONE_CLASS[due.tone] : 'text-muted')}>
+          <span className="block truncate text-body-sm font-semibold text-fg">{flowTitle(f)}</span>
+          <span className="mt-0.5 block truncate text-mini text-muted">{subtitle}</span>
+          <span className={cn('mt-0.5 block truncate text-mini @xl:hidden', due ? DUE_TONE_CLASS[due.tone] : 'text-muted')}>
             {done ? `${f.stepCount} etapas em ${daysText(span)}` : due?.text}
           </span>
         </span>
@@ -372,19 +372,19 @@ function FlowRow({
         {!done ? (
           <>
             <MemberAvatar name={step?.assignee?.name} unassigned={!step?.assignee} userId={step?.assignee?.id} />
-            <span className={cn('truncate text-[13px]', step?.assignee ? 'text-fg' : 'text-subtle')}>{step?.assignee ? shortName(step.assignee.name) : 'Sem responsável'}</span>
+            <span className={cn('truncate text-caption', step?.assignee ? 'text-fg' : 'text-subtle')}>{step?.assignee ? shortName(step.assignee.name) : 'Sem responsável'}</span>
           </>
         ) : null}
       </div>
       <div className="hidden w-36 text-right @xl:block">
         {done ? (
-          <span className="text-xs text-muted">
+          <span className="text-mini text-muted">
             {f.stepCount} etapas em {daysText(span)}
           </span>
         ) : (
           <>
-            <p className="tabular text-[13px] font-medium text-fg">{step?.task?.dueDate ? formatDateBR(step.task.dueDate) : '—'}</p>
-            {due ? <span className={cn('text-xs', DUE_TONE_CLASS[due.tone])}>{due.text}</span> : null}
+            <p className="tabular text-caption font-medium text-fg">{step?.task?.dueDate ? formatDateBR(step.task.dueDate) : '—'}</p>
+            {due ? <span className={cn('text-mini', DUE_TONE_CLASS[due.tone])}>{due.text}</span> : null}
           </>
         )}
       </div>

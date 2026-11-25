@@ -51,7 +51,7 @@ export function HistoryList({ onStart }: { onStart: () => void }) {
     <Card className="@container overflow-hidden">
       <div className="border-b border-border p-5">
         <h2 className="text-title-sm font-semibold tracking-tight text-fg">Lotes aplicados</h2>
-        {data?.total ? <p className="mt-0.5 text-xs text-muted">{pluralize(data.total, 'reajuste', 'reajustes')} em lote</p> : null}
+        {data?.total ? <p className="mt-0.5 text-mini text-muted">{pluralize(data.total, 'reajuste', 'reajustes')} em lote</p> : null}
       </div>
       {list.isPending ? (
         <SkeletonRows rows={4} className="p-4" />
@@ -76,11 +76,11 @@ export function HistoryList({ onStart }: { onStart: () => void }) {
               <li key={b.id} className="flex flex-col gap-2 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <span className="font-semibold text-fg">{formatMonthKey(b.month)}</span>
-                  <span className="text-sm font-semibold text-fg tabular">
+                  <span className="text-body-sm font-semibold text-fg tabular">
                     {formatBps(b.appliedBps)} <span className="font-normal text-muted">· {batchIndexLabel(b)}</span>
                   </span>
                 </div>
-                <p className="text-xs text-muted">
+                <p className="text-mini text-muted">
                   {clients(b)} · {b.appliedBy.name} em {formatDateTime(b.createdAt)}
                 </p>
                 <div>
@@ -89,10 +89,10 @@ export function HistoryList({ onStart }: { onStart: () => void }) {
               </li>
             ))}
           </ul>
-          <table className="hidden w-full text-sm @2xl:table">
+          <table className="hidden w-full text-body-sm @2xl:table">
             <caption className="sr-only">Reajustes em lote aplicados</caption>
             <thead>
-              <tr className="border-b border-border text-left text-xs font-medium text-muted">
+              <tr className="border-b border-border text-left text-mini font-medium text-muted">
                 <th scope="col" className="py-2.5 pr-3 pl-5">
                   Mês das vigências
                 </th>
@@ -120,12 +120,12 @@ export function HistoryList({ onStart }: { onStart: () => void }) {
                   <td className="px-3 py-3 text-right font-semibold text-fg tabular">{formatBps(b.appliedBps)}</td>
                   <td className="px-3 py-3">
                     {batchIndexLabel(b)}
-                    {!b.adjustEmployeeFee ? <span className="block text-xs text-muted">taxa por empregado mantida</span> : null}
+                    {!b.adjustEmployeeFee ? <span className="block text-mini text-muted">taxa por empregado mantida</span> : null}
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap">{clients(b)}</td>
                   <td className="px-3 py-3">
                     <span className="block">{b.appliedBy.name}</span>
-                    <span className="block text-xs text-muted tabular">{formatDateTime(b.createdAt)}</span>
+                    <span className="block text-mini text-muted tabular">{formatDateTime(b.createdAt)}</span>
                   </td>
                   <td className="py-3 pr-5 pl-3 text-right">
                     <Reprint batch={b} />
@@ -137,7 +137,7 @@ export function HistoryList({ onStart }: { onStart: () => void }) {
         </div>
       )}
       {data && data.total > PAGE_SIZE ? (
-        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted">
+        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-body-sm text-muted">
           <span>
             Página {page} de {totalPages}
           </span>

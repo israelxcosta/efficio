@@ -62,7 +62,7 @@ export function Sheet({
             <div className="min-w-0 flex-1">
               <Dialog.Title className="text-xl font-semibold tracking-tight text-fg">{title}</Dialog.Title>
               {description ? (
-                <Dialog.Description className="mt-1 text-sm text-muted">{description}</Dialog.Description>
+                <Dialog.Description className="mt-1 text-body-sm text-muted">{description}</Dialog.Description>
               ) : (
                 <Dialog.Description className="sr-only">Formulário</Dialog.Description>
               )}

@@ -93,18 +93,18 @@ export function ImportHistoryCard() {
                       {b.origin === 'open_finance' ? <Landmark className="size-4" /> : <FileText className="size-4" />}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">
+                      <p className="flex flex-wrap items-center gap-2 text-body-sm font-semibold text-fg">
                         <span className="truncate" title={title(b)}>
                           {title(b)}
                         </span>
                         {b.format ? <Badge tone="brand">{b.format.toUpperCase()}</Badge> : null}
                         {undone ? <Badge title="Os lançamentos deste lote foram excluídos">Desfeito em {formatDateTime(b.undoneAt!)}</Badge> : null}
                       </p>
-                      <p className="mt-0.5 text-xs text-muted">
+                      <p className="mt-0.5 text-mini text-muted">
                         {targetLabel(b, { accounts: accounts.data, cards: cards.data })} · {formatDateTime(b.createdAt)}
                         {b.createdByName ? ` · por ${b.createdByName}` : ''}
                       </p>
-                      <p className="mt-0.5 text-xs text-muted">
+                      <p className="mt-0.5 text-mini text-muted">
                         <span className="font-medium text-fg">{pluralize(b.createdCount, 'criado', 'criados')}</span>
                         {b.skippedCount ? ` · ${pluralize(b.skippedCount, 'ignorado', 'ignorados')} (já existiam)` : ''}
                         {undone
@@ -128,7 +128,7 @@ export function ImportHistoryCard() {
               })}
             </ul>
             {pages > 1 ? (
-              <div className="mt-3 flex items-center justify-between text-xs text-muted">
+              <div className="mt-3 flex items-center justify-between text-mini text-muted">
                 <span>
                   Página {page} de {pages} · {data.total} importações
                 </span>

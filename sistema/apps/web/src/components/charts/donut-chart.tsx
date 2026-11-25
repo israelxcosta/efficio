@@ -119,14 +119,14 @@ export function DonutChart({ data, total, centerLabel = 'Total', height = 200, m
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-[18%] text-center">
-        <span className={cn('w-full truncate leading-tight font-medium text-muted', fill ? 'text-mini' : 'text-[11px]')}>{focused ? focused.name : centerLabel}</span>
+        <span className={cn('w-full truncate leading-tight font-medium text-muted', fill ? 'text-mini' : 'text-micro')}>{focused ? focused.name : centerLabel}</span>
         <span
-          className={cn('tabular mt-0.5 font-semibold tracking-tight whitespace-nowrap text-fg', !fill && (small ? 'text-[13px]' : 'text-[15px]'))}
+          className={cn('tabular mt-0.5 font-semibold tracking-tight whitespace-nowrap text-fg', !fill && (small ? 'text-caption' : 'text-[15px]'))}
           style={valueStyle}
         >
           {centerText}
         </span>
-        {focused ? <span className={cn('leading-tight text-muted', fill ? 'text-mini' : 'text-[11px]')}>{formatPercent(focused.share, 0)}</span> : null}
+        {focused ? <span className={cn('leading-tight text-muted', fill ? 'text-mini' : 'text-micro')}>{formatPercent(focused.share, 0)}</span> : null}
       </div>
     </div>
   );
@@ -139,13 +139,13 @@ export function DonutChart({ data, total, centerLabel = 'Total', height = 200, m
           <>
             <span className={cn('shrink-0 rounded-full', fill ? 'size-2' : 'size-2.5')} style={{ backgroundColor: d.fill }} />
             <span className="truncate text-left text-fg">{d.name}</span>
-            <span className={cn('tabular text-right text-muted', fill ? 'text-mini' : 'text-xs')}>{formatPercent(d.share, 0)}</span>
+            <span className={cn('tabular text-right text-muted', fill ? 'text-mini' : 'text-mini')}>{formatPercent(d.share, 0)}</span>
             <span className="tabular text-right font-semibold whitespace-nowrap text-fg">{formatBRL(d.amount)}</span>
           </>
         );
         const rowClass = cn(
           'col-span-4 grid grid-cols-subgrid items-center rounded-md px-1.5 transition-colors',
-          fill ? 'py-1 text-[12px]' : 'py-1.5 text-[13px]',
+          fill ? 'py-1 text-mini' : 'py-1.5 text-caption',
           active === i && 'bg-bg-subtle',
         );
         return (

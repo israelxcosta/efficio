@@ -48,7 +48,7 @@ export function OpenFinanceTransparency({ compact = false }: { compact?: boolean
   return (
     <ul className={compact ? 'flex flex-col gap-2' : 'flex flex-col gap-3'}>
       {items.map((item) => (
-        <li key={item.text} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-muted">
+        <li key={item.text} className="flex items-start gap-2.5 text-caption leading-relaxed text-muted">
           <span className="mt-0.5 shrink-0 text-success [&_svg]:size-4">{item.icon}</span>
           {item.text}
         </li>
@@ -220,7 +220,7 @@ function IntroDialog({
     >
       <div className="flex flex-col gap-4">
         <OpenFinanceTransparency />
-        <p className="rounded-md bg-surface-muted px-3 py-2.5 text-xs leading-relaxed text-muted">
+        <p className="rounded-md bg-surface-muted px-3 py-2.5 text-mini leading-relaxed text-muted">
           A conexão é feita pela Pluggy, plataforma de Open Finance que recebe os dados do banco com o seu consentimento e os repassa ao
           Efficio. Você escolhe quais contas entram e pode desconectar quando quiser — os lançamentos já importados continuam aqui.
         </p>
@@ -270,7 +270,7 @@ function FakeConnectDialog({
     >
       {updateItemId ? (
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-muted">No ambiente real, esta etapa abre o app ou o site do banco para você confirmar o consentimento.</p>
+          <p className="text-body-sm text-muted">No ambiente real, esta etapa abre o app ou o site do banco para você confirmar o consentimento.</p>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => onDone(null)}>
               Cancelar
@@ -295,7 +295,7 @@ function FakeConnectDialog({
                 className="flex w-full items-center gap-3 rounded-lg border border-border px-3.5 py-3 text-left transition-colors hover:border-border-strong hover:bg-surface-muted focus-visible:ring-[3px] focus-visible:ring-brand-500/25 focus-visible:outline-none disabled:opacity-60"
               >
                 <BankLogo bank={inst.bank} size="sm" />
-                <span className="flex-1 text-sm font-semibold text-fg">{inst.name}</span>
+                <span className="flex-1 text-body-sm font-semibold text-fg">{inst.name}</span>
                 {choosing === inst.id ? <RefreshCw className="size-4 animate-spin text-muted" aria-label="Conectando" /> : null}
               </button>
             </li>
@@ -413,7 +413,7 @@ function LinkAccountsDialog({ connection, initial, onClose }: { connection: Bank
             <SummaryTile label="Atualizados" value={result.updated} />
             <SummaryTile label="Ignorados" value={result.skipped} hint="já existiam" />
           </dl>
-          <p className="text-xs text-muted">Os lançamentos já aparecem no extrato, nas faturas e nos relatórios, com o selo “Open Finance”.</p>
+          <p className="text-mini text-muted">Os lançamentos já aparecem no extrato, nas faturas e nos relatórios, com o selo “Open Finance”.</p>
         </div>
       </Modal>
     );
@@ -445,7 +445,7 @@ function LinkAccountsDialog({ connection, initial, onClose }: { connection: Bank
             <SkeletonRows rows={3} />
           )
         ) : connection.accounts.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">A instituição não retornou contas para este consentimento.</p>
+          <p className="py-6 text-center text-body-sm text-muted">A instituição não retornou contas para este consentimento.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {connection.accounts.map((a) => {
@@ -458,8 +458,8 @@ function LinkAccountsDialog({ connection, initial, onClose }: { connection: Bank
                       {a.kind === 'credit_card' ? <CreditCard className="size-4" /> : <Landmark className="size-4" />}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-fg">{a.name}</p>
-                      <p className="text-xs text-muted">
+                      <p className="truncate text-body-sm font-semibold text-fg">{a.name}</p>
+                      <p className="text-mini text-muted">
                         {a.kind === 'credit_card' ? 'Cartão de crédito' : 'Conta'}
                         {a.number ? ` · final ${a.number.replace(/\D/g, '').slice(-4) || a.number}` : ''}
                         {a.kind === 'credit_card' && a.creditLimit !== null ? ` · limite ${formatBRL(a.creditLimit)}` : ''}
@@ -504,7 +504,7 @@ function LinkAccountsDialog({ connection, initial, onClose }: { connection: Bank
             })}
           </ul>
         )}
-        <p className="mt-4 text-xs text-muted">
+        <p className="mt-4 text-mini text-muted">
           “Importar desde” define até onde a primeira sincronização volta (padrão {OPEN_FINANCE_DEFAULT_HISTORY_DAYS} dias, no máximo{' '}
           {OPEN_FINANCE_MAX_HISTORY_DAYS}). Lançamentos repetidos não entram duas vezes.
         </p>
@@ -516,9 +516,9 @@ function LinkAccountsDialog({ connection, initial, onClose }: { connection: Bank
 function SummaryTile({ label, value, tone, hint }: { label: string; value: number; tone?: 'success'; hint?: string }) {
   return (
     <div className="rounded-lg border border-border px-3 py-2.5">
-      <dt className="text-xs text-muted">{label}</dt>
+      <dt className="text-mini text-muted">{label}</dt>
       <dd className={`tabular mt-0.5 text-lg font-semibold ${tone === 'success' ? 'text-success' : 'text-fg'}`}>{value}</dd>
-      {hint ? <dd className="text-[11px] text-subtle">{hint}</dd> : null}
+      {hint ? <dd className="text-micro text-subtle">{hint}</dd> : null}
     </div>
   );
 }

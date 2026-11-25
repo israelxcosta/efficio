@@ -461,7 +461,7 @@ function ConfirmPaymentDialog({
         {late > 0 ? (
           <div className="flex flex-col gap-3 rounded-lg border border-warning/40 bg-warning-soft/40 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[13px] font-semibold text-fg">
+              <p className="text-caption font-semibold text-fg">
                 {late === 1 ? '1 dia de atraso' : `${late} dias de atraso`}
                 <span className="block text-caption font-normal text-muted">
                   {income ? 'Lance os juros e a multa cobrados do cliente, se houver.' : 'Lance os juros e a multa pagos, se houver.'}
@@ -480,7 +480,7 @@ function ConfirmPaymentDialog({
               </Field>
             </div>
             {interest + fine > 0 ? (
-              <p className="flex items-center justify-between border-t border-border pt-2 text-[13px]">
+              <p className="flex items-center justify-between border-t border-border pt-2 text-caption">
                 <span className="text-muted">{income ? 'Total recebido' : 'Total pago'}</span>
                 <span className="tabular font-semibold text-fg">{formatBRL(total)}</span>
               </p>
@@ -489,7 +489,7 @@ function ConfirmPaymentDialog({
         ) : null}
         {discountable ? (
           <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface-muted p-3">
-            <label className="flex cursor-pointer items-start gap-2.5 text-[13px] text-fg">
+            <label className="flex cursor-pointer items-start gap-2.5 text-caption text-fg">
               <Checkbox checked={giveDiscount} onCheckedChange={setGiveDiscount} aria-describedby="discount-hint" />
               <span>
                 <span className="font-semibold">Conceder desconto de {formatBps(discountBps)}</span>
@@ -504,7 +504,7 @@ function ConfirmPaymentDialog({
                 <MoneyInput value={discount} onChange={setDiscount} />
               </Field>
             ) : null}
-            <p className="flex items-center justify-between border-t border-border pt-2 text-[13px]">
+            <p className="flex items-center justify-between border-t border-border pt-2 text-caption">
               <span className="text-muted">Valor recebido</span>
               <span className="tabular font-semibold text-fg">{formatBRL(total)}</span>
             </p>
@@ -560,7 +560,7 @@ function AnticipateDialog({ tx, onClose }: { tx: Transaction | null; onClose: ()
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-[13px] leading-relaxed text-muted">
+        <p className="text-caption leading-relaxed text-muted">
           {isCard
             ? `As parcelas escolhidas saem dos próximos meses e entram na fatura atual do ${tx?.creditCard?.name ?? 'cartão'}.`
             : 'As parcelas escolhidas saem dos próximos meses e passam a vencer hoje.'}{' '}
@@ -570,7 +570,7 @@ function AnticipateDialog({ tx, onClose }: { tx: Transaction | null; onClose: ()
           <Input type="number" min={1} max={remaining} inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value)} />
         </Field>
         {tx && n > 0 ? (
-          <p className="rounded-md bg-primary-soft px-3 py-2 text-[13px] font-semibold text-primary-soft-fg">
+          <p className="rounded-md bg-primary-soft px-3 py-2 text-caption font-semibold text-primary-soft-fg">
             {n}x de {formatBRL(tx.amount)} · total {formatBRL(tx.amount * n)}
           </p>
         ) : null}

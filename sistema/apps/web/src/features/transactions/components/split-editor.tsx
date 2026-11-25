@@ -61,17 +61,17 @@ export function SplitEditor({ type, total, rows, onChange, onCancel, rowErrors =
   return (
     <section aria-label="Divisão por categoria" className="flex flex-col gap-3 rounded-xl border border-border bg-surface-muted/60 p-3.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] font-medium text-fg">Dividir em categorias</p>
+        <p className="text-caption font-medium text-fg">Dividir em categorias</p>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => onChange(evenSplit(rows, total))}
             disabled={total <= 0}
-            className="rounded-md px-2 py-1 text-xs font-semibold text-brand-text transition-colors hover:bg-bg-subtle disabled:opacity-50"
+            className="rounded-md px-2 py-1 text-mini font-semibold text-brand-text transition-colors hover:bg-bg-subtle disabled:opacity-50"
           >
             Dividir igualmente
           </button>
-          <button type="button" onClick={onCancel} className="rounded-md px-2 py-1 text-xs font-semibold text-muted transition-colors hover:bg-bg-subtle hover:text-fg">
+          <button type="button" onClick={onCancel} className="rounded-md px-2 py-1 text-mini font-semibold text-muted transition-colors hover:bg-bg-subtle hover:text-fg">
             Desfazer divisão
           </button>
         </div>
@@ -107,7 +107,7 @@ export function SplitEditor({ type, total, rows, onChange, onCancel, rowErrors =
                 </button>
               </div>
               {e?.category || e?.amount ? (
-                <p className="text-xs text-danger">{[e.category, e.amount].filter(Boolean).join(' · ')}</p>
+                <p className="text-mini text-danger">{[e.category, e.amount].filter(Boolean).join(' · ')}</p>
               ) : null}
             </li>
           );
@@ -118,14 +118,14 @@ export function SplitEditor({ type, total, rows, onChange, onCancel, rowErrors =
         type="button"
         onClick={() => onChange([...rows, newSplitRow({ amount: diff > 0 ? diff : 0 })])}
         disabled={rows.length >= MAX_SPLITS}
-        className="flex items-center gap-1.5 self-start rounded-md px-1 py-1 text-[13px] font-semibold text-brand-text transition-colors hover:underline disabled:opacity-50"
+        className="flex items-center gap-1.5 self-start rounded-md px-1 py-1 text-caption font-semibold text-brand-text transition-colors hover:underline disabled:opacity-50"
       >
         <Plus className="size-4" /> Adicionar categoria
       </button>
 
       <div
         className={cn(
-          'flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px]',
+          'flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-caption',
           diff === 0 ? 'bg-success-soft text-success' : diff > 0 ? 'bg-warning-soft text-warning' : 'bg-danger-soft text-danger',
         )}
         aria-live="polite"
@@ -145,7 +145,7 @@ export function SplitEditor({ type, total, rows, onChange, onCancel, rowErrors =
           )}
         </span>
       </div>
-      {error ? <p className="text-xs text-danger">{error}</p> : null}
+      {error ? <p className="text-mini text-danger">{error}</p> : null}
     </section>
   );
 }

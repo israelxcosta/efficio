@@ -11,7 +11,7 @@ export const PercentInput = forwardRef<HTMLInputElement, Omit<InputHTMLAttribute
     return (
       <div className={cn('relative', wrapperClassName)}>
         <input ref={ref} type="text" inputMode="decimal" autoComplete="off" className={cn(inputClasses, 'tabular pr-8 text-right', className)} {...props} />
-        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted" aria-hidden>
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-body-sm text-muted" aria-hidden>
           %
         </span>
       </div>

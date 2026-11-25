@@ -103,7 +103,7 @@ function ExportCard() {
         icon={<Download />}
       />
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface-muted px-4 py-3">
-        <p className="max-w-lg text-[13px] text-muted">
+        <p className="max-w-lg text-caption text-muted">
           {isOwner
             ? 'O arquivo leva tudo deste espaço (clientes, honorários, lançamentos, contas e demais cadastros) com os campos protegidos decifrados, inclusive as senhas de acesso dos clientes. Guarde-o em local seguro, não o envie por e-mail ou mensagem e apague as cópias que não forem mais necessárias.'
             : 'Somente o proprietário pode exportar os dados deste espaço.'}
@@ -133,9 +133,9 @@ function AuditCard() {
           <EmptyState compact title="Nenhum registro ainda" description="As ações sensíveis aparecerão aqui." />
         ) : (
           <div className="-mx-2 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-[13px]">
+            <table className="w-full min-w-[520px] text-left text-caption">
               <thead>
-                <tr className="text-xs text-muted">
+                <tr className="text-mini text-muted">
                   <th className="px-2 py-2 font-medium">Quando</th>
                   <th className="px-2 py-2 font-medium">Ação</th>
                   <th className="px-2 py-2 font-medium">Quem</th>
@@ -157,7 +157,7 @@ function AuditCard() {
         )}
       </div>
       {totalPages > 1 ? (
-        <div className="mt-3 flex items-center justify-end gap-2 text-xs text-muted">
+        <div className="mt-3 flex items-center justify-end gap-2 text-mini text-muted">
           <span className="tabular">
             Página {page} de {totalPages}
           </span>

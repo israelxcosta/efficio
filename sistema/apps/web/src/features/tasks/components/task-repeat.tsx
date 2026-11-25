@@ -156,7 +156,7 @@ export function TaskRepeatField({
             </Button>
           ) : null}
         </div>
-        {lockReason ? <p className="text-xs text-muted">{lockReason}</p> : null}
+        {lockReason ? <p className="text-mini text-muted">{lockReason}</p> : null}
         <ConfirmDialog
           open={stopping}
           onOpenChange={setStopping}
@@ -242,7 +242,7 @@ function FrozenRepeat({ reason }: { reason: string }) {
         ]}
         className="self-start opacity-60"
       />
-      <p className="text-xs text-muted">{reason}</p>
+      <p className="text-mini text-muted">{reason}</p>
     </div>
   );
 }

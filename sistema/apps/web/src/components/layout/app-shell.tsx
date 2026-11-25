@@ -135,7 +135,7 @@ export function FullPageLoader() {
       <span className="h-1 w-24 overflow-hidden rounded-full bg-bg-subtle">
         <span className="block h-full w-1/2 animate-shimmer rounded-full bg-primary" />
       </span>
-      {IS_DEMO ? <span className="text-xs text-muted">Preparando o ambiente de testes…</span> : null}
+      {IS_DEMO ? <span className="text-mini text-muted">Preparando o ambiente de testes…</span> : null}
     </div>
   );
 }

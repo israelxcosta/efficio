@@ -95,7 +95,7 @@ export default function CardsPage() {
                   <CardVisual card={c} />
                 </Link>
                 <div>
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center justify-between text-mini">
                     <span className="text-muted">Usado {formatBRL(c.usedLimit)}</span>
                     <span className="font-semibold">Limite {formatBRL(c.limit)}</span>
                   </div>
@@ -103,12 +103,12 @@ export default function CardsPage() {
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-3.5 py-3">
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 text-xs text-muted">
+                    <p className="flex items-center gap-2 text-mini text-muted">
                       Fatura {formatMonthKey(inv.month, 'short')}
                       <Badge tone={INVOICE_TONE[inv.status]}>{INVOICE_STATUS_LABELS[inv.status]}</Badge>
                     </p>
                     <p className="tabular mt-0.5 text-lg font-semibold">{formatBRL(inv.total)}</p>
-                    <p className="text-[11px] text-subtle">
+                    <p className="text-micro text-subtle">
                       Fecha {formatDateBR(inv.closingDate).slice(0, 5)} · vence {formatDateBR(inv.dueDate).slice(0, 5)}
                     </p>
                   </div>

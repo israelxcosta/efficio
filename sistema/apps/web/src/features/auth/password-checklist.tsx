@@ -10,7 +10,7 @@ const RULES = [
 /** Live hints for new passwords (same rules as `newPasswordSchema`). */
 export function PasswordChecklist({ value, id }: { value: string; id?: string }) {
   return (
-    <ul id={id} className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Requisitos da senha">
+    <ul id={id} className="flex flex-wrap gap-x-4 gap-y-1 text-mini" aria-label="Requisitos da senha">
       {RULES.map((r) => {
         const ok = r.test(value);
         return (

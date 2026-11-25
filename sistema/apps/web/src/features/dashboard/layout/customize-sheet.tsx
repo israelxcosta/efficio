@@ -64,7 +64,7 @@ export function CustomizeSheet({ open, onOpenChange, kind }: { open: boolean; on
                       <li key={spec.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
                         <Switch checked={visible} onCheckedChange={(v) => api.setVisible(spec.id, v)} aria-label={`Exibir ${spec.title}`} />
                         <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium text-fg">{spec.title}</p>
+                          <p className="text-caption font-medium text-fg">{spec.title}</p>
                           <p className="text-caption text-muted">{spec.description}</p>
                         </div>
                         <Select
@@ -103,7 +103,7 @@ export function CustomizeSheet({ open, onOpenChange, kind }: { open: boolean; on
               <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                 {hidden.map((spec) => (
                   <li key={spec.id} className="flex items-center gap-3 px-3 py-2">
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-fg">{spec.title}</span>
+                    <span className="min-w-0 flex-1 truncate text-caption font-medium text-fg">{spec.title}</span>
                     <Button variant="outline" size="sm" onClick={() => api.setVisible(spec.id, true)}>
                       Reexibir
                     </Button>

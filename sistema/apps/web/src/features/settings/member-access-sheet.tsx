@@ -236,7 +236,7 @@ function PermissionGroup({
           return (
             <li key={key} className="flex min-h-14 items-start gap-3 py-3">
               <div className="min-w-0 flex-1">
-                <label htmlFor={id} className={cn('flex flex-wrap items-center gap-2 text-sm font-medium', canGrant ? 'text-fg' : 'text-muted')}>
+                <label htmlFor={id} className={cn('flex flex-wrap items-center gap-2 text-body-sm font-medium', canGrant ? 'text-fg' : 'text-muted')}>
                   {PERMISSION_LABELS[key]}
                   {adjusted.has(key) ? <Badge tone="neutral">Ajustado</Badge> : null}
                 </label>

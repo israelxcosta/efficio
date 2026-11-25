@@ -38,7 +38,7 @@ export function Modal({ open, onOpenChange, title, description, children, footer
             <div>
               <RDialog.Title className="text-lg font-semibold tracking-tight">{title}</RDialog.Title>
               {description ? (
-                <RDialog.Description className="mt-1 text-sm text-muted">{description}</RDialog.Description>
+                <RDialog.Description className="mt-1 text-body-sm text-muted">{description}</RDialog.Description>
               ) : (
                 <RDialog.Description className="sr-only">Diálogo</RDialog.Description>
               )}

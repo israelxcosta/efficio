@@ -146,7 +146,7 @@ export default function MfaEnrollmentPage() {
           }}
         >
           <MfaStep n={1} title="Escaneie o QR code">
-            <p className="mt-1 text-[13px] text-muted">Use Google Authenticator, Microsoft Authenticator, 1Password ou similar.</p>
+            <p className="mt-1 text-caption text-muted">Use Google Authenticator, Microsoft Authenticator, 1Password ou similar.</p>
             <MfaQrCode data={data} stacked />
           </MfaStep>
           <MfaStep n={2} title="Digite o código de 6 dígitos">
@@ -161,7 +161,7 @@ export default function MfaEnrollmentPage() {
                 disabled={enable.isPending}
               />
               {codeError ? (
-                <p role="alert" className="text-xs font-medium text-danger">
+                <p role="alert" className="text-mini font-medium text-danger">
                   {codeError}
                 </p>
               ) : null}
@@ -169,7 +169,7 @@ export default function MfaEnrollmentPage() {
           </MfaStep>
           {needPassword ? (
             <MfaStep n={3} title="Confirme sua senha">
-              <p className="mt-1 text-[13px] text-muted">Por segurança, como o login não é recente, confirme a senha para ativar.</p>
+              <p className="mt-1 text-caption text-muted">Por segurança, como o login não é recente, confirme a senha para ativar.</p>
               <div className="mt-3 flex flex-col gap-1.5">
                 <PasswordInput
                   ref={passwordRef}
@@ -182,7 +182,7 @@ export default function MfaEnrollmentPage() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 {passwordError ? (
-                  <p role="alert" className="text-xs font-medium text-danger">
+                  <p role="alert" className="text-mini font-medium text-danger">
                     {passwordError}
                   </p>
                 ) : null}

@@ -36,7 +36,7 @@ export function Sidebar({ area, memory }: SidebarProps) {
         className={cn('flex flex-col items-center', canAccessFinance ? 'mb-5' : 'mb-6')}
         aria-label={area === 'financeiro' ? 'Efficio — painel financeiro' : 'Efficio — início da gestão'}
       >
-        <span className="text-[13px] font-extrabold tracking-tight text-fg">efficio</span>
+        <span className="text-caption font-extrabold tracking-tight text-fg">efficio</span>
         {canAccessFinance ? <span className="mt-0.5 text-micro font-semibold text-muted">{AREA_SHORT_LABELS[area]}</span> : null}
       </Link>
       <nav

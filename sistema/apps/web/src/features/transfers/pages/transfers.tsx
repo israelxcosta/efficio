@@ -131,8 +131,8 @@ export default function TransfersPage() {
           <CardHeader title="Investimentos" icon={<PiggyBank />} />
           <div className="mt-4 rounded-xl bg-gradient-to-br from-hero-from to-hero-to p-5 text-white">
             <p className="eyebrow text-white/70">Patrimônio investido</p>
-            <p className="tabular mt-2 text-[28px] font-semibold tracking-tight">{formatBRL(invested)}</p>
-            <p className="mt-1 text-xs text-white/70">{investmentAccounts.length} conta(s) de investimento</p>
+            <p className="tabular mt-2 text-display font-semibold tracking-tight">{formatBRL(invested)}</p>
+            <p className="mt-1 text-mini text-white/70">{investmentAccounts.length} conta(s) de investimento</p>
           </div>
           <div className="mt-4 flex flex-col gap-1">
             {accounts.isPending ? (
@@ -148,8 +148,8 @@ export default function TransfersPage() {
               investmentAccounts.map((a) => (
                 <div key={a.id} className="flex items-center gap-3 rounded-md px-2 py-2.5 hover:bg-surface-muted">
                   <BankLogo bank={a.bank} color={a.color} size="sm" />
-                  <span className="flex-1 truncate text-sm font-medium">{a.name}</span>
-                  <span className="tabular text-sm font-semibold">{formatBRL(a.balance)}</span>
+                  <span className="flex-1 truncate text-body-sm font-medium">{a.name}</span>
+                  <span className="tabular text-body-sm font-semibold">{formatBRL(a.balance)}</span>
                 </div>
               ))
             )}

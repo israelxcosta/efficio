@@ -86,7 +86,7 @@ export function ClientDocumentsSheet({ client, open, onOpenChange }: { client: C
       >
         <ClientDocumentsEditor value={docs} onChange={setDocs} errors={errors.rows} />
         {errors.list ? (
-          <p role="alert" className="text-xs font-medium text-danger">
+          <p role="alert" className="text-mini font-medium text-danger">
             {errors.list}
           </p>
         ) : null}

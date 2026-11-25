@@ -73,7 +73,7 @@ const itemClass = cn(
 const createClass =
   'size-9 sm:pointer-coarse:h-12 sm:pointer-coarse:w-auto sm:pointer-coarse:min-w-14 sm:pointer-coarse:flex-col sm:pointer-coarse:gap-0.5 sm:pointer-coarse:px-2.5';
 /** The visible name: hidden on the computer, where the tooltip and the `aria-label` carry it. */
-const captionClass = 'hidden max-w-full truncate text-[11px] leading-tight font-semibold max-sm:block max-sm:text-xs sm:pointer-coarse:block';
+const captionClass = 'hidden max-w-full truncate text-micro leading-tight font-semibold max-sm:block max-sm:text-mini sm:pointer-coarse:block';
 
 function Caption({ children }: { children: ReactNode }) {
   return (
@@ -170,13 +170,13 @@ export function TasksHubView({ views, active, hrefOf, replaceViews, onViewChosen
                     <DropdownMenuItem icon={<Workflow />} onSelect={onApplyTemplate} className="items-start">
                       <span>
                         <span className="block">Aplicar modelo de processo</span>
-                        <span className="block text-xs font-normal text-muted">As etapas de um modelo para um cliente.</span>
+                        <span className="block text-mini font-normal text-muted">As etapas de um modelo para um cliente.</span>
                       </span>
                     </DropdownMenuItem>
                     <DropdownMenuItem icon={<ListTree />} onSelect={onAdHocProcess} className="items-start">
                       <span>
                         <span className="block">Processo avulso</span>
-                        <span className="block text-xs font-normal text-muted">Monte as etapas agora, sem modelo.</span>
+                        <span className="block text-mini font-normal text-muted">Monte as etapas agora, sem modelo.</span>
                       </span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>

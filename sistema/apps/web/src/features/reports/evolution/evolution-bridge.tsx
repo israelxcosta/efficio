@@ -115,7 +115,7 @@ function PeopleList({
         <ul className="mt-1.5 flex flex-col gap-2">
           {shown.map((c) => (
             <li key={c.id} className="flex items-center gap-2.5">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[11px] font-bold text-primary-soft-fg" aria-hidden>
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-micro font-bold text-primary-soft-fg" aria-hidden>
                 {initials(c.name)}
               </span>
               <span className="min-w-0 flex-1">

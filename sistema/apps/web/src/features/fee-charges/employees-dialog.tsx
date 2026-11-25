@@ -197,7 +197,7 @@ function EmployeesForm({ fee, onClose }: { fee: Transaction; onClose: () => void
               : 'Se houver cobrança de empregados para este honorário, ela será excluída.'}
           </Notice>
         ) : employees === 0 ? (
-          <p className="text-[13px] text-muted">Com 0 empregados nada é lançado.</p>
+          <p className="text-caption text-muted">Com 0 empregados nada é lançado.</p>
         ) : priced ? (
           <EmployeesPreview preview={preview} dimmed={!current} dueDate={fee.date} />
         ) : null}
@@ -267,7 +267,7 @@ function Notice({
     <div
       role={alert ? 'alert' : 'status'}
       className={cn(
-        'flex items-start gap-2 rounded-lg border p-3 text-[13px]',
+        'flex items-start gap-2 rounded-lg border p-3 text-caption',
         tone === 'danger' ? 'border-danger/25 bg-danger-soft/60 text-danger' : 'border-warning/30 bg-warning-soft/60 text-warning',
       )}
     >

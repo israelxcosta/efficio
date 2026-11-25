@@ -99,7 +99,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function
         aria-hidden
         className={cn(
           'pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 font-semibold text-muted',
-          size === 'lg' ? 'text-base' : 'text-sm',
+          size === 'lg' ? 'text-base' : 'text-body-sm',
         )}
       >
         {negative ? '-R$' : 'R$'}
@@ -144,7 +144,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function
         <button
           type="button"
           onClick={() => onChange(-cents)}
-          className="absolute top-1/2 right-[-2.75rem] flex size-9 -translate-y-1/2 items-center justify-center rounded-md border border-border bg-surface text-sm font-semibold text-muted hover:text-fg"
+          className="absolute top-1/2 right-[-2.75rem] flex size-9 -translate-y-1/2 items-center justify-center rounded-md border border-border bg-surface text-body-sm font-semibold text-muted hover:text-fg"
           aria-label={negative ? 'Tornar positivo' : 'Tornar negativo'}
           title="Alternar sinal (+/−)"
         >

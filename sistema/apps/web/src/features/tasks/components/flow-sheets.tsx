@@ -137,7 +137,7 @@ export function FlowStepsEditor({ steps, onChange, options, errors, readOnly, bu
                       onChange={(ev) => patch(i, { title: ev.target.value })}
                     />
                     {e.title ? (
-                      <p role="alert" className="mt-1 text-xs font-medium text-danger">
+                      <p role="alert" className="mt-1 text-mini font-medium text-danger">
                         {e.title}
                       </p>
                     ) : null}
@@ -209,7 +209,7 @@ export function FlowStepsEditor({ steps, onChange, options, errors, readOnly, bu
                       </span>
                     )}
                     {e.deadline ? (
-                      <p role="alert" className="text-xs font-medium text-danger">
+                      <p role="alert" className="text-mini font-medium text-danger">
                         {e.deadline}
                       </p>
                     ) : null}
@@ -269,7 +269,7 @@ export function FlowStepsEditor({ steps, onChange, options, errors, readOnly, bu
                       </Select>
                     )}
                     {e.department ? (
-                      <p id={`step-${s.key}-department`} role="alert" className="text-xs font-medium text-danger">
+                      <p id={`step-${s.key}-department`} role="alert" className="text-mini font-medium text-danger">
                         {e.department}
                       </p>
                     ) : null}
@@ -420,7 +420,7 @@ export function FlowTemplateSheet({ open, onOpenChange, template, duplicate, opt
               <HelpTip>O prazo de cada etapa conta em dias corridos a partir da conclusão da anterior. Na primeira, conta do dia em que o modelo for aplicado. Use 0 para vencer no mesmo dia.</HelpTip>
             </div>
             {errors.steps ? (
-              <p role="alert" className="text-xs font-medium text-danger">
+              <p role="alert" className="text-mini font-medium text-danger">
                 {errors.steps}
               </p>
             ) : null}
@@ -515,7 +515,7 @@ export function FlowBuilderSheet({ open, onOpenChange, options, onCreated }: Flo
           <div className="flex flex-col gap-2">
             <h3 className="text-body-sm font-semibold text-fg">Etapas</h3>
             {errors.steps ? (
-              <p role="alert" className="text-xs font-medium text-danger">
+              <p role="alert" className="text-mini font-medium text-danger">
                 {errors.steps}
               </p>
             ) : null}
@@ -523,12 +523,12 @@ export function FlowBuilderSheet({ open, onOpenChange, options, onCreated }: Flo
           </div>
           {canManage ? (
             <div className="flex flex-col gap-1">
-              <label className="flex items-center gap-2.5 text-sm text-fg">
+              <label className="flex items-center gap-2.5 text-body-sm text-fg">
                 <Checkbox checked={saveAsTemplate} onCheckedChange={setSaveAsTemplate} aria-label="Salvar também como modelo" />
                 Salvar também como modelo
               </label>
               {errors.saveAsTemplate ? (
-                <p role="alert" className="text-xs font-medium text-danger">
+                <p role="alert" className="text-mini font-medium text-danger">
                   {errors.saveAsTemplate}
                 </p>
               ) : null}
@@ -663,7 +663,7 @@ export function TemplatePickerDialog({ open, onOpenChange, onPick, onNewTemplate
       <div className="flex flex-col gap-3 pb-5">
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-          <Input data-autofocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar modelo" aria-label="Buscar modelo" className="h-9 pl-9 text-[13px]" />
+          <Input data-autofocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar modelo" aria-label="Buscar modelo" className="h-9 pl-9 text-caption" />
         </div>
         {templates.isPending ? (
           <SkeletonRows rows={3} />
@@ -694,8 +694,8 @@ export function TemplatePickerDialog({ open, onOpenChange, onPick, onNewTemplate
                     <Workflow className="size-4" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-fg">{t.title}</span>
-                    <span className="block truncate text-xs text-muted">
+                    <span className="block truncate text-body-sm font-semibold text-fg">{t.title}</span>
+                    <span className="block truncate text-mini text-muted">
                       {t.stepCount} {t.stepCount === 1 ? 'etapa' : 'etapas'} · até {daysText(t.totalDays)}
                     </span>
                   </span>

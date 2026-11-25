@@ -114,7 +114,7 @@ export function ReviewStep({ preview, destination, choices, onChoices, onChangeF
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3">
-        <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-2 text-xs lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_auto_minmax(0,1fr)]">
+        <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-2 text-mini lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_auto_minmax(0,1fr)]">
           <div className="min-w-0">
             <dt className="text-muted">Arquivo</dt>
             <dd className="mt-0.5 font-semibold break-words text-fg" title={preview.fileName}>
@@ -163,7 +163,7 @@ export function ReviewStep({ preview, destination, choices, onChoices, onChangeF
       </div>
 
       {preview.rows.length > 0 && preview.rows.every((r) => duplicateKind(r) === 'imported') ? (
-        <p role="status" className="flex items-center gap-2 rounded-md bg-primary-soft px-4 py-3 text-[13px] font-medium text-primary-soft-fg">
+        <p role="status" className="flex items-center gap-2 rounded-md bg-primary-soft px-4 py-3 text-caption font-medium text-primary-soft-fg">
           <CheckCheck className="size-4 shrink-0" /> Todos os lançamentos deste arquivo já foram importados antes — nada novo para trazer.
         </p>
       ) : null}
@@ -236,13 +236,13 @@ export function ReviewStep({ preview, destination, choices, onChoices, onChangeF
                   onChange={applyCategory}
                   placeholder={`Categoria para ${selectedByType[effectiveBulkType]} ${selectedByType[effectiveBulkType] === 1 ? 'selecionado' : 'selecionados'}`}
                   aria-label="Aplicar categoria aos lançamentos selecionados"
-                  className="h-9 w-full rounded-[10px] text-[13px] sm:w-72"
+                  className="h-9 w-full rounded-[10px] text-caption sm:w-72"
                 />
               </div>
             ) : null}
           </div>
 
-          <div className="hidden grid-cols-[18px_84px_minmax(0,1fr)_230px_124px] gap-x-3 border-b border-border px-4 py-2 text-xs font-medium text-muted md:grid" aria-hidden>
+          <div className="hidden grid-cols-[18px_84px_minmax(0,1fr)_230px_124px] gap-x-3 border-b border-border px-4 py-2 text-mini font-medium text-muted md:grid" aria-hidden>
             <span />
             <span>Data</span>
             <span>Descrição</span>
@@ -251,7 +251,7 @@ export function ReviewStep({ preview, destination, choices, onChoices, onChangeF
           </div>
 
           {pageRows.length === 0 ? (
-            <p className="px-4 py-10 text-center text-sm text-muted">Nenhum lançamento neste filtro.</p>
+            <p className="px-4 py-10 text-center text-body-sm text-muted">Nenhum lançamento neste filtro.</p>
           ) : (
             <ul className="divide-y divide-border">
               {pageRows.map((r) => {
@@ -272,7 +272,7 @@ export function ReviewStep({ preview, destination, choices, onChoices, onChangeF
           )}
 
           {pages > 1 ? (
-            <div className="flex items-center justify-between border-t border-border px-4 py-2.5 text-xs text-muted">
+            <div className="flex items-center justify-between border-t border-border px-4 py-2.5 text-mini text-muted">
               <span>
                 Página {current} de {pages} · {visible.length} lançamentos
               </span>
@@ -295,7 +295,7 @@ export function ReviewStep({ preview, destination, choices, onChoices, onChangeF
 function Tile({ label, value, tone, hint }: { label: string; value: string; tone?: 'success' | 'danger' | 'warning'; hint?: string }) {
   return (
     <div className="rounded-lg border border-border px-3.5 py-2.5">
-      <p className="text-xs font-medium text-muted">{label}</p>
+      <p className="text-mini font-medium text-muted">{label}</p>
       <p
         className={cn(
           'tabular mt-0.5 text-[15px] font-semibold tracking-tight text-fg',
@@ -306,7 +306,7 @@ function Tile({ label, value, tone, hint }: { label: string; value: string; tone
       >
         {value}
       </p>
-      {hint ? <p className="text-[11px] text-subtle">{hint}</p> : null}
+      {hint ? <p className="text-micro text-subtle">{hint}</p> : null}
     </div>
   );
 }
@@ -338,12 +338,12 @@ function ReviewRow({ row, choice, targetKind, categoryValue, onSelected, onCateg
         aria-label={`Importar ${row.description} de ${formatDateBR(row.date)}`}
         className="row-span-2 self-start md:row-span-1 md:self-center"
       />
-      <span className={cn('tabular hidden text-[13px] text-muted md:block', !choice.selected && 'opacity-60')}>{formatDateBR(row.date)}</span>
+      <span className={cn('tabular hidden text-caption text-muted md:block', !choice.selected && 'opacity-60')}>{formatDateBR(row.date)}</span>
       <div className={cn('min-w-0', !choice.selected && 'opacity-60')}>
-        <p className="line-clamp-2 text-sm font-semibold break-words text-fg md:line-clamp-1" title={row.description}>
+        <p className="line-clamp-2 text-body-sm font-semibold break-words text-fg md:line-clamp-1" title={row.description}>
           {row.description}
         </p>
-        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-mini text-muted">
           <span className="tabular md:hidden">{formatDateBR(row.date)} ·</span>
           <span>{typeLabel(row.type, targetKind)}</span>
           {dup === 'imported' ? (
@@ -370,11 +370,11 @@ function ReviewRow({ row, choice, targetKind, categoryValue, onSelected, onCateg
           onChange={onCategory}
           placeholder="Sem categoria"
           aria-label={`Categoria de ${row.description}`}
-          className="h-9 rounded-[10px] text-[13px]"
+          className="h-9 rounded-[10px] text-caption"
         />
       </div>
       <div className={cn('col-start-3 row-start-1 text-right md:col-auto md:row-auto', !choice.selected && 'opacity-60')}>
-        <Money value={signed} signed showPlus className="text-sm" />
+        <Money value={signed} signed showPlus className="text-body-sm" />
       </div>
     </li>
   );

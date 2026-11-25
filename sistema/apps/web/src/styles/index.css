@@ -208,24 +208,30 @@
 }
 
 /*
- * Type scale of dashboard widgets, at the "medium density" of app screens (design-taste-frontend):
- * rows and values in 14px, card titles 16px, meta 12px, axis 11px; the chart grows with the card,
- * the text does not. micro: axis ticks and footnotes · mini: list meta, counts · caption: legends,
- * subtitles, "+ N" · body-sm: list rows and values · title-sm: card title · kpi: hero numbers.
+ * The app's one type scale (polish pass, ui-taste): eight steps, no fixed px sizes and no raw `text-xs`/
+ * `text-sm` in screens. micro 11: axis ticks, footnotes · mini 12: list meta, counts, badges ·
+ * caption 13: legends, subtitles, secondary lines · body-sm 14: rows, values, controls · title-sm 16:
+ * card and block titles · title 22: page title · kpi 24: indicator figures · display 28: the one
+ * highlighted figure (solid card, one-line summaries). Documents (contract, letters) and the site keep
+ * their own sizes.
  */
 @theme {
   --text-micro: 11px;
   --text-micro--line-height: 14px;
   --text-mini: 12px;
   --text-mini--line-height: 16px;
-  --text-caption: 12.5px;
+  --text-caption: 13px;
   --text-caption--line-height: 18px;
   --text-body-sm: 14px;
   --text-body-sm--line-height: 20px;
   --text-title-sm: 16px;
   --text-title-sm--line-height: 22px;
+  --text-title: 22px;
+  --text-title--line-height: 28px;
   --text-kpi: 24px;
   --text-kpi--line-height: 30px;
+  --text-display: 28px;
+  --text-display--line-height: 34px;
 }
 
 @theme inline {

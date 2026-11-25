@@ -1,24 +1,23 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SpotlightRow } from '@/components/ui/spotlight-card';
-import { OverdueSpotlight } from '../components/finance-aside';
+import { NextBillSpotlight } from '../components/finance-aside';
 import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
-import { ArrowUpToLine, Check, ChevronLeft, ChevronRight, LayoutGrid, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { ArrowUpToLine, Check, LayoutGrid, SlidersHorizontal, Sparkles } from 'lucide-react';
 import {
-  MONTH_NAMES,
-  addMonthKey,
   formatBRL,
   formatMonthKey,
+  monthKey,
   percentChange,
   type DashboardResponse,
   type MonthKey,
   type WorkspaceKind,
 } from '@effinance/shared';
-import { Button, HIT_44 } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { MetricStrip, type MetricCell } from '@/components/ui/metric-strip';
 import { ErrorState } from '@/components/ui/misc';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Select } from '@/components/ui/select';
+import { PeriodNavigator } from '@/components/ui/period-navigator';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useActiveMonth } from '@/lib/active-month';
 import { useElementSize } from '@/lib/use-element-size';
@@ -119,17 +118,11 @@ export default function DashboardPage() {
     update({ personalizar: null, aba: null });
   }, [openCustomize]);
 
-  const year = Number(month.slice(0, 4));
-  const monthIndex = Number(month.slice(5, 7));
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 6 }, (_, i) => currentYear - 3 + i);
-  const setMonth = (y: number, m: number) => setActiveMonth(`${y}-${String(m).padStart(2, '0')}`);
-
   return (
-    <div ref={ref} className="calm-text @container flex flex-col gap-6">
+    <div ref={ref} className="calm-text @container flex flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1 basis-48">
-          <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-fg">Painel financeiro</h1>
+          <h1 className="text-title font-semibold tracking-tight text-fg">Painel financeiro</h1>
           <MonthLine month={month} updatedAt={dashboard.dataUpdatedAt} />
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2 max-lg:basis-full lg:shrink-0">
@@ -145,28 +138,8 @@ export default function DashboardPage() {
               { value: 'insights', label: 'Dashboard inteligente', icon: <Sparkles /> },
             ]}
           />
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Mês anterior" onClick={() => setActiveMonth(addMonthKey(month, -1))}>
-              <ChevronLeft />
-            </Button>
-            <Select aria-label="Mês" value={monthIndex} onChange={(e) => setMonth(year, Number(e.target.value))} className="h-9 w-[136px] bg-surface text-[13px] font-medium">
-              {MONTH_NAMES.map((name, i) => (
-                <option key={name} value={i + 1}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-            <Select aria-label="Ano" value={year} onChange={(e) => setMonth(Number(e.target.value), monthIndex)} className="h-9 w-[92px] bg-surface text-[13px] font-medium">
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </Select>
-            <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Próximo mês" onClick={() => setActiveMonth(addMonthKey(month, 1))}>
-              <ChevronRight />
-            </Button>
-          </div>
+          {/* The same month navigator as the Gestão screens (one period control in the whole app). */}
+          <PeriodNavigator modes={['month']} value={{ mode: 'month', anchor: `${month}-01` }} onChange={(v) => setActiveMonth(monthKey(v.anchor))} />
           {tab === 'dashboard' && !editing ? (
             <Button id={CUSTOMIZE_BUTTON_ID} variant="outline" size="sm" onClick={() => startEditing()}>
               <SlidersHorizontal /> Personalizar
@@ -202,7 +175,7 @@ export default function DashboardPage() {
         // back to 100% starts at once.
         <div
           className={cn(
-            'flex flex-col gap-6 transition-opacity duration-(--dur-state)',
+            'flex flex-col gap-5 transition-opacity duration-(--dur-state)',
             dashboard.isPlaceholderData && 'opacity-60 delay-150',
           )}
           aria-busy={dashboard.isPlaceholderData || undefined}
@@ -244,7 +217,7 @@ function Overview({ d, loading, month, kind, width, editing, onCustomize }: Over
   return (
     <>
       {/* First row: the number strip and the solid card beside it; the board below keeps the full width. */}
-      <SpotlightRow spotlight={<OverdueSpotlight />}>
+      <SpotlightRow spotlight={<NextBillSpotlight d={d} loading={loading} />}>
         <DashboardKpis d={d} loading={loading} />
       </SpotlightRow>
       <DashboardBoard

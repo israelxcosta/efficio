@@ -161,19 +161,19 @@ function ConnectionItem({
         <BankLogo bank={c.institution.bank} size="md" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-[15px] font-semibold text-fg">{c.institution.name}</p>
+            <p className="truncate text-title-sm font-semibold text-fg">{c.institution.name}</p>
             <Badge tone={STATUS_TONE[c.status]}>
               {c.status === 'syncing' ? <RefreshCw className="animate-spin" aria-hidden /> : null}
               {BANK_CONNECTION_STATUS_LABELS[c.status]}
             </Badge>
           </div>
-          <p className="mt-0.5 text-xs text-muted">
+          <p className="mt-0.5 text-mini text-muted">
             {c.lastSyncAt
               ? `Última sincronização ${Date.now() - new Date(c.lastSyncAt).getTime() < 60_000 ? 'agora há pouco' : formatRelative(c.lastSyncAt)}`
               : 'Ainda não sincronizado'}
             {c.consentExpiresAt && !expiring ? ` · consentimento até ${formatDateBR(c.consentExpiresAt.slice(0, 10))}` : ''}
           </p>
-          {c.statusDetail && c.status !== 'active' ? <p className="mt-1 text-xs text-muted">{c.statusDetail}</p> : null}
+          {c.statusDetail && c.status !== 'active' ? <p className="mt-1 text-mini text-muted">{c.statusDetail}</p> : null}
         </div>
         <div className="flex items-center gap-1.5">
           <WriteGate>
@@ -209,14 +209,14 @@ function ConnectionItem({
               <DropdownMenuItem icon={<Unplug />} tone="danger" disabled={readOnly || !!manageReason} onSelect={() => setConfirming(true)}>
                 Desconectar
               </DropdownMenuItem>
-              {manageReason && !readOnly ? <p className="max-w-60 px-2 py-1.5 text-xs text-muted">{manageReason}</p> : null}
+              {manageReason && !readOnly ? <p className="max-w-60 px-2 py-1.5 text-mini text-muted">{manageReason}</p> : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
       {needsConsent ? (
-        <div className="mx-4 mb-3 flex flex-wrap items-center gap-3 rounded-md bg-warning-soft px-3 py-2.5 text-[13px] text-warning">
+        <div className="mx-4 mb-3 flex flex-wrap items-center gap-3 rounded-md bg-warning-soft px-3 py-2.5 text-caption text-warning">
           <TriangleAlert className="size-4 shrink-0 self-start sm:self-center" />
           <span className="min-w-[12rem] flex-1">
             {c.status === 'outdated' || (days !== null && days < 0)
@@ -240,20 +240,20 @@ function ConnectionItem({
           {c.accounts.map((a) => {
             const target = targetName(a);
             return (
-              <li key={a.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 py-1.5 text-[13px]">
+              <li key={a.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 py-1.5 text-caption">
                 {a.kind === 'credit_card' ? <CreditCard className="size-3.5 text-muted" aria-hidden /> : <Landmark className="size-3.5 text-muted" aria-hidden />}
                 <span className="font-medium text-fg">{a.name}</span>
-                {a.number ? <span className="text-xs text-subtle">final {a.number.replace(/\D/g, '').slice(-4) || a.number}</span> : null}
+                {a.number ? <span className="text-mini text-subtle">final {a.number.replace(/\D/g, '').slice(-4) || a.number}</span> : null}
                 <ArrowRight className="size-3.5 text-subtle" aria-hidden />
-                <span className={cn('text-xs', target ? 'font-semibold text-fg' : 'text-muted')}>{target ?? 'Não sincroniza (ignorada)'}</span>
-                {target && a.syncFrom ? <span className="text-xs text-subtle">· desde {formatDateBR(a.syncFrom)}</span> : null}
+                <span className={cn('text-mini', target ? 'font-semibold text-fg' : 'text-muted')}>{target ?? 'Não sincroniza (ignorada)'}</span>
+                {target && a.syncFrom ? <span className="text-mini text-subtle">· desde {formatDateBR(a.syncFrom)}</span> : null}
               </li>
             );
           })}
         </ul>
       ) : null}
       {linked.length === 0 && c.accounts.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-xs text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-mini text-muted">
           Nenhuma conta vinculada: nada é sincronizado.
           <WriteGate>
             <Button size="xs" variant="soft" onClick={onManage}>

@@ -219,7 +219,7 @@ export function UnionSheet({ param, onClose, onCycles }: { param: string | null;
                 ) : null}
               </div>
               {e.document?.message ? (
-                <p id="union-document-help" role="alert" className="text-xs font-medium text-danger">
+                <p id="union-document-help" role="alert" className="text-mini font-medium text-danger">
                   {e.document.message}
                 </p>
               ) : !readOnly ? (
@@ -442,7 +442,7 @@ function UnionClientsPicker({
             </option>
           ))}
         </Select>
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar cliente" className="h-9 rounded-[10px] text-[13px]" />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar cliente" className="h-9 rounded-[10px] text-caption" />
       </div>
       <div className="flex flex-wrap items-center gap-2 text-body-sm">
         <span className="tabular text-muted">{pluralize(value.length, 'selecionado', 'selecionados')}</span>
@@ -476,7 +476,7 @@ function UnionClientsPicker({
                   onCheckedChange={(v) => onChange(v ? [...value, c.id] : value.filter((x) => x !== c.id))}
                 />
                 <label htmlFor={id} className={cn('min-w-0 flex-1', disabled ? 'cursor-default' : 'cursor-pointer')}>
-                  <span className={cn('block truncate text-sm', c.status === 'active' ? 'text-fg' : 'text-muted')}>
+                  <span className={cn('block truncate text-body-sm', c.status === 'active' ? 'text-fg' : 'text-muted')}>
                     {c.name}
                     {c.status !== 'active' ? ' · inativo' : ''}
                   </span>

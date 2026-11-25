@@ -49,7 +49,7 @@ export function ProfileTab() {
               <MemberAvatar size="xl" name={user?.name} userId={user?.id} photoVersion={user?.photoUpdatedAt ?? null} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{user?.name}</p>
-                <p className="truncate text-sm text-muted">{user?.email}</p>
+                <p className="truncate text-body-sm text-muted">{user?.email}</p>
               </div>
               <ProfilePhotoActions />
             </div>

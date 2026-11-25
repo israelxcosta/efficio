@@ -25,7 +25,7 @@ export function CardHeader({ title, subtitle, info, action, icon, className }: C
             <HelpTip label="Mais informações">{info}</HelpTip>
           ) : null}
         </div>
-        {subtitle ? <p className="mt-0.5 text-xs text-muted">{subtitle}</p> : null}
+        {subtitle ? <p className="mt-0.5 text-mini text-muted">{subtitle}</p> : null}
       </div>
       {action ?? (icon ? <span className="text-muted [&_svg]:size-4">{icon}</span> : null)}
     </div>
@@ -46,7 +46,7 @@ interface SectionLabelProps extends HTMLAttributes<HTMLHeadingElement> {
 export function SectionLabel({ as: Tag = 'p', level = 'group', className, ...props }: SectionLabelProps) {
   return (
     <Tag
-      className={cn(level === 'section' ? 'text-[13px] leading-[18px] font-semibold text-brand-text' : 'eyebrow text-brand-text', className)}
+      className={cn(level === 'section' ? 'text-caption leading-[18px] font-semibold text-brand-text' : 'eyebrow text-brand-text', className)}
       {...props}
     />
   );

@@ -106,10 +106,10 @@ export function Notifications({ area, className }: { area: Area; className?: str
       {taskCount > 0 ? (
         <DropdownMenuItem onSelect={() => navigate(tasksHref({ scope: 'mine', situation: 'overdue' }))}>
           <span className="flex-1">Atrasadas atribuídas a você</span>
-          <span className="tabular rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{taskCount}</span>
+          <span className="tabular rounded-full bg-danger px-2 py-0.5 text-micro font-bold text-white">{taskCount}</span>
         </DropdownMenuItem>
       ) : (
-        <p className="px-2.5 py-2 text-sm text-muted">Nenhuma tarefa sua atrasada.</p>
+        <p className="px-2.5 py-2 text-body-sm text-muted">Nenhuma tarefa sua atrasada.</p>
       )}
       {activity.slice(0, 4).map((a) => (
         <DropdownMenuItem key={a.id} onSelect={() => navigate(taskHref(a.taskId))}>
@@ -117,7 +117,7 @@ export function Notifications({ area, className }: { area: Area; className?: str
             <span className="truncate">
               <span className="font-semibold">{a.author?.name ?? 'Alguém'}</span> comentou em {a.taskTitle}
             </span>
-            <span className="truncate text-xs text-muted">
+            <span className="truncate text-mini text-muted">
               {commentTime(a.createdAt)} · {a.text}
             </span>
           </span>
@@ -132,13 +132,13 @@ export function Notifications({ area, className }: { area: Area; className?: str
       {deadlines.documents ? (
         <DropdownMenuItem onSelect={() => openDeadlines('documents', 'overdue')}>
           <span className="flex-1">Documentos de clientes vencidos</span>
-          <span className="tabular rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{deadlines.documents}</span>
+          <span className="tabular rounded-full bg-danger px-2 py-0.5 text-micro font-bold text-white">{deadlines.documents}</span>
         </DropdownMenuItem>
       ) : null}
       {deadlines.conventions ? (
         <DropdownMenuItem onSelect={() => openDeadlines('conventions', 'overdue')}>
           <span className="flex-1">Convenções coletivas vencidas</span>
-          <span className="tabular rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{deadlines.conventions}</span>
+          <span className="tabular rounded-full bg-danger px-2 py-0.5 text-micro font-bold text-white">{deadlines.conventions}</span>
         </DropdownMenuItem>
       ) : null}
       {deadlines.soon ? (
@@ -151,7 +151,7 @@ export function Notifications({ area, className }: { area: Area; className?: str
       ) : null}
       {!deadlines.documents && !deadlines.conventions && !deadlines.soon ? (
         <DropdownMenuItem onSelect={() => openDeadlines('documents')}>
-          <span className="text-sm text-muted">Nada vencido. Ver vencimentos</span>
+          <span className="text-body-sm text-muted">Nada vencido. Ver vencimentos</span>
         </DropdownMenuItem>
       ) : null}
     </>
@@ -161,7 +161,7 @@ export function Notifications({ area, className }: { area: Area; className?: str
     <>
       <DropdownMenuSeparator />
       <DropdownMenuLabel>Registro de auditoria</DropdownMenuLabel>
-      <p className="px-2.5 pt-1 text-sm text-fg">{pendingNoticeText(auditPending)}</p>
+      <p className="px-2.5 pt-1 text-body-sm text-fg">{pendingNoticeText(auditPending)}</p>
       <DropdownMenuItem disabled={auditDownload.downloading} onSelect={() => void auditDownload.download()}>
         <Download className="size-4 text-muted" aria-hidden />
         <span className="font-semibold">Baixar registro (CSV)</span>
@@ -176,14 +176,14 @@ export function Notifications({ area, className }: { area: Area; className?: str
     <>
       <DropdownMenuLabel>Contas vencidas</DropdownMenuLabel>
       {billCount === 0 ? (
-        <p className="px-2.5 py-2 text-sm text-muted">Tudo em dia por aqui.</p>
+        <p className="px-2.5 py-2 text-body-sm text-muted">Tudo em dia por aqui.</p>
       ) : (
         <>
           {bills.slice(0, area === 'financeiro' ? 5 : 3).map((t) => (
             <DropdownMenuItem key={t.id} onSelect={() => actions.edit(t)}>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate">{t.description}</span>
-                <span className="text-xs text-danger">Venceu em {formatDateBR(t.date)}</span>
+                <span className="text-mini text-danger">Venceu em {formatDateBR(t.date)}</span>
               </span>
               <span className={t.type === 'income' ? 'tabular font-semibold text-success' : 'tabular font-semibold text-danger'}>
                 {formatBRL(t.amount)}
@@ -209,7 +209,7 @@ export function Notifications({ area, className }: { area: Area; className?: str
         >
           <Bell />
           {count ? (
-            <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-surface">
+            <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-micro font-bold text-white ring-2 ring-surface">
               {count > 9 ? '9+' : count}
             </span>
           ) : null}

@@ -106,14 +106,14 @@ export default function CardDetailPage() {
       <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="flex flex-col gap-4 p-4">
           <CardVisual card={card} />
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-2 gap-2 text-mini">
             <Info label="Bandeira" value={CARD_BRAND_LABELS[card.brand]} />
             <Info label="Fechamento" value={`Dia ${card.closingDay}`} />
             <Info label="Vencimento" value={`Dia ${card.dueDay}`} />
             <Info label="Limite" value={formatBRL(card.limit)} />
           </div>
           <div>
-            <div className="flex justify-between text-xs text-muted">
+            <div className="flex justify-between text-mini text-muted">
               <span>Usado {formatBRL(card.usedLimit)}</span>
               <span>{Math.round(usage * 100)}%</span>
             </div>
@@ -155,8 +155,8 @@ export default function CardDetailPage() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon-sm" onClick={() => setMonth(addMonthKey(month, -1))} aria-label="Fatura anterior"><ChevronLeft /></Button>
             <div className="min-w-[170px] text-center">
-              <p className="text-[15px] font-semibold">Fatura de {formatMonthKey(month)}</p>
-              {inv ? <p className="text-xs text-muted">Fecha em {formatDateBR(inv.closingDate)} · vence em {formatDateBR(inv.dueDate)}</p> : null}
+              <p className="text-title-sm font-semibold">Fatura de {formatMonthKey(month)}</p>
+              {inv ? <p className="text-mini text-muted">Fecha em {formatDateBR(inv.closingDate)} · vence em {formatDateBR(inv.dueDate)}</p> : null}
             </div>
             <Button variant="outline" size="icon-sm" onClick={() => setMonth(addMonthKey(month, 1))} aria-label="Próxima fatura"><ChevronRight /></Button>
           </div>

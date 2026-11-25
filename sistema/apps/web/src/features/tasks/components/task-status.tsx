@@ -135,7 +135,7 @@ export function PriorityBadge({ priority, show = 'row', className }: { priority:
         <ChevronDown aria-hidden /> Baixa
       </Badge>
     );
-  if (show === 'detail') return <span className={cn('text-sm text-muted', className)}>Média</span>;
+  if (show === 'detail') return <span className={cn('text-body-sm text-muted', className)}>Média</span>;
   return null;
 }
 
@@ -148,7 +148,7 @@ export function TaskDueLabel({ task, today, beside = false, className }: { task:
   const tip =
     completedByText(task, formatDateTime) ??
     (task.occurrence && task.dueDate ? deadlineTip({ legalDueDate: task.dueDate, targetDate: task.occurrence.targetDate }, today) : null);
-  const label = <span className={cn('text-xs', DUE_TONE_CLASS[info.tone], className)}>{info.text}</span>;
+  const label = <span className={cn('text-mini', DUE_TONE_CLASS[info.tone], className)}>{info.text}</span>;
   return tip ? (
     <Tooltip content={tip}>
       <span tabIndex={-1}>{label}</span>

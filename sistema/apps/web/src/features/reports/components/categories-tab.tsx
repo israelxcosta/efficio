@@ -82,7 +82,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
       </Card>
 
       {drill ? (
-        <nav aria-label="Navegação" className="flex items-center gap-1.5 text-sm">
+        <nav aria-label="Navegação" className="flex items-center gap-1.5 text-body-sm">
           <button type="button" className="font-semibold text-brand-text hover:underline" onClick={() => setDrill(null)}>
             Todas as categorias
           </button>
@@ -152,7 +152,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
           {series.length ? (
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
               {series.map((s) => (
-                <span key={s.key} className="flex items-center gap-1.5 text-xs text-muted">
+                <span key={s.key} className="flex items-center gap-1.5 text-mini text-muted">
                   <span className="size-2.5 rounded-full" style={{ backgroundColor: s.color }} /> {s.name}
                 </span>
               ))}
@@ -164,9 +164,9 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
       {r && r.series.length ? (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full min-w-[640px] text-body-sm">
               <thead>
-                <tr className="border-b border-border text-left text-xs font-medium text-muted">
+                <tr className="border-b border-border text-left text-mini font-medium text-muted">
                   <th className="px-4 py-2.5">{drill ? 'Subcategoria' : 'Categoria'}</th>
                   <th className="px-4 py-2.5 text-right">Total</th>
                   <th className="px-4 py-2.5 text-right">Média</th>
@@ -196,7 +196,7 @@ export function CategoriesTab({ from, to }: { from: string; to: string }) {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <ProgressBar value={s.share} color="var(--app-data)" size="sm" />
-                            <span className="w-10 text-right text-xs text-muted">{formatPercent(s.share, 0)}</span>
+                            <span className="w-10 text-right text-mini text-muted">{formatPercent(s.share, 0)}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-subtle">{canDrill ? <ChevronRight className="size-4" /> : null}</td>

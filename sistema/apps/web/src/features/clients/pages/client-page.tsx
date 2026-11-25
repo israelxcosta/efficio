@@ -209,12 +209,12 @@ function ClientRecord({ client: c, back }: { client: Client; back: ReactNode }) 
       {back}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary-soft-fg" aria-hidden>
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-soft text-body-sm font-bold text-primary-soft-fg" aria-hidden>
             {initials(display)}
           </span>
           <div className="min-w-0">
-            <h1 className="text-[22px] leading-tight font-semibold tracking-tight break-words text-fg">{display}</h1>
-            {c.tradeName ? <p className="mt-0.5 text-sm break-words text-muted">{c.name}</p> : null}
+            <h1 className="text-title font-semibold tracking-tight break-words text-fg">{display}</h1>
+            {c.tradeName ? <p className="mt-0.5 text-body-sm break-words text-muted">{c.name}</p> : null}
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
               <Badge tone={c.status === 'active' ? 'success' : 'neutral'} size="md">
                 {c.status === 'active' ? 'Ativo' : c.inactivation ? `Inativo desde ${formatDateBR(c.inactivation.date)}` : 'Inativo'}
@@ -223,7 +223,7 @@ function ClientRecord({ client: c, back }: { client: Client; back: ReactNode }) 
                 {TAX_REGIME_LABELS[c.taxRegime]}
                 {c.simplesAnnex ? ` · Anexo ${c.simplesAnnex}` : ''}
               </Badge>
-              <span className="flex items-center text-sm text-muted">
+              <span className="flex items-center text-body-sm text-muted">
                 CNPJ <span className="tabular ml-1 text-fg">{formatCNPJ(c.document)}</span>
                 <Button
                   variant="ghost"
@@ -512,12 +512,12 @@ function TasksSection({ client: c }: { client: Client }) {
                     className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-surface-muted"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-fg">{occurrenceTitle(o, today)}</span>
-                      <span className="block truncate text-xs text-muted">
+                      <span className="block truncate text-body-sm text-fg">{occurrenceTitle(o, today)}</span>
+                      <span className="block truncate text-mini text-muted">
                         {o.department?.name ? `${o.department.name} · ` : ''}prazo legal {formatDateBR(o.legalDueDate)}
                       </span>
                     </span>
-                    <span className={cn('shrink-0 text-right text-xs', done ? 'font-medium text-success' : DUE_TONE_CLASS[due.tone])}>
+                    <span className={cn('shrink-0 text-right text-mini', done ? 'font-medium text-success' : DUE_TONE_CLASS[due.tone])}>
                       {done ? OCCURRENCE_STATUS_LABELS.done : due.text}
                     </span>
                   </button>
@@ -554,9 +554,9 @@ function FinanceSection({ client: c, onFees, onContract }: { client: Client; onF
               <span>
                 <span className="tabular font-semibold">{formatBRL(fee.amount)}</span>/mês · <span className="tabular">{formatBRL(fee.employeeFee)}</span> por empregado
                 {fee.discountBps > 0 ? (
-                  <span className="block text-xs text-muted">{formatBps(fee.discountBps)} de desconto para pagamento até o vencimento</span>
+                  <span className="block text-mini text-muted">{formatBps(fee.discountBps)} de desconto para pagamento até o vencimento</span>
                 ) : null}
-                <span className="block text-xs text-muted">
+                <span className="block text-mini text-muted">
                   vigência de {formatDateBR(fee.startDate)} a {formatDateBR(fee.endDate)}
                 </span>
               </span>
@@ -581,8 +581,8 @@ function FinanceSection({ client: c, onFees, onContract }: { client: Client; onF
         </div>
         {c.notes ? (
           <div className="border-t border-border pt-4">
-            <p className="text-xs font-medium text-muted">Observações</p>
-            <p className="mt-0.5 text-sm whitespace-pre-line text-fg">{c.notes}</p>
+            <p className="text-mini font-medium text-muted">Observações</p>
+            <p className="mt-0.5 text-body-sm whitespace-pre-line text-fg">{c.notes}</p>
           </div>
         ) : null}
       </Card>
@@ -621,13 +621,13 @@ function FinanceSection({ client: c, onFees, onContract }: { client: Client; onF
             {rs!.items.map((t) => (
               <li key={t.id} className="flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-fg">{t.description}</span>
-                  <span className={cn('tabular block text-xs', t.overdue ? 'font-semibold text-danger' : 'text-muted')}>
+                  <span className="block truncate text-body-sm text-fg">{t.description}</span>
+                  <span className={cn('tabular block text-mini', t.overdue ? 'font-semibold text-danger' : 'text-muted')}>
                     {t.overdue ? 'Venceu em ' : 'Vence em '}
                     {formatDateBR(t.date)}
                   </span>
                 </span>
-                <Money value={t.amount} className="text-sm" />
+                <Money value={t.amount} className="text-body-sm" />
               </li>
             ))}
           </ul>

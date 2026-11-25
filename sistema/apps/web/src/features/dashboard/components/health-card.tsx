@@ -28,20 +28,20 @@ export function HealthCard({ health, loading }: { health: HealthScore | undefine
             <Gauge score={health.score} size={190} />
           </div>
           <details className="group mt-1">
-            <summary className="cursor-pointer list-none text-center text-xs font-semibold text-brand-text hover:underline">
+            <summary className="cursor-pointer list-none text-center text-mini font-semibold text-brand-text hover:underline">
               Ver fatores
             </summary>
             <ul className="mt-3 flex flex-col gap-2.5">
               {health.factors.map((f) => (
                 <li key={f.label}>
-                  <div className="flex justify-between text-xs">
+                  <div className="flex justify-between text-mini">
                     <span className="font-medium">{f.label}</span>
                     <span className="tabular text-muted">
                       {f.score}/{f.max}
                     </span>
                   </div>
                   <ProgressBar value={f.max ? f.score / f.max : 0} size="sm" className="mt-1" tone={f.score / (f.max || 1) < 0.4 ? 'danger' : 'brand'} />
-                  <p className="mt-1 text-[11px] text-muted">{f.hint}</p>
+                  <p className="mt-1 text-micro text-muted">{f.hint}</p>
                 </li>
               ))}
             </ul>

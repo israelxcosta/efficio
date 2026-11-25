@@ -368,7 +368,7 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
         >
           {isEdit && tx ? <SeriesInfo tx={tx} /> : null}
           {isEdit && tx?.splitGroupId ? (
-            <div className="flex items-center gap-2 rounded-md bg-primary-soft px-3 py-2.5 text-[13px] text-primary-soft-fg">
+            <div className="flex items-center gap-2 rounded-md bg-primary-soft px-3 py-2.5 text-caption text-primary-soft-fg">
               <Split className="size-4" />
               <span className="font-medium">Parte de um lançamento dividido entre categorias</span>
             </div>
@@ -390,7 +390,7 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
 
           {!isCard ? (
             <fieldset className="flex flex-col gap-2">
-              <legend className="mb-1.5 text-[13px] font-medium text-fg">Status</legend>
+              <legend className="mb-1.5 text-caption font-medium text-fg">Status</legend>
               <div className="grid grid-cols-2 gap-2">
                 <StatusOption
                   active={values.paid === true}
@@ -469,7 +469,7 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
                 error={formState.errors.categoryId?.message ?? formState.errors.subcategoryId?.message}
                 aside={
                   isEdit ? null : (
-                    <button type="button" onClick={startSplit} className="flex items-center gap-1 text-xs font-semibold text-brand-text hover:underline">
+                    <button type="button" onClick={startSplit} className="flex items-center gap-1 text-mini font-semibold text-brand-text hover:underline">
                       <Split className="size-3.5" /> Dividir
                     </button>
                   )
@@ -527,7 +527,7 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
           {!isEdit ? (
             <div className="flex flex-col gap-4 border-t border-border pt-4">
               <label className="flex cursor-pointer items-center justify-between gap-3">
-                <span className="flex items-center gap-2 text-sm font-semibold text-brand-text">
+                <span className="flex items-center gap-2 text-body-sm font-semibold text-brand-text">
                   <Repeat className="size-4" /> Repetir
                 </span>
                 <Controller
@@ -579,7 +579,7 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
                         name="installmentAmountMode"
                         render={({ field }) => (
                           <div className="flex flex-col gap-1.5">
-                            <span className="text-[13px] font-medium">O valor informado é</span>
+                            <span className="text-caption font-medium">O valor informado é</span>
                             <SegmentedControl
                               fullWidth
                               size="sm"
@@ -594,7 +594,7 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
                         )}
                       />
                       {installmentPreview ? (
-                        <p className="rounded-md bg-primary-soft px-3 py-2 text-[13px] font-semibold text-primary-soft-fg">
+                        <p className="rounded-md bg-primary-soft px-3 py-2 text-caption font-semibold text-primary-soft-fg">
                           {installmentPreview}
                         </p>
                       ) : null}
@@ -618,7 +618,7 @@ export function TransactionSheet({ state, onOpenChange }: TransactionSheetProps)
                       </Field>
                     </div>
                     {!(Number(values.occurrences) > 0) ? (
-                      <p className="flex items-start gap-2 text-[13px] leading-relaxed text-muted">
+                      <p className="flex items-start gap-2 text-caption leading-relaxed text-muted">
                         <InfinityIcon className="mt-0.5 size-4 shrink-0 text-brand-text" />
                         Sem quantidade, o lançamento é fixo: repete sem data de término e aparece nos relatórios e
                         projeções. Para encerrar, exclua a partir do mês desejado.
@@ -726,7 +726,7 @@ function StatusOption({
       aria-checked={active}
       onClick={onClick}
       className={cn(
-        'flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-semibold transition-colors',
+        'flex h-11 items-center justify-center gap-2 rounded-md border text-body-sm font-semibold transition-colors',
         active
           ? tone === 'success'
             ? 'border-success/30 bg-success-soft text-success'
@@ -750,7 +750,7 @@ function SeriesInfo({ tx }: { tx: Transaction }) {
         ? `Repete ${tx.frequency && tx.frequency !== 'monthly' ? FREQUENCY_LABELS[tx.frequency].toLowerCase() : 'todo mês'}, sem fim`
         : `${tx.frequency ? FREQUENCY_LABELS[tx.frequency] : ''}${tx.occurrenceNumber ? ` · ocorrência ${tx.occurrenceNumber}` : ''}`;
   return (
-    <div className="flex items-center gap-2 rounded-md bg-primary-soft px-3 py-2.5 text-[13px] text-primary-soft-fg">
+    <div className="flex items-center gap-2 rounded-md bg-primary-soft px-3 py-2.5 text-caption text-primary-soft-fg">
       <Repeat className="size-4" />
       <Badge tone="solid">{RECURRENCE_KIND_LABELS[tx.recurrenceKind]}</Badge>
       <span className="font-medium">{detail}</span>

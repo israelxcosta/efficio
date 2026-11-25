@@ -78,7 +78,7 @@ function MenuAction({
     <DropdownMenuItem icon={icon} tone={tone} disabled={Boolean(blockedReason)} onSelect={onSelect} className="min-h-10 [&>svg]:shrink-0">
       <span className="min-w-0">
         <span className="block">{label}</span>
-        {blockedReason ? <span className="block text-xs font-normal text-muted">{blockedReason}</span> : null}
+        {blockedReason ? <span className="block text-mini font-normal text-muted">{blockedReason}</span> : null}
       </span>
     </DropdownMenuItem>
   );
@@ -96,7 +96,7 @@ function FeeCell({ client, today, onOpen, align = 'left' }: { client: Client; to
         aria-label={`Honorários de ${client.name}`}
       >
         <span className="tabular block font-semibold whitespace-nowrap text-fg">{formatBRL(fee.amount)}</span>
-        <span className="tabular block text-[11px] whitespace-nowrap text-muted">
+        <span className="tabular block text-micro whitespace-nowrap text-muted">
           {formatBRL(fee.employeeFee)} / empregado
         </span>
       </button>
@@ -307,7 +307,7 @@ export default function ClientsPage() {
             ))}
           </Select>
           {data ? (
-            <span className="ml-auto text-xs text-muted">{pluralize(data.total, 'cliente', 'clientes')}</span>
+            <span className="ml-auto text-mini text-muted">{pluralize(data.total, 'cliente', 'clientes')}</span>
           ) : null}
         </div>
 
@@ -339,7 +339,7 @@ export default function ClientsPage() {
               {data!.items.map((c) => (
                 <li key={c.id} className="flex flex-col gap-2 p-4">
                   <div className="flex items-start gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-mini font-bold text-primary-soft-fg">
                       {initials(c.tradeName || c.name)}
                     </span>
                     <Link to={clientPagePath('financeiro', c.id)} className="min-w-0 flex-1 text-left">
@@ -351,10 +351,10 @@ export default function ClientsPage() {
                       >
                         {c.tradeName || c.name}
                       </span>
-                      <span className="tabular block text-xs text-muted">
+                      <span className="tabular block text-mini text-muted">
                         {formatCNPJ(c.document)}
                       </span>
-                      <span className="block text-xs text-muted">
+                      <span className="block text-mini text-muted">
                         {TAX_REGIME_LABELS[c.taxRegime]}
                         {c.simplesAnnex ? ` · Anexo ${c.simplesAnnex}` : ''} · desde{' '}
                         {formatDateBR(c.contractStartDate)}
@@ -370,9 +370,9 @@ export default function ClientsPage() {
               ))}
             </ul>
             <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[960px] text-sm">
+              <table className="w-full min-w-[960px] text-body-sm">
                 <thead>
-                  <tr className="border-b border-border text-left text-xs font-medium text-muted">
+                  <tr className="border-b border-border text-left text-mini font-medium text-muted">
                     <th className="px-4 py-2.5">Cliente</th>
                     <th className="px-4 py-2.5">CNPJ</th>
                     <th className="px-4 py-2.5">Regime</th>
@@ -399,7 +399,7 @@ export default function ClientsPage() {
                       >
                         <td className="px-4 py-3">
                           <Link to={clientPagePath('financeiro', c.id)} className="flex items-center gap-3 text-left">
-                            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg">
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-mini font-bold text-primary-soft-fg">
                               {initials(c.tradeName || c.name)}
                             </span>
                             <span className="min-w-0">
@@ -412,7 +412,7 @@ export default function ClientsPage() {
                                 {c.tradeName || c.name}
                               </span>
                               {c.tradeName ? (
-                                <span className="block max-w-[260px] truncate text-xs text-muted">
+                                <span className="block max-w-[260px] truncate text-mini text-muted">
                                   {c.name}
                                 </span>
                               ) : null}
@@ -427,7 +427,7 @@ export default function ClientsPage() {
                             {TAX_REGIME_LABELS[c.taxRegime]}
                           </span>
                           {c.simplesAnnex ? (
-                            <span className="block text-xs text-muted">Anexo {c.simplesAnnex}</span>
+                            <span className="block text-mini text-muted">Anexo {c.simplesAnnex}</span>
                           ) : null}
                         </td>
                         <td className="tabular px-4 py-3 whitespace-nowrap">
@@ -438,7 +438,7 @@ export default function ClientsPage() {
                         </td>
                         {status === 'all' ? <td className="px-4 py-3">{c.status === 'inactive' ? statusBadge(c) : null}</td> : null}
                         {status === 'inactive' ? (
-                          <td className="px-4 py-3 text-xs text-muted">
+                          <td className="px-4 py-3 text-mini text-muted">
                             {c.inactivation ? (
                               <>
                                 <span className="block whitespace-nowrap text-fg">{INACTIVATION_REASON_LABELS[c.inactivation.reason]}</span>
@@ -459,7 +459,7 @@ export default function ClientsPage() {
           </>
         )}
         {data && data.total > PAGE_SIZE ? (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-body-sm text-muted">
             <span>
               Página {page} de {totalPages}
             </span>

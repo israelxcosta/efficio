@@ -131,7 +131,7 @@ export function UnionsTab() {
       <UnionSummary data={data} situation={filters.situation} onSituation={(s) => update({ situation: filters.situation === s ? '' : s })} />
       <Card className="@container overflow-hidden">
         <UnionToolbar filters={filters} total={data?.total} onChange={update} />
-        <div className="hidden items-center gap-3 border-y border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
+        <div className="hidden items-center gap-3 border-y border-border px-5.5 py-2.5 text-mini font-medium text-muted @xl:flex">
           <span className="flex-1">Sindicato</span>
           <span className="hidden w-44 @3xl:block">Categoria</span>
           <span className="hidden w-28 @2xl:block">Clientes</span>
@@ -260,7 +260,7 @@ function UnionSummary({ data, situation, onSituation }: { data: UnionListRespons
           <span
             className={cn(
               'tabular mt-1 block leading-10 font-semibold tracking-tight',
-              opts.main ? 'text-[32px]' : 'text-kpi',
+              opts.main ? 'text-display' : 'text-kpi',
               value && opts.tone === 'danger' ? 'text-danger' : value && opts.tone === 'warning' ? 'text-warning' : 'text-fg',
             )}
           >
@@ -326,7 +326,7 @@ function UnionToolbar({ filters, total, onChange }: { filters: UnionFilters; tot
   const searchInput = (placeholder: string) => (
     <div className="relative min-w-0 flex-1">
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={placeholder} aria-label="Buscar sindicato" className="h-9 rounded-[10px] pl-9 text-[13px]" />
+      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={placeholder} aria-label="Buscar sindicato" className="h-9 rounded-[10px] pl-9 text-caption" />
     </div>
   );
   return (
@@ -370,11 +370,11 @@ const menuButton =
 
 /** "01/11/2026" and "Vence em 2 dias" (or "Sem data-base"), with the cycle in the tooltip. */
 function ConventionWhen({ union: u, inline }: { union: UnionListItem; inline?: boolean }) {
-  if (!u.tracked) return <span className={cn('text-xs text-subtle', !inline && 'block')}>Sem data-base</span>;
+  if (!u.tracked) return <span className={cn('text-mini text-subtle', !inline && 'block')}>Sem data-base</span>;
   const text = deadlineLabel(u.tracked);
   if (inline) {
     return (
-      <span className="text-xs">
+      <span className="text-mini">
         <span className="tabular text-fg">{formatDateBR(u.tracked.dueDate)}</span> · <span className={deadlineClass(u.tracked)}>{text}</span>
       </span>
     );
@@ -382,8 +382,8 @@ function ConventionWhen({ union: u, inline }: { union: UnionListItem; inline?: b
   return (
     <Tooltip content={`Convenção Coletiva ${u.tracked.label}`}>
       <span tabIndex={-1} className="block">
-        <span className="tabular block text-[13px] font-medium text-fg">{formatDateBR(u.tracked.dueDate)}</span>
-        <span className={cn('block text-xs', deadlineClass(u.tracked))}>{text}</span>
+        <span className="tabular block text-caption font-medium text-fg">{formatDateBR(u.tracked.dueDate)}</span>
+        <span className={cn('block text-mini', deadlineClass(u.tracked))}>{text}</span>
       </span>
     </Tooltip>
   );
@@ -409,15 +409,15 @@ function UnionRow({
   return (
     <div className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-surface-muted @lg:px-4">
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left">
-        <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-xs font-bold text-muted">
+        <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-mini font-bold text-muted">
           {unionInitials(u)}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className={cn('min-w-0 truncate text-sm font-semibold', u.active ? 'text-fg' : 'text-muted')}>{title}</span>
+            <span className={cn('min-w-0 truncate text-body-sm font-semibold', u.active ? 'text-fg' : 'text-muted')}>{title}</span>
             {!u.active ? <Badge tone="neutral">Inativo</Badge> : null}
           </span>
-          <span className="mt-0.5 block truncate text-xs text-muted">
+          <span className="mt-0.5 block truncate text-mini text-muted">
             {subtitle}
             {month ? <span className="@4xl:hidden"> · data-base em {month.toLowerCase()}</span> : null}
           </span>

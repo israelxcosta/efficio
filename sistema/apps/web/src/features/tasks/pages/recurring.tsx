@@ -141,7 +141,7 @@ export default function RecurringTasksPage() {
 
           <Card className="@container overflow-hidden">
             {emptyAll ? null : (
-              <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
+              <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-mini font-medium text-muted @xl:flex">
                 <span className="w-10" aria-hidden />
                 <span className="flex-1">Tarefa recorrente</span>
                 <span className="hidden w-32 @3xl:block">Departamento</span>
@@ -391,7 +391,7 @@ function RecurringFiltersBar({
       >
         <div className="relative sm:col-span-2 lg:col-span-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar tarefa recorrente" aria-label="Buscar tarefa recorrente" className="h-9 rounded-[10px] pl-9 text-[13px]" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar tarefa recorrente" aria-label="Buscar tarefa recorrente" className="h-9 rounded-[10px] pl-9 text-caption" />
         </div>
         {periodSelect(true)}
         {departmentSelect(true)}
@@ -409,7 +409,7 @@ function RecurringFiltersBar({
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label="Buscar tarefa recorrente" className="h-9 rounded-[10px] pl-9 text-[13px]" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label="Buscar tarefa recorrente" className="h-9 rounded-[10px] pl-9 text-caption" />
           </div>
           <Button variant="outline" size="sm" className="h-9" onClick={() => setSheet(true)}>
             <SlidersHorizontal /> Filtros{count - (filters.search ? 1 : 0) > 0 ? ` (${count - (filters.search ? 1 : 0)})` : ''}
@@ -475,16 +475,16 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
           {r.category ? <CategoryIcon icon={r.category.icon} color={r.category.color} /> : <NeutralIcon icon={Repeat} />}
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className={cn('min-w-0 truncate text-sm font-semibold', r.active ? 'text-fg' : 'text-muted')}>{r.name}</span>
+              <span className={cn('min-w-0 truncate text-body-sm font-semibold', r.active ? 'text-fg' : 'text-muted')}>{r.name}</span>
               {r.period !== 'monthly' ? <Badge tone="neutral">{RECURRENCE_FREQUENCY_LABELS[r.period]}</Badge> : null}
               {!r.active && r.endCompetence ? <Badge tone="neutral">{endedLabel(r.endCompetence)}</Badge> : null}
             </span>
-            <span className="mt-0.5 block truncate text-xs text-muted">
+            <span className="mt-0.5 block truncate text-mini text-muted">
               <span className="@3xl:hidden">{head}</span>
               <span className="hidden @3xl:inline">{subtitle.length ? subtitle.join(' · ') : (r.description ?? r.category?.name ?? '')}</span>
               {subtitle.length ? <span className="@3xl:hidden">{head ? ' · ' : ''}{subtitle.join(' · ')}</span> : null}
             </span>
-            <span className="mt-0.5 block truncate text-xs text-muted @xl:hidden">
+            <span className="mt-0.5 block truncate text-mini text-muted @xl:hidden">
               {m.occurs ? `${m.done} de ${live}` : `Não ocorre em ${monthName}`} · {dueRuleText(r)}
               {r.targetDaysBefore ? `, meta ${r.targetDaysBefore} ${r.targetDaysBefore === 1 ? 'dia' : 'dias'} antes` : ''}
             </span>
@@ -510,7 +510,7 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
         <div className="hidden w-40 @xl:block">
           {m.occurs && live > 0 ? (
             <>
-              <span className="tabular text-[13px] font-medium text-fg">
+              <span className="tabular text-caption font-medium text-fg">
                 {m.done} de {live}
               </span>
               {m.overdue > 0 ? <span className="text-mini text-danger"> · {m.overdue} {m.overdue === 1 ? 'atrasada' : 'atrasadas'}</span> : null}
@@ -519,12 +519,12 @@ function RecurringRow({ recurring: r, monthName, canEdit, canDelete, onOpen, onD
               </span>
             </>
           ) : (
-            <span className="text-xs text-subtle">{m.occurs ? 'Nenhum cliente' : `Não ocorre em ${monthName}`}</span>
+            <span className="text-mini text-subtle">{m.occurs ? 'Nenhum cliente' : `Não ocorre em ${monthName}`}</span>
           )}
         </div>
         <div className="hidden w-52 text-right @xl:block">
-          <p className="tabular text-[13px] font-medium text-fg">{deadline.line1}</p>
-          <p className="line-clamp-2 text-xs text-muted">{deadline.line2}</p>
+          <p className="tabular text-caption font-medium text-fg">{deadline.line1}</p>
+          <p className="line-clamp-2 text-mini text-muted">{deadline.line2}</p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -595,14 +595,14 @@ function RepetitionRow({ recurring: r, monthName, onOpen, onStop }: { recurring:
           {r.category ? <CategoryIcon icon={r.category.icon} color={r.category.color} /> : <NeutralIcon icon={Repeat} />}
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className={cn('min-w-0 truncate text-sm font-semibold', r.active ? 'text-fg' : 'text-muted')}>{r.name}</span>
+              <span className={cn('min-w-0 truncate text-body-sm font-semibold', r.active ? 'text-fg' : 'text-muted')}>{r.name}</span>
             </span>
-            <span className="mt-0.5 block truncate text-xs text-muted">
+            <span className="mt-0.5 block truncate text-mini text-muted">
               <Repeat className="mr-1 inline size-3 align-[-2px]" aria-hidden />
               {rule}
               <span className="@4xl:hidden"> · {client}</span>
             </span>
-            <span className="mt-0.5 block truncate text-xs text-muted @xl:hidden">
+            <span className="mt-0.5 block truncate text-mini text-muted @xl:hidden">
               {m.occurs ? `${m.done} de ${live}` : `Não ocorre em ${monthName}`} · {deadline.line1}
             </span>
           </span>
@@ -620,7 +620,7 @@ function RepetitionRow({ recurring: r, monthName, onOpen, onStop }: { recurring:
         <div className="hidden w-40 @xl:block">
           {m.occurs && live > 0 ? (
             <>
-              <span className="tabular text-[13px] font-medium text-fg">
+              <span className="tabular text-caption font-medium text-fg">
                 {m.done} de {live}
               </span>
               {m.overdue > 0 ? <span className="text-mini text-danger"> · {m.overdue} {m.overdue === 1 ? 'atrasada' : 'atrasadas'}</span> : null}
@@ -629,12 +629,12 @@ function RepetitionRow({ recurring: r, monthName, onOpen, onStop }: { recurring:
               </span>
             </>
           ) : (
-            <span className="text-xs text-subtle">{`Não ocorre em ${monthName}`}</span>
+            <span className="text-mini text-subtle">{`Não ocorre em ${monthName}`}</span>
           )}
         </div>
         <div className="hidden w-52 text-right @xl:block">
-          <p className="tabular text-[13px] font-medium text-fg">{deadline.line1}</p>
-          {deadline.line2 ? <p className="line-clamp-2 text-xs text-muted">{deadline.line2}</p> : null}
+          <p className="tabular text-caption font-medium text-fg">{deadline.line1}</p>
+          {deadline.line2 ? <p className="line-clamp-2 text-mini text-muted">{deadline.line2}</p> : null}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

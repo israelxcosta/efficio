@@ -189,7 +189,7 @@ function DepartmentsTab({
 
   return (
     <Card className="@container overflow-hidden">
-      <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
+      <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-mini font-medium text-muted @xl:flex">
         <span className="flex-1">Departamento</span>
         <span className="hidden w-32 @2xl:block">Membros</span>
         <span className="w-28 text-right">Em aberto</span>
@@ -223,8 +223,8 @@ function DepartmentsTab({
                   <UsersRound />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-fg">{d.name}</span>
-                  <span className="mt-0.5 block truncate text-xs text-muted">{namesSummary(d.members.map((m) => m.name))}</span>
+                  <span className="block truncate text-body-sm font-semibold text-fg">{d.name}</span>
+                  <span className="mt-0.5 block truncate text-mini text-muted">{namesSummary(d.members.map((m) => m.name))}</span>
                 </span>
                 <span className="hidden w-32 @2xl:block">
                   {d.members.length ? <AvatarStack people={d.members} /> : <span className="text-body-sm text-subtle">—</span>}
@@ -338,10 +338,10 @@ function CategoriesTab({
               <CategoryIcon icon={c.icon} color={c.color} />
               <span className="min-w-0 flex-1">
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-sm font-semibold text-fg">{c.name}</span>
+                  <span className="truncate text-body-sm font-semibold text-fg">{c.name}</span>
                   {c.isRework ? <ReworkBadge className="shrink-0" /> : null}
                 </span>
-                <span className="mt-0.5 block text-xs text-muted">{pluralize(c.taskCount, 'tarefa', 'tarefas')}</span>
+                <span className="mt-0.5 block text-mini text-muted">{pluralize(c.taskCount, 'tarefa', 'tarefas')}</span>
               </span>
               <Link to={tasksHref({ scope: 'all', category: c.id, situation: 'all' })} className="hidden text-caption font-medium text-brand-text hover:underline @md:inline">
                 Ver tarefas
@@ -447,7 +447,7 @@ function TeamTab() {
         </Card>
       ) : null}
       <Card className="@container overflow-hidden">
-        <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
+        <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-mini font-medium text-muted @xl:flex">
           <span className="flex-1">Pessoa</span>
           <span className="hidden w-32 @2xl:block">Papel</span>
           <span className="w-48">Departamento</span>
@@ -480,10 +480,10 @@ function TeamTab() {
                   <MemberAvatar size="md" name={m.name} userId={m.id} />
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate text-sm font-semibold text-fg">{m.name}</span>
+                      <span className="truncate text-body-sm font-semibold text-fg">{m.name}</span>
                       {m.isYou ? <Badge tone="brand">Você</Badge> : null}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-muted">
+                    <span className="mt-0.5 block truncate text-mini text-muted">
                       {email ?? ROLE_LABELS[m.role]}
                       <span className="@2xl:hidden">{email ? ` · ${ROLE_LABELS[m.role]}` : ''}</span>
                     </span>
@@ -492,7 +492,7 @@ function TeamTab() {
                         <DepartmentSelect member={m} departments={o.departments} onChange={(v) => void changeDepartment(m, v)} />
                       </span>
                     ) : (
-                      <span className="mt-0.5 block truncate text-xs @xl:hidden">
+                      <span className="mt-0.5 block truncate text-mini @xl:hidden">
                         <span className={m.department ? 'text-muted' : 'text-subtle'}>{m.department?.name ?? 'Sem departamento'}</span>
                       </span>
                     )}

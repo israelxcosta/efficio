@@ -124,7 +124,7 @@ export default function StatementPage() {
           />
         </div>
         <div className="flex items-center justify-between gap-3">
-          <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-medium text-muted">
+          <label className="flex cursor-pointer items-center gap-2.5 text-caption font-medium text-muted">
             <Switch checked={includePending} onCheckedChange={(c) => update({ previstos: c ? null : '0' })} aria-label="Mostrar previstos" />
             Mostrar previstos
           </label>
@@ -143,12 +143,12 @@ export default function StatementPage() {
       <Card className="overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
-            <h2 className="text-[15px] font-semibold">{account ? account.name : 'Todas as contas'}</h2>
-            <p className="text-xs text-muted">
+            <h2 className="text-title-sm font-semibold">{account ? account.name : 'Todas as contas'}</h2>
+            <p className="text-mini text-muted">
               {account ? ACCOUNT_TYPE_LABELS[account.type] : 'Contas incluídas no saldo total (sem investimentos)'}
             </p>
           </div>
-          {data ? <span className="text-xs text-muted">{data.entries.length} movimentações</span> : null}
+          {data ? <span className="text-mini text-muted">{data.entries.length} movimentações</span> : null}
         </div>
         <div className="p-1.5">
           {statement.isPending ? (
@@ -184,7 +184,7 @@ export default function StatementPage() {
                   <section key={date} aria-label={dayHeader(date)}>
                     <div className="sticky top-[72px] z-[1] flex items-center justify-between bg-surface/95 px-4 pt-4 pb-2 backdrop-blur">
                       <span className="eyebrow text-muted">{dayHeader(date)}</span>
-                      <span className="text-xs text-muted">
+                      <span className="text-mini text-muted">
                         Saldo do dia <span className="tabular font-semibold text-fg">{formatBRL(last.balanceAfter)}</span>
                       </span>
                     </div>
@@ -196,7 +196,7 @@ export default function StatementPage() {
                         showDue={false}
                         muted={e.pending}
                         trailing={
-                          <p className="tabular text-[11px] text-subtle">
+                          <p className="tabular text-micro text-subtle">
                             {e.pending ? 'previsto · ' : ''}
                             {formatBRL(e.balanceAfter)}
                           </p>

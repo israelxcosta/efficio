@@ -47,7 +47,7 @@ function GroupBars({ groups, onPick, showReconciled }: { groups: ReceiptsGroup[]
             <span className="flex items-baseline justify-between gap-3 text-body-sm">
               <span className={cn('truncate font-medium text-fg', onPick && 'group-hover:underline')}>{g.label}</span>
               <span className="tabular shrink-0 font-semibold text-fg">
-                {formatBRL(g.amount)} <span className="text-xs font-normal text-muted">· {formatPercent(g.share, 0)} · {g.count}</span>
+                {formatBRL(g.amount)} <span className="text-mini font-normal text-muted">· {formatPercent(g.share, 0)} · {g.count}</span>
               </span>
             </span>
             <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-bg-subtle">

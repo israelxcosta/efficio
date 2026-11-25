@@ -107,8 +107,8 @@ export function CategorySheet({
         <div className="flex items-center gap-3 rounded-lg bg-surface-muted p-4">
           <CategoryIcon tinted icon={icon} color={color} size="lg" />
           <div>
-            <p className="text-sm font-semibold">{name || 'Nome da categoria'}</p>
-            <p className="text-xs text-muted">Pré-visualização</p>
+            <p className="text-body-sm font-semibold">{name || 'Nome da categoria'}</p>
+            <p className="text-mini text-muted">Pré-visualização</p>
           </div>
         </div>
         {!category && !parent ? (
@@ -141,8 +141,8 @@ export function CategorySheet({
         {category ? (
           <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border p-4">
             <span>
-              <span className="block text-sm font-semibold">Arquivada</span>
-              <span className="block text-xs text-muted">Some dos formulários, mas mantém o histórico.</span>
+              <span className="block text-body-sm font-semibold">Arquivada</span>
+              <span className="block text-mini text-muted">Some dos formulários, mas mantém o histórico.</span>
             </span>
             <Controller control={control} name="archived" render={({ field }) => <Switch checked={Boolean(field.value)} onCheckedChange={field.onChange} />} />
           </label>

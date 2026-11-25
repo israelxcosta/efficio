@@ -4,7 +4,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
 // The custom `--text-*` sizes (index.css) are font sizes, not text colors: without this,
 // `cn('text-caption', 'text-muted')` would drop one of them.
 const twMerge = extendTailwindMerge({
-  extend: { classGroups: { 'font-size': [{ text: ['micro', 'mini', 'caption', 'body-sm', 'title-sm', 'kpi'] }] } },
+  extend: { classGroups: { 'font-size': [{ text: ['micro', 'mini', 'caption', 'body-sm', 'title-sm', 'title', 'kpi', 'display'] }] } },
 });
 
 export function cn(...inputs: ClassValue[]): string {

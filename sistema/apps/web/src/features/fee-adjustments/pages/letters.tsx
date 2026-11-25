@@ -87,7 +87,7 @@ export default function FeeAdjustmentLettersPage() {
           }
         />
         {data && data.missingOffice.length ? (
-          <div role="note" className="flex flex-wrap items-start gap-3 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-[13px] text-fg">
+          <div role="note" className="flex flex-wrap items-start gap-3 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-caption text-fg">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
             <p className="min-w-0 flex-1">
               <span className="font-semibold">Faltam dados do escritório no cabeçalho:</span> {data.missingOffice.join(', ')}.
@@ -98,7 +98,7 @@ export default function FeeAdjustmentLettersPage() {
           </div>
         ) : null}
         {edited || late ? (
-          <p className="text-[13px] text-muted">
+          <p className="text-caption text-muted">
             {[
               edited ? `${pluralize(edited, 'carta com a vigência alterada', 'cartas com a vigência alterada')} depois do reajuste (marcadas; mostram os valores do lote)` : '',
               late ? `${pluralize(late, 'aviso', 'avisos')} fora do prazo de 30 dias` : '',

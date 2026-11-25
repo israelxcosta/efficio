@@ -64,7 +64,7 @@ export function SubscriptionTab() {
         )}
       </Cell>
       <Cell wide>
-        <p className="flex items-center gap-2 text-xs text-muted">
+        <p className="flex items-center gap-2 text-mini text-muted">
           <Lock className="size-3.5 shrink-0" aria-hidden />
           Pagamento processado com segurança pelo Mercado Pago. O Efficio não armazena dados do seu cartão.
         </p>
@@ -140,13 +140,13 @@ function CurrentPlanCard({ sub }: { sub: Subscription }) {
       />
       <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-2xl font-semibold tracking-tight">{plan ? plan.name : 'Teste grátis'}</p>
+          <p className="text-kpi font-semibold tracking-tight">{plan ? plan.name : 'Teste grátis'}</p>
           {plan ? (
-            <p className="tabular text-sm text-muted">
+            <p className="tabular text-body-sm text-muted">
               {formatBRL(plan.priceCents)} / {plan.interval === 'year' ? 'ano' : 'mês'}
             </p>
           ) : null}
-          <p className="mt-2 max-w-xl text-[13px] text-muted">{detail}</p>
+          <p className="mt-2 max-w-xl text-caption text-muted">{detail}</p>
         </div>
         {canCancel ? (
           <Button variant="ghost" onClick={() => setConfirming(true)}>
@@ -156,7 +156,7 @@ function CurrentPlanCard({ sub }: { sub: Subscription }) {
       </div>
       {sub.maxMembers > 1 ? (
         <div className="mt-5 max-w-sm">
-          <div className="mb-1.5 flex justify-between text-xs">
+          <div className="mb-1.5 flex justify-between text-mini">
             <span className="font-medium text-muted">Membros</span>
             <span className="tabular font-semibold">
               {sub.memberCount} de {sub.maxMembers}
@@ -226,7 +226,7 @@ function PlansCard({ sub, plans }: { sub: Subscription; plans: Plan[] | undefine
           <Skeleton className="h-56 rounded-xl" />
         </div>
       ) : available.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">Nenhum plano disponível para este tipo de espaço.</p>
+        <p className="mt-4 text-body-sm text-muted">Nenhum plano disponível para este tipo de espaço.</p>
       ) : (
         <div className={cn('mt-5 grid gap-4', available.length > 1 && 'md:grid-cols-2')}>
           {available.map((plan) => {
@@ -257,15 +257,15 @@ function PlansCard({ sub, plans }: { sub: Subscription; plans: Plan[] | undefine
                   </Badge>
                 ) : null}
                 <p className="font-semibold">{plan.name}</p>
-                <p className="mt-0.5 text-xs text-muted">{plan.description}</p>
+                <p className="mt-0.5 text-mini text-muted">{plan.description}</p>
                 <p className="mt-4">
-                  <span className="tabular text-[26px] font-semibold tracking-tight">{formatBRL(plan.priceCents)}</span>
-                  <span className="text-sm text-muted"> / {plan.interval === 'year' ? 'ano' : 'mês'}</span>
+                  <span className="tabular text-kpi font-semibold tracking-tight">{formatBRL(plan.priceCents)}</span>
+                  <span className="text-body-sm text-muted"> / {plan.interval === 'year' ? 'ano' : 'mês'}</span>
                 </p>
                 {plan.interval === 'year' ? (
-                  <p className="tabular text-xs text-muted">equivale a {formatBRL(Math.round(plan.priceCents / 12))} por mês</p>
+                  <p className="tabular text-mini text-muted">equivale a {formatBRL(Math.round(plan.priceCents / 12))} por mês</p>
                 ) : null}
-                <ul className="mt-4 flex flex-1 flex-col gap-2 text-[13px]">
+                <ul className="mt-4 flex flex-1 flex-col gap-2 text-caption">
                   {plan.highlights.map((h) => (
                     <li key={h} className="flex items-start gap-2">
                       <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
@@ -295,7 +295,7 @@ function PlansCard({ sub, plans }: { sub: Subscription; plans: Plan[] | undefine
           })}
         </div>
       )}
-      {!isOwner ? <p className="mt-4 text-xs text-muted">{OWNER_ONLY}</p> : null}
+      {!isOwner ? <p className="mt-4 text-mini text-muted">{OWNER_ONLY}</p> : null}
     </Card>
   );
 }

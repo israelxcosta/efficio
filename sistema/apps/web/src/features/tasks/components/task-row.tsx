@@ -85,7 +85,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className={cn('min-w-[4.5rem] truncate text-sm font-semibold', closed ? 'text-muted' : 'text-fg')}>{task.title}</span>
+              <span className={cn('min-w-[4.5rem] truncate text-body-sm font-semibold', closed ? 'text-muted' : 'text-fg')}>{task.title}</span>
               {task.priority === 'urgent' ? <PriorityBadge priority="urgent" /> : null}
               {task.priority === 'high' && !compact ? <PriorityBadge priority="high" className="hidden @md:inline-flex" /> : null}
               {task.flow ? (
@@ -122,7 +122,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
                 </span>
               ) : null}
             </span>
-            <span className="mt-0.5 block truncate text-xs text-muted empty:hidden">
+            <span className="mt-0.5 block truncate text-mini text-muted empty:hidden">
               {repetition ? (
                 <span>
                   <Repeat className="mr-1 inline size-3 align-[-2px]" aria-hidden />
@@ -151,7 +151,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
             </span>
             <span className={cn('mt-0.5 block truncate', compact ? '@2xl:hidden' : '@xl:hidden')}>
               <TaskDueLabel task={task} today={today} />
-              {!hideAssignee && task.assignee ? <span className="text-xs text-muted @sm:hidden"> · {firstName(task.assignee.name)}</span> : null}
+              {!hideAssignee && task.assignee ? <span className="text-mini text-muted @sm:hidden"> · {firstName(task.assignee.name)}</span> : null}
             </span>
           </span>
         </button>
@@ -165,7 +165,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
             {!compact ? (
               <div className="hidden w-36 min-w-0 items-center gap-2 @2xl:flex">
                 <MemberAvatar name={task.assignee?.name} unassigned={!task.assignee} userId={task.assignee?.id} />
-                <span className={cn('truncate text-[13px]', task.assignee ? 'text-fg' : 'text-subtle')}>
+                <span className={cn('truncate text-caption', task.assignee ? 'text-fg' : 'text-subtle')}>
                   {task.assignee ? shortName(task.assignee.name) : 'Ex-membro'}
                 </span>
               </div>
@@ -181,7 +181,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
         ) : null}
         {!compact ? (
           <div className="hidden w-36 @4xl:block">
-            <span className={cn('inline-flex items-center gap-1.5 text-[13px] whitespace-nowrap', STATUS_TEXT_CLASS[task.status])}>
+            <span className={cn('inline-flex items-center gap-1.5 text-caption whitespace-nowrap', STATUS_TEXT_CLASS[task.status])}>
               <TaskStatusGlyph status={task.status} className="size-3.5" />
               {TASK_STATUS_LABELS[task.status]}
             </span>
@@ -189,7 +189,7 @@ export function TaskRow({ task, today: todayProp, density = 'default', hideAssig
         ) : null}
         <div className={cn('hidden min-w-0 text-right', compact ? 'w-44 @2xl:block' : 'w-48 @xl:block')}>
           {/* An occurrence is worked by its target (the legal deadline goes in the text below). */}
-          <p className="tabular text-[13px] font-medium text-fg" title={(task.occurrence?.targetDate ?? task.dueDate) ? formatDateBR((task.occurrence?.targetDate ?? task.dueDate)!) : undefined}>
+          <p className="tabular text-caption font-medium text-fg" title={(task.occurrence?.targetDate ?? task.dueDate) ? formatDateBR((task.occurrence?.targetDate ?? task.dueDate)!) : undefined}>
             {task.occurrence ? listDate(task.occurrence.targetDate, today) : task.dueDate ? listDate(task.dueDate, today) : '—'}
           </p>
           <TaskDueLabel task={task} today={today} beside />

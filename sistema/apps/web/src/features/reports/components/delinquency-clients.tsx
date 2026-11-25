@@ -84,8 +84,8 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
       <div className="flex flex-col gap-3 border-b border-border p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="text-[15px] font-semibold tracking-tight text-fg">Empresas</h2>
-            <p className="mt-0.5 text-xs text-muted">
+            <h2 className="text-title-sm font-semibold tracking-tight text-fg">Empresas</h2>
+            <p className="mt-0.5 text-mini text-muted">
               {`${pluralize(scoped.length, scope === 'active' ? 'cliente ativo' : 'cliente', scope === 'active' ? 'clientes ativos' : 'clientes')} com mensalidades nos últimos ${months} meses ou valores vencidos em aberto`}
               {hidden > 0 ? ` · ${pluralize(hidden, 'inativo em dia oculto', 'inativos em dia ocultos')}` : ''}
             </p>
@@ -101,7 +101,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar empresa, responsável ou CNPJ"
-              className="h-9 pl-9 text-[13px]"
+              className="h-9 pl-9 text-caption"
               aria-label="Buscar empresas"
             />
           </div>
@@ -188,7 +188,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
 
           {/* Desktop: table. */}
           <div className="hidden lg:block">
-            <table className="w-full table-fixed text-sm">
+            <table className="w-full table-fixed text-body-sm">
               <colgroup>
                 <col />
                 <col className="w-[92px] xl:w-[104px]" />
@@ -199,7 +199,7 @@ export function DelinquencyClients({ clients, months, onMessage }: Props) {
                 <col className="w-[140px]" />
               </colgroup>
               <thead>
-                <tr className="border-b border-border text-left text-xs font-medium text-muted">
+                <tr className="border-b border-border text-left text-mini font-medium text-muted">
                   <th className="px-4 py-2.5">Cliente</th>
                   <th className="px-3 py-2.5" aria-sort={ariaSort('late')}>
                     Atrasos
@@ -312,7 +312,7 @@ function ClientName({ client: c, expanded, onToggle }: { client: DelinquencyClie
   const title = collectionName(c);
   return (
     <button type="button" onClick={onToggle} aria-expanded={expanded} className="group flex w-full min-w-0 flex-1 items-start gap-3 text-left">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg">{initials(title)}</span>
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-mini font-bold text-primary-soft-fg">{initials(title)}</span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1">
           <span className="truncate font-semibold text-fg group-hover:underline group-hover:underline-offset-2">{title}</span>
@@ -397,7 +397,7 @@ export function ScoreCell({ client: c, compact }: { client: DelinquencyClient; c
         }
       >
         <span tabIndex={0} className="flex w-fit cursor-default items-baseline gap-1.5 rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-brand-500/25">
-          <span className={cn('tabular text-[15px] leading-none font-bold', RISK_TONE[c.risk].text)}>{c.score}</span>
+          <span className={cn('tabular text-title-sm leading-none font-semibold', RISK_TONE[c.risk].text)}>{c.score}</span>
           <RiskBadge risk={c.risk} className="h-4 px-1.5" />
           <span className="sr-only">{`Composição: ${parts}`}</span>
         </span>

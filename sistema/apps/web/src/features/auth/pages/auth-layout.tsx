@@ -22,24 +22,24 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
         </Link>
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
           <h1 className="text-[28px] font-semibold tracking-tight">{title}</h1>
-          <p className="mt-1.5 text-sm text-muted">{subtitle}</p>
+          <p className="mt-1.5 text-body-sm text-muted">{subtitle}</p>
           <div className="mt-8">{children}</div>
-          <div className="mt-6 text-center text-sm text-muted">{footer}</div>
+          <div className="mt-6 text-center text-body-sm text-muted">{footer}</div>
         </div>
-        <p className="text-xs text-subtle">© {new Date().getFullYear()} Efficio Contabilidade</p>
+        <p className="text-mini text-subtle">© {new Date().getFullYear()} Efficio Contabilidade</p>
       </div>
       <div className="relative hidden overflow-hidden border-l border-border bg-surface-muted lg:block">
         <div className="relative flex h-full flex-col justify-center px-14 py-12">
           <h2 className="max-w-md text-[28px] leading-tight font-semibold tracking-tight">O mês do escritório num só lugar</h2>
-          <p className="mt-2 max-w-md text-sm text-muted">Sistema interno da equipe: as obrigações e as tarefas de cada cliente, os honorários e os relatórios.</p>
+          <p className="mt-2 max-w-md text-body-sm text-muted">Sistema interno da equipe: as obrigações e as tarefas de cada cliente, os honorários e os relatórios.</p>
           <div className="mt-10 grid max-w-md grid-cols-2 gap-x-10 gap-y-8">
             {TEAM_NODES.map((n, i) => (
               <div key={n.title} className="relative rounded-lg border border-border bg-surface p-3.5">
                 <div className="flex items-center gap-2.5">
                   <n.icon className="size-4 text-muted" aria-hidden />
-                  <span className="text-sm font-semibold">{n.title}</span>
+                  <span className="text-body-sm font-semibold">{n.title}</span>
                 </div>
-                <p className="mt-2 text-xs text-muted">{n.text}</p>
+                <p className="mt-2 text-mini text-muted">{n.text}</p>
                 {i % 2 === 0 ? (
                   <ArrowRight className="absolute top-1/2 -right-8 size-4 -translate-y-1/2 text-brand-700" aria-hidden />
                 ) : i < TEAM_NODES.length - 1 ? (
@@ -49,9 +49,9 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
             ))}
           </div>
           <div className="mt-12 max-w-md rounded-xl bg-hero-from p-5 text-white">
-            <p className="text-xs text-white/75">Competência 10/2026</p>
+            <p className="text-mini text-white/75">Competência 10/2026</p>
             <p className="mt-1 text-[15px] font-semibold">5 de 7 entregas concluídas, 1 aguardando o cliente</p>
-            <p className="mt-1 text-xs text-white/75">Extratos bancários de setembro, pedidos em 06/10 para o balancete. Dados de exemplo.</p>
+            <p className="mt-1 text-mini text-white/75">Extratos bancários de setembro, pedidos em 06/10 para o balancete. Dados de exemplo.</p>
           </div>
         </div>
       </div>

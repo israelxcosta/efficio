@@ -46,7 +46,7 @@ export default function CategoriesPage() {
         title="Categorias"
         actions={
           <>
-            <label className="mr-2 flex cursor-pointer items-center gap-2 text-[13px] font-medium text-muted">
+            <label className="mr-2 flex cursor-pointer items-center gap-2 text-caption font-medium text-muted">
               <Switch checked={showArchived} onCheckedChange={setShowArchived} aria-label="Mostrar arquivadas" /> Arquivadas
             </label>
             <WriteGate>
@@ -92,8 +92,8 @@ export default function CategoriesPage() {
               <div className="flex items-start gap-3">
                 <CategoryIcon tinted icon={c.icon} color={c.color} size="lg" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-semibold">{c.name}</p>
-                  <p className="text-xs text-muted">
+                  <p className="truncate text-title-sm font-semibold">{c.name}</p>
+                  <p className="text-mini text-muted">
                     {c.subcategories.length ? `${c.subcategories.length} subcategoria(s)` : 'Sem subcategorias'}
                     {c.archived ? ' · arquivada' : ''}
                   </p>
@@ -118,7 +118,7 @@ export default function CategoriesPage() {
                     key={s.id}
                     type="button"
                     onClick={() => open({ category: s, parent: c })}
-                    className={cn('inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors hover:brightness-95', s.archived && 'line-through opacity-60')}
+                    className={cn('inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-mini font-medium transition-colors hover:brightness-95', s.archived && 'line-through opacity-60')}
                     style={{ backgroundColor: alpha(tone(s.color), 0.1), borderColor: alpha(tone(s.color), 0.25), color: tone(s.color) }}
                     title="Editar subcategoria"
                   >
@@ -130,7 +130,7 @@ export default function CategoriesPage() {
                   <button
                     type="button"
                     onClick={() => open({ category: null, parent: c })}
-                    className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-border-strong px-2.5 text-xs font-medium text-muted hover:text-fg"
+                    className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-border-strong px-2.5 text-mini font-medium text-muted hover:text-fg"
                   >
                     <Plus className="size-3.5" /> Subcategoria
                   </button>

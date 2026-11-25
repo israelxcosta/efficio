@@ -183,7 +183,7 @@ export function AttachmentList({ task, readOnly, today }: { task: TaskDetail; re
               <>
                 <AttachmentIcon type={a.contentType} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-fg" title={a.fileName}>
+                  <span className="block truncate text-body-sm font-medium text-fg" title={a.fileName}>
                     {middleTruncate(a.fileName)}
                   </span>
                   <span className="block truncate text-caption text-muted">
@@ -212,7 +212,7 @@ export function AttachmentList({ task, readOnly, today }: { task: TaskDetail; re
           <li key={u.id} className="flex min-h-12 items-center gap-3 rounded-lg px-2 py-1.5">
             <AttachmentIcon type={u.contentType} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-fg" title={u.file.name}>
+              <span className="block truncate text-body-sm font-medium text-fg" title={u.file.name}>
                 {middleTruncate(u.file.name)}
               </span>
               {u.phase === 'error' ? (

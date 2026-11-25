@@ -3,9 +3,9 @@ import { usePhotoUrl, usePhotoVersion } from '@/features/profile/photos';
 import { cn, initials } from '@/lib/utils';
 
 const SIZES = {
-  sm: 'size-6 text-[11px] [&_svg]:size-3.5',
-  md: 'size-8 text-xs [&_svg]:size-4',
-  lg: 'size-10 text-[13px] [&_svg]:size-5',
+  sm: 'size-6 text-micro [&_svg]:size-3.5',
+  md: 'size-8 text-mini [&_svg]:size-4',
+  lg: 'size-10 text-caption [&_svg]:size-5',
   xl: 'size-14 text-base [&_svg]:size-6',
 } as const;
 
@@ -71,7 +71,7 @@ export function AvatarStack({ names, people, max = 4, className }: { names?: str
         <MemberAvatar key={`${p.id ?? p.name}-${i}`} name={p.name} userId={p.id} className="ring-2 ring-surface" />
       ))}
       {rest > 0 ? (
-        <span className="inline-flex size-6 items-center justify-center rounded-full bg-bg-subtle text-[11px] font-semibold text-muted ring-2 ring-surface">
+        <span className="inline-flex size-6 items-center justify-center rounded-full bg-bg-subtle text-micro font-semibold text-muted ring-2 ring-surface">
           +{rest}
         </span>
       ) : null}

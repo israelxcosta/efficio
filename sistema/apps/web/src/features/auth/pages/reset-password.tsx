@@ -56,7 +56,7 @@ export default function ResetPasswordPage() {
   if (token.length < 20) {
     return (
       <AuthLayout title="Link inválido" subtitle="Este link de redefinição está incompleto ou expirou. Abra de novo o link do e-mail." footer={footer}>
-        <div className="flex flex-col items-start gap-3 rounded-xl border border-warning/30 bg-warning-soft px-4 py-4 text-sm">
+        <div className="flex flex-col items-start gap-3 rounded-xl border border-warning/30 bg-warning-soft px-4 py-4 text-body-sm">
           <span className="inline-flex items-center gap-2 font-semibold text-warning">
             <TriangleAlert className="size-4" /> Não foi possível usar este link
           </span>

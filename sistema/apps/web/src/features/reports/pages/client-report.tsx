@@ -214,10 +214,10 @@ function ClientHeader({
     <Card className="print:break-inside-avoid">
       <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-start">
         <div className="flex min-w-0 flex-1 items-start gap-4">
-          <span className="hidden size-12 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary-soft-fg sm:flex print:hidden">{initials(title)}</span>
+          <span className="hidden size-12 shrink-0 items-center justify-center rounded-full bg-primary-soft text-body-sm font-bold text-primary-soft-fg sm:flex print:hidden">{initials(title)}</span>
           <div className="min-w-0 flex-1">
             <p className="text-caption text-muted">Relatório financeiro do cliente</p>
-            <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-fg">{title}</h1>
+            <h1 className="text-title font-semibold tracking-tight text-fg">{title}</h1>
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-body-sm text-muted">
               {title !== c.name ? <span>{c.name}</span> : null}
               <span className="tabular">{c.document ? formatCNPJ(c.document) : 'Sem CNPJ'}</span>
@@ -296,7 +296,7 @@ function ScoreBlock({ analysis: a, ready, reworkFailed }: { analysis: ClientAnal
       ) : (
         <>
           <div className="flex items-baseline gap-2">
-            <span className={cn('tabular text-[28px] leading-none font-bold tracking-tight', RISK_TONE[s.risk].text)}>{s.score}</span>
+            <span className={cn('tabular text-display leading-none font-semibold tracking-tight', RISK_TONE[s.risk].text)}>{s.score}</span>
             <span className="text-caption text-subtle">de 1000</span>
             <RiskBadge risk={s.risk} className="ml-auto" />
           </div>

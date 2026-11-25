@@ -171,7 +171,7 @@ export function filterPaletteGroups<T extends Pick<PaletteEntry, 'label' | 'keyw
 const groupClass = '[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-subtle';
 
 const itemClass =
-  'flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm text-fg data-[selected=true]:bg-bg-subtle [&_svg]:size-4 [&_svg]:text-muted';
+  'flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-body-sm text-fg data-[selected=true]:bg-bg-subtle [&_svg]:size-4 [&_svg]:text-muted';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -301,10 +301,10 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                 placeholder={SEARCH_PLACEHOLDERS[scope]}
                 className="h-14 flex-1 bg-transparent text-[15px] outline-none placeholder:text-subtle"
               />
-              <kbd className="rounded-md border border-border bg-bg-subtle px-1.5 py-0.5 text-[11px] font-semibold text-muted">ESC</kbd>
+              <kbd className="rounded-md border border-border bg-bg-subtle px-1.5 py-0.5 text-micro font-semibold text-muted">ESC</kbd>
             </div>
             <Command.List className="scrollbar-thin max-h-[60vh] overflow-y-auto p-2">
-              <Command.Empty className="px-3 py-8 text-center text-sm text-muted">
+              <Command.Empty className="px-3 py-8 text-center text-body-sm text-muted">
                 {search.isFetching ? 'Buscando…' : 'Nada encontrado.'}
               </Command.Empty>
 
@@ -317,9 +317,9 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                           <ListChecks />
                           <span className="min-w-0 flex-1 truncate">
                             {t.title}
-                            <span className="ml-2 text-xs text-muted">{t.client?.name ?? 'Interna'}</span>
+                            <span className="ml-2 text-mini text-muted">{t.client?.name ?? 'Interna'}</span>
                           </span>
-                          <span className={t.overdue ? 'text-xs font-semibold text-danger' : 'text-xs text-muted'}>
+                          <span className={t.overdue ? 'text-mini font-semibold text-danger' : 'text-mini text-muted'}>
                             {t.status === 'done' ? 'Concluída' : t.status === 'canceled' ? 'Cancelada' : t.dueDate ? `${t.overdue ? 'Venceu' : 'Vence'} ${shortDate(t.dueDate, today)}` : 'Sem vencimento'}
                           </span>
                         </Command.Item>
@@ -332,7 +332,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                         <Command.Item key={t.id} value={`rec-${t.id}`} className={itemClass} onSelect={() => run(() => navigate(`/tarefas/recorrentes?recorrente=${t.id}`))}>
                           <Repeat />
                           <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                          <span className="text-xs text-muted">{RECURRENCE_PERIOD_LABELS[t.period]}</span>
+                          <span className="text-mini text-muted">{RECURRENCE_PERIOD_LABELS[t.period]}</span>
                         </Command.Item>
                       ))}
                     </Command.Group>
@@ -344,9 +344,9 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                           <Scale />
                           <span className="min-w-0 flex-1 truncate">
                             {u.acronym ?? u.name}
-                            {u.acronym ? <span className="ml-2 text-xs text-muted">{u.name}</span> : null}
+                            {u.acronym ? <span className="ml-2 text-mini text-muted">{u.name}</span> : null}
                           </span>
-                          <span className="text-xs text-muted">{u.active ? (u.category ?? 'Sindicato') : 'Inativo'}</span>
+                          <span className="text-mini text-muted">{u.active ? (u.category ?? 'Sindicato') : 'Inativo'}</span>
                         </Command.Item>
                       ))}
                     </Command.Group>
@@ -358,7 +358,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                           <CategoryIcon icon={t.category?.icon ?? (t.type === 'transfer' ? 'landmark' : 'tag')} color={t.category?.color ?? '#6B6F76'} size="sm" />
                           <span className="flex-1 truncate">
                             {t.description}
-                            <span className="ml-2 text-xs text-muted">{formatDateBR(t.date)}</span>
+                            <span className="ml-2 text-mini text-muted">{formatDateBR(t.date)}</span>
                           </span>
                           <span className={t.type === 'income' ? 'tabular font-semibold text-success' : t.type === 'expense' ? 'tabular font-semibold text-danger' : 'tabular font-semibold'}>
                             {formatBRL(t.amount)}
@@ -373,7 +373,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                         <Command.Item key={a.id} value={`acc-${a.id}`} className={itemClass} onSelect={() => run(() => navigate(`/extrato?conta=${a.id}`))}>
                           <BankLogo bank={a.bank} color={a.color} size="sm" />
                           <span className="flex-1 truncate">{a.name}</span>
-                          <span className="tabular text-sm font-semibold">{formatBRL(a.balance)}</span>
+                          <span className="tabular text-body-sm font-semibold">{formatBRL(a.balance)}</span>
                         </Command.Item>
                       ))}
                     </Command.Group>
@@ -399,7 +399,7 @@ export function CommandPalette({ open, onOpenChange, area, memory }: CommandPale
                         >
                           {c.kind === 'client' ? <Building2 /> : <Truck />}
                           <span className="flex-1 truncate">{c.name}</span>
-                          <span className="text-xs text-muted">{c.kind === 'client' ? 'Cliente' : 'Fornecedor'}</span>
+                          <span className="text-mini text-muted">{c.kind === 'client' ? 'Cliente' : 'Fornecedor'}</span>
                         </Command.Item>
                       ))}
                     </Command.Group>

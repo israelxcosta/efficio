@@ -95,10 +95,10 @@ export function FileStep({
               <FileText className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-fg" title={file.fileName}>
+              <p className="truncate text-body-sm font-semibold text-fg" title={file.fileName}>
                 {file.fileName}
               </p>
-              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-mini text-muted">
                 <Badge tone="brand">{file.format.toUpperCase()}</Badge>
                 <span>{formatBytes(file.size)}</span>
                 <span>· {CHARSET_LABELS[file.charset]}</span>
@@ -133,16 +133,16 @@ export function FileStep({
             <span className="flex size-11 items-center justify-center rounded-md bg-bg-subtle text-muted">
               {reading ? <LoaderCircle className="size-5 animate-spin" /> : <Upload className="size-5" />}
             </span>
-            <span className="text-sm font-semibold text-fg">
+            <span className="text-body-sm font-semibold text-fg">
               {reading ? 'Lendo arquivo…' : dragging ? 'Solte o arquivo aqui' : 'Arraste o arquivo aqui ou clique para escolher'}
             </span>
-            <span id={hintId} className="text-xs text-muted">
+            <span id={hintId} className="text-mini text-muted">
               OFX, QFX, CSV ou TXT exportado pelo banco
             </span>
           </label>
         )}
         {fileError ? (
-          <p role="alert" className="mt-2 text-xs font-medium text-danger">
+          <p role="alert" className="mt-2 text-mini font-medium text-danger">
             {fileError}
           </p>
         ) : null}
@@ -172,7 +172,7 @@ export function FileStep({
 
       {card ? (
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1.5 text-[13px] font-medium text-fg">Fatura</legend>
+          <legend className="mb-1.5 text-caption font-medium text-fg">Fatura</legend>
           <SegmentedControl
             ariaLabel="Fatura de destino"
             fullWidth
@@ -193,7 +193,7 @@ export function FileStep({
               ))}
             </Select>
           ) : null}
-          <p className="text-xs text-muted">
+          <p className="text-mini text-muted">
             {invoiceMode === 'date'
               ? `Cada compra entra na fatura da sua data (fechamento no dia ${card.closingDay}).`
               : 'Todos os lançamentos entram na fatura escolhida — ideal para o arquivo da fatura exportado pelo banco.'}
@@ -202,12 +202,12 @@ export function FileStep({
       ) : null}
 
       {error ? (
-        <div role="alert" className="rounded-md border border-danger/25 bg-danger-soft/60 px-4 py-3 text-sm text-danger">
+        <div role="alert" className="rounded-md border border-danger/25 bg-danger-soft/60 px-4 py-3 text-body-sm text-danger">
           {error}
         </div>
       ) : null}
 
-      <div className="rounded-lg bg-surface-muted px-4 py-3.5 text-xs leading-relaxed text-muted">
+      <div className="rounded-lg bg-surface-muted px-4 py-3.5 text-mini leading-relaxed text-muted">
         <p className="flex items-center gap-1.5 font-semibold text-fg">
           <ShieldCheck className="size-4 text-success" /> Como funciona
         </p>

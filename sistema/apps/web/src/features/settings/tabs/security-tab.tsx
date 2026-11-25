@@ -114,7 +114,7 @@ function TwoFactorCard() {
         action={enabled ? <Badge tone="success" size="md"><ShieldCheck /> Ativa</Badge> : <Badge tone="neutral" size="md">Desativada</Badge>}
       />
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface-muted px-4 py-3">
-        <p className="max-w-lg text-[13px] text-muted">
+        <p className="max-w-lg text-caption text-muted">
           {enabled && mfaRequired
             ? 'Obrigatória neste escritório: sua conta pede o código do aplicativo a cada novo login. Trocou de celular? Cadastre o novo aqui.'
             : enabled
@@ -280,7 +280,7 @@ function MfaSetupSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o
                 onChange={(e) => setPassword(e.target.value)}
               />
               {passwordError ? (
-                <p role="alert" className="text-xs font-medium text-danger">
+                <p role="alert" className="text-mini font-medium text-danger">
                   {passwordError}
                 </p>
               ) : null}
@@ -290,7 +290,7 @@ function MfaSetupSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o
             <div className="mt-3 flex max-w-xs flex-col gap-1.5">
               <CodeInput value={code} onChange={setCode} onComplete={(v) => void confirm(v)} invalid={!!codeError} disabled={enable.isPending} />
               {codeError ? (
-                <p role="alert" className="text-xs font-medium text-danger">
+                <p role="alert" className="text-mini font-medium text-danger">
                   {codeError}
                 </p>
               ) : null}
@@ -464,11 +464,11 @@ function SessionsCard() {
                     <Icon className="size-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                    <p className="flex flex-wrap items-center gap-2 text-body-sm font-semibold">
                       {device.label}
                       {s.current ? <Badge tone="success">Este dispositivo</Badge> : null}
                     </p>
-                    <p className="text-xs text-muted">
+                    <p className="text-mini text-muted">
                       {s.ip ? `${s.ip} · ` : ''}
                       {s.current ? 'Ativa agora' : `Último uso ${formatRelative(s.lastUsedAt)}`} · desde {formatDateTime(s.createdAt)}
                     </p>
@@ -509,7 +509,7 @@ function LogoutCard() {
   return (
     <Card className="flex flex-wrap items-center justify-between gap-4 p-6">
       <div>
-        <h2 className="text-[15px] font-semibold">Sair da conta</h2>
+        <h2 className="text-title-sm font-semibold">Sair da conta</h2>
       </div>
       <Button
         variant="danger-soft"

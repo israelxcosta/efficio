@@ -321,7 +321,7 @@ export function ClientSheet({
             </Button>
           </div>
           {e.document?.message ? (
-            <p id="client-document-help" role="alert" className="text-xs font-medium text-danger">
+            <p id="client-document-help" role="alert" className="text-mini font-medium text-danger">
               {e.document.message}
             </p>
           ) : (
@@ -334,7 +334,7 @@ export function ClientSheet({
         {imported ? (
           <div
             className={cn(
-              'flex flex-col gap-2 rounded-lg border p-3 text-[13px]',
+              'flex flex-col gap-2 rounded-lg border p-3 text-caption',
               situationOk
                 ? 'border-brand-200 bg-brand-50 text-fg'
                 : 'border-warning/30 bg-warning-soft text-fg',
@@ -366,7 +366,7 @@ export function ClientSheet({
                   <button
                     key={`${p.name}-${p.role}`}
                     type="button"
-                    className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium hover:border-brand-300 hover:text-brand-text"
+                    className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-mini font-medium hover:border-brand-300 hover:text-brand-text"
                     title={`Usar ${p.name} como responsável`}
                     onClick={() => setValue('responsibleName', p.name, { shouldDirty: true })}
                   >
@@ -605,7 +605,7 @@ export function ClientSheet({
               )}
             />
             {e.documents?.message ? (
-              <p className="text-xs font-medium text-danger">{e.documents.message}</p>
+              <p className="text-mini font-medium text-danger">{e.documents.message}</p>
             ) : null}
           </>
         ) : null}

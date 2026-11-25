@@ -88,7 +88,7 @@ export function SegmentedControl<T extends string>({
             className={cn(
               'inline-flex items-center justify-center gap-1.5 font-semibold whitespace-nowrap transition-colors duration-150 [&_svg]:size-4',
               fullWidth && 'flex-1',
-              size === 'sm' ? 'h-7 rounded-[8px] px-2.5 text-xs' : 'h-9 rounded-[10px] px-3.5 text-[13px]',
+              size === 'sm' ? 'h-7 rounded-[8px] px-2.5 text-mini' : 'h-9 rounded-[10px] px-3.5 text-caption',
               variant === 'card' && 'h-12 rounded-lg text-[15px]',
               active
                 ? (opt.activeClassName ??

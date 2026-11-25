@@ -210,7 +210,7 @@ export function DebtorsWidget({ alert }: WidgetProps) {
           >
             <span className="flex min-w-0 items-baseline gap-1 [grid-area:name]" title={displayCompanyName(debtor.name)}>
               <span className="shrink-0 text-micro text-subtle tabular">{i + 1}.</span>
-              <span className={cn('truncate text-[12px] font-semibold', debtor.contactId ? 'text-fg' : 'text-muted')}>{displayCompanyName(debtor.name)}</span>
+              <span className={cn('truncate text-mini font-semibold', debtor.contactId ? 'text-fg' : 'text-muted')}>{displayCompanyName(debtor.name)}</span>
             </span>
             <span className="flex items-baseline justify-end gap-2 [grid-area:value]">
               <span className="text-micro text-muted tabular">{shares[i]?.pct ?? 0}%</span>

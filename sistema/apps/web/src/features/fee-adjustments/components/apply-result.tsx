@@ -29,11 +29,11 @@ export function ApplyResult({ result, onClose }: { result: FeeAdjustmentApplyRes
             {title}
           </h2>
           {adjustment ? (
-            <p className="mt-0.5 text-sm text-muted tabular">
+            <p className="mt-0.5 text-body-sm text-muted tabular">
               {formatBps(adjustment.appliedBps)} ({batchIndexLabel(adjustment)}) · vigências de {monthInSentence(formatMonthKey(adjustment.month))} · honorários de {formatBRL(before)} → {formatBRL(after)} por mês
             </p>
           ) : (
-            <p className="mt-0.5 text-sm text-muted">Nada foi gravado. Veja abaixo o motivo de cada cliente.</p>
+            <p className="mt-0.5 text-body-sm text-muted">Nada foi gravado. Veja abaixo o motivo de cada cliente.</p>
           )}
         </div>
         <Button variant="ghost" size="icon-sm" aria-label="Fechar o resultado" onClick={onClose}>
@@ -43,8 +43,8 @@ export function ApplyResult({ result, onClose }: { result: FeeAdjustmentApplyRes
 
       {skipped.length ? (
         <div className="mt-4 rounded-lg border border-border p-3 sm:ml-8">
-          <p className="text-[13px] font-medium text-fg">{pluralize(skipped.length, 'cliente ficou de fora', 'clientes ficaram de fora')}</p>
-          <ul className="mt-1.5 flex flex-col gap-1 text-[13px]">
+          <p className="text-caption font-medium text-fg">{pluralize(skipped.length, 'cliente ficou de fora', 'clientes ficaram de fora')}</p>
+          <ul className="mt-1.5 flex flex-col gap-1 text-caption">
             {skipped.map((s) => (
               <li key={s.clientId} className="flex flex-wrap gap-x-2">
                 <span className="font-medium text-fg">{s.name ?? 'Cliente não encontrado'}</span>

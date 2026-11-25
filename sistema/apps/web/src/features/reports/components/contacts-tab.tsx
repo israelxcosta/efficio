@@ -56,7 +56,7 @@ export function ContactsTab({ from, to }: { from: string; to: string }) {
       ) : (
         <>
           {unassigned ? (
-            <p className="flex items-start gap-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-fg">
+            <p className="flex items-start gap-2 rounded-lg border border-border bg-surface px-4 py-3 text-body-sm text-fg">
               <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
               <span>
                 {unassigned.count === 1 ? '1 lançamento' : `${unassigned.count} lançamentos`} sem contato no período ({formatBRL(unassigned.income + unassigned.expense)}) ficaram fora do
@@ -103,9 +103,9 @@ export function ContactsTab({ from, to }: { from: string; to: string }) {
 
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
+              <table className="w-full min-w-[640px] text-body-sm">
                 <thead>
-                  <tr className="border-b border-border text-left text-xs font-medium text-muted">
+                  <tr className="border-b border-border text-left text-mini font-medium text-muted">
                     <th className="px-4 py-2.5">Contato</th>
                     <th className="px-4 py-2.5 text-right">Lançamentos</th>
                     <th className="px-4 py-2.5 text-right">Receitas</th>
@@ -126,7 +126,7 @@ export function ContactsTab({ from, to }: { from: string; to: string }) {
                       >
                         <td className="px-4 py-3">
                           <span className="flex items-center gap-3">
-                            <span className="flex size-8 items-center justify-center rounded-full bg-bg-subtle text-[11px] font-semibold text-muted">{initials(i.name)}</span>
+                            <span className="flex size-8 items-center justify-center rounded-full bg-bg-subtle text-micro font-semibold text-muted">{initials(i.name)}</span>
                             <span className="font-semibold">{i.name}</span>
                           </span>
                         </td>

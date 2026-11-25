@@ -75,7 +75,7 @@ export function RepeatFieldView({ on, onToggle, form, onForm, start, today, erro
           ]}
           className={cn('self-start', locked && 'opacity-60')}
         />
-        {disabledReason || hint ? <p className="text-xs text-muted">{disabledReason ?? hint}</p> : null}
+        {disabledReason || hint ? <p className="text-mini text-muted">{disabledReason ?? hint}</p> : null}
       </div>
       {on ? (
         <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
@@ -92,7 +92,7 @@ export function RepeatFieldView({ on, onToggle, form, onForm, start, today, erro
             {hasInterval(f) ? <IntervalField form={form} disabled={locked} error={errors.interval} onChange={(v) => set('interval', v)} /> : null}
           </div>
           {errors.interval ? (
-            <p role="alert" className="-mt-1 text-xs font-medium text-danger">
+            <p role="alert" className="-mt-1 text-mini font-medium text-danger">
               {errors.interval}
             </p>
           ) : null}
@@ -122,15 +122,15 @@ export function RepeatFieldView({ on, onToggle, form, onForm, start, today, erro
                 </Field>
               ) : null}
               {isAnchored(f) && f !== 'annual' ? (
-                <p className="text-xs text-muted sm:col-span-2">{dueRuleHint({ period: f, dueDay: Number(form.dueDay) || 1, dueMonth: Number(form.dueMonth) || 1 })}</p>
+                <p className="text-mini text-muted sm:col-span-2">{dueRuleHint({ period: f, dueDay: Number(form.dueDay) || 1, dueMonth: Number(form.dueMonth) || 1 })}</p>
               ) : null}
             </div>
           ) : null}
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-fg">Dia não útil</span>
+            <span className="text-caption font-medium text-fg">Dia não útil</span>
             {isDayBased(f) ? (
-              <label className="flex items-center gap-2 text-[13px] text-fg">
+              <label className="flex items-center gap-2 text-caption text-fg">
                 <Switch checked={form.skipNonBusiness} disabled={locked} onCheckedChange={(v) => set('skipNonBusiness', v)} aria-label="Só em dias úteis" />
                 Só em dias úteis
               </label>
@@ -171,7 +171,7 @@ function IntervalField({ form, disabled, error, onChange }: { form: RepeatForm; 
   const n = Number(form.interval);
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-[13px] font-medium text-fg">
+      <label htmlFor={id} className="text-caption font-medium text-fg">
         A cada
       </label>
       <div className="flex h-10 items-center gap-2">
@@ -197,7 +197,7 @@ function WeekdaysField({ value, disabled, error, onChange }: { value: number[]; 
   const set = new Set(value);
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-medium text-fg">Dias da semana</span>
+      <span className="text-caption font-medium text-fg">Dias da semana</span>
       <div className="grid grid-cols-7 gap-1.5 sm:flex">
         {WEEKDAY_LETTERS.map(([day, letter]) => {
           const pressed = set.has(day);
@@ -210,7 +210,7 @@ function WeekdaysField({ value, disabled, error, onChange }: { value: number[]; 
               disabled={disabled}
               onClick={() => onChange(pressed ? value.filter((d) => d !== day) : [...value, day].sort((a, b) => a - b))}
               className={cn(
-                'flex h-9 items-center justify-center rounded-[10px] text-[13px] font-semibold transition-colors duration-150 disabled:opacity-60 sm:w-9 pointer-coarse:h-10 sm:pointer-coarse:w-10',
+                'flex h-9 items-center justify-center rounded-[10px] text-caption font-semibold transition-colors duration-150 disabled:opacity-60 sm:w-9 pointer-coarse:h-10 sm:pointer-coarse:w-10',
                 pressed ? 'bg-primary-soft text-primary-soft-fg' : 'text-muted ring-1 ring-border hover:text-fg',
               )}
             >
@@ -220,7 +220,7 @@ function WeekdaysField({ value, disabled, error, onChange }: { value: number[]; 
         })}
       </div>
       {error ? (
-        <p role="alert" className="text-xs font-medium text-danger">
+        <p role="alert" className="text-mini font-medium text-danger">
           {error}
         </p>
       ) : null}
@@ -233,7 +233,7 @@ function EndsField({ form, disabled, errors, onForm }: { form: RepeatForm; disab
   const error = form.ends === 'date' ? errors.endDate : form.ends === 'count' ? errors.count : undefined;
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-medium text-fg">Termina</span>
+      <span className="text-caption font-medium text-fg">Termina</span>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <SegmentedControl<RepeatForm['ends']>
           size="sm"
@@ -278,7 +278,7 @@ function EndsField({ form, disabled, errors, onForm }: { form: RepeatForm; disab
         ) : null}
       </div>
       {error ? (
-        <p role="alert" className="text-xs font-medium text-danger">
+        <p role="alert" className="text-mini font-medium text-danger">
           {error}
         </p>
       ) : null}

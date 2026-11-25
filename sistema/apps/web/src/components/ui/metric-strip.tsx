@@ -81,7 +81,8 @@ function MetricCellView({ cell }: { cell: MetricCell }) {
         />
       ) : null}
       <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-1.5 text-caption font-medium text-muted @[560px]:col-span-2">
-        <span className="truncate">{cell.label}</span>
+        {/* Never cut: a long label wraps (the cells of a row keep one height). */}
+        <span className="min-w-0 text-pretty">{cell.label}</span>
         {cell.info ? (
           <Tooltip content={cell.info}>
             <span tabIndex={0} role="img" aria-label={cell.info} className="relative z-10 shrink-0 rounded-sm text-subtle hover:text-muted">
@@ -95,7 +96,7 @@ function MetricCellView({ cell }: { cell: MetricCell }) {
         className={cn(
           'tabular col-start-2 row-span-2 row-start-1 self-center text-right text-[20px] leading-tight font-semibold tracking-tight whitespace-nowrap',
           '@[560px]:col-start-1 @[560px]:row-span-1 @[560px]:row-start-2 @[560px]:mt-1 @[560px]:self-end @[560px]:text-left @[560px]:text-kpi',
-          cell.hero && '@[1000px]:text-[32px] @[1000px]:leading-[38px]',
+          cell.hero && '@[1000px]:text-display',
           cell.tone ? VALUE_TONE[cell.tone] : 'text-fg',
         )}
       >
@@ -108,7 +109,7 @@ function MetricCellView({ cell }: { cell: MetricCell }) {
       ) : null}
       <div
         title={cell.footerTitle}
-        className="col-start-1 row-start-2 mt-0.5 min-w-0 truncate text-caption text-muted @[560px]:col-span-2 @[560px]:row-start-3 @[560px]:mt-1.5 [&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-10"
+        className="col-start-1 row-start-2 mt-0.5 line-clamp-2 min-w-0 text-caption text-pretty text-muted @[560px]:col-span-2 @[560px]:row-start-3 @[560px]:mt-1.5 [&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-10"
       >
         {cell.loading ? <Skeleton className="h-3.5 w-28" /> : (cell.footer ?? '\u00a0')}
       </div>

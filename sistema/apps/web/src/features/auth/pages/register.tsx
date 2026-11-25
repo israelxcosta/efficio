@@ -85,7 +85,7 @@ export default function RegisterPage() {
       }
     >
       {closed ? (
-        <div role="alert" className="mb-4 flex flex-col gap-1 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3.5 text-sm">
+        <div role="alert" className="mb-4 flex flex-col gap-1 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3.5 text-body-sm">
           <p className="font-semibold text-warning">{SIGNUP_DISABLED_MESSAGE}</p>
           <p className="text-muted">Abra o link do convite que você recebeu por e-mail ou peça um convite ao escritório.</p>
         </div>
@@ -109,7 +109,7 @@ export default function RegisterPage() {
           <PasswordChecklist value={form.watch('password') ?? ''} />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-snug text-muted">
+          <label className="flex cursor-pointer items-start gap-2.5 text-caption leading-snug text-muted">
             <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--app-primary)]" {...form.register('acceptTerms')} />
             <span>
               Li e aceito os{' '}
@@ -124,7 +124,7 @@ export default function RegisterPage() {
             </span>
           </label>
           {form.formState.errors.acceptTerms ? (
-            <p className="text-xs text-danger">{form.formState.errors.acceptTerms.message}</p>
+            <p className="text-mini text-danger">{form.formState.errors.acceptTerms.message}</p>
           ) : null}
         </div>
         <Button type="submit" size="lg" className="mt-2 w-full" loading={form.formState.isSubmitting} disabled={closed}>

@@ -112,7 +112,7 @@ export function PeriodFilter({ value, activeMonth, onChange, onMonthChange }: Pe
             className="h-10 w-[150px]"
             aria-label="De"
           />
-          <span className="text-xs text-muted">até</span>
+          <span className="text-mini text-muted">até</span>
           <Input
             type="date"
             value={to}
@@ -122,7 +122,7 @@ export function PeriodFilter({ value, activeMonth, onChange, onMonthChange }: Pe
           />
         </div>
       ) : (
-        <span className="text-xs text-muted">
+        <span className="text-mini text-muted">
           {formatDateBR(from)} – {formatDateBR(to)}
         </span>
       )}
@@ -150,7 +150,7 @@ function Stepper({
         <ChevronLeft />
       </Button>
       <span
-        className="min-w-[120px] px-1 text-center text-[13px] font-semibold text-fg tabular"
+        className="min-w-[120px] px-1 text-center text-caption font-semibold text-fg tabular"
         aria-live="polite"
       >
         {label}

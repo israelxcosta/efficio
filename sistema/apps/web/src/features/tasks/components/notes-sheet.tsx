@@ -45,7 +45,7 @@ export function NotesSheet({ open, onOpenChange, onOpenNote }: { open: boolean; 
           {(notes.data?.length ?? 0) > 10 ? (
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar anotação" aria-label="Buscar anotação" className="h-9 pl-9 text-[13px]" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar anotação" aria-label="Buscar anotação" className="h-9 pl-9 text-caption" />
             </div>
           ) : (
             <span className="flex-1" />
@@ -78,7 +78,7 @@ export function NotesSheet({ open, onOpenChange, onOpenNote }: { open: boolean; 
           {list.map((n) => (
             <li key={n.id}>
               <button type="button" onClick={() => onOpenNote(n)} className="flex min-h-14 w-full flex-col justify-center rounded-lg px-2 py-2 text-left hover:bg-surface-muted">
-                <span className="truncate text-sm font-semibold text-fg">{n.title}</span>
+                <span className="truncate text-body-sm font-semibold text-fg">{n.title}</span>
                 {n.content ? <span className="truncate text-body-sm text-muted">{n.content.split('\n')[0]}</span> : null}
                 <span className="text-caption text-subtle">editada {formatRelative(n.updatedAt)}</span>
               </button>

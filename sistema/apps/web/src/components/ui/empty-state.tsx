@@ -39,8 +39,8 @@ export function EmptyState({ icon, title, description, action, className, compac
           {icon}
         </div>
       ) : null}
-      <p className="text-sm font-semibold text-fg">{title}</p>
-      {description ? <p className="max-w-sm text-xs leading-relaxed text-muted">{description}</p> : null}
+      <p className="text-body-sm font-semibold text-fg">{title}</p>
+      {description ? <p className="max-w-sm text-mini leading-relaxed text-muted">{description}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}
     </div>
   );

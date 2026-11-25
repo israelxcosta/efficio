@@ -89,10 +89,10 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
                 { label: 'Variáveis', value: o.variableExpense, color: 'var(--app-chart-3)' },
               ].map((row) => (
                 <div key={row.label}>
-                  <div className="flex justify-between text-[13px]">
+                  <div className="flex justify-between text-caption">
                     <span className="font-medium">{row.label}</span>
                     <span className="tabular font-semibold">
-                      {formatBRL(row.value)} <span className="text-xs font-normal text-muted">· {formatPercent(totalSplit ? row.value / totalSplit : 0, 0)}</span>
+                      {formatBRL(row.value)} <span className="text-mini font-normal text-muted">· {formatPercent(totalSplit ? row.value / totalSplit : 0, 0)}</span>
                     </span>
                   </div>
                   <ProgressBar value={totalSplit ? row.value / totalSplit : 0} color={row.color} className="mt-1.5" />
@@ -102,10 +102,10 @@ export function OverviewTab({ from, to }: { from: string; to: string }) {
                 <p className="eyebrow mb-2 text-muted">Formas de pagamento</p>
                 <ul className="flex flex-col gap-1.5">
                   {o.byPaymentMethod.map((m) => (
-                    <li key={m.label} className="flex items-center justify-between text-[13px]">
+                    <li key={m.label} className="flex items-center justify-between text-caption">
                       <span>{m.label}</span>
                       <span className="tabular font-semibold">
-                        {formatBRL(m.amount)} <span className="text-xs font-normal text-muted">· {formatPercent(m.share, 0)}</span>
+                        {formatBRL(m.amount)} <span className="text-mini font-normal text-muted">· {formatPercent(m.share, 0)}</span>
                       </span>
                     </li>
                   ))}

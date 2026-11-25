@@ -182,7 +182,7 @@ export default function ImportWizard({ open, onOpenChange, initialTarget }: Impo
       </>
     ) : (
       <>
-        <p className="mr-auto hidden min-w-0 truncate text-xs text-muted sm:block" aria-live="polite">
+        <p className="mr-auto hidden min-w-0 truncate text-mini text-muted sm:block" aria-live="polite">
           <span className="font-semibold text-fg">{selectedRows.length}</span> {selectedRows.length === 1 ? 'selecionado' : 'selecionados'}
           {income ? <span className="tabular text-success"> · +{formatBRL(income)}</span> : null}
           {expense ? <span className="tabular text-danger"> · −{formatBRL(expense)}</span> : null}
@@ -217,7 +217,7 @@ export default function ImportWizard({ open, onOpenChange, initialTarget }: Impo
             : 'Confira os lançamentos, ajuste as categorias e desmarque o que não quiser importar.'
       }
       headerExtra={
-        <ol className="flex items-center gap-2 text-xs font-semibold" aria-label="Etapas da importação">
+        <ol className="flex items-center gap-2 text-mini font-semibold" aria-label="Etapas da importação">
           {steps.map((s, i) => {
             const currentIndex = steps.findIndex((x) => x.id === step);
             const state = i < currentIndex ? 'done' : i === currentIndex ? 'current' : 'todo';
@@ -226,7 +226,7 @@ export default function ImportWizard({ open, onOpenChange, initialTarget }: Impo
                 {i > 0 ? <span className="h-px w-5 bg-border-strong" aria-hidden /> : null}
                 <span
                   className={cn(
-                    'flex size-5 items-center justify-center rounded-full text-[11px]',
+                    'flex size-5 items-center justify-center rounded-full text-micro',
                     state === 'current' ? 'bg-primary text-primary-fg' : state === 'done' ? 'bg-primary-soft text-primary-soft-fg' : 'bg-bg-subtle text-muted',
                   )}
                 >

@@ -110,11 +110,11 @@ export function DepartmentSheet({
         </Field>
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-[13px] font-medium text-fg">
+            <span className="flex items-center gap-1.5 text-caption font-medium text-fg">
               Membros
               <HelpTip>Cada pessoa fica em um departamento: marcar aqui tira a pessoa do departamento atual.</HelpTip>
             </span>
-            <span className="tabular text-xs text-muted">{chosen.size} marcados</span>
+            <span className="tabular text-mini text-muted">{chosen.size} marcados</span>
           </div>
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
@@ -141,9 +141,9 @@ export function DepartmentSheet({
                     />
                     <MemberAvatar name={m.name} userId={m.id} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-fg">{m.name}</span>
+                      <span className="block truncate text-body-sm text-fg">{m.name}</span>
                       {elsewhere ? (
-                        <span className={cn('block text-xs', checked ? 'text-warning' : 'text-muted')}>
+                        <span className={cn('block text-mini', checked ? 'text-warning' : 'text-muted')}>
                           {checked ? `sai de ${elsewhere}` : `está em ${elsewhere}`}
                         </span>
                       ) : null}
@@ -152,7 +152,7 @@ export function DepartmentSheet({
                 </li>
               );
             })}
-            {list.length === 0 ? <li className="px-3 py-4 text-center text-sm text-muted">Ninguém com esse nome</li> : null}
+            {list.length === 0 ? <li className="px-3 py-4 text-center text-body-sm text-muted">Ninguém com esse nome</li> : null}
           </ul>
         </div>
       </div>
@@ -171,7 +171,7 @@ export function ReworkField({ checked, onChange }: { checked: boolean; onChange:
     <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-3">
       <Checkbox id={id} checked={checked} onCheckedChange={onChange} aria-describedby={`${id}-help`} className="mt-px" />
       <div className="min-w-0">
-        <label htmlFor={id} className="block cursor-pointer text-[13px] font-medium text-fg">
+        <label htmlFor={id} className="block cursor-pointer text-caption font-medium text-fg">
           Conta como retrabalho
         </label>
         <p id={`${id}-help`} className="mt-0.5 text-caption text-muted">
@@ -263,10 +263,10 @@ export function TaskCategorySheet({
         </Field>
         <ReworkField checked={isRework} onChange={setIsRework} />
         <div className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-fg">Prévia</span>
+          <span className="text-caption font-medium text-fg">Prévia</span>
           <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
             <CategoryIcon tinted icon={icon} color={color} />
-            <span className="min-w-0 truncate text-sm font-semibold text-fg">{name.trim() || 'Nova categoria'}</span>
+            <span className="min-w-0 truncate text-body-sm font-semibold text-fg">{name.trim() || 'Nova categoria'}</span>
             {isRework ? <ReworkBadge /> : null}
           </div>
         </div>

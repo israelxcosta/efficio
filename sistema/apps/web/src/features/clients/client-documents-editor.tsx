@@ -123,7 +123,7 @@ export function ClientDocumentsEditor({
                 </Field>
                 <div className={cn('flex items-center justify-between gap-2 sm:justify-end', i === 0 && 'sm:pt-[26px]')}>
                   {status && (status.bucket === 'overdue' || status.bucket === 'within30') ? (
-                    <span className={cn('text-xs sm:hidden', deadlineClass(status))}>{deadlineLabel(status)}</span>
+                    <span className={cn('text-mini sm:hidden', deadlineClass(status))}>{deadlineLabel(status)}</span>
                   ) : (
                     <span className="sm:hidden" />
                   )}
@@ -134,7 +134,7 @@ export function ClientDocumentsEditor({
                   ) : null}
                 </div>
                 {status && (status.bucket === 'overdue' || status.bucket === 'within30') ? (
-                  <p className={cn('-mt-1 hidden text-xs sm:col-start-2 sm:block', deadlineClass(status))}>{deadlineLabel(status)}</p>
+                  <p className={cn('-mt-1 hidden text-mini sm:col-start-2 sm:block', deadlineClass(status))}>{deadlineLabel(status)}</p>
                 ) : null}
               </li>
             );

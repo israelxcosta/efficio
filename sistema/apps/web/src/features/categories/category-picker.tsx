@@ -170,19 +170,19 @@ export function CategoryPicker({
                 aria-controls={listId}
                 aria-activedescendant={flat[active] ? `${listId}-${active}` : undefined}
                 aria-label="Buscar categoria"
-                className="h-11 min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-subtle"
+                className="h-11 min-w-0 flex-1 bg-transparent text-body-sm text-fg outline-none placeholder:text-subtle"
               />
             </label>
             <div ref={listRef} id={listId} role="listbox" aria-label="Categorias" className="scrollbar-thin max-h-[min(320px,var(--radix-popover-content-available-height))] overflow-y-auto p-1.5">
               {categories.isPending ? (
-                <p className="px-3 py-6 text-center text-sm text-muted">Carregando…</p>
+                <p className="px-3 py-6 text-center text-body-sm text-muted">Carregando…</p>
               ) : filtered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-muted">Nenhuma categoria encontrada</p>
+                <p className="px-3 py-6 text-center text-body-sm text-muted">Nenhuma categoria encontrada</p>
               ) : (
                 filtered.map((g, gi) => (
                   <div key={g.key} role="group" aria-label={g.label ?? 'Outras categorias'} className={cn(gi > 0 && 'mt-1 border-t border-border pt-1')}>
                     {g.label ? (
-                      <p className="px-3 pt-2 pb-1 text-[12px] font-medium text-subtle">{g.label}</p>
+                      <p className="px-3 pt-2 pb-1 text-mini font-medium text-subtle">{g.label}</p>
                     ) : null}
                     {g.items.map((item) => {
                       index += 1;
@@ -199,7 +199,7 @@ export function CategoryPicker({
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => choose(item)}
                           className={cn(
-                            'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg transition-colors',
+                            'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-body-sm text-fg transition-colors',
                             i === active && 'bg-bg-subtle',
                           )}
                         >
@@ -227,7 +227,7 @@ export function CategoryPicker({
                   setOpen(false);
                   setSheet({ open: true, type, category: null, parent: null });
                 }}
-                className="flex items-center gap-2 border-t border-border px-4 py-3 text-sm font-semibold text-brand-text transition-colors hover:bg-bg-subtle"
+                className="flex items-center gap-2 border-t border-border px-4 py-3 text-body-sm font-semibold text-brand-text transition-colors hover:bg-bg-subtle"
               >
                 <Plus className="size-4" /> Nova categoria
               </button>

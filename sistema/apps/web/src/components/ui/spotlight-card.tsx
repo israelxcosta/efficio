@@ -46,13 +46,13 @@ export function SpotlightCard({ label, badge, value, title, caption, to, onClick
       </span>
       <span className="mt-1.5 flex items-end justify-between gap-2">
         {value !== undefined ? (
-          <span className="tabular text-[28px] leading-[1.1] font-bold tracking-tight">{value}</span>
+          <span className="tabular text-display font-semibold tracking-tight">{value}</span>
         ) : (
-          <span className="text-[15px] leading-snug font-semibold">{title}</span>
+          <span className="text-title-sm font-semibold">{title}</span>
         )}
         {to || onClick ? <ChevronRight className="mb-1 size-4 shrink-0 text-hero-accent transition-transform group-hover/spot:translate-x-0.5" aria-hidden /> : null}
       </span>
-      {caption ? <span className="mt-1 line-clamp-1 text-mini text-hero-accent" title={typeof caption === 'string' ? caption : undefined}>{caption}</span> : null}
+      {caption ? <span className="mt-1 line-clamp-2 text-caption text-pretty text-hero-accent" title={typeof caption === 'string' ? caption : undefined}>{caption}</span> : null}
     </>
   );
   const interactive = cn(base, 'group/spot transition-colors hover:bg-hero-from/92 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary');

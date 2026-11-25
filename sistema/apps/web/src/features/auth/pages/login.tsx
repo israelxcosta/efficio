@@ -101,7 +101,7 @@ export default function LoginPage() {
       footer={<LoginFooter state={location.state} fromInvite={from.startsWith('/convite')} />}
     >
       {IS_DEMO ? (
-        <p className="mb-4 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-[13px] text-fg">
+        <p className="mb-4 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-caption text-fg">
           <strong className="font-semibold">Ambiente de testes.</strong> A conta de demonstração já está
           preenchida — é só clicar em Entrar.
         </p>
@@ -114,7 +114,7 @@ export default function LoginPage() {
           label="Senha"
           error={form.formState.errors.password?.message}
           aside={
-            <Link to="/esqueci-senha" className="text-xs font-semibold text-brand-text hover:underline">
+            <Link to="/esqueci-senha" className="text-mini font-semibold text-brand-text hover:underline">
               Esqueci minha senha
             </Link>
           }
@@ -188,7 +188,7 @@ function MfaStep({ mfaToken, onDone, onBack }: { mfaToken: string; onDone: (me: 
           <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary-soft text-primary-soft-fg">
             <ShieldCheck className="size-4" />
           </span>
-          <p className="text-[13px] text-muted">Sua conta está protegida com um segundo fator.</p>
+          <p className="text-caption text-muted">Sua conta está protegida com um segundo fator.</p>
         </div>
         {recovery ? (
           <Field label="Código de recuperação" error={error ?? undefined}>
@@ -205,7 +205,7 @@ function MfaStep({ mfaToken, onDone, onBack }: { mfaToken: string; onDone: (me: 
           <div className="flex flex-col gap-1.5">
             <CodeInput value={code} onChange={setCode} onComplete={(v) => void submit(v)} autoFocus invalid={!!error} disabled={submitting} />
             {error ? (
-              <p role="alert" className="text-xs font-medium text-danger">
+              <p role="alert" className="text-mini font-medium text-danger">
                 {error}
               </p>
             ) : null}
@@ -216,7 +216,7 @@ function MfaStep({ mfaToken, onDone, onBack }: { mfaToken: string; onDone: (me: 
         </Button>
         <button
           type="button"
-          className="text-center text-[13px] font-semibold text-brand-text hover:underline"
+          className="text-center text-caption font-semibold text-brand-text hover:underline"
           onClick={() => {
             setRecovery((r) => !r);
             setCode('');

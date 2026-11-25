@@ -44,11 +44,11 @@ export default function ForgotPasswordPage() {
           <span className="flex size-11 items-center justify-center rounded-full bg-primary-soft text-primary-soft-fg">
             <MailCheck className="size-5" />
           </span>
-          <p className="text-sm text-fg">
+          <p className="text-body-sm text-fg">
             Se <strong className="font-semibold">{sentTo}</strong> estiver cadastrado, você receberá um link para criar uma
             nova senha. O link vale por 30 minutos e só pode ser usado uma vez.
           </p>
-          <p className="text-xs text-muted">Não chegou? Confira a caixa de spam ou tente de novo em alguns minutos.</p>
+          <p className="text-mini text-muted">Não chegou? Confira a caixa de spam ou tente de novo em alguns minutos.</p>
           <Button variant="outline" size="sm" className="mt-1" onClick={() => setSentTo(null)}>
             Usar outro e-mail
           </Button>

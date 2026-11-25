@@ -181,7 +181,7 @@ export function isLate(tx: Pick<Transaction, 'paid' | 'overdue' | 'date' | 'cred
 export function DueLabel({ tx, beside = false }: { tx: Transaction; beside?: boolean }) {
   if (tx.creditCardId && tx.type !== 'transfer') {
     return (
-      <span className="text-xs text-muted">
+      <span className="text-mini text-muted">
         {tx.paid ? 'Fatura paga' : tx.invoiceMonth ? `Fatura ${formatMonthKey(tx.invoiceMonth, 'short')}` : 'No cartão'}
       </span>
     );
@@ -189,13 +189,13 @@ export function DueLabel({ tx, beside = false }: { tx: Transaction; beside?: boo
   if (tx.paid) {
     const verb = tx.type === 'income' ? 'Recebido' : tx.type === 'transfer' ? 'Efetivada' : 'Pago';
     const when = !tx.paidAt ? '' : !beside ? ` em ${shortDate(tx.paidAt)}` : tx.paidAt === tx.date ? ' no vencimento' : ` em ${formatDateBR(tx.paidAt)}`;
-    return <span className="text-xs text-muted">{verb}{when}</span>;
+    return <span className="text-mini text-muted">{verb}{when}</span>;
   }
   const days = diffInDays(tx.date, todayISO());
-  if (isLate(tx)) return <span className="text-xs font-semibold text-danger">Venceu há {daysText(Math.abs(days))}</span>;
-  if (days === 0) return <span className="text-xs font-semibold text-warning">Vence hoje</span>;
-  if (days <= 5) return <span className="text-xs font-medium text-warning">Vence em {daysText(days)}</span>;
-  return <span className="text-xs text-muted">Vence em {beside ? daysText(days) : shortDate(tx.date)}</span>;
+  if (isLate(tx)) return <span className="text-mini font-semibold text-danger">Venceu há {daysText(Math.abs(days))}</span>;
+  if (days === 0) return <span className="text-mini font-semibold text-warning">Vence hoje</span>;
+  if (days <= 5) return <span className="text-mini font-medium text-warning">Vence em {daysText(days)}</span>;
+  return <span className="text-mini text-muted">Vence em {beside ? daysText(days) : shortDate(tx.date)}</span>;
 }
 
 export function TxIcon({ tx, size = 'md' }: { tx: Transaction; size?: 'sm' | 'md' }) {
@@ -208,7 +208,7 @@ export function TxIcon({ tx, size = 'md' }: { tx: Transaction; size?: 'sm' | 'md
 export function SourceLabel({ tx }: { tx: Transaction }) {
   if (tx.creditCard) {
     return (
-      <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
+      <span className="flex min-w-0 items-center gap-1.5 text-mini text-muted">
         <BankLogo bank={tx.creditCard.bank} size="xs" />
         <span className="truncate">{tx.creditCard.name}</span>
         {tx.invoiceMonth ? <span className="shrink-0 text-subtle">· fatura {formatMonthKey(tx.invoiceMonth, 'short')}</span> : null}
@@ -217,20 +217,20 @@ export function SourceLabel({ tx }: { tx: Transaction }) {
   }
   if (tx.type === 'transfer') {
     return (
-      <span className="truncate text-xs text-muted">
+      <span className="truncate text-mini text-muted">
         {tx.account?.name ?? '—'} → {tx.toAccount?.name ?? '—'}
       </span>
     );
   }
   if (tx.account) {
     return (
-      <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
+      <span className="flex min-w-0 items-center gap-1.5 text-mini text-muted">
         <BankLogo bank={tx.account.bank} color={tx.account.color} size="xs" />
         <span className="truncate">{tx.account.name}</span>
       </span>
     );
   }
-  return <span className="text-xs text-subtle">Sem conta</span>;
+  return <span className="text-mini text-subtle">Sem conta</span>;
 }
 
 interface TransactionRowProps {
@@ -363,7 +363,7 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="min-w-[4.5rem] truncate text-sm font-semibold text-fg">{tx.description}</span>
+            <span className="min-w-[4.5rem] truncate text-body-sm font-semibold text-fg">{tx.description}</span>
             {/* Labels the description already implies (Fixa, Ref., Juros…) give way on phones. */}
             <span className="hidden shrink-0 items-center gap-1.5 @md:flex">
               <SeriesBadge tx={tx} />
@@ -375,7 +375,7 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
             <DiscountBadge tx={tx} />
             <OriginBadge tx={tx} />
           </span>
-          {detail ? <span className="mt-0.5 block truncate text-xs text-muted">{detail}</span> : null}
+          {detail ? <span className="mt-0.5 block truncate text-mini text-muted">{detail}</span> : null}
           {showDue ? (
             // Narrow rows have no date column: the due status gets its own line (compact rows up to a
             // wider width, to leave room for the description).
@@ -407,7 +407,7 @@ function TransactionFullRow({ tx, amount, trailing, showDue = true, muted, densi
       </div>
       {showDue ? (
         <div className={cn('hidden w-36 text-right', compact ? '@2xl:block' : '@xl:block')}>
-          <p className="text-[13px] font-medium text-fg tabular" title={formatDateBR(tx.date)}>
+          <p className="text-caption font-medium text-fg tabular" title={formatDateBR(tx.date)}>
             {listDate(tx.date)}
           </p>
           <DueLabel tx={tx} beside />

@@ -34,7 +34,7 @@ export function AuditRetentionCard() {
       />
       {pending ? (
         <div role="status" className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-warning-soft px-4 py-3">
-          <p className="flex max-w-lg items-start gap-2 text-[13px] text-fg">
+          <p className="flex max-w-lg items-start gap-2 text-caption text-fg">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
             <span>
               <strong className="font-semibold">{pendingNoticeText(pending)}</strong> Baixe o arquivo antes, se precisar guardá-los.
@@ -64,7 +64,7 @@ export function AuditRetentionCard() {
           <Download /> Baixar registro de auditoria
         </Button>
       </form>
-      <p className="mt-3 text-xs text-muted">O arquivo CSV traz data, ação, quem fez e o IP de cada registro do período. O download também fica registrado.</p>
+      <p className="mt-3 text-mini text-muted">O arquivo CSV traz data, ação, quem fez e o IP de cada registro do período. O download também fica registrado.</p>
     </Card>
   );
 }

@@ -146,7 +146,7 @@ export default function TaskHomePage() {
   ];
 
   return (
-    <div ref={page.ref} className="calm-text flex flex-col gap-6">
+    <div ref={page.ref} className="calm-text flex flex-col gap-5">
       {/* "Nova tarefa" lives in the bottom bar (quick actions): no button repeated up here. */}
       <PageHeader title="Início" description={updated ? `${description} · ${updated}` : description} />
 
@@ -159,7 +159,7 @@ export default function TaskHomePage() {
           </div>
         ) : null}
         <div className="flex items-center gap-2 sm:ml-auto">
-          <span className="text-caption text-muted">Competência</span>
+          <span className="text-caption text-muted max-sm:hidden">Competência</span>
           <PeriodNavigator modes={['month']} value={{ mode: 'month', anchor: `${month}-01` }} onChange={(v) => chooseMonth(monthKey(v.anchor))} />
         </div>
       </div>
@@ -372,18 +372,18 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
       aria: `Concluídas em ${month}${where}: ${done}${onTime !== null ? `, ${onTime}% no prazo` : ''}. Ver na lista de tarefas.`,
       footerTitle: doneText,
       footer: t ? (
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 items-start gap-2">
           {done > 0 ? (
             <StackBar
               size="sm"
-              className="w-12 shrink-0"
+              className="mt-1.5 w-12 shrink-0"
               segments={[
                 { value: t.doneOnTime, className: 'bg-chart-success' },
                 { value: t.doneLate, className: 'bg-chart-red' },
               ]}
             />
           ) : null}
-          <span className="tabular truncate">{doneText}</span>
+          <span className="tabular line-clamp-2 min-w-0">{doneText}</span>
         </span>
       ) : null,
       loading,

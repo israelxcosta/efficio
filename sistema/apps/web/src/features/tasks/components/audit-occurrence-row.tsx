@@ -48,7 +48,7 @@ export const AUDIT_ROW_GRID =
 export function AuditColumnsHeader({ view }: { view: AuditView }) {
   return (
     <div aria-hidden className="hidden px-1.5 @4xl:block">
-      <div className={cn('items-center gap-3 px-2 pt-2 pb-1.5 text-xs font-medium text-muted @lg:px-3', AUDIT_ROW_GRID)}>
+      <div className={cn('items-center gap-3 px-2 pt-2 pb-1.5 text-mini font-medium text-muted @lg:px-3', AUDIT_ROW_GRID)}>
         <span className="truncate pl-10">{view === 'client' ? 'Cliente' : 'Tarefa recorrente'}</span>
         <span className="hidden truncate @6xl:block">Departamento</span>
         <span className="truncate text-center">Responsável</span>
@@ -79,7 +79,7 @@ export function ProgressTrack({ done, live }: { done: number; live: number }) {
   const ratio = live ? done / live : 0;
   return (
     <span data-col="progress" className="flex w-24 shrink-0 flex-col items-end gap-1 @sm:w-28 @4xl:w-auto @4xl:min-w-0 @4xl:items-center">
-      <span className="tabular text-[13px] font-medium text-fg">
+      <span className="tabular text-caption font-medium text-fg">
         {done}/{live}
       </span>
       <span className="block h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
@@ -117,22 +117,22 @@ export function AuditClientRowView({ client, cells, today, expanded, regionId }:
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-sm font-semibold text-fg">{client.name}</span>
+            <span className="truncate text-body-sm font-semibold text-fg">{client.name}</span>
             <MonthLock client={client} today={today} />
           </span>
-          <span className="mt-0.5 block truncate text-xs text-muted">
+          <span className="mt-0.5 block truncate text-mini text-muted">
             {TAX_REGIME_LABELS[client.taxRegime]}
             {note ? <span className={cn('@4xl:hidden', DUE_TONE_CLASS[note.tone])}> · {note.text}</span> : null}
           </span>
         </span>
       </span>
       <span data-col="deadline" className="hidden min-w-0 text-center @4xl:block">
-        {next ? <span className="tabular block truncate text-[13px] font-medium text-fg">{shortDate(next, today)}</span> : null}
-        {note ? <span className={cn('block truncate text-xs', DUE_TONE_CLASS[note.tone])}>{note.text}</span> : null}
+        {next ? <span className="tabular block truncate text-caption font-medium text-fg">{shortDate(next, today)}</span> : null}
+        {note ? <span className={cn('block truncate text-mini', DUE_TONE_CLASS[note.tone])}>{note.text}</span> : null}
       </span>
       <ProgressTrack done={progress.done} live={progress.live} />
       <span data-col="concluded-at" aria-hidden className="hidden min-w-0 text-center @4xl:block">
-        {client.monthConcludedAt ? <span className="tabular block truncate text-[13px] text-fg">{concludedAtText(client.monthConcludedAt, today)}</span> : null}
+        {client.monthConcludedAt ? <span className="tabular block truncate text-caption text-fg">{concludedAtText(client.monthConcludedAt, today)}</span> : null}
       </span>
     </>
   );
@@ -222,7 +222,7 @@ export function AuditOccurrenceRowView({ lead, cell, column, client, today, cont
           type="button"
           onClick={onOpenTask}
           title={name}
-          className={cn('flex max-w-full items-center gap-1.5 rounded-sm text-left text-sm font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', canceled ? 'text-muted' : 'text-fg')}
+          className={cn('flex max-w-full items-center gap-1.5 rounded-sm text-left text-body-sm font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', canceled ? 'text-muted' : 'text-fg')}
         >
           {lead === 'client' && client.monthConcludedAt ? (
             <span role="img" aria-label="Mês concluído" className="inline-flex shrink-0 text-muted">
@@ -230,14 +230,14 @@ export function AuditOccurrenceRowView({ lead, cell, column, client, today, cont
             </span>
           ) : null}
           <span className="truncate">{name}</span>
-          {lead === 'obligation' && period ? <span className="shrink-0 text-xs font-normal text-muted">{period}</span> : null}
+          {lead === 'obligation' && period ? <span className="shrink-0 text-mini font-normal text-muted">{period}</span> : null}
         </button>
         {lead === 'client' ? (
-          <p className="hidden truncate text-xs text-muted @4xl:block">{TAX_REGIME_LABELS[client.taxRegime]}</p>
+          <p className="hidden truncate text-mini text-muted @4xl:block">{TAX_REGIME_LABELS[client.taxRegime]}</p>
         ) : (
-          <p className="hidden truncate text-xs text-muted @4xl:block @6xl:hidden">{department}</p>
+          <p className="hidden truncate text-mini text-muted @4xl:block @6xl:hidden">{department}</p>
         )}
-        <p data-col="stacked-meta" className="truncate text-xs @4xl:hidden">
+        <p data-col="stacked-meta" className="truncate text-mini @4xl:hidden">
           <span className="text-muted">{meta.text}</span>
           {meta.alert ? <span className={DUE_TONE_CLASS[meta.alert.tone]}> · {meta.alert.text}</span> : null}
         </p>
@@ -265,12 +265,12 @@ export function AuditOccurrenceRowView({ lead, cell, column, client, today, cont
       <div data-col="deadline" className="hidden min-w-0 text-center @4xl:block">
         <span className="sr-only">Prazo: </span>
         <Tooltip content={deadlineTip(cell, today)}>
-          <span tabIndex={-1} className="tabular block truncate text-[13px] font-medium text-fg">
+          <span tabIndex={-1} className="tabular block truncate text-caption font-medium text-fg">
             {shortDate(cell.targetDate, today)}
           </span>
         </Tooltip>
         {deadlineDetail ? (
-          <span title={deadlineDetail.text} className={cn('block truncate text-xs', DUE_TONE_CLASS[deadlineDetail.tone])}>
+          <span title={deadlineDetail.text} className={cn('block truncate text-mini', DUE_TONE_CLASS[deadlineDetail.tone])}>
             {deadlineDetail.text}
           </span>
         ) : null}
@@ -281,8 +281,8 @@ export function AuditOccurrenceRowView({ lead, cell, column, client, today, cont
         {control}
         {exception || delay ? (
           <span className="hidden min-w-0 @4xl:block">
-            {exception ? <span className={cn('block truncate text-[13px]', exception.className)}>{exception.text}</span> : null}
-            {delay ? <span className="block truncate text-xs font-medium text-danger">{conclusionDelayText(delay)}</span> : null}
+            {exception ? <span className={cn('block truncate text-caption', exception.className)}>{exception.text}</span> : null}
+            {delay ? <span className="block truncate text-mini font-medium text-danger">{conclusionDelayText(delay)}</span> : null}
           </span>
         ) : null}
       </div>
@@ -291,7 +291,7 @@ export function AuditOccurrenceRowView({ lead, cell, column, client, today, cont
       <div data-col="concluded-at" aria-hidden className="hidden min-w-0 text-center @6xl:block">
         {done && cell.concludedAt ? (
           <Tooltip content={dateTimeBR(cell.concludedAt)}>
-            <span tabIndex={-1} className="tabular block truncate text-[13px] text-fg">
+            <span tabIndex={-1} className="tabular block truncate text-caption text-fg">
               {concludedAtText(cell.concludedAt, today)}
             </span>
           </Tooltip>
@@ -312,8 +312,8 @@ export function AuditOccurrenceRowView({ lead, cell, column, client, today, cont
       <div data-col="conclusion" aria-hidden className="hidden min-w-0 text-center @4xl:block @6xl:hidden">
         {done ? (
           <>
-            {cell.concludedAt ? <span className="tabular block truncate text-[13px] text-fg">{concludedAtText(cell.concludedAt, today)}</span> : null}
-            {cell.concludedBy ? <span className="block truncate text-xs text-muted">{shortName(cell.concludedBy.name)}</span> : <span className="block text-xs text-subtle">—</span>}
+            {cell.concludedAt ? <span className="tabular block truncate text-caption text-fg">{concludedAtText(cell.concludedAt, today)}</span> : null}
+            {cell.concludedBy ? <span className="block truncate text-mini text-muted">{shortName(cell.concludedBy.name)}</span> : <span className="block text-mini text-subtle">—</span>}
           </>
         ) : null}
       </div>
@@ -332,7 +332,7 @@ function StackedSituation({ cell, today, delay }: { cell: OccurrenceCell; today:
   const label = 'Concluída';
   const rest = (withTime: boolean) => (cellConclusionLine(cell, today, withTime) ?? label).slice(label.length);
   return (
-    <p data-col="stacked-situation" className="flex flex-wrap items-baseline gap-x-1 text-xs @4xl:hidden">
+    <p data-col="stacked-situation" className="flex flex-wrap items-baseline gap-x-1 text-mini @4xl:hidden">
       <span className="min-w-0 truncate">
         {cell.status === 'done' ? (
           <>

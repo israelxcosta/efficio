@@ -85,7 +85,7 @@ export default function ContactsPage() {
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
             <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar por nome ou CPF/CNPJ" className="h-10 pl-9" aria-label="Buscar fornecedores" />
           </div>
-          {data ? <span className="text-xs text-muted">{data.total} fornecedor(es)</span> : null}
+          {data ? <span className="text-mini text-muted">{data.total} fornecedor(es)</span> : null}
         </div>
 
         {contacts.isPending ? (
@@ -102,9 +102,9 @@ export default function ContactsPage() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[720px] text-body-sm">
               <thead>
-                <tr className="border-b border-border text-left text-xs font-medium text-muted">
+                <tr className="border-b border-border text-left text-mini font-medium text-muted">
                   <th className="px-4 py-2.5">Nome</th>
                   <th className="px-4 py-2.5">CPF / CNPJ</th>
                   <th className="px-4 py-2.5">Contato</th>
@@ -117,14 +117,14 @@ export default function ContactsPage() {
                   <tr key={c.id} className="group border-b border-border last:border-0 hover:bg-surface-muted">
                     <td className="px-4 py-3">
                       <button type="button" className="flex items-center gap-3 text-left" onClick={() => setSheet({ open: true, contact: c })}>
-                        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg">{initials(c.name)}</span>
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-mini font-bold text-primary-soft-fg">{initials(c.name)}</span>
                         <span className="font-semibold text-fg">{c.name}</span>
                       </button>
                     </td>
                     {/* CPF masked in the list (LGPD minimization); the edit form shows it in full. */}
                     <td className="tabular px-4 py-3 text-muted">{c.document ? maskDocument(c.document) : '—'}</td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col gap-0.5 text-xs text-muted">
+                      <div className="flex flex-col gap-0.5 text-mini text-muted">
                         {c.email ? <span className="flex items-center gap-1.5"><Mail className="size-3.5" />{c.email}</span> : null}
                         {c.phone ? <span className="flex items-center gap-1.5"><Phone className="size-3.5" />{formatPhone(c.phone)}</span> : null}
                         {!c.email && !c.phone ? '—' : null}
@@ -154,7 +154,7 @@ export default function ContactsPage() {
           </div>
         )}
         {data && data.total > PAGE_SIZE ? (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-body-sm text-muted">
             <span>Página {page} de {totalPages}</span>
             <div className="flex gap-1">
               <Button variant="outline" size="icon-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Página anterior"><ChevronLeft /></Button>

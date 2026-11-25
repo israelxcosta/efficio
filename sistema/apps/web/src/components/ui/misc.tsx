@@ -9,10 +9,10 @@ import { HelpTip } from './help-tip';
 export function ErrorState({ error, onRetry, className }: { error: unknown; onRetry?: () => void; className?: string }) {
   return (
     <div className={cn('flex flex-col items-start gap-2 rounded-lg border border-danger/20 bg-danger-soft/50 p-5', className)} role="alert">
-      <div className="flex items-center gap-2 text-sm font-semibold text-danger">
+      <div className="flex items-center gap-2 text-body-sm font-semibold text-danger">
         <TriangleAlert className="size-4" /> Não consegui carregar agora
       </div>
-      <p className="text-sm text-muted">{errorMessage(error)}</p>
+      <p className="text-body-sm text-muted">{errorMessage(error)}</p>
       {onRetry ? (
         <Button variant="outline" size="sm" onClick={onRetry}>
           <RefreshCw /> Tentar novamente
@@ -43,13 +43,13 @@ export function PageHeader({ title, description, info, actions, className, actio
       <div className="min-w-0">
         {info ? (
           <div className="flex items-center gap-1.5">
-            <h1 className="text-[22px] font-semibold tracking-tight text-fg">{title}</h1>
+            <h1 className="text-title font-semibold tracking-tight text-fg">{title}</h1>
             <HelpTip label="Mais informações" side="bottom">{info}</HelpTip>
           </div>
         ) : (
-          <h1 className="text-[22px] font-semibold tracking-tight text-fg">{title}</h1>
+          <h1 className="text-title font-semibold tracking-tight text-fg">{title}</h1>
         )}
-        {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
+        {description ? <p className="mt-1 text-body-sm text-muted">{description}</p> : null}
       </div>
       {actions ? <div className={cn('flex flex-wrap items-center gap-2', actionsClassName)}>{actions}</div> : null}
     </div>
@@ -88,7 +88,7 @@ export function StatPill({ label, value, tone = 'neutral', className }: { label:
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-md px-3 py-1.5 text-[13px]',
+        'flex items-center justify-between gap-3 rounded-md px-3 py-1.5 text-caption',
         tone === 'success' && 'bg-success-soft text-success',
         tone === 'danger' && 'bg-danger-soft text-danger',
         tone === 'neutral' && 'bg-bg-subtle text-muted',

@@ -134,17 +134,17 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
             <p className="eyebrow text-muted">Honorário vigente</p>
             {current ? (
               <>
-                <p className="tabular mt-1 text-[28px] leading-tight font-bold tracking-tight text-fg">
+                <p className="tabular mt-1 text-display font-semibold tracking-tight text-fg">
                   {formatBRL(current.amount)}
-                  <span className="ml-1 text-sm font-medium text-muted">/mês</span>
+                  <span className="ml-1 text-body-sm font-medium text-muted">/mês</span>
                 </p>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-body-sm text-muted">
                   Taxa por empregado:{' '}
                   <span className="tabular font-semibold text-fg">
                     {formatBRL(current.employeeFee)}
                   </span>
                 </p>
-                <p className="mt-0.5 text-sm text-muted">
+                <p className="mt-0.5 text-body-sm text-muted">
                   {current.discountBps > 0 ? (
                     <>
                       Desconto de <span className="tabular font-semibold text-fg">{formatBps(current.discountBps)}</span> para
@@ -154,13 +154,13 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
                     'Sem desconto por pontualidade'
                   )}
                 </p>
-                <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
+                <p className="mt-2 flex items-center gap-1.5 text-mini text-muted">
                   <CalendarRange className="size-3.5" /> {ordinal(current.index)}:{' '}
                   {periodLabel(current)}
                 </p>
               </>
             ) : (
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-1 text-body-sm text-muted">
                 {latest && latest.endDate < today
                   ? `Nenhuma vigência cobre hoje: a última terminou em ${formatDateBR(latest.endDate)}. Cadastre a próxima.`
                   : latest
@@ -186,11 +186,11 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
 
           {editing ? (
             <div className="flex flex-col gap-3 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
-              <p className="text-sm font-semibold text-fg">
+              <p className="text-body-sm font-semibold text-fg">
                 {editing.fee
                   ? `Editar ${ordinal(editing.period.index)}`
                   : `Nova vigência (${ordinal(editing.period.index)})`}
-                <span className="block text-xs font-normal text-muted">
+                <span className="block text-mini font-normal text-muted">
                   {periodLabel(editing.period)}
                 </span>
               </p>
@@ -203,7 +203,7 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
                 </Field>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
-                <label htmlFor={`${discountId}-check`} className="flex cursor-pointer items-start gap-2.5 pt-1 text-sm text-fg sm:pt-7">
+                <label htmlFor={`${discountId}-check`} className="flex cursor-pointer items-start gap-2.5 pt-1 text-body-sm text-fg sm:pt-7">
                   <Checkbox
                     id={`${discountId}-check`}
                     checked={hasDiscount}
@@ -214,7 +214,7 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
                   />
                   <span>
                     Cliente tem desconto
-                    <span className="block text-xs text-muted">Para pagamento até o vencimento</span>
+                    <span className="block text-mini text-muted">Para pagamento até o vencimento</span>
                   </span>
                 </label>
                 <Field
@@ -232,7 +232,7 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
                       className="tabular pr-8"
                       aria-label="Percentual do desconto"
                     />
-                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted" aria-hidden>
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-body-sm text-muted" aria-hidden>
                       %
                     </span>
                   </div>
@@ -251,7 +251,7 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
 
           {data!.items.length === 0 ? (
             !editing ? (
-              <p className="text-sm text-muted">
+              <p className="text-body-sm text-muted">
                 Clique em + para cadastrar a primeira vigência ({periodLabel(data!.next)}).
               </p>
             ) : null
@@ -268,16 +268,16 @@ export function FeesDialog({ client, onClose }: { client: Client | null; onClose
                     )}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-2 text-sm font-semibold text-fg">
+                      <p className="flex items-center gap-2 text-body-sm font-semibold text-fg">
                         {ordinal(fee.index)} <Badge tone={status.tone}>{status.label}</Badge>
                       </p>
-                      <p className="text-xs text-muted">{periodLabel(fee)}</p>
+                      <p className="text-mini text-muted">{periodLabel(fee)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="tabular text-sm font-semibold text-fg">
+                      <p className="tabular text-body-sm font-semibold text-fg">
                         {formatBRL(fee.amount)}
                       </p>
-                      <p className="tabular text-[11px] text-muted">
+                      <p className="tabular text-micro text-muted">
                         {formatBRL(fee.employeeFee)} / empregado
                         {fee.discountBps > 0 ? ` · ${formatBps(fee.discountBps)} desc.` : ''}
                       </p>

@@ -163,16 +163,22 @@ rótulo de seção (`SectionLabel as="h2" level="section"`, `components/ui/card.
 marca no fluxo de leitura e fica acima dos cards, com **40px acima e 12px abaixo**; o título do card
 (16px / 600, `text-fg`) continua sendo o nível de título. O ganho vem do contraste de cor e de espaço.
 
-Escala compacta dos cards do dashboard (tokens `--text-*` em `index.css`, classes Tailwind):
+Escala tipográfica única do app (tokens `--text-*` em `index.css`; polimento de 25/11/2026). Telas não
+usam `text-xs`/`text-sm` crus nem tamanhos fixos em px (`text-[13px]`…): sempre um destes oito degraus.
+Documentos (contrato, cartas de reajuste), o site e a página legal têm tipografia própria.
 
-| Classe           | Tamanho | Uso                                                        |
-| ---------------- | ------- | ---------------------------------------------------------- |
-| `text-micro`     | 10px    | eixos dos gráficos, metadados de linha, notas de rodapé    |
-| `text-mini`      | 10.5px  | rótulos de categoria, contadores, selos                    |
-| `text-caption`   | 11.5px  | subtítulos de card, tooltips, links "Ver todos →"          |
-| `text-body-sm`   | 12.5px  | linhas de lista e valores secundários                      |
-| `text-title-sm`  | 14px    | título do card                                             |
-| `text-kpi`       | 22px    | um número-herói por card e a faixa de KPIs                 |
+| Classe           | Tamanho | Uso                                                                   |
+| ---------------- | ------- | --------------------------------------------------------------------- |
+| `text-micro`     | 11px    | eixos dos gráficos, notas de rodapé, contadores em selo               |
+| `text-mini`      | 12px    | metadados de linha, contadores, selos                                 |
+| `text-caption`   | 13px    | legendas, subtítulos de card, linhas de apoio, links "Ver todos →"     |
+| `text-body-sm`   | 14px    | linhas de lista, valores, controles                                   |
+| `text-title-sm`  | 16px    | título de card e de bloco, nome de item em tile                       |
+| `text-title`     | 22px    | título da página (`PageHeader`)                                       |
+| `text-kpi`       | 24px    | número de indicador (faixas, cards)                                   |
+| `text-display`   | 28px    | o número de destaque: card sólido e resumos de uma linha (semibold)   |
+
+Legendas de faixa de indicadores nunca são cortadas no rótulo e usam até duas linhas (`line-clamp-2`).
 
 Nos gráficos os textos têm tamanho fixo (`CHART_TEXT`: eixo 10px, categoria 10.5px, valor 11.5px)
 e não acompanham o tamanho do card; quem cresce é o desenho.
@@ -455,7 +461,8 @@ Revisto a pedido do dono: a coluna à direita foi **removida** (perdia espaço).
   abaixo de 1280px vai para baixo da faixa). Rótulo, chip neutro, número grande ou título curto e uma
   linha de contexto; o card inteiro é o link (ou abre a tarefa). Sem nada urgente, a frase calma no mesmo
   lugar. Onde está: Início (o **próximo prazo legal** com clientes pendentes — não repete o "Atrasadas" da
-  faixa), Minha área, Clientes da gestão e Painel financeiro (inadimplência).
+  faixa), Minha área, Clientes da gestão e Painel financeiro (a **próxima conta a pagar**, ou as contas a pagar
+  vencidas quando houver — a inadimplência já tem o card dela no quadro, então o sólido não a repete).
 - **Cards em duas colunas que se arrastam** (`SortableBoard` em `features/tasks/components/dash-slot.tsx`):
   Início e Minha área. Arrasta-se pelo título do card ou pela alça que aparece no topo ao passar o mouse;
   pelo teclado, a alça aceita as setas. A ordem fica salva por escritório e pessoa neste navegador
@@ -469,3 +476,6 @@ Revisto a pedido do dono: a coluna à direita foi **removida** (perdia espaço).
   faixa de números, clicável para filtrar.
 - **`StackedBar`** e o ranking com ordenação no título da coluna (Relatório de tarefas) seguem como antes.
 - Os painéis têm 4 colunas a partir de 900px (`columnsForWidth`).
+- **Um seletor de período** (`PeriodNavigator`): Gestão, Painel financeiro e listas usam o mesmo
+  "‹ Novembro 2026 › Hoje"; setas e "Hoje" ficam sempre na mesma linha (no celular também).
+- **Ritmo**: 20px entre os blocos de qualquer página interna (`gap-5`).

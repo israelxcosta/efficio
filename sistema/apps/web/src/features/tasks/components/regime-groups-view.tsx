@@ -112,17 +112,17 @@ function RegimeChoice({ group: g, selected, onSelect }: { group: RegimeGroup; se
         selected ? 'border-primary ring-1 ring-primary' : 'border-border',
       )}
     >
-      <span className="truncate text-sm font-semibold text-fg">{g.label}</span>
-      <span className="mt-0.5 truncate text-xs text-muted">{companiesText(g.clientCount)}</span>
+      <span className="truncate text-body-sm font-semibold text-fg">{g.label}</span>
+      <span className="mt-0.5 truncate text-mini text-muted">{companiesText(g.clientCount)}</span>
       <span className="mt-3 flex items-center gap-2">
         <span className="block h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-bg-subtle" aria-hidden>
           <span className={cn('block h-full rounded-full', g.missing === 0 ? 'bg-success' : 'bg-data')} style={{ width: `${total ? (applied / total) * 100 : 0}%` }} />
         </span>
-        <span className="tabular shrink-0 text-xs font-medium text-fg">
+        <span className="tabular shrink-0 text-mini font-medium text-fg">
           {applied}/{total}
         </span>
       </span>
-      <span className={cn('mt-1 truncate text-xs', g.missing ? 'text-muted' : 'text-success')}>{g.missing ? `${pluralize(g.missing, 'falta', 'faltam')} aplicar` : 'Grupo aplicado'}</span>
+      <span className={cn('mt-1 truncate text-mini', g.missing ? 'text-muted' : 'text-success')}>{g.missing ? `${pluralize(g.missing, 'falta', 'faltam')} aplicar` : 'Grupo aplicado'}</span>
     </button>
   );
 }
@@ -225,7 +225,7 @@ function GroupDetail({
           }
         />
       </div>
-      <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @3xl:flex">
+      <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-mini font-medium text-muted @3xl:flex">
         <span className="flex-1">Obrigação</span>
         <span className="w-36">Departamento</span>
         <span className="w-48">Prazo legal</span>
@@ -433,13 +433,13 @@ function IncludeExistingDialog({ open, onOpenChange, group: g }: { open: boolean
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-fg">{r.name}</span>
-                    <span className="block truncate text-xs text-muted">
+                    <span className="block truncate text-body-sm font-semibold text-fg">{r.name}</span>
+                    <span className="block truncate text-mini text-muted">
                       {r.department ? `${r.department.name} · ` : ''}
                       {dueText(r)}
                     </span>
                   </span>
-                  {saving === r.id ? <span className="text-xs text-muted">Incluindo…</span> : <Plus className="size-4 shrink-0 text-muted" aria-hidden />}
+                  {saving === r.id ? <span className="text-mini text-muted">Incluindo…</span> : <Plus className="size-4 shrink-0 text-muted" aria-hidden />}
                 </button>
               </li>
             ))}
@@ -550,11 +550,11 @@ function GroupRow({
   onExclude?: () => void;
 }) {
   const title = openId ? (
-    <button type="button" onClick={() => onOpenRecurring(openId)} className="block min-w-0 truncate text-left text-sm font-semibold text-fg hover:underline">
+    <button type="button" onClick={() => onOpenRecurring(openId)} className="block min-w-0 truncate text-left text-body-sm font-semibold text-fg hover:underline">
       {name}
     </button>
   ) : (
-    <span className="block min-w-0 truncate text-sm font-semibold text-fg">{name}</span>
+    <span className="block min-w-0 truncate text-body-sm font-semibold text-fg">{name}</span>
   );
   return (
     <li className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-muted @lg:px-4">
@@ -563,8 +563,8 @@ function GroupRow({
           {title}
           {badge ? <span className="shrink-0">{badge}</span> : null}
         </span>
-        {sub ? <span className="block truncate text-xs text-muted">{sub}</span> : null}
-        <span className="block truncate text-xs text-muted @3xl:hidden">
+        {sub ? <span className="block truncate text-mini text-muted">{sub}</span> : null}
+        <span className="block truncate text-mini text-muted @3xl:hidden">
           {usesDepartments ? `${dept} · ` : ''}
           {due}
         </span>
@@ -627,8 +627,8 @@ export function RemovedItems({
           {items.map((item) => (
             <li key={item.key} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface-muted @lg:px-4">
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-muted line-through decoration-border-strong">{item.name}</span>
-                <span className="block truncate text-xs text-muted">
+                <span className="block truncate text-body-sm font-medium text-muted line-through decoration-border-strong">{item.name}</span>
+                <span className="block truncate text-mini text-muted">
                   {dueText(item)} · removida em {format(new Date(item.excludedAt), 'dd/MM/yyyy')}
                 </span>
               </span>

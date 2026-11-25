@@ -91,7 +91,7 @@ export function ComparisonTab() {
             <RangeInputs title="Período B" value={custom.b} onChange={(b) => setCustom((c) => ({ ...c, b }))} />
           </div>
         ) : (
-          <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+          <p className="flex flex-wrap items-center gap-2 text-mini text-muted">
             <span className="rounded-full bg-bg-subtle px-2 py-0.5 font-semibold">A</span> {label(ranges.a)}
             <ArrowRight className="size-3.5" />
             <span className="rounded-full bg-primary-soft px-2 py-0.5 font-semibold text-primary-soft-fg">B</span> {label(ranges.b)}
@@ -138,9 +138,9 @@ export function ComparisonTab() {
           {r && r.rows.length ? (
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
+                <table className="w-full min-w-[640px] text-body-sm">
                   <thead>
-                    <tr className="border-b border-border text-left text-xs font-medium text-muted">
+                    <tr className="border-b border-border text-left text-mini font-medium text-muted">
                       <th className="px-4 py-2.5">Categoria</th>
                       <th className="px-4 py-2.5 text-right">Período A</th>
                       <th className="px-4 py-2.5 text-right">Período B</th>
@@ -165,7 +165,7 @@ export function ComparisonTab() {
                             {row.diff > 0 ? '+' : ''}
                             {formatBRL(row.diff)}
                           </td>
-                          <td className={cn('tabular px-4 py-3 text-right text-xs font-semibold', row.diffPercent === null || row.diff === 0 ? 'text-muted' : worse ? 'text-danger' : 'text-success')}>
+                          <td className={cn('tabular px-4 py-3 text-right text-mini font-semibold', row.diffPercent === null || row.diff === 0 ? 'text-muted' : worse ? 'text-danger' : 'text-success')}>
                             {row.diffPercent === null ? 'novo' : `${row.diffPercent > 0 ? '+' : ''}${formatPercent(row.diffPercent)}`}
                           </td>
                         </tr>
@@ -185,9 +185,9 @@ export function ComparisonTab() {
 function RangeInputs({ title, value, onChange }: { title: string; value: Range; onChange: (r: Range) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3">
-      <span className="w-20 text-xs font-semibold">{title}</span>
+      <span className="w-20 text-mini font-semibold">{title}</span>
       <Input type="date" value={value.from} onChange={(e) => onChange({ ...value, from: e.target.value })} className="h-9 w-[150px]" aria-label={`${title} — de`} />
-      <span className="text-xs text-muted">até</span>
+      <span className="text-mini text-muted">até</span>
       <Input type="date" value={value.to} onChange={(e) => onChange({ ...value, to: e.target.value })} className="h-9 w-[150px]" aria-label={`${title} — até`} />
     </div>
   );
@@ -216,17 +216,17 @@ function CompareCard({
   const good = invert ? !up : up;
   return (
     <Card className="p-5">
-      <p className="text-[13px] font-medium text-muted">{title}</p>
+      <p className="text-caption font-medium text-muted">{title}</p>
       <div className="mt-2 flex items-end justify-between gap-2">
         <div>
-          <p className="text-[11px] text-subtle">Período B</p>
-          <p className="tabular text-[22px] font-bold tracking-tight">{formatBRL(vb)}</p>
+          <p className="text-micro text-subtle">Período B</p>
+          <p className="tabular text-kpi font-semibold tracking-tight">{formatBRL(vb)}</p>
         </div>
-        <span className={cn('rounded-full px-2 py-1 text-xs font-semibold', va === vb ? 'bg-bg-subtle text-muted' : good ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger')}>
+        <span className={cn('rounded-full px-2 py-1 text-mini font-semibold', va === vb ? 'bg-bg-subtle text-muted' : good ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger')}>
           {change === null ? 'novo' : `${change > 0 ? '+' : ''}${formatPercent(change)}`}
         </span>
       </div>
-      <p className="mt-2 text-xs text-muted">
+      <p className="mt-2 text-mini text-muted">
         Período A: <span className="tabular font-semibold text-fg">{formatBRL(va)}</span> · diferença{' '}
         <span className="tabular font-semibold text-fg">{formatBRL(vb - va)}</span>
       </p>

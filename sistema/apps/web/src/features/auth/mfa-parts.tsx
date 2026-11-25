@@ -18,9 +18,9 @@ export function formatSecret(secret: string): string {
 export function MfaStep({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <section className="flex gap-3">
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-fg">{n}</span>
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-mini font-bold text-primary-fg">{n}</span>
       <div className="min-w-0 flex-1">
-        <h3 className="text-sm font-semibold">{title}</h3>
+        <h3 className="text-body-sm font-semibold">{title}</h3>
         {children}
       </div>
     </section>
@@ -35,10 +35,10 @@ export function MfaQrCode({ data, stacked }: { data: MfaSetupResponse; stacked?:
       <div className="rounded-xl border border-border bg-white p-3">
         <QRCodeSVG value={data.otpauthUrl} size={168} level="M" title="QR code para o aplicativo autenticador" />
       </div>
-      <div className={stacked ? 'min-w-0 text-center text-[13px] text-muted' : 'min-w-0 text-[13px] text-muted'}>
+      <div className={stacked ? 'min-w-0 text-center text-caption text-muted' : 'min-w-0 text-caption text-muted'}>
         <p>Não consegue escanear? Digite esta chave no aplicativo:</p>
         <div className={stacked ? 'mt-2 flex items-center justify-center gap-2' : 'mt-2 flex items-center gap-2'}>
-          <code className="tabular rounded-md bg-bg-subtle px-2.5 py-1.5 text-[13px] font-semibold tracking-wider break-all text-fg">
+          <code className="tabular rounded-md bg-bg-subtle px-2.5 py-1.5 text-caption font-semibold tracking-wider break-all text-fg">
             {formatSecret(data.secret)}
           </code>
           <CopyButton text={data.secret} label="Copiar chave" />
@@ -64,7 +64,7 @@ export function RecoveryCodes({ codes, saved, onSavedChange }: { codes: string[]
     <div className="flex flex-col gap-4">
       <ul className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-surface-muted p-4" aria-label="Códigos de recuperação">
         {codes.map((c) => (
-          <li key={c} className="tabular rounded-md bg-surface px-3 py-2 text-center font-mono text-sm font-semibold tracking-wider">
+          <li key={c} className="tabular rounded-md bg-surface px-3 py-2 text-center font-mono text-body-sm font-semibold tracking-wider">
             {c}
           </li>
         ))}
@@ -78,7 +78,7 @@ export function RecoveryCodes({ codes, saved, onSavedChange }: { codes: string[]
           <Download /> Baixar .txt
         </Button>
       </div>
-      <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-snug text-fg">
+      <label className="flex cursor-pointer items-start gap-2.5 text-caption leading-snug text-fg">
         <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--app-primary)]" checked={saved} onChange={(e) => onSavedChange(e.target.checked)} />
         Guardei os códigos em um local seguro (gerenciador de senhas ou papel guardado).
       </label>

@@ -638,16 +638,16 @@ function TaskProperties({
       ) : null}
       {occurrence ? (
         <div className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-fg">Prazo</span>
+          <span className="text-caption font-medium text-fg">Prazo</span>
           <div className="flex min-h-10 flex-col justify-center rounded-md border border-border bg-bg-subtle px-3 py-1.5">
-            <span className="tabular text-sm text-fg">
+            <span className="tabular text-body-sm text-fg">
               Meta {formatDateBR(occurrence.targetDate).slice(0, 5)}
               {occurrence.legalDueDate ? ` · prazo legal ${formatDateBR(occurrence.legalDueDate).slice(0, 5)}` : ''}
             </span>
             <TaskDueLabel task={occurrence.task} today={today} beside />
           </div>
           {onOpenRecurring ? (
-            <Button variant="link" size="sm" className="self-start text-xs" onClick={onOpenRecurring}>
+            <Button variant="link" size="sm" className="self-start text-mini" onClick={onOpenRecurring}>
               Ver tarefa recorrente
             </Button>
           ) : null}
@@ -684,8 +684,8 @@ function TaskProperties({
       </Field>
       {occurrence ? null : (
       <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-medium text-fg">Horário</span>
-        {timeLocked && !showTime ? <span className="text-xs text-muted">{lockHint('startTime')}</span> : null}
+        <span className="text-caption font-medium text-fg">Horário</span>
+        {timeLocked && !showTime ? <span className="text-mini text-muted">{lockHint('startTime')}</span> : null}
         {showTime ? (
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
@@ -698,7 +698,7 @@ function TaskProperties({
                 onChange={(e) => setTimeDraft((d) => ({ ...d, start: e.target.value }))}
                 onBlur={() => commitTime(timeDraft.start, timeDraft.end)}
               />
-              <span className="text-sm text-muted">às</span>
+              <span className="text-body-sm text-muted">às</span>
               <Input
                 type="time"
                 aria-label="Hora de término"
@@ -710,7 +710,7 @@ function TaskProperties({
               />
             </div>
             {timeError || errors.endTime ? (
-              <p role="alert" className="text-xs font-medium text-danger">
+              <p role="alert" className="text-mini font-medium text-danger">
                 {timeError ?? errors.endTime}
               </p>
             ) : null}
@@ -818,7 +818,7 @@ function SubtaskList({ task, readOnly }: { task: TaskDetail; readOnly: boolean }
                 update.mutate({ id: s.id, patch: { done: checked } }, { onError: (e) => toastError(e) })
               }
             />
-            <span className={cn('min-w-0 flex-1 text-sm break-words', s.done ? 'text-muted line-through' : 'text-fg')}>{s.title}</span>
+            <span className={cn('min-w-0 flex-1 text-body-sm break-words', s.done ? 'text-muted line-through' : 'text-fg')}>{s.title}</span>
             {!readOnly ? (
               <button
                 type="button"
@@ -942,7 +942,7 @@ function CommentThread({ task, me, readOnly }: { task: TaskDetail; me: TaskOptio
                   </Button>
                 </div>
               ) : (
-                <p className="mt-0.5 text-sm break-words whitespace-pre-wrap text-fg">{c.text}</p>
+                <p className="mt-0.5 text-body-sm break-words whitespace-pre-wrap text-fg">{c.text}</p>
               )}
             </div>
           </li>
@@ -1345,7 +1345,7 @@ function NewTaskSheet({
           />
           <p className="text-caption text-subtle">Subtarefas, anexos e comentários ficam disponíveis depois de criar.</p>
           {create.isError && !(create.error instanceof ApiRequestError) ? (
-            <p role="alert" className="text-xs text-danger">
+            <p role="alert" className="text-mini text-danger">
               {errorMessage(create.error)}
             </p>
           ) : null}

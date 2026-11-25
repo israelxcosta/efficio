@@ -84,16 +84,16 @@ export function ContributionDialog({ goal, onClose }: { goal: Goal | null; onClo
           {history.isPending ? (
             <Skeleton className="h-16" />
           ) : (history.data ?? []).length === 0 ? (
-            <p className="text-sm text-muted">Nenhum aporte ainda.</p>
+            <p className="text-body-sm text-muted">Nenhum aporte ainda.</p>
           ) : (
             <ul className="scrollbar-thin flex max-h-56 flex-col gap-1 overflow-y-auto">
               {history.data!.map((c) => (
                 <li key={c.id} className="group flex items-center gap-3 rounded-md px-2 py-2 hover:bg-surface-muted">
-                  <span className="flex-1 text-sm">
+                  <span className="flex-1 text-body-sm">
                     {formatDateBR(c.date)}
-                    {c.note ? <span className="ml-2 text-xs text-muted">{c.note}</span> : null}
+                    {c.note ? <span className="ml-2 text-mini text-muted">{c.note}</span> : null}
                   </span>
-                  <span className={c.amount >= 0 ? 'tabular text-sm font-semibold text-success' : 'tabular text-sm font-semibold text-danger'}>
+                  <span className={c.amount >= 0 ? 'tabular text-body-sm font-semibold text-success' : 'tabular text-body-sm font-semibold text-danger'}>
                     {c.amount >= 0 ? '+' : ''}
                     {formatBRL(c.amount)}
                   </span>

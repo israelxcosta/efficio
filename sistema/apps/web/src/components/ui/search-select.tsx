@@ -126,7 +126,7 @@ export function SearchSelect({
           className={cn(
             inputClasses,
             'group/ss flex cursor-pointer items-center gap-2 text-left data-[state=open]:border-brand-500 data-[state=open]:ring-[3px] data-[state=open]:ring-brand-500/15',
-            size_ === 'sm' && 'h-9 rounded-[10px] text-[13px]',
+            size_ === 'sm' && 'h-9 rounded-[10px] text-caption',
             size_ === 'md' && 'h-10',
             className,
           )}
@@ -161,7 +161,7 @@ export function SearchSelect({
               aria-controls={listId}
               aria-activedescendant={filtered[active] ? `${listId}-${active}` : undefined}
               aria-label={searchPlaceholder}
-              className="h-11 min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-subtle"
+              className="h-11 min-w-0 flex-1 bg-transparent text-body-sm text-fg outline-none placeholder:text-subtle"
             />
           </label>
           <div
@@ -172,7 +172,7 @@ export function SearchSelect({
             className="scrollbar-thin max-h-[min(320px,var(--radix-popover-content-available-height))] overflow-y-auto p-1.5"
           >
             {filtered.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm text-muted">{emptyText}</p>
+              <p className="px-3 py-6 text-center text-body-sm text-muted">{emptyText}</p>
             ) : (
               filtered.map((o, i) => {
                 const checked = o.value === value;
@@ -180,7 +180,7 @@ export function SearchSelect({
                 return (
                   <div key={o.value} role="presentation">
                     {heading ? (
-                      <p className={cn('px-3 pt-2 pb-1 text-xs font-semibold text-subtle', i > 0 && 'mt-1 border-t border-border pt-2.5')}>{heading}</p>
+                      <p className={cn('px-3 pt-2 pb-1 text-mini font-semibold text-subtle', i > 0 && 'mt-1 border-t border-border pt-2.5')}>{heading}</p>
                     ) : null}
                     <div
                       id={`${listId}-${i}`}
@@ -191,13 +191,13 @@ export function SearchSelect({
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => choose(o)}
                       className={cn(
-                        'relative flex cursor-pointer items-center gap-2.5 rounded-lg py-2 pr-9 pl-3 text-sm text-fg transition-colors',
+                        'relative flex cursor-pointer items-center gap-2.5 rounded-lg py-2 pr-9 pl-3 text-body-sm text-fg transition-colors',
                         i === active && 'bg-bg-subtle',
                       )}
                     >
                       {o.leading}
                       <span className={cn('min-w-0 flex-1 truncate', checked && 'font-semibold')}>{o.label}</span>
-                      {o.hint ? <span className="max-w-[45%] shrink-0 truncate text-xs text-muted">{o.hint}</span> : null}
+                      {o.hint ? <span className="max-w-[45%] shrink-0 truncate text-mini text-muted">{o.hint}</span> : null}
                       {checked ? <Check className="absolute right-3 size-4 text-primary" aria-hidden /> : null}
                     </div>
                   </div>

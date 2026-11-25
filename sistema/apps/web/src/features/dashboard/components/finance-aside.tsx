@@ -1,30 +1,50 @@
-import { useMemo } from 'react';
-import { formatBRL, displayCompanyName } from '@effinance/shared';
-import { rankDebtors } from '@/components/charts/chart-scale';
+import { diffInDays, formatBRL, todayISO, type DashboardResponse } from '@effinance/shared';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { pluralize } from '@/lib/utils';
-import { OVERDUE_RECEIVABLES_HREF } from '../layout/alerts';
-import { useOverdueReceivables } from '../widgets/data';
+
+const PAYABLES_HREF = '/contas-a-pagar';
+
+/** "05/12" */
+const dayMonth = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 /**
- * The solid card of the Painel financeiro (first row, beside the number strip): today's overdue
- * receivables; the whole card opens them. The board below keeps its own layout and customization.
+ * The solid card of the Painel financeiro (first row, beside the number strip): the next bill to pay,
+ * the pair of the Gestão's "Próximo prazo legal". Overdue receivables already have their own card on
+ * the board ("Inadimplência"), so this card never repeats them. Overdue bills come first: they are the
+ * action for today. The whole card opens Contas a pagar.
  */
-export function OverdueSpotlight() {
-  const overdue = useOverdueReceivables();
-  const data = overdue.data;
-  const debtors = useMemo(() => (data ? rankDebtors(data.items) : []), [data]);
-  if (!data) return <SpotlightCard label="Inadimplência hoje" loading={overdue.isPending} title={overdue.isError ? 'Não foi possível carregar' : undefined} />;
-  if (data.total === 0) return <SpotlightCard label="Inadimplência hoje" title="Nenhum honorário vencido" caption="Todas as receitas vencidas foram recebidas." to="/contas-a-receber" />;
-  const total = data.items.reduce((n, t) => n + t.amount, 0);
-  const top = debtors[0];
+export function NextBillSpotlight({ d, loading }: { d: DashboardResponse | undefined; loading: boolean }) {
+  if (!d) return <SpotlightCard label="Próxima conta a pagar" loading={loading} title={loading ? undefined : 'Não foi possível carregar'} />;
+  const today = todayISO();
+  if (d.overdue.count > 0) {
+    const oldest = d.upcoming.find((t) => t.type === 'expense' && !t.paid && t.date < today);
+    return (
+      <SpotlightCard
+        label="Contas a pagar vencidas"
+        badge={pluralize(d.overdue.count, 'conta', 'contas')}
+        value={formatBRL(d.overdue.amount)}
+        caption={oldest ? `A mais antiga venceu em ${dayMonth(oldest.date)} · ${oldest.description}` : 'Veja em Contas a pagar.'}
+        to={PAYABLES_HREF}
+      />
+    );
+  }
+  // `upcoming` is pending, card purchases left out, oldest first; overdue ones were handled above.
+  const bills = d.upcoming.filter((t) => t.type === 'expense' && !t.paid && t.date >= today);
+  const next = bills[0];
+  if (!next) {
+    return <SpotlightCard label="Próxima conta a pagar" title="Nada a pagar em 15 dias" caption="Nenhuma conta pendente vence nos próximos 15 dias." to={PAYABLES_HREF} />;
+  }
+  const days = diffInDays(next.date, today);
+  const when = days <= 0 ? 'hoje' : days === 1 ? 'amanhã' : `em ${days} dias`;
+  const others = bills.length - 1;
+  const rest = others > 0 ? ` · +${pluralize(others, 'conta', 'contas')} em 15 dias` : '';
   return (
     <SpotlightCard
-      label="Inadimplência hoje"
-      badge={pluralize(data.total, 'título', 'títulos')}
-      value={formatBRL(total)}
-      caption={`${pluralize(debtors.length, 'cliente', 'clientes')}${top ? ` · maior: ${displayCompanyName(top.name)}` : ''}`}
-      to={OVERDUE_RECEIVABLES_HREF}
+      label="Próxima conta a pagar"
+      badge={when}
+      value={formatBRL(next.amount)}
+      caption={`${next.description} · ${dayMonth(next.date)}${rest}`}
+      to={PAYABLES_HREF}
     />
   );
 }

@@ -79,7 +79,7 @@ export default function GoalsPage() {
               <div className="flex items-start gap-3">
                 <CategoryIcon icon={g.icon} color={g.color} size="lg" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-semibold">{g.name}</p>
+                  <p className="truncate text-title-sm font-semibold">{g.name}</p>
                   <GoalDeadline goal={g} />
                 </div>
                 {g.completed ? <Badge tone="success">Concluída</Badge> : null}
@@ -100,19 +100,19 @@ export default function GoalsPage() {
               <div className="rounded-lg p-4" style={{ background: `linear-gradient(135deg, ${alpha(tone(g.color), 0.1)}, ${alpha(tone(g.color), 0.03)})` }}>
                 <div className="flex items-end justify-between gap-2">
                   <div>
-                    <p className="text-xs text-muted">Conquistado</p>
+                    <p className="text-mini text-muted">Conquistado</p>
                     <p className="tabular text-xl font-semibold tracking-tight">{formatBRL(g.currentAmount)}</p>
                   </div>
-                  <p className="text-2xl font-bold tracking-tight" style={{ color: tone(g.color) }}>{formatPercent(g.progress, 0)}</p>
+                  <p className="text-kpi font-semibold tracking-tight" style={{ color: tone(g.color) }}>{formatPercent(g.progress, 0)}</p>
                 </div>
                 <ProgressBar value={g.progress} color={g.color} className="mt-3" label={`Progresso de ${g.name}`} />
-                <div className="mt-2 flex justify-between text-[11px] text-muted">
+                <div className="mt-2 flex justify-between text-micro text-muted">
                   <span>Faltam {formatBRL(Math.max(0, g.targetAmount - g.currentAmount))}</span>
                   <span>Meta {formatBRL(g.targetAmount)}</span>
                 </div>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted">
+                <p className="text-mini text-muted">
                   {g.monthlyNeeded && !g.completed ? (
                     <>Guarde <span className="font-semibold text-fg">{formatBRL(g.monthlyNeeded)}</span>/mês</>
                   ) : g.completed ? 'Parabéns! 🎉' : 'Defina um prazo para ver o valor mensal'}

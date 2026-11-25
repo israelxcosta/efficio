@@ -94,7 +94,7 @@ function AuditSummaryPanel({ summary: s, filters, onChange }: { summary: AuditMa
         <div className="min-w-0 p-4 sm:p-5">
           <SummaryLabel>Concluídas</SummaryLabel>
           {s ? (
-            <span className="tabular mt-1 block text-[32px] leading-10 font-semibold tracking-tight text-fg lg:text-[28px] xl:text-[32px]">
+            <span className="tabular mt-1 block text-display font-semibold tracking-tight text-fg">
               {s.done} <span className="text-kpi font-medium text-muted">de {live}</span>
             </span>
           ) : (
@@ -300,7 +300,7 @@ function AuditToolbar({ filters, options, onChange }: { filters: AuditFilters; o
         <div className="grid w-full min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))_auto] 2xl:w-auto 2xl:flex-1">
           <div className="relative sm:col-span-2 lg:col-span-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label={searchLabel} className="h-9 rounded-[10px] pl-9 text-[13px]" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label={searchLabel} className="h-9 rounded-[10px] pl-9 text-caption" />
           </div>
           {regime(true)}
           {department(true)}
@@ -321,7 +321,7 @@ function AuditToolbar({ filters, options, onChange }: { filters: AuditFilters; o
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label={searchLabel} className="h-9 rounded-[10px] pl-9 text-[13px]" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar" aria-label={searchLabel} className="h-9 rounded-[10px] pl-9 text-caption" />
           </div>
           <Button variant="outline" size="sm" className="h-9" onClick={() => setSheet(true)}>
             <SlidersHorizontal /> Filtros{count - (filters.search ? 1 : 0) > 0 ? ` (${count - (filters.search ? 1 : 0)})` : ''}
@@ -500,7 +500,7 @@ function AuditClientList({ data, filters, today, announce, monthName }: SharedPr
     <Card className="@container overflow-hidden">
       <div className="border-b border-border">
         <div className="flex items-center gap-3 px-4 py-2.5">
-          <span className="text-xs font-medium text-muted">{pluralize(items.length, 'cliente', 'clientes')}</span>
+          <span className="text-mini font-medium text-muted">{pluralize(items.length, 'cliente', 'clientes')}</span>
           <Button variant="ghost" size="sm" className="-mr-2 ml-auto h-8" onClick={() => setOpen(allOpen ? new Set() : new Set(items.map((i) => i.client.id)))}>
             <ChevronsUpDown /> {allOpen ? 'Recolher todos' : 'Expandir todos'}
           </Button>
@@ -586,7 +586,7 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
     <Card className="@container overflow-hidden">
       <div className="border-b border-border">
         <div className="flex items-center gap-3 px-4 py-2.5">
-          <span className="text-xs font-medium text-muted">{pluralize(items.length, 'tarefa recorrente', 'tarefas recorrentes')}</span>
+          <span className="text-mini font-medium text-muted">{pluralize(items.length, 'tarefa recorrente', 'tarefas recorrentes')}</span>
           <Button
             variant="ghost"
             size="sm"
@@ -634,28 +634,28 @@ function TaskAccordion({ data, filters, options, today, announce, monthName, onE
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate text-sm font-semibold text-fg">{col.name}</span>
+                      <span className="truncate text-body-sm font-semibold text-fg">{col.name}</span>
                       {col.period !== 'monthly' ? (
                         <span className="hidden shrink-0 @md:inline-flex">
                           <Badge tone="neutral">{RECURRENCE_PERIOD_LABELS[col.period]}</Badge>
                         </span>
                       ) : null}
-                      {col.period === 'weekly' ? <span className="hidden shrink-0 text-xs text-muted @md:inline">{periodLabel(col, today)}</span> : null}
+                      {col.period === 'weekly' ? <span className="hidden shrink-0 text-mini text-muted @md:inline">{periodLabel(col, today)}</span> : null}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-muted">
+                    <span className="mt-0.5 block truncate text-mini text-muted">
                       {/* Narrow: the name keeps the room; the week goes to the subtitle */}
                       {col.period === 'weekly' ? <span className="@md:hidden">{periodLabel(col, today)} · </span> : null}
                       {col.department.name}
                     </span>
-                    <span className={cn('mt-0.5 block truncate text-xs @xl:hidden', DUE_TONE_CLASS[inline.tone])}>{inline.text}</span>
+                    <span className={cn('mt-0.5 block truncate text-mini @xl:hidden', DUE_TONE_CLASS[inline.tone])}>{inline.text}</span>
                   </span>
                 </span>
                 {/* Prazo track: the target and how the deadline stands (right of the bar below @4xl) */}
                 <span className="order-last hidden w-40 shrink-0 text-right @xl:block @4xl:order-none @4xl:w-auto @4xl:min-w-0 @4xl:text-center">
                   <Tooltip content={deadlineTip(col, today)}>
-                    <span className="tabular block truncate text-[13px] font-medium text-fg">{shortDate(col.targetDate, today)}</span>
+                    <span className="tabular block truncate text-caption font-medium text-fg">{shortDate(col.targetDate, today)}</span>
                   </Tooltip>
-                  <span className={cn('block truncate text-xs', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span>
+                  <span className={cn('block truncate text-mini', DUE_TONE_CLASS[dl.tone])}>{dl.text}</span>
                 </span>
                 {/* Situação track: "1/3" and the bar */}
                 <ProgressTrack done={col.done} live={live} />

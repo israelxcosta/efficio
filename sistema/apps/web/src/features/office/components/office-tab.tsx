@@ -182,7 +182,7 @@ function OfficeForm({ office }: { office: Office }) {
                 </Button>
               </div>
               {e.document?.message ? (
-                <p role="alert" className="text-xs font-medium text-danger">
+                <p role="alert" className="text-mini font-medium text-danger">
                   {e.document.message}
                 </p>
               ) : null}
@@ -401,7 +401,7 @@ function LogoCard({ office }: { office: Office | undefined }) {
         </div>
       </div>
       {error ? (
-        <p role="alert" className="mt-3 text-xs font-medium text-danger">
+        <p role="alert" className="mt-3 text-mini font-medium text-danger">
           {error}
         </p>
       ) : null}

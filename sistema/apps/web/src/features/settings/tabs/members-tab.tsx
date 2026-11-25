@@ -140,7 +140,7 @@ function WorkspaceCard() {
         ) : (
           <div className="min-w-0">
             <p className="truncate font-semibold">{workspace.name}</p>
-            <p className="text-xs text-muted">
+            <p className="text-mini text-muted">
               {WORKSPACE_KIND_LABELS[workspace.kind]} · você é {ROLE_LABELS[workspace.role].toLowerCase()}
             </p>
           </div>
@@ -238,11 +238,11 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
               <li key={m.userId} className="flex flex-wrap items-center gap-3 py-3">
                 <MemberAvatar size="lg" name={m.name} userId={m.userId} photoVersion={m.photoUpdatedAt} />
                 <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                  <p className="flex flex-wrap items-center gap-2 text-body-sm font-semibold">
                     <span className="truncate">{m.name}</span>
                     {m.isYou ? <Badge tone="brand">Você</Badge> : null}
                   </p>
-                  <p className="truncate text-xs text-muted">{m.email}</p>
+                  <p className="truncate text-mini text-muted">{m.email}</p>
                   {canManageMembers && m.role !== 'owner' ? (
                     <p className="text-caption text-muted" title={adjustmentSummary(m) ?? undefined}>
                       {memberAccessLine(m)}
@@ -282,7 +282,7 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
           </ul>
         )}
       </div>
-      <div className="mt-4 grid gap-2 rounded-lg bg-surface-muted px-4 py-3 text-xs text-muted sm:grid-cols-3">
+      <div className="mt-4 grid gap-2 rounded-lg bg-surface-muted px-4 py-3 text-mini text-muted sm:grid-cols-3">
         {(['owner', 'editor', 'viewer'] as const).map((r) => (
           <p key={r}>
             <span className="font-semibold text-fg">{ROLE_LABELS[r]}:</span> {ROLE_HINTS[r]}
@@ -291,7 +291,7 @@ function MembersCard({ onPermissions }: { onPermissions: (userId: string) => voi
       </div>
       {!isOwner && workspace?.kind !== 'personal' ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          <p className="text-[13px] text-muted">Você perderá o acesso aos dados deste espaço.</p>
+          <p className="text-caption text-muted">Você perderá o acesso aos dados deste espaço.</p>
           <Button variant="danger-soft" onClick={() => setLeaving(true)}>
             <DoorOpen /> Sair do espaço
           </Button>
@@ -368,7 +368,7 @@ function InvitesCard() {
     <Card className="p-6">
       <CardHeader title="Convidar pessoas" info="O convite vale por 7 dias e precisa ser aceito com o mesmo e-mail." icon={<MailPlus />} />
       {limit ? (
-        <div className="mt-4 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-[13px]">
+        <div className="mt-4 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-caption">
           <p className="font-semibold text-fg">{limit.title}</p>
           <p className="mt-0.5 text-muted">{limit.detail}</p>
         </div>
@@ -391,7 +391,7 @@ function InvitesCard() {
       {lastUrl ? (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-brand-500/25 bg-primary-soft/50 px-3 py-2.5">
           <Link2 className="size-4 shrink-0 text-brand-text" aria-hidden />
-          <code className="min-w-0 flex-1 truncate text-xs text-fg">{lastUrl}</code>
+          <code className="min-w-0 flex-1 truncate text-mini text-fg">{lastUrl}</code>
           <CopyLinkButton url={lastUrl} />
           <Button variant="ghost" size="icon-sm" aria-label="Fechar" onClick={() => setLastUrl(null)}>
             <X />
@@ -399,7 +399,7 @@ function InvitesCard() {
         </div>
       ) : null}
 
-      <h3 className="mt-6 text-sm font-semibold">Convites pendentes</h3>
+      <h3 className="mt-6 text-body-sm font-semibold">Convites pendentes</h3>
       <div className="mt-2">
         {invites.isPending ? (
           <SkeletonRows rows={1} />
@@ -431,8 +431,8 @@ function InviteRow({ invite, onRevoke, revoking }: { invite: Invite; onRevoke: (
   return (
     <li className="flex flex-wrap items-center gap-3 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{invite.email}</p>
-        <p className="text-xs text-muted">
+        <p className="truncate text-body-sm font-semibold">{invite.email}</p>
+        <p className="text-mini text-muted">
           {ROLE_LABELS[invite.role]} · {expired ? 'expirou em' : 'expira em'} {formatDateTime(invite.expiresAt)}
         </p>
       </div>

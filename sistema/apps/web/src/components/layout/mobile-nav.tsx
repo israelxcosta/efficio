@@ -24,7 +24,7 @@ import { MemberAvatar } from '@/components/ui/member-avatar';
 import { useMyOverdueTasks, useOverdueBills } from './notifications';
 import { useDeadlinesSummary } from '@/features/deadlines/api';
 
-const menuRow = 'flex items-center gap-3 rounded-md px-3 py-3 text-sm font-semibold';
+const menuRow = 'flex items-center gap-3 rounded-md px-3 py-3 text-body-sm font-semibold';
 
 /**
  * Bottom bar on phones and tablets: two items, "+", one item and "Mais", per area
@@ -54,7 +54,7 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
         key={i.to}
         to={i.to}
         aria-current={isActive ? 'page' : undefined}
-        className={cn('flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-semibold', isActive ? 'text-fg' : 'text-muted')}
+        className={cn('flex flex-1 flex-col items-center gap-1 py-2 text-micro font-semibold', isActive ? 'text-fg' : 'text-muted')}
       >
         <i.icon className="size-5" />
         {i.short ?? i.label.split(' ')[0]}
@@ -73,7 +73,7 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
         {items.slice(0, 2).map(barLink)}
         {area === 'financeiro' ? <FinanceCreate /> : <TaskCreate />}
         {items.slice(2, 3).map(barLink)}
-        <button type="button" className="flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-semibold text-muted" onClick={() => setMenuOpen(true)}>
+        <button type="button" className="flex flex-1 flex-col items-center gap-1 py-2 text-micro font-semibold text-muted" onClick={() => setMenuOpen(true)}>
           <Menu className="size-5" />
           Mais
         </button>
@@ -89,7 +89,7 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
           >
             <MemberAvatar size="md" name={user?.name} userId={user?.id} photoVersion={user?.photoUpdatedAt ?? null} />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold">{user?.name}</span>
+              <span className="block truncate text-body-sm font-semibold">{user?.name}</span>
               <span className="block text-caption text-muted">Minha área</span>
             </span>
           </Link>
@@ -142,7 +142,7 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
             }}
           >
             <ListChecks className="size-5" /> Tarefas atrasadas
-            {overdueTasks ? <span className="ml-auto rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{overdueTasks}</span> : null}
+            {overdueTasks ? <span className="ml-auto rounded-full bg-danger px-2 py-0.5 text-micro font-bold text-white">{overdueTasks}</span> : null}
           </button>
           <button
             type="button"
@@ -153,7 +153,7 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
             }}
           >
             <FileClock className="size-5" /> Vencimentos
-            {overdueDeadlines ? <span className="ml-auto rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{overdueDeadlines}</span> : null}
+            {overdueDeadlines ? <span className="ml-auto rounded-full bg-danger px-2 py-0.5 text-micro font-bold text-white">{overdueDeadlines}</span> : null}
           </button>
           {canAccessFinance ? (
             <button
@@ -165,7 +165,7 @@ export function MobileNav({ area, memory, onSearch }: { area: Area; memory: Area
               }}
             >
               <Bell className="size-5" /> Contas vencidas
-              {overdueBills ? <span className="ml-auto rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{overdueBills}</span> : null}
+              {overdueBills ? <span className="ml-auto rounded-full bg-danger px-2 py-0.5 text-micro font-bold text-white">{overdueBills}</span> : null}
             </button>
           ) : null}
           <span className="my-1 h-px bg-border" aria-hidden />

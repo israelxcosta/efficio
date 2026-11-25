@@ -53,7 +53,7 @@ export function IndicesCard(props: IndicesCardProps) {
         <div className="@container flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-1.5">
-              <span id="adjustment-month-label" className="text-[13px] font-medium text-fg">
+              <span id="adjustment-month-label" className="text-caption font-medium text-fg">
                 Vigências que começam em
               </span>
               <HelpTip>Mês sugerido: {formatMonthKey(defaultMonth).toLowerCase()}, o primeiro com o aviso de 30 dias no prazo para todos os clientes.</HelpTip>
@@ -63,7 +63,7 @@ export function IndicesCard(props: IndicesCardProps) {
                 <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Mês anterior" onClick={() => onMonthChange(addMonthKey(month, -1))}>
                   <ChevronLeft />
                 </Button>
-                <span className="min-w-[150px] px-1 text-center text-[13px] font-semibold text-fg tabular" aria-live="polite">
+                <span className="min-w-[150px] px-1 text-center text-caption font-semibold text-fg tabular" aria-live="polite">
                   {formatMonthKey(month)}
                 </span>
                 <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Próximo mês" onClick={() => onMonthChange(addMonthKey(month, 1))}>
@@ -76,11 +76,11 @@ export function IndicesCard(props: IndicesCardProps) {
                 </Button>
               ) : null}
             </div>
-            {early ? <p className="text-xs text-muted">Neste mês o aviso de 30 dias pode já ter passado: confira o prazo de cada cliente.</p> : null}
+            {early ? <p className="text-mini text-muted">Neste mês o aviso de 30 dias pode já ter passado: confira o prazo de cada cliente.</p> : null}
           </div>
 
           <fieldset className="flex flex-col gap-3">
-            <legend className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-fg">
+            <legend className="mb-3 flex items-center gap-1.5 text-caption font-medium text-fg">
               Índices acumulados em 12 meses (%)
               <HelpTip>Até a data-base do reajuste (cláusula 3.2). Deixe em branco o que não tiver; negativo é aceito.</HelpTip>
             </legend>
@@ -145,13 +145,13 @@ export function IndicesCard(props: IndicesCardProps) {
           </div>
 
           <section aria-labelledby="calculation-memory" className="rounded-lg bg-surface-muted px-4 py-3">
-            <h3 id="calculation-memory" className="text-xs font-medium text-muted">
+            <h3 id="calculation-memory" className="text-mini font-medium text-muted">
               Memória de cálculo
             </h3>
-            <p className="mt-1 text-sm font-semibold text-fg tabular" aria-live="polite">
+            <p className="mt-1 text-body-sm font-semibold text-fg tabular" aria-live="polite">
               {plan.memory}
             </p>
-            <p className="mt-0.5 text-xs text-muted tabular">
+            <p className="mt-0.5 text-mini text-muted tabular">
               Ex.: {formatBRL(EXAMPLE_FEE)} × {plan.factor} = {formatBRL(props.exampleAdjusted)}
               {plan.appliedBps > 0 ? ` (+${formatBps(plan.appliedBps)})` : ''}
             </p>

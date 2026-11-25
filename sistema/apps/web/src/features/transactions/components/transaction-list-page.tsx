@@ -258,7 +258,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
       <Card className="p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {status === 'overdue' ? (
-            <p className="text-sm font-semibold text-danger">Todas as vencidas até hoje</p>
+            <p className="text-body-sm font-semibold text-danger">Todas as vencidas até hoje</p>
           ) : (
             <PeriodNavigator
               value={period}
@@ -288,7 +288,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Buscar descrição ou observação"
-              className="h-9 rounded-[10px] pl-9 text-[13px] max-sm:h-10"
+              className="h-9 rounded-[10px] pl-9 text-caption max-sm:h-10"
               aria-label="Buscar"
             />
           </div>
@@ -335,7 +335,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
         <div className="flex flex-col gap-4">
           {status !== 'overdue' ? (
             <fieldset className="flex flex-col gap-1.5">
-              <legend className="mb-1.5 text-[13px] font-medium text-fg">Período</legend>
+              <legend className="mb-1.5 text-caption font-medium text-fg">Período</legend>
               <SegmentedControl
                 ariaLabel="Tipo de período"
                 value={period.mode}
@@ -355,7 +355,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
 
       {/* overflow-clip (not hidden) keeps the column header sticky while the page scrolls. */}
       <Card className="@container overflow-clip">
-        <div className="sticky top-[72px] z-[2] hidden items-center gap-3 border-b border-border bg-surface/95 px-5.5 py-2.5 text-xs font-medium text-muted backdrop-blur @xl:flex">
+        <div className="sticky top-[72px] z-[2] hidden items-center gap-3 border-b border-border bg-surface/95 px-5.5 py-2.5 text-mini font-medium text-muted backdrop-blur @xl:flex">
           {selecting ? (
             <Checkbox
               className="-mr-2 -ml-2.5"
@@ -451,7 +451,7 @@ export function TransactionListPage({ type, actions: extraActions }: Transaction
           }}
         />
         {list.data && list.data.total > PAGE_SIZE ? (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-body-sm text-muted">
             <span>
               Página {page} de {totalPages} · {list.data.total} lançamentos
             </span>

@@ -75,8 +75,8 @@ export function TasksSummary({ summary, scope, situation, department, onSituatio
             {summary ? (
               <span
                 className={cn(
-                  'tabular mt-1 block text-[32px] leading-10 font-semibold tracking-tight lg:text-[28px] xl:text-[32px]',
-                  summary.overdue > 0 ? 'text-danger' : 'text-fg',
+                  'tabular mt-1 block text-display font-semibold tracking-tight',
+                  'text-fg',
                 )}
               >
                 {summary.overdue}

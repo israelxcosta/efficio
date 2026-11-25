@@ -174,7 +174,7 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
         />
         <div className="hidden flex-wrap items-center gap-2 sm:flex">
           {board ? (
-            <label className="flex items-center gap-2 text-[13px] font-medium text-fg">
+            <label className="flex items-center gap-2 text-caption font-medium text-fg">
               <Switch checked={filters.onlyOverdue} onCheckedChange={(onlyOverdue) => onChange({ onlyOverdue })} aria-label="Só atrasadas" />
               Só atrasadas
             </label>
@@ -198,7 +198,7 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Buscar pelo nome da tarefa"
-            className="h-9 rounded-[10px] pl-9 text-[13px]"
+            className="h-9 rounded-[10px] pl-9 text-caption"
             aria-label="Buscar tarefas"
           />
         </div>
@@ -242,7 +242,7 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Buscar"
-            className="h-9 rounded-[10px] pl-9 text-[13px]"
+            className="h-9 rounded-[10px] pl-9 text-caption"
             aria-label="Buscar tarefas"
           />
         </div>
@@ -274,17 +274,17 @@ export function TaskFiltersBar({ filters, onChange, options, months, resultCount
       >
         <div className="flex flex-col gap-4">
           {board ? (
-            <label className="flex items-center justify-between gap-2 text-sm font-medium text-fg">
+            <label className="flex items-center justify-between gap-2 text-body-sm font-medium text-fg">
               Só atrasadas
               <Switch checked={filters.onlyOverdue} onCheckedChange={(onlyOverdue) => onChange({ onlyOverdue })} aria-label="Só atrasadas" />
             </label>
           ) : (
             <fieldset className="flex flex-col gap-1.5">
-              <legend className="mb-1.5 text-[13px] font-medium text-fg">Situação</legend>
+              <legend className="mb-1.5 text-caption font-medium text-fg">Situação</legend>
               {SITUATION_OPTIONS.map((o) => (
                 <label
                   key={o.value}
-                  className={cn('flex h-10 items-center gap-3 rounded-md px-3 text-sm', filters.situation === o.value ? 'bg-bg-subtle font-semibold' : 'hover:bg-surface-muted')}
+                  className={cn('flex h-10 items-center gap-3 rounded-md px-3 text-body-sm', filters.situation === o.value ? 'bg-bg-subtle font-semibold' : 'hover:bg-surface-muted')}
                 >
                   <input
                     type="radio"

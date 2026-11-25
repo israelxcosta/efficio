@@ -58,7 +58,7 @@ export function MappingStep({ content, mapping, onChange, apiColumns, live }: Ma
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-muted">Diga o que cada coluna representa.</p>
+        <p className="text-body-sm text-muted">Diga o que cada coluna representa.</p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Separador">
             <Select value={mapping.delimiter} onChange={(e) => set({ delimiter: e.target.value as CsvMapping['delimiter'] })}>
@@ -76,7 +76,7 @@ export function MappingStep({ content, mapping, onChange, apiColumns, live }: Ma
             </Select>
           </Field>
         </div>
-        <label className="flex cursor-pointer items-center justify-between gap-3 text-[13px] font-medium text-fg">
+        <label className="flex cursor-pointer items-center justify-between gap-3 text-caption font-medium text-fg">
           A primeira linha é o cabeçalho
           <Switch checked={mapping.hasHeader} onCheckedChange={(c) => set({ hasHeader: c })} aria-label="A primeira linha é o cabeçalho" />
         </label>
@@ -102,7 +102,7 @@ export function MappingStep({ content, mapping, onChange, apiColumns, live }: Ma
           </Select>
         </Field>
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1.5 text-[13px] font-medium text-fg">Valores</legend>
+          <legend className="mb-1.5 text-caption font-medium text-fg">Valores</legend>
           <SegmentedControl
             ariaLabel="Como os valores aparecem"
             fullWidth
@@ -147,10 +147,10 @@ export function MappingStep({ content, mapping, onChange, apiColumns, live }: Ma
             {columnOptions(true)}
           </Select>
         </Field>
-        <label className="flex cursor-pointer items-start justify-between gap-3 text-[13px] font-medium text-fg">
+        <label className="flex cursor-pointer items-start justify-between gap-3 text-caption font-medium text-fg">
           <span>
             Inverter sinal dos valores
-            <span className="mt-0.5 block text-xs font-normal text-muted">Para faturas de cartão que listam as compras como valores positivos.</span>
+            <span className="mt-0.5 block text-mini font-normal text-muted">Para faturas de cartão que listam as compras como valores positivos.</span>
           </span>
           <Switch checked={mapping.invertSign} onCheckedChange={(c) => set({ invertSign: c })} aria-label="Inverter sinal dos valores" />
         </label>
@@ -159,8 +159,8 @@ export function MappingStep({ content, mapping, onChange, apiColumns, live }: Ma
       <section aria-label="Prévia da leitura" aria-busy={live.loading} className="flex min-w-0 flex-col rounded-xl border border-border">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div>
-            <h3 className="text-sm font-semibold text-fg">Prévia</h3>
-            <p className="text-xs text-muted" aria-live="polite">
+            <h3 className="text-body-sm font-semibold text-fg">Prévia</h3>
+            <p className="text-mini text-muted" aria-live="polite">
               {live.data
                 ? `${live.data.totals.count} ${live.data.totals.count === 1 ? 'lançamento lido' : 'lançamentos lidos'}`
                 : live.loading
@@ -171,15 +171,15 @@ export function MappingStep({ content, mapping, onChange, apiColumns, live }: Ma
           {live.loading ? <LoaderCircle className="size-4 animate-spin text-muted" aria-hidden /> : null}
         </div>
         {live.error ? (
-          <p role="alert" className="m-4 flex items-start gap-2 rounded-md bg-danger-soft/60 px-3 py-2.5 text-[13px] text-danger">
+          <p role="alert" className="m-4 flex items-start gap-2 rounded-md bg-danger-soft/60 px-3 py-2.5 text-caption text-danger">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {live.error}
           </p>
         ) : null}
         {rows.length ? (
           <div className={cn('overflow-x-auto', live.loading && 'opacity-60')}>
-            <table className="w-full text-[13px]">
+            <table className="w-full text-caption">
               <thead>
-                <tr className="text-left text-xs font-medium text-muted">
+                <tr className="text-left text-mini font-medium text-muted">
                   <th scope="col" className="w-28 px-4 py-2 font-semibold">Data</th>
                   <th scope="col" className="px-2 py-2 font-semibold">Descrição</th>
                   <th scope="col" className="px-4 py-2 text-right font-semibold">Valor</th>
@@ -201,11 +201,11 @@ export function MappingStep({ content, mapping, onChange, apiColumns, live }: Ma
               </tbody>
             </table>
             {rows.length > SAMPLE_ROWS ? (
-              <p className="border-t border-border px-4 py-2 text-xs text-muted">e mais {rows.length - SAMPLE_ROWS} na revisão.</p>
+              <p className="border-t border-border px-4 py-2 text-mini text-muted">e mais {rows.length - SAMPLE_ROWS} na revisão.</p>
             ) : null}
           </div>
         ) : !live.loading && !live.error ? (
-          <p className="px-4 py-8 text-center text-sm text-muted">Nenhum lançamento lido com este mapeamento.</p>
+          <p className="px-4 py-8 text-center text-body-sm text-muted">Nenhum lançamento lido com este mapeamento.</p>
         ) : null}
       </section>
     </div>

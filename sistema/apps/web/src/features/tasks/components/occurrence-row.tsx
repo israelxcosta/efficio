@@ -119,18 +119,18 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className={cn('min-w-[4.5rem] truncate text-sm font-semibold', o.pending === 0 ? 'text-muted' : 'text-fg')}>{o.name}</span>
+              <span className={cn('min-w-[4.5rem] truncate text-body-sm font-semibold', o.pending === 0 ? 'text-muted' : 'text-fg')}>{o.name}</span>
               <Badge tone="neutral" className="shrink-0 px-1.5 @md:px-2" title="Recorrente">
                 <Repeat aria-hidden />
                 <span className="sr-only @md:not-sr-only">Recorrente</span>
               </Badge>
             </span>
-            <span className="mt-0.5 block truncate text-xs text-muted">
+            <span className="mt-0.5 block truncate text-mini text-muted">
               {pendingText(o, Boolean(mine))}
               {showDepartment && o.department ? ` · ${o.department.name}` : ''}
               {o.period === 'weekly' ? ` · ${periodLabel(o, today)}` : ''}
             </span>
-            <span className={cn('mt-0.5 block truncate text-xs', compact ? '@2xl:hidden' : '@xl:hidden', DUE_TONE_CLASS[inline.tone])}>{inline.text}</span>
+            <span className={cn('mt-0.5 block truncate text-mini', compact ? '@2xl:hidden' : '@xl:hidden', DUE_TONE_CLASS[inline.tone])}>{inline.text}</span>
           </span>
         </button>
         {!compact ? (
@@ -144,7 +144,7 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
               {names.length === 1 ? (
                 <>
                   <MemberAvatar name={names[0]} />
-                  {!compact ? <span className="truncate text-[13px] text-fg">{shortName(names[0]!)}</span> : null}
+                  {!compact ? <span className="truncate text-caption text-fg">{shortName(names[0]!)}</span> : null}
                 </>
               ) : names.length ? (
                 <AvatarStack names={names} max={3} />
@@ -157,7 +157,7 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
         ) : null}
         {!compact ? (
           <div className="hidden w-36 @4xl:block">
-            <span className="tabular text-[13px] text-muted">
+            <span className="tabular text-caption text-muted">
               {/* In "Abertas" the view only has the pending ones: say so instead of a misleading 0/N. */}
               {o.done === 0 && o.pending === live ? `${o.pending} ${o.pending === 1 ? 'pendente' : 'pendentes'}` : `${o.done}/${live} concluídas`}
             </span>
@@ -165,11 +165,11 @@ export function RecurringOccurrenceRow({ occurrence: o, today, density = 'defaul
         ) : null}
         <div className={cn('hidden min-w-0 text-right', compact ? 'w-44 @2xl:block' : 'w-48 @xl:block')}>
           <Tooltip content={deadlineTip(o, today)}>
-            <p className="tabular text-[13px] font-medium text-fg" tabIndex={-1}>
+            <p className="tabular text-caption font-medium text-fg" tabIndex={-1}>
               {listDate(o.targetDate, today)}
             </p>
           </Tooltip>
-          <span className={cn('block truncate text-xs', DUE_TONE_CLASS[deadline.tone])} title={deadline.text}>
+          <span className={cn('block truncate text-mini', DUE_TONE_CLASS[deadline.tone])} title={deadline.text}>
             {deadline.text}
           </span>
         </div>

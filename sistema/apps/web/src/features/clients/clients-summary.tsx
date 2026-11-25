@@ -178,7 +178,7 @@ export function ClientsSummary({ summary, items, filter, onFilter, onOpenFees }:
           </Label>
           {summary ? (
             <>
-              <p className="tabular mt-1 text-[32px] leading-10 font-semibold tracking-tight whitespace-nowrap text-fg lg:text-[28px] xl:text-[32px]">
+              <p className="tabular mt-1 text-display font-semibold tracking-tight whitespace-nowrap text-fg">
                 {formatBRL(summary.monthlyFees ?? 0)}
               </p>
               <p className="mt-1 text-body-sm text-muted">

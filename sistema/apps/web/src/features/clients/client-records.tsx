@@ -118,7 +118,7 @@ export function CredentialField({ clientId, clientName, field, stored }: { clien
     <span className="flex flex-col gap-1">
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {/* `translate="no"`: the browser's page translation would send the value to an outside service. */}
-        <span className="notranslate w-full font-mono text-sm break-all text-fg sm:w-auto" data-sensitive translate="no">
+        <span className="notranslate w-full font-mono text-body-sm break-all text-fg sm:w-auto" data-sensitive translate="no">
           {value}
         </span>
         <span className="flex items-center gap-1">
@@ -168,15 +168,15 @@ export function ClientAccesses({ client: c, footer }: { client: Client; footer?:
       <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         {simples ? (
           <div>
-            <dt className="text-xs font-medium text-muted">{CLIENT_CREDENTIAL_FIELD_LABELS.simplesAccessCode}</dt>
-            <dd className="mt-0.5 text-sm">
+            <dt className="text-mini font-medium text-muted">{CLIENT_CREDENTIAL_FIELD_LABELS.simplesAccessCode}</dt>
+            <dd className="mt-0.5 text-body-sm">
               <CredentialField clientId={c.id} clientName={c.tradeName || c.name} field="simplesAccessCode" stored={c.credentials.simplesAccessCode} />
             </dd>
           </div>
         ) : null}
         <div>
-          <dt className="text-xs font-medium text-muted">{CLIENT_CREDENTIAL_FIELD_LABELS.accountantPassword}</dt>
-          <dd className="mt-0.5 text-sm">
+          <dt className="text-mini font-medium text-muted">{CLIENT_CREDENTIAL_FIELD_LABELS.accountantPassword}</dt>
+          <dd className="mt-0.5 text-body-sm">
             <CredentialField clientId={c.id} clientName={c.tradeName || c.name} field="accountantPassword" stored={c.credentials.accountantPassword} />
           </dd>
         </div>
@@ -243,12 +243,12 @@ export function ClientDocumentsList({
             <li key={d.id} className="group flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-muted">
               <NeutralIcon icon={documentIcon(d.kind)} size="sm" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-fg">{d.name.replace(/\s*\([^)]*\)$/, '')}</span>
-                {d.note ? <span className="block truncate text-xs text-muted">{d.note}</span> : null}
+                <span className="block truncate text-body-sm text-fg">{d.name.replace(/\s*\([^)]*\)$/, '')}</span>
+                {d.note ? <span className="block truncate text-mini text-muted">{d.note}</span> : null}
               </span>
               <span className="flex shrink-0 flex-col items-end text-right">
-                <span className="tabular text-[13px] font-medium text-fg">{d.expiresAt ? formatDateBR(d.expiresAt) : '—'}</span>
-                <span className={cn('text-xs', deadlineClass(d.deadline))}>{deadlineLabel(d.deadline, 'Sem vencimento')}</span>
+                <span className="tabular text-caption font-medium text-fg">{d.expiresAt ? formatDateBR(d.expiresAt) : '—'}</span>
+                <span className={cn('text-mini', deadlineClass(d.deadline))}>{deadlineLabel(d.deadline, 'Sem vencimento')}</span>
               </span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -304,11 +304,11 @@ export function ClientUnionsList({ client: c }: { client: Client }) {
               <Link to={`/tarefas/cadastros?aba=sindicatos&sindicato=${u.id}`} className="flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-muted">
                 <NeutralIcon icon={Scale} size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className={cn('block truncate text-sm', u.active ? 'text-fg' : 'text-muted')}>
+                  <span className={cn('block truncate text-body-sm', u.active ? 'text-fg' : 'text-muted')}>
                     {[u.name, u.category].filter(Boolean).join(' · ')}
                     {!u.active ? ' · inativo' : ''}
                   </span>
-                  <span className={cn('block truncate text-xs', u.tracked ? deadlineClass(u.tracked) : 'text-subtle')}>
+                  <span className={cn('block truncate text-mini', u.tracked ? deadlineClass(u.tracked) : 'text-subtle')}>
                     {u.tracked
                       ? `Convenção ${u.tracked.label} ${u.tracked.bucket === 'overdue' ? 'venceu' : 'vence'} em ${formatDateBR(u.tracked.dueDate)}`
                       : 'Sem data-base'}

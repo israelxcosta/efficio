@@ -113,16 +113,16 @@ export default function InvitePage() {
           </span>
           <div className="min-w-0">
             <p className="truncate font-semibold">{invite.workspaceName}</p>
-            <p className="text-xs text-muted">
+            <p className="text-mini text-muted">
               {WORKSPACE_KIND_LABELS[invite.workspaceKind]} · como <strong className="font-semibold text-fg">{ROLE_LABELS[invite.role]}</strong>
             </p>
-            <p className="mt-0.5 text-xs text-subtle">{ROLE_HINTS[invite.role]}</p>
+            <p className="mt-0.5 text-mini text-subtle">{ROLE_HINTS[invite.role]}</p>
           </div>
         </div>
 
         {invite.expired ? null : !user ? (
           <>
-            <p className="text-sm text-muted">
+            <p className="text-body-sm text-muted">
               Entre ou crie uma conta com <strong className="font-semibold text-fg">{invite.email}</strong> para aceitar.
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -139,7 +139,7 @@ export default function InvitePage() {
             Aceitar convite
           </Button>
         ) : (
-          <div className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3.5 text-sm">
+          <div className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3.5 text-body-sm">
             <p className="inline-flex items-center gap-2 font-semibold text-warning">
               <MailWarning className="size-4" /> Convite para outro e-mail
             </p>

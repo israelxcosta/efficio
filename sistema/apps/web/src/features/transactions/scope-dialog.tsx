@@ -111,8 +111,8 @@ export function ScopeDialog({ open, onOpenChange, action, kind, loading, onConfi
               {scope === s ? <span className="size-2 rounded-full bg-primary" /> : null}
             </span>
             <span>
-              <span className="block text-sm font-semibold text-fg">{copy[s].label}</span>
-              <span className="block text-xs text-muted">{copy[s].hint}</span>
+              <span className="block text-body-sm font-semibold text-fg">{copy[s].label}</span>
+              <span className="block text-mini text-muted">{copy[s].hint}</span>
             </span>
           </button>
         ))}

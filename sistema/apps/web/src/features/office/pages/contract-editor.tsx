@@ -268,7 +268,7 @@ function EditorBody({ template, sample }: { template: ContractTemplateResponse; 
           <p className="font-semibold text-danger">
             {unknown.length === 1 ? '1 campo que o sistema não reconhece' : `${unknown.length} campos que o sistema não reconhece`}
           </p>
-          <p className="mt-1 font-mono text-xs break-words text-fg">{unknown.join(' · ')}</p>
+          <p className="mt-1 font-mono text-mini break-words text-fg">{unknown.join(' · ')}</p>
           <p className="mt-1 text-muted">Saem do jeito que estão escritos. Confira a grafia ou troque por um campo da lista.</p>
         </div>
       ) : null}
@@ -277,7 +277,7 @@ function EditorBody({ template, sample }: { template: ContractTemplateResponse; 
           <p className="font-semibold text-warning">
             {missingFactory.length === 1 ? '1 campo do modelo de fábrica não aparece mais' : `${missingFactory.length} campos do modelo de fábrica não aparecem mais`}
           </p>
-          <p className="mt-1 font-mono text-xs break-words text-fg">{missingFactory.join(' · ')}</p>
+          <p className="mt-1 font-mono text-mini break-words text-fg">{missingFactory.join(' · ')}</p>
           <p className="mt-1 text-muted">Sem eles, o contrato sai sem esses dados. Pode ser intencional.</p>
         </div>
       ) : null}
@@ -318,7 +318,7 @@ function EditorBody({ template, sample }: { template: ContractTemplateResponse; 
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-1.5">
-                <label className="text-sm font-medium text-fg" htmlFor="watermark-enabled">
+                <label className="text-body-sm font-medium text-fg" htmlFor="watermark-enabled">
                   Usar marca d'água
                 </label>
                 <HelpTip>Aparece atrás do texto em todas as páginas. PNG, JPG ou WebP até 500 KB.</HelpTip>
@@ -336,7 +336,7 @@ function EditorBody({ template, sample }: { template: ContractTemplateResponse; 
               ) : null}
             </div>
             {watermarkError ? (
-              <p role="alert" className="text-xs font-medium text-danger">
+              <p role="alert" className="text-mini font-medium text-danger">
                 {watermarkError}
               </p>
             ) : null}
@@ -562,7 +562,7 @@ function BlockRow({
         />
       )}
       {error ? (
-        <p role="alert" className="text-xs font-medium text-danger">
+        <p role="alert" className="text-mini font-medium text-danger">
           {error}
         </p>
       ) : warning ? (

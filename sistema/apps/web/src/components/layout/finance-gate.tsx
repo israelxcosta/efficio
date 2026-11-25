@@ -64,12 +64,12 @@ export function RestrictedAccess({ message = FINANCE_ONLY_REASON }: { message?: 
       <span className="flex size-10 items-center justify-center rounded-full bg-bg-subtle text-muted" aria-hidden>
         <LockKeyhole className="size-5" />
       </span>
-      <h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold tracking-tight outline-none">
+      <h1 ref={heading} tabIndex={-1} className="text-title font-semibold tracking-tight outline-none">
         Acesso restrito
       </h1>
-      <p className="max-w-md text-sm text-muted">{message}</p>
+      <p className="max-w-md text-body-sm text-muted">{message}</p>
       {ask && ask.names.length ? (
-        <p className="max-w-md text-sm text-muted">
+        <p className="max-w-md text-body-sm text-muted">
           Para pedir acesso, fale com <strong className="font-semibold text-fg">{ask.names[0]}</strong>
           {ask.names[1] ? (
             <>

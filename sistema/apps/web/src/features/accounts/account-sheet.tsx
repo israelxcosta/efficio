@@ -117,8 +117,8 @@ export function AccountSheet({ open, onOpenChange, account }: { open: boolean; o
         <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
           <label className="flex cursor-pointer items-center justify-between gap-4">
             <span>
-              <span className="block text-sm font-semibold">Incluir no saldo total</span>
-              <span className="block text-xs text-muted">
+              <span className="block text-body-sm font-semibold">Incluir no saldo total</span>
+              <span className="block text-mini text-muted">
                 {type === 'investment' ? 'Investimentos são somados à parte, no total investido.' : 'Soma esta conta no "Saldo em contas" do dashboard.'}
               </span>
             </span>
@@ -127,8 +127,8 @@ export function AccountSheet({ open, onOpenChange, account }: { open: boolean; o
           {account ? (
             <label className="flex cursor-pointer items-center justify-between gap-4 border-t border-border pt-3">
               <span>
-                <span className="block text-sm font-semibold">Arquivada</span>
-                <span className="block text-xs text-muted">Oculta a conta das listas sem apagar o histórico.</span>
+                <span className="block text-body-sm font-semibold">Arquivada</span>
+                <span className="block text-mini text-muted">Oculta a conta das listas sem apagar o histórico.</span>
               </span>
               <Controller control={control} name="archived" render={({ field }) => <Switch checked={Boolean(field.value)} onCheckedChange={field.onChange} />} />
             </label>

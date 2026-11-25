@@ -37,10 +37,10 @@ export const AccountMenuTrigger = forwardRef<HTMLButtonElement, { workspace: { n
 export function AccountMenuHeader({ name, email, workspace, kindLabel }: { name: string; email: string; workspace: string; kindLabel: string }) {
   return (
     <div className="px-2.5 pb-2">
-      <p className="truncate text-sm font-semibold">{name}</p>
-      <p className="truncate text-xs text-muted">{email}</p>
+      <p className="truncate text-body-sm font-semibold">{name}</p>
+      <p className="truncate text-mini text-muted">{email}</p>
       {workspace ? (
-        <p className="mt-1.5 truncate text-xs text-muted">
+        <p className="mt-1.5 truncate text-mini text-muted">
           Escritório: <span className="font-semibold text-fg">{workspace}</span> · {kindLabel}
         </p>
       ) : null}

@@ -67,7 +67,7 @@ function collect(children: ReactNode): Entry[] {
 }
 
 const itemClass =
-  'relative flex cursor-pointer select-none items-center rounded-lg py-2 pr-9 pl-3 text-sm text-fg outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle data-[state=checked]:font-semibold';
+  'relative flex cursor-pointer select-none items-center rounded-lg py-2 pr-9 pl-3 text-body-sm text-fg outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-bg-subtle data-[state=checked]:font-semibold';
 
 /**
  * Design-system select: the same API as a native `<select>` (children are `<option>`/`<optgroup>`,
@@ -170,7 +170,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           className={cn(
             inputClasses,
             'group/select flex cursor-pointer items-center justify-between gap-2 text-left data-[state=open]:border-brand-500 data-[state=open]:ring-[3px] data-[state=open]:ring-brand-500/15',
-            size_ === 'sm' && 'h-9 rounded-[10px] text-[13px]',
+            size_ === 'sm' && 'h-9 rounded-[10px] text-caption',
             className,
           )}
         >
@@ -199,7 +199,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
                 isGroup(e) ? (
                   <RS.Group key={`g-${e.label}-${i}`}>
                     {i > 0 ? <RS.Separator className="mx-2 my-1.5 h-px bg-border" /> : null}
-                    <RS.Label className="px-3 pt-1.5 pb-1 text-xs font-semibold text-subtle">
+                    <RS.Label className="px-3 pt-1.5 pb-1 text-mini font-semibold text-subtle">
                       {e.label}
                     </RS.Label>
                     {e.options.map(renderItem)}

@@ -107,7 +107,7 @@ export default function TaskClientsPage() {
               <SummaryLabel>Clientes ativos</SummaryLabel>
               {ready ? (
                 <div className="flex items-center gap-4 md:block">
-                  <p className="tabular mt-1 text-[32px] leading-10 font-semibold tracking-tight text-fg lg:text-[28px] xl:text-[32px]">{active.length}</p>
+                  <p className="tabular mt-1 text-display font-semibold tracking-tight text-fg">{active.length}</p>
                   {inactiveCount > 0 ? (
                     <button
                       type="button"
@@ -232,10 +232,10 @@ export default function TaskClientsPage() {
               </option>
             ))}
           </Select>
-          {ready ? <span className="ml-auto text-xs text-muted">{pluralize(filtered.length, 'cliente', 'clientes')}</span> : null}
+          {ready ? <span className="ml-auto text-mini text-muted">{pluralize(filtered.length, 'cliente', 'clientes')}</span> : null}
         </div>
 
-        <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-xs font-medium text-muted @xl:flex">
+        <div className="hidden items-center gap-3 border-b border-border px-5.5 py-2.5 text-mini font-medium text-muted @xl:flex">
           <span className="flex-1">Cliente</span>
           <span className="hidden w-40 @3xl:block">CNPJ</span>
           <span className="hidden w-36 @2xl:block">Regime</span>
@@ -279,7 +279,7 @@ export default function TaskClientsPage() {
           )}
         </div>
         {filtered.length > PAGE_SIZE ? (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-body-sm text-muted">
             <span>
               Página {page} de {totalPages} · {filtered.length} clientes
             </span>
@@ -336,24 +336,24 @@ function ClientRow({ client: c, docAlert, work }: ClientRowProps) {
   return (
     <div className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-surface-muted @lg:px-4">
       <Link to={href} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-soft-fg" aria-hidden>
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-mini font-bold text-primary-soft-fg" aria-hidden>
           {initials(name)}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className={cn('min-w-[4.5rem] truncate text-sm font-semibold', inactive ? 'text-muted' : 'text-fg')}>{name}</span>
+            <span className={cn('min-w-[4.5rem] truncate text-body-sm font-semibold', inactive ? 'text-muted' : 'text-fg')}>{name}</span>
             {inactive ? <Badge tone="neutral">Inativo</Badge> : null}
           </span>
           {docAlert?.mostUrgent ? (
-            <span className={cn('mt-0.5 block truncate text-xs', docAlert.mostUrgent.deadline.bucket === 'overdue' ? 'text-danger' : 'text-warning')}>
+            <span className={cn('mt-0.5 block truncate text-mini', docAlert.mostUrgent.deadline.bucket === 'overdue' ? 'text-danger' : 'text-warning')}>
               {mostUrgentText(docAlert.mostUrgent)}
             </span>
           ) : (
-            <span className="mt-0.5 block truncate text-xs text-muted">
+            <span className="mt-0.5 block truncate text-mini text-muted">
               {inactive && c.inactivation ? `Inativo desde ${formatDateBR(c.inactivation.date)}` : c.tradeName ? c.name : TAX_REGIME_LABELS[c.taxRegime]}
             </span>
           )}
-          <span className="mt-0.5 block truncate text-xs text-muted @3xl:hidden">
+          <span className="mt-0.5 block truncate text-mini text-muted @3xl:hidden">
             <span className="tabular">{formatCNPJ(c.document)}</span>
             <span className="@2xl:hidden"> · {TAX_REGIME_LABELS[c.taxRegime]}</span>
           </span>
@@ -362,11 +362,11 @@ function ClientRow({ client: c, docAlert, work }: ClientRowProps) {
       <span className="tabular hidden w-40 text-body-sm text-muted @3xl:block">{formatCNPJ(c.document)}</span>
       <span className="hidden w-36 min-w-0 @2xl:block">
         <span className="block truncate text-body-sm text-fg">{TAX_REGIME_LABELS[c.taxRegime]}</span>
-        {c.simplesAnnex ? <span className="block text-xs text-muted">Anexo {c.simplesAnnex}</span> : null}
+        {c.simplesAnnex ? <span className="block text-mini text-muted">Anexo {c.simplesAnnex}</span> : null}
       </span>
       <Link to={tasksHref({ scope: 'all', client: c.id })} className="hidden w-24 text-right leading-tight @lg:block" aria-label={`Tarefas de ${name}`}>
         <span className={cn('tabular block text-body-sm', work?.open ? 'text-fg' : 'text-subtle')}>{work?.open ?? 0} {work?.open === 1 ? 'aberta' : 'abertas'}</span>
-        {work?.overdue ? <span className="tabular block text-xs font-semibold text-danger">{work.overdue} {work.overdue === 1 ? 'atrasada' : 'atrasadas'}</span> : null}
+        {work?.overdue ? <span className="tabular block text-mini font-semibold text-danger">{work.overdue} {work.overdue === 1 ? 'atrasada' : 'atrasadas'}</span> : null}
       </Link>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

@@ -126,7 +126,7 @@ export function EvolutionTab() {
         {kpis.map((k) => (
           <div key={k.key} className="px-4 py-3">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-medium text-muted [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-subtle">
+              <span className="flex min-w-0 items-center gap-1.5 text-mini font-medium text-muted [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-subtle">
                 {KPI_ICONS[k.key]}
                 <span className="truncate">{k.label}</span>
               </span>

@@ -91,7 +91,7 @@ export default function MyAreaPage() {
   const obligation = home.data?.obligations.items.find((x) => x.pending > 0) ?? null;
 
   return (
-    <div className="calm-text flex flex-col gap-6">
+    <div className="calm-text flex flex-col gap-5">
       <PageHeader
         title={user ? greeting(officeHour(new Date()), user.name) : 'Minha área'}
         description={myAreaDescription(today, role, department?.name ?? null, overview.dataUpdatedAt ? updated : '')}

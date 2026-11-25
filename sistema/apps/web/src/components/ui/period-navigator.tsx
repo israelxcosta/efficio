@@ -27,20 +27,23 @@ export function PeriodNavigator({ value, onChange, modes = ['day', 'week', 'mont
           options={modes.map((m) => ({ value: m, label: PERIOD_MODE_LABELS[m] }))}
         />
       ) : null}
-      <div className="flex items-center gap-1 rounded-md border border-border bg-surface p-1 shadow-xs">
-        <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Período anterior" onClick={() => onChange(shiftPeriod(value, -1))}>
-          <ChevronLeft />
-        </Button>
-        <span className="min-w-[150px] px-1 text-center text-[13px] font-semibold text-fg tabular" aria-live="polite">
-          {periodLabel(value)}
-        </span>
-        <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Próximo período" onClick={() => onChange(shiftPeriod(value, 1))}>
-          <ChevronRight />
+      {/* Arrows and "Hoje" stay on one line: on a phone "Hoje" never drops alone below. */}
+      <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 rounded-md border border-border bg-surface p-1 shadow-xs">
+          <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Período anterior" onClick={() => onChange(shiftPeriod(value, -1))}>
+            <ChevronLeft />
+          </Button>
+          <span className="min-w-[150px] px-1 text-center text-caption font-semibold text-fg tabular" aria-live="polite">
+            {periodLabel(value)}
+          </span>
+          <Button variant="ghost" size="icon-sm" className={HIT_44} aria-label="Próximo período" onClick={() => onChange(shiftPeriod(value, 1))}>
+            <ChevronRight />
+          </Button>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => onChange({ mode: value.mode, anchor: todayISO() })}>
+          Hoje
         </Button>
       </div>
-      <Button variant="ghost" size="sm" onClick={() => onChange({ mode: value.mode, anchor: todayISO() })}>
-        Hoje
-      </Button>
     </div>
   );
 }

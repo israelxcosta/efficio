@@ -196,7 +196,7 @@ export default function FeeAdjustmentPage() {
           </>
         }
       >
-        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-body-sm">
           <dt className="text-muted">Cálculo</dt>
           <dd className="font-medium text-fg tabular">{plan.memory}</dd>
           <dt className="text-muted">Honorários</dt>
@@ -207,12 +207,12 @@ export default function FeeAdjustmentPage() {
           <dd className="text-fg">{adjustEmployeeFee ? 'Reajustada também' : 'Mantida'}</dd>
         </dl>
         {totals.late ? (
-          <p className="mt-4 flex items-start gap-2 rounded-lg bg-danger-soft/60 p-3 text-[13px] text-danger">
+          <p className="mt-4 flex items-start gap-2 rounded-lg bg-danger-soft/60 p-3 text-caption text-danger">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
             {totals.late === 1 ? '1 cliente já passou do prazo do aviso de 30 dias.' : `${totals.late} clientes já passaram do prazo do aviso de 30 dias.`}
           </p>
         ) : null}
-        <p className="mt-4 text-xs text-muted">Para desfazer, exclua a nova vigência no cadastro do cliente.</p>
+        <p className="mt-4 text-mini text-muted">Para desfazer, exclua a nova vigência no cadastro do cliente.</p>
       </Modal>
     </div>
   );

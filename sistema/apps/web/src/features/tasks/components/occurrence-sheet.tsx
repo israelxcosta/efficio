@@ -167,7 +167,7 @@ function RecurringOccurrenceSheet({ open, id, period, initialView, onClose, onOp
             </div>
             <div className="relative min-w-0 flex-1 sm:min-w-40">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar cliente" className="h-9 rounded-[10px] pl-9 text-[13px]" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar cliente" className="h-9 rounded-[10px] pl-9 text-caption" />
             </div>
             {options.data ? (
               <MemberPicker
@@ -284,10 +284,10 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
         <OccurrenceStatusGlyph cell={cell} large label={`${detail.name}, ${cell.client.name}: ${cellTip(cell, department)}`} />
       )}
       <div className="min-w-0 flex-1">
-        <button type="button" onClick={onOpenTask} className={cn('block max-w-full truncate rounded-sm text-left text-sm font-semibold hover:underline', canceled ? 'text-muted' : 'text-fg')}>
+        <button type="button" onClick={onOpenTask} className={cn('block max-w-full truncate rounded-sm text-left text-body-sm font-semibold hover:underline', canceled ? 'text-muted' : 'text-fg')}>
           {cell.client.name}
         </button>
-        <p className="truncate text-xs text-muted">
+        <p className="truncate text-mini text-muted">
           {TAX_REGIME_LABELS[cell.client.taxRegime]}
           <span className="sm:hidden"> · {cell.assignee ? shortName(cell.assignee.name) : 'Ex-membro'}</span>
         </p>
@@ -301,7 +301,7 @@ export function OccurrenceClientRow({ cell, detail, today, members, meId, onOpen
       <Tooltip content={sourceTip}>
         <span className="hidden w-32 min-w-0 items-center gap-2 sm:flex" tabIndex={-1}>
           <MemberAvatar name={cell.assignee?.name} unassigned={!cell.assignee} userId={cell.assignee?.id} />
-          <span className={cn('truncate text-[13px]', cell.assignee ? 'text-fg' : 'text-subtle')}>{cell.assignee ? shortName(cell.assignee.name) : 'Ex-membro'}</span>
+          <span className={cn('truncate text-caption', cell.assignee ? 'text-fg' : 'text-subtle')}>{cell.assignee ? shortName(cell.assignee.name) : 'Ex-membro'}</span>
         </span>
       </Tooltip>
       <DropdownMenu>

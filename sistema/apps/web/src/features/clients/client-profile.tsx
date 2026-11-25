@@ -13,8 +13,8 @@ import {
 export function ProfileItem({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
   return (
     <div className={wide ? 'sm:col-span-2 xl:col-span-3' : undefined}>
-      <dt className="text-xs font-medium text-muted">{label}</dt>
-      <dd className="mt-0.5 text-sm break-words text-fg">{children || <span className="text-subtle">—</span>}</dd>
+      <dt className="text-mini font-medium text-muted">{label}</dt>
+      <dd className="mt-0.5 text-body-sm break-words text-fg">{children || <span className="text-subtle">—</span>}</dd>
     </div>
   );
 }
@@ -58,7 +58,7 @@ export function ClientProfile({ client: c, contractExtra, showContacts = true, s
   return (
     <div className="flex flex-col gap-6">
       {c.inactivation ? (
-        <div className="rounded-lg border border-border bg-surface-muted p-3 text-sm">
+        <div className="rounded-lg border border-border bg-surface-muted p-3 text-body-sm">
           <p className="font-semibold text-fg">
             Inativado em {formatDateBR(c.inactivation.date)} — {INACTIVATION_REASON_LABELS[c.inactivation.reason]}
           </p>
@@ -107,7 +107,7 @@ export function ClientProfile({ client: c, contractExtra, showContacts = true, s
       {showNotes && c.notes ? (
         <section className="flex flex-col gap-2">
           <p className="eyebrow text-brand-text">Observações</p>
-          <p className="text-sm whitespace-pre-line text-fg">{c.notes}</p>
+          <p className="text-body-sm whitespace-pre-line text-fg">{c.notes}</p>
         </section>
       ) : null}
     </div>

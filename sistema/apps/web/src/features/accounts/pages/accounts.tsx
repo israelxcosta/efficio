@@ -67,7 +67,7 @@ export default function AccountsPage() {
         title="Contas e carteiras"
         actions={
           <>
-            <label className="mr-2 flex cursor-pointer items-center gap-2 text-[13px] font-medium text-muted">
+            <label className="mr-2 flex cursor-pointer items-center gap-2 text-caption font-medium text-muted">
               <Switch checked={showArchived} onCheckedChange={setShowArchived} aria-label="Mostrar arquivadas" /> Arquivadas
             </label>
             {openFinance.enabled ? (
@@ -121,7 +121,7 @@ export default function AccountsPage() {
               <div className="flex items-start gap-3">
                 <BankLogo bank={a.bank} color={a.color} size="lg" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-semibold">{a.name}</p>
+                  <p className="truncate text-title-sm font-semibold">{a.name}</p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     <Badge tone={a.type === 'investment' ? 'brand' : 'neutral'}>{ACCOUNT_TYPE_LABELS[a.type]}</Badge>
                     {!a.includeInTotal && a.type !== 'investment' ? <Badge tone="warning">Fora do total</Badge> : null}
@@ -149,11 +149,11 @@ export default function AccountsPage() {
                 </DropdownMenu>
               </div>
               <div>
-                <p className="text-xs font-medium text-muted">Saldo atual</p>
-                <p className={cn('tabular mt-1 text-[26px] font-semibold tracking-tight', a.balance < 0 && 'text-danger')}>{formatBRL(a.balance)}</p>
+                <p className="text-mini font-medium text-muted">Saldo atual</p>
+                <p className={cn('tabular mt-1 text-kpi font-semibold tracking-tight', a.balance < 0 && 'text-danger')}>{formatBRL(a.balance)}</p>
               </div>
               <div
-                className="flex items-center justify-between rounded-md px-3 py-2 text-xs"
+                className="flex items-center justify-between rounded-md px-3 py-2 text-mini"
                 style={{ backgroundColor: alpha(a.color, 0.08) }}
               >
                 <span className="text-muted">Previsto fim do mês</span>

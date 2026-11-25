@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { HelpTip } from './help-tip';
 
 export const inputClasses =
-  'h-11 w-full rounded-md border border-border bg-surface px-3.5 text-sm text-fg shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-subtle hover:border-border-strong focus:border-brand-500 focus:ring-[3px] focus:ring-brand-500/15 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:opacity-70 aria-[invalid=true]:border-danger aria-[invalid=true]:focus:ring-danger/15';
+  'h-11 w-full rounded-md border border-border bg-surface px-3.5 text-body-sm text-fg shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-subtle hover:border-border-strong focus:border-brand-500 focus:ring-[3px] focus:ring-brand-500/15 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:opacity-70 aria-[invalid=true]:border-danger aria-[invalid=true]:focus:ring-danger/15';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
@@ -19,7 +19,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 );
 
 export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
-  return <label className={cn('text-[13px] font-medium text-fg', className)} {...props} />;
+  return <label className={cn('text-caption font-medium text-fg', className)} {...props} />;
 }
 
 interface FieldProps {
@@ -73,12 +73,12 @@ export function Field({ label, hint, error, className, aside, children }: FieldP
       ) : null}
       {control}
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-xs font-medium text-danger">
+        <p id={`${id}-error`} role="alert" className="text-mini font-medium text-danger">
           {error}
         </p>
       ) : hint ? (
         // With a label the hint lives in the "?" balloon; screen readers still get it as the description.
-        <p id={`${id}-hint`} className={label ? 'sr-only' : 'text-xs text-muted'}>
+        <p id={`${id}-hint`} className={label ? 'sr-only' : 'text-mini text-muted'}>
           {hint}
         </p>
       ) : null}
