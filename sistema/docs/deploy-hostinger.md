@@ -15,7 +15,24 @@ dentro do banco e o backup diário sai cifrado. Os arquivos do kit estão em `si
 
 > Convenções: linhas que começam com `PS>` são digitadas no **PowerShell do seu computador**; as
 > demais, **no servidor** (dentro da conexão SSH). Troque `IP-DO-VPS` pelo IP mostrado no painel da
-> Hostinger.
+> Hostinger (hPanel → **VPS** → seu servidor → visão geral).
+
+## Resumo (revisado em 25/11/2026)
+
+| # | Passo | Onde | Tempo |
+|---|-------|------|-------|
+| 1 | Contratar o VPS **KVM 1** com Ubuntu 24.04 e ativar as duas etapas nas contas | Hostinger, registro.br, GitHub | 15 min |
+| 2 | Criar a chave SSH e cadastrá-la no VPS | seu computador + hPanel | 10 min |
+| 3 | Apontar `efficio.com.br` e `www` para o IP do VPS (veja **onde** fica a zona DNS) | registro.br **ou** hPanel | 10 min + propagação |
+| 4 | Preparar o servidor (`install.sh`: firewall, fail2ban, Docker, SSH só com chave) | servidor | 20 min |
+| 5–6 | Gerar os segredos e configurar o e-mail (SMTP da Hostinger) | servidor | 10 min |
+| 7 | Subir o sistema (`atualizar.sh`: banco, migrações até a 0029, HTTPS automático) | servidor | 5–15 min |
+| 8 | Criar o proprietário, ativar as duas etapas e convidar a equipe | servidor + navegador | 15 min |
+| 9–10 | Ligar o backup diário, testar a restauração, cópia no Drive e monitoramento | servidor + navegador | 30 min |
+| 12 | Conferir o checklist de segurança | — | 10 min |
+
+O sistema só fica acessível depois do passo 7. Até lá, o domínio pode continuar como está, e o e-mail
+do escritório não é afetado em nenhum passo.
 
 ## 1. O que você precisa antes
 
@@ -26,6 +43,12 @@ dentro do banco e o backup diário sai cifrado. Os arquivos do kit estão em `si
 - Um **gerenciador de senhas** (Bitwarden, 1Password…) ou um caderno guardado em local seguro.
 - Ative a **verificação em duas etapas** na Hostinger, no registro.br e no GitHub: quem entra
   nessas contas controla o servidor e o domínio.
+- **Uma branch `main` com a versão a publicar.** O servidor instala e atualiza a partir da `main`.
+  Em 25/11/2026 o repositório ainda **não tinha `main`**: a branch padrão era a da landing page
+  (`claude/efficio-landing-page-kvpkf5`) e o sistema estava em `claude/zealous-maxwell-81aseb`. No
+  GitHub, crie a `main` a partir de `claude/zealous-maxwell-81aseb` (botão de branches → digite `main`
+  → "Create branch main from claude/zealous-maxwell-81aseb") e, em **Settings → General → Default
+  branch**, escolha `main`. As próximas versões entram na `main` por pull request.
 
 ## 2. Chave SSH (entrar no servidor sem senha)
 
@@ -41,25 +64,41 @@ dentro do banco e o backup diário sai cifrado. Os arquivos do kit estão em `si
 
 A chave privada (`id_ed25519`, sem `.pub`) nunca sai do seu computador.
 
-## 3. DNS no registro.br
+## 3. DNS: apontar o domínio para o VPS
 
-No registro.br, abra `efficio.com.br` → **DNS** → editar zona (modo avançado):
+### 3.1 Descubra onde a zona DNS é editada
 
-| Tipo | Nome | Valor |
-|------|------|-------|
-| A | (vazio / `efficio.com.br`) | IP-DO-VPS |
-| A | `www` | IP-DO-VPS |
+No **registro.br**, entre com sua conta → **Domínios** → `efficio.com.br` → veja a seção **DNS**:
+
+- **Os servidores DNS são `ns1.dns-parking.com` e `ns2.dns-parking.com`**: a zona é da **Hostinger**
+  (é o caso mais comum quando o e-mail do escritório está na Hostinger). Edite em **hPanel →
+  Domínios → `efficio.com.br` → DNS / Nameservers → Gerenciar registros DNS** e **não mude** os
+  servidores DNS no registro.br.
+- **O registro.br oferece "Configurar zona DNS"** (você usa o DNS do próprio Registro.br): edite a zona
+  ali. Se só aparecer o modo simples, ative o **modo avançado** para poder criar registros A.
+- **Outro provedor** (Cloudflare, hospedagem antiga…): edite a zona nesse provedor, ou passe a usar um
+  dos dois acima. Antes de trocar, copie todos os registros de e-mail (MX, TXT, CNAME).
+
+Na dúvida, não troque os servidores DNS: só edite os registros onde a zona já está.
+
+### 3.2 Registros a criar ou ajustar
+
+| Tipo | Nome | Valor | TTL |
+|------|------|-------|-----|
+| A | (vazio / `@` / `efficio.com.br`) | IP-DO-VPS | 3600 (ou o padrão) |
+| A | `www` | IP-DO-VPS | 3600 (ou o padrão) |
 
 - **Apague** qualquer outro registro A, AAAA ou CNAME de `efficio.com.br` e `www` que aponte para
-  outro lugar (hospedagem antiga, "parking").
-- **Não crie AAAA (IPv6)** por enquanto: com o Docker padrão, acessos por IPv6 chegariam à API sem o
+  outro lugar (hospedagem antiga, "parking", site padrão da Hostinger).
+- **Não crie AAAA (IPv6)** por enquanto. Com o Docker padrão, um acesso por IPv6 chegaria à API sem o
   IP real da pessoa, e a proteção contra tentativas de senha (limite por IP) ficaria cega.
-- **Não mexa** nos registros de e-mail: MX, TXT (SPF, DKIM, DMARC) e CNAMEs como `autodiscover`
-  da Hostinger continuam como estão.
+- **Não mexa** nos registros de e-mail: MX, TXT (SPF, DKIM, DMARC) e CNAMEs como `autodiscover` da
+  Hostinger continuam como estão.
 - Opcional, se o painel oferecer: `CAA` em `efficio.com.br` com `0 issue "letsencrypt.org"`.
 
 Conferir (pode levar de minutos a algumas horas): `PS> nslookup efficio.com.br` e
-`PS> nslookup www.efficio.com.br` mostram o IP do VPS.
+`PS> nslookup www.efficio.com.br` mostram o IP do VPS. Também dá para conferir em dnschecker.org
+(registro A). O passo 7 só emite o certificado HTTPS depois que o DNS já aponta para o VPS.
 
 ## 4. Preparar o servidor
 
@@ -83,7 +122,7 @@ linha mostrada e **deixe desmarcado "Allow write access"**.
 ```bash
 # 4.3 Baixar o código. Na pergunta "Are you sure you want to continue connecting", confira se a
 # impressão digital é SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU (a oficial do GitHub) e digite yes.
-sudo -u efficio git clone git@github.com:israelxcosta/efficio.git /opt/efficio/app
+sudo -u efficio git clone --branch main git@github.com:israelxcosta/efficio.git /opt/efficio/app
 
 # 4.4 Preparação completa (atualizações automáticas, firewall, fail2ban, Docker, swap, SSH seguro)
 bash /opt/efficio/app/sistema/deploy/scripts/install.sh

@@ -1,5 +1,9 @@
 # Segurança — auditoria de 19–20/11/2026
 
+> **Atualização de 25/11/2026:** `auditoria-2026-11-25.md` revisou o que mudou depois desta auditoria
+> (conciliação, Recebimentos, sincronização de tarefas, migrações 0028/0029, painéis): 0 crítico/alto/médio,
+> 0 dependência vulnerável, 0 segredo; 2 itens informativos.
+
 Feita por 9 agentes especializados (`.claude/agents/security-*.md`), em paralelo, cada um no seu domínio.
 
 | Relatório | Agente | Resultado |
