@@ -62,6 +62,9 @@ Segurança (auditoria + correção com teste de regressão, um por linguagem/cam
 - Toda query do backend filtra pelo espaço (`workspace_id`); o RLS é a segunda barreira. Tabelas
   financeiras só são acessíveis dentro de `withTenant`/`req.db` (o login da API não tem acesso direto).
 - UI em pt-BR; código em inglês.
+- **Telas sem textos explicativos** (decisão do dono, 25/11/2026): formulários e cadastros mostram só
+  rótulo, valor, erro e avisos de estado (bloqueado, atrasado). Nada de dicas fixas sob os campos,
+  parágrafos de ajuda, prévias ou resumos didáticos: o que cada coisa faz vai para o manual do sistema.
 - **Portal do cliente (futuro):** ainda não existe, mas toda função de tarefas, cadastros, processos e
   cobrança deve nascer pronta para o cliente solicitar e acompanhar pelo portal (quem pediu/canal,
   visível ao cliente × interno, amarrado ao `client_id`). Ver `docs/roadmap.md` → "Diretriz permanente".

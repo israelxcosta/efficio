@@ -482,3 +482,14 @@ Revisto a pedido do dono: a coluna à direita foi **removida** (perdia espaço).
 - **Um seletor de período** (`PeriodNavigator`): Gestão, Painel financeiro e listas usam o mesmo
   "‹ Novembro 2026 › Hoje"; setas e "Hoje" ficam sempre na mesma linha (no celular também).
 - **Ritmo**: 20px entre os blocos de qualquer página interna (`gap-5`).
+
+## 8. Menos texto nas telas (25/11/2026)
+
+Decisão do dono: o sistema não explica a si mesmo em cada título ou seção; um manual à parte fará isso.
+- Formulários e cadastros: rótulo, campo, erro e avisos de estado (bloqueado, atrasado, sem permissão).
+  Sem `hint` fixo nos `Field`, sem parágrafos de ajuda, prévias ("Prévia"), resumos ("Aplica-se a…",
+  "Todo dia 25 · próximas…") ou descrições na abertura do `Sheet`.
+- Cadastro de recorrente: Nome → Descrição → Responsável + Departamento (o departamento vem do
+  responsável) → Categoria → Periodicidade → Prazo legal + Competência → Dia não útil → Começa/Encerra →
+  Regimes, clientes e exceções. A meta é a regra fixa (3 dias) e não aparece no formulário.
+- Categoria de tarefa: Nome, Ícone, Cor e o checkbox **Retrabalho**.

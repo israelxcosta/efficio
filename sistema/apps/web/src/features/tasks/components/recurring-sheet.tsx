@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Info, Plus, Search, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   addMonthKey,
@@ -16,10 +16,8 @@ import {
   type RecurringTaskInput,
   type TaskOptionsResponse,
   type TaxRegime,
-  RECURRING_TARGET_DAYS_BEFORE,
   recurringTargetDays,
 } from '@effinance/shared';
-import { HelpTip } from '@/components/ui/help-tip';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Modal } from '@/components/ui/dialog';
@@ -28,22 +26,14 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Sheet } from '@/components/ui/sheet';
 import { SkeletonRows } from '@/components/ui/skeleton';
-import { Tooltip } from '@/components/ui/tooltip';
 import { ADMIN_ONLY_REASON } from '@/features/auth/permissions';
 import { ApiRequestError } from '@/lib/api';
 import { toastError } from '@/lib/notify';
-import { cn } from '@/lib/utils';
 import { recurringInputOf, useSaveRecurring } from '../api';
 import { competenceName } from '../occurrence';
 import {
-  appliesTo,
   competenceOptions,
-  distributionText,
-  dueRuleHint,
-  holidaysText,
-  NON_BUSINESS_HINTS,
   PERIOD_OPTIONS,
-  previewLines,
   referenceOptionLabel,
 } from '../recurring-rules';
 import { ClientPicker, MemberPicker } from './pickers';
@@ -201,20 +191,6 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
   };
 
   const departments = options?.departments ?? [];
-  const department = departments.find((d) => d.id === form.departmentId);
-  const schedule = useMemo(() => {
-    const dueDay = Number(form.dueDay);
-    if (!dueDay || (form.period === 'weekly' && dueDay > 7)) return null;
-    if (form.period !== 'monthly' && form.period !== 'weekly' && !form.dueMonth) return null;
-    return {
-      period: form.period,
-      dueDay,
-      dueMonth: form.dueMonth ? Number(form.dueMonth) : null,
-      targetDaysBefore: recurringTargetDays(form.period),
-      nonBusinessDayRule: form.nonBusinessDayRule,
-      referenceOffset: form.period === 'weekly' ? 0 : Number(form.referenceOffset) || 0,
-    };
-  }, [form.period, form.dueDay, form.dueMonth, form.nonBusinessDayRule, form.referenceOffset]);
 
   async function submit() {
     const next = validateRecurring(form);
@@ -235,14 +211,12 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
   }
 
   const title = readOnly && recurring ? recurring.name : editing ? 'Editar tarefa recorrente' : duplicate ? 'Duplicar tarefa recorrente' : 'Nova tarefa recorrente';
-  const monthName = competenceName(current).split(' ')[0];
 
   return (
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description="Vira uma coluna da auditoria mensal e uma tarefa por cliente a cada período, para o responsável padrão."
       width="lg"
       footer={
         readOnly ? (
@@ -253,20 +227,13 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
             </Button>
           </>
         ) : (
-          <div className="flex w-full flex-col gap-3">
-            {editing ? (
-              <p className="text-caption text-subtle">
-                As mudanças valem para as tarefas desta recorrente ainda não iniciadas, a partir de {monthName}; as em andamento e as concluídas não mudam.
-              </p>
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button loading={save.isPending} onClick={() => void submit()}>
-                Salvar tarefa recorrente
-              </Button>
-            </div>
+          <div className="flex w-full justify-end gap-2">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button loading={save.isPending} onClick={() => void submit()}>
+              Salvar tarefa recorrente
+            </Button>
           </div>
         )
       }
@@ -282,83 +249,84 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
             void submit();
           }}
         >
-          <Group title="O quê">
-            <Field label="Nome*" error={errors.name}>
-              <Input
-                data-autofocus
+          {/* Same order as the standalone task: name, description, who, then when and for which clients. */}
+          <Field label="Nome*" error={errors.name}>
+            <Input
+              data-autofocus
+              disabled={readOnly}
+              maxLength={200}
+              value={form.name}
+              onChange={(e) => set('name', e.target.value)}
+              placeholder="Ex.: DCTFWeb, DAS do Simples, Folha de pagamento"
+            />
+          </Field>
+          <Field label="Descrição">
+            <Textarea disabled={readOnly} rows={2} maxLength={5000} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Opcional" />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Responsável*" error={errors.assigneeId}>
+              <MemberPicker
+                value={form.assigneeId}
+                onChange={(v) => {
+                  set('assigneeId', v);
+                  // Like the standalone task: the department follows the responsible when it is still empty.
+                  const dept = options.members.find((m) => m.id === v)?.department?.id;
+                  if (dept && !form.departmentId) set('departmentId', dept);
+                }}
+                members={options.members}
+                meFirst
+                placeholder="Escolha o responsável"
+                departmentId={form.departmentId || undefined}
                 disabled={readOnly}
-                maxLength={200}
-                value={form.name}
-                onChange={(e) => set('name', e.target.value)}
-                placeholder="Ex.: DCTFWeb, DAS do Simples, Folha de pagamento"
               />
             </Field>
-            <Field label="Descrição" hint="Vai para a descrição de cada tarefa gerada.">
-              <Textarea disabled={readOnly} rows={2} maxLength={5000} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Detalhes ou observações (opcional)" />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {/* Required (migration 0024): without departments registered, the field says how to go on. */}
-              <Field
-                  label="Departamento*"
-                  error={errors.departmentId ?? (departments.length ? undefined : 'Cadastre um departamento em Cadastros antes de criar a recorrente.')}
-                  hint="Recebe as tarefas desta obrigação. O responsável de cada cliente vem deste departamento."
-                >
-                  <Select disabled={readOnly || departments.length === 0} value={form.departmentId} onChange={(e) => set('departmentId', e.target.value)}>
-                    <option value="">{departments.length ? 'Escolha o departamento' : 'Nenhum departamento cadastrado'}</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              <Field label="Categoria">
-                <Select disabled={readOnly} value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)}>
-                  <option value="">Sem categoria</option>
-                  {options.categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-          </Group>
-
-          <Group title="Quando">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-caption font-medium text-fg">Periodicidade*</span>
-              <div className="hidden sm:block">
-                <SegmentedControl<RecurrencePeriod>
-                  size="sm"
-                  ariaLabel="Periodicidade"
-                  value={form.period}
-                  onChange={(p) => !readOnly && set('period', p)}
-                  options={PERIOD_OPTIONS}
-                />
-              </div>
-              <Select className="sm:hidden" wrapperClassName="sm:hidden" aria-label="Periodicidade" disabled={readOnly} value={form.period} onChange={(e) => set('period', e.target.value as RecurrencePeriod)}>
-                {PERIOD_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
+            {/* Required (migration 0024): without departments registered, the field says how to go on. */}
+            <Field label="Departamento*" error={errors.departmentId ?? (departments.length ? undefined : 'Cadastre um departamento em Cadastros antes.')}>
+              <Select disabled={readOnly || departments.length === 0} value={form.departmentId} onChange={(e) => set('departmentId', e.target.value)}>
+                <option value="">{departments.length ? 'Escolha o departamento' : 'Nenhum departamento cadastrado'}</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
                   </option>
                 ))}
               </Select>
+            </Field>
+          </div>
+          <Field label="Categoria">
+            <Select disabled={readOnly} value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)}>
+              <option value="">Sem categoria</option>
+              {options.categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-caption font-medium text-fg">Periodicidade*</span>
+            <div className="hidden sm:block">
+              <SegmentedControl<RecurrencePeriod>
+                size="sm"
+                ariaLabel="Periodicidade"
+                value={form.period}
+                onChange={(p) => !readOnly && set('period', p)}
+                options={PERIOD_OPTIONS}
+              />
             </div>
+            <Select className="sm:hidden" wrapperClassName="sm:hidden" aria-label="Periodicidade" disabled={readOnly} value={form.period} onChange={(e) => set('period', e.target.value as RecurrencePeriod)}>
+              {PERIOD_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
             <DueFields form={form} errors={errors} readOnly={readOnly} set={set} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <span className="text-caption font-medium text-fg">Meta interna</span>
-                <p className="flex h-10 items-center text-body-sm text-fg">
-                  {RECURRING_TARGET_DAYS_BEFORE} dias antes do prazo legal
-                </p>
-                <p className="text-mini text-muted">Regra do escritório para todas as recorrentes; antecipa se cair em dia não útil.</p>
-              </div>
-              <Field
-                label="Competência de referência"
-                hint={form.period === 'weekly' ? 'Na semanal, a referência é a própria semana.' : 'O DAS que vence em outubro se refere a setembro: aparece como ref. 09/2026.'}
-              >
-                <Select disabled={readOnly || form.period === 'weekly'} value={form.period === 'weekly' ? '0' : form.referenceOffset} onChange={(e) => set('referenceOffset', e.target.value)}>
+            {form.period !== 'weekly' ? (
+              <Field label="Competência de referência">
+                <Select disabled={readOnly} value={form.referenceOffset} onChange={(e) => set('referenceOffset', e.target.value)}>
                   {Array.from({ length: MAX_REFERENCE_OFFSET + 1 }, (_, i) => (
                     <option key={i} value={String(i)}>
                       {referenceOptionLabel(i)}
@@ -366,91 +334,47 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
                   ))}
                 </Select>
               </Field>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-caption font-medium text-fg">Se cair em dia não útil</span>
-              <NonBusinessField value={form.nonBusinessDayRule} onChange={(v) => set('nonBusinessDayRule', v)} disabled={readOnly} />
-              <p className="text-mini text-muted">{NON_BUSINESS_HINTS[form.nonBusinessDayRule]} Vale para o prazo legal; a meta sempre antecipa.</p>
-            </div>
-            <Preview schedule={schedule} current={current} start={form.startCompetence} />
-          </Group>
-
-          <Group title="Vigência">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Começa em" hint="Competências antes desta não geram tarefas.">
-                <Select disabled={readOnly} value={form.startCompetence} onChange={(e) => set('startCompetence', e.target.value)}>
-                  {competenceOptions(current).map((m) => (
-                    <option key={m} value={m}>
-                      {formatMonthKey(m)}
-                      {m === current ? ' (atual)' : ''}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field
-                label="Encerra em"
-                error={errors.endCompetence}
-                hint="Última competência com tarefas. Depois dela, a recorrente sai da auditoria e das listas; o histórico fica."
-              >
-                <Select disabled={readOnly} value={form.endCompetence} onChange={(e) => set('endCompetence', e.target.value)}>
-                  <option value="">Sem data para encerrar</option>
-                  {competenceOptions(form.startCompetence, 0, 36).map((m) => (
-                    <option key={m} value={m}>
-                      {formatMonthKey(m)}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-          </Group>
-
-          <Group title="Quem">
-            <Field
-              label="Responsável padrão*"
-              error={errors.assigneeId}
-              hint={
-                <>
-                  Recebe as tarefas de todos os clientes desta recorrente, todo período{department ? ` (de preferência alguém do ${department.name})` : ''}. Dá para atribuir outra pessoa numa competência.
-                  {editing && recurring && distributionText(recurring) ? <span className="mt-1 block">{distributionText(recurring)}</span> : null}
-                </>
-              }
-            >
-              <MemberPicker
-                value={form.assigneeId}
-                onChange={(v) => set('assigneeId', v)}
-                members={options.members}
-                meFirst
-                placeholder="Escolha o responsável padrão"
-                departmentId={form.departmentId || undefined}
-                disabled={readOnly}
-              />
+            ) : null}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-caption font-medium text-fg">Se cair em dia não útil</span>
+            <NonBusinessField value={form.nonBusinessDayRule} onChange={(v) => set('nonBusinessDayRule', v)} disabled={readOnly} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Começa em">
+              <Select disabled={readOnly} value={form.startCompetence} onChange={(e) => set('startCompetence', e.target.value)}>
+                {competenceOptions(current).map((m) => (
+                  <option key={m} value={m}>
+                    {formatMonthKey(m)}
+                    {m === current ? ' (atual)' : ''}
+                  </option>
+                ))}
+              </Select>
             </Field>
-          </Group>
+            <Field label="Encerra em" error={errors.endCompetence}>
+              <Select disabled={readOnly} value={form.endCompetence} onChange={(e) => set('endCompetence', e.target.value)}>
+                <option value="">Sem data para encerrar</option>
+                {competenceOptions(form.startCompetence, 0, 36).map((m) => (
+                  <option key={m} value={m}>
+                    {formatMonthKey(m)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
 
-          <Group title="Para quais clientes">
-            <ClientsField
-              form={form}
-              errors={errors}
-              options={options}
-              current={current}
-              readOnly={readOnly}
-              set={set}
-              showExceptions={showExceptions}
-              onShowExceptions={() => setShowExceptions(true)}
-            />
-          </Group>
+          <ClientsField
+            form={form}
+            errors={errors}
+            options={options}
+            readOnly={readOnly}
+            set={set}
+            showExceptions={showExceptions}
+            onShowExceptions={() => setShowExceptions(true)}
+          />
         </form>
       )}
     </Sheet>
-  );
-}
-
-function Group({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <fieldset className="flex min-w-0 flex-col gap-4">
-      <legend className="mb-3 text-body-sm font-semibold text-fg">{title}</legend>
-      {children}
-    </fieldset>
   );
 }
 
@@ -458,12 +382,9 @@ type Setter = <K extends keyof RecurringForm>(key: K, value: RecurringForm[K]) =
 
 /** Legal deadline by periodicity: the weekday, the day, or the day and the (first) month. */
 function DueFields({ form, errors, readOnly, set }: { form: RecurringForm; errors: RecurringErrors; readOnly: boolean; set: Setter }) {
-  const dueDay = Number(form.dueDay);
-  const rule = { period: form.period, dueDay, dueMonth: form.dueMonth ? Number(form.dueMonth) : null };
-  const hint = dueDay && (form.period === 'monthly' || form.period === 'weekly' || form.dueMonth) ? dueRuleHint(rule) : undefined;
   if (form.period === 'weekly') {
     return (
-      <Field label="Prazo legal*" error={errors.dueDay} hint={hint}>
+      <Field label="Prazo legal*" error={errors.dueDay}>
         <Select disabled={readOnly} value={Number(form.dueDay) <= 7 ? form.dueDay : ''} onChange={(e) => set('dueDay', e.target.value)}>
           <option value="">Escolha o dia da semana</option>
           {[1, 2, 3, 4, 5, 6, 7].map((d) => (
@@ -478,7 +399,7 @@ function DueFields({ form, errors, readOnly, set }: { form: RecurringForm; error
   const daySelect = <DueDayField disabled={readOnly} aria-label="Dia do prazo legal" placeholder="Dia" value={form.dueDay} onChange={(v) => set('dueDay', v)} />;
   if (form.period === 'monthly') {
     return (
-      <Field label="Prazo legal*" error={errors.dueDay} hint={hint}>
+      <Field label="Prazo legal*" error={errors.dueDay}>
         {daySelect}
       </Field>
     );
@@ -501,41 +422,7 @@ function DueFields({ form, errors, readOnly, set }: { form: RecurringForm; error
         <p role="alert" className="text-mini font-medium text-danger">
           {errors.dueDay ?? errors.dueMonth}
         </p>
-      ) : hint ? (
-        <p className="text-mini text-muted">{hint}</p>
-      ) : form.period !== 'annual' ? (
-        <p className="text-mini text-muted">O 1º mês se repete a cada {form.period === 'bimonthly' ? 2 : form.period === 'quarterly' ? 3 : 6} meses.</p>
       ) : null}
-    </div>
-  );
-}
-
-/** Read-only preview of the next 3 periods (§10.3), with the holidays of the year in a tooltip. */
-function Preview({ schedule, current, start }: { schedule: Parameters<typeof previewLines>[0] | null; current: MonthKey; start: MonthKey }) {
-  const year = Number((start > current ? start : current).slice(0, 4));
-  return (
-    <div className="rounded-lg bg-surface-muted p-3 text-caption text-muted" aria-live="polite">
-      <p className="font-semibold text-fg">Prévia</p>
-      {schedule ? (
-        <ul className="mt-1 flex flex-col gap-1">
-          {previewLines(schedule, current, start).map((l) => (
-            <li key={l}>{l}</li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-1">Informe o prazo legal para ver as próximas datas.</p>
-      )}
-      <p className="mt-2 flex flex-wrap items-center gap-1">
-        Considera fins de semana e feriados nacionais
-        <Tooltip
-          content={`${holidaysText(year)} Carnaval e Corpus Christi entram porque não há expediente bancário.`}
-        >
-          <span tabIndex={0} role="img" aria-label={`Feriados nacionais de ${year}`} className="inline-flex text-subtle hover:text-muted">
-            <Info className="size-3.5" aria-hidden />
-          </span>
-        </Tooltip>
-      </p>
-      <p>Feriados estaduais e municipais ainda não entram.</p>
     </div>
   );
 }
@@ -546,12 +433,11 @@ const normalize = (s: string) =>
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();
 
-/** Regimes, specific clients and exceptions, with the summary of who it applies to. */
+/** Regimes, specific clients and exceptions. */
 function ClientsField({
   form,
   errors,
   options,
-  current,
   readOnly,
   set,
   showExceptions,
@@ -560,7 +446,6 @@ function ClientsField({
   form: RecurringForm;
   errors: RecurringErrors;
   options: TaskOptionsResponse;
-  current: MonthKey;
   readOnly: boolean;
   set: Setter;
   showExceptions: boolean;
@@ -569,8 +454,6 @@ function ClientsField({
   const [search, setSearch] = useState('');
   const active = options.clients.filter((c) => c.status === 'active').sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const visible = active.filter((c) => !search || normalize(c.name).includes(normalize(search)) || normalize(c.legalName).includes(normalize(search)));
-  const summary = appliesTo(options.clients, current, form);
-  const monthName = competenceName(current).split(' ')[0];
   const regimeCount = (r: TaxRegime) => active.filter((c) => c.taxRegime === r).length;
   const toggle = (list: string[], id: string, on: boolean) => (on ? [...new Set([...list, id])] : list.filter((x) => x !== id));
   const exceptionCandidates = options.clients.filter((c) => form.regimes.includes(c.taxRegime) && !form.excludedClientIds.includes(c.id));
@@ -598,10 +481,7 @@ function ClientsField({
 
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="flex items-center gap-1.5 text-caption font-medium text-fg">
-            Clientes específicos
-            <HelpTip>Somam-se aos regimes.</HelpTip>
-          </span>
+          <span className="text-caption font-medium text-fg">Clientes específicos</span>
           <span className="flex items-center gap-1 text-caption text-muted">
             <span className="tabular">{form.clientIds.length} selecionados</span>
             {!readOnly ? (
@@ -681,23 +561,14 @@ function ClientsField({
           <p role="alert" className="text-mini font-medium text-danger">
             {errors.excludedClientIds}
           </p>
-        ) : (
-          <p className="text-mini text-muted">
-            Clientes do regime que não fazem esta obrigação. As tarefas deles ainda não iniciadas, da competência atual em diante, são canceladas; as em andamento continuam.
-          </p>
-        )}
+        ) : null}
       </div>
 
-      <p className={cn('text-body-sm', errors.regimes ? 'text-danger' : 'text-fg')} role={errors.regimes ? 'alert' : undefined}>
-        {errors.regimes ? (
-          errors.regimes
-        ) : (
-          <>
-            Aplica-se a <span className="font-semibold">{summary.total} {summary.total === 1 ? 'cliente ativo' : 'clientes ativos'}</span> em {monthName}: {summary.byRegime} pelo regime, mais{' '}
-            {summary.specific} {summary.specific === 1 ? 'específico' : 'específicos'}, menos {summary.exceptions} {summary.exceptions === 1 ? 'exceção' : 'exceções'}.
-          </>
-        )}
-      </p>
+      {errors.regimes ? (
+        <p role="alert" className="text-body-sm text-danger">
+          {errors.regimes}
+        </p>
+      ) : null}
     </>
   );
 }

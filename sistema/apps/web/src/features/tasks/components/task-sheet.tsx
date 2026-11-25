@@ -577,7 +577,7 @@ function TaskProperties({
         />
       </Field>
       {isLocked('departmentId') || derivedDepartment ? (
-        <Field label="Departamento" hint={isLocked('departmentId') ? lockHint('departmentId') : 'Segue o departamento do responsável.'}>
+        <Field label="Departamento" hint={isLocked('departmentId') ? lockHint('departmentId') : undefined}>
           <Input
             readOnly
             disabled

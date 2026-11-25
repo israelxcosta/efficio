@@ -13,7 +13,6 @@ import {
 import { HelpTip } from '@/components/ui/help-tip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CategoryIcon } from '@/components/ui/category-icon';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { IconPicker } from '@/components/ui/icon-picker';
@@ -160,25 +159,14 @@ export function DepartmentSheet({
   );
 }
 
-/** What "Conta como retrabalho" does, in the words of spec §6.1 (fixed copy). */
-export const REWORK_FIELD_HELP =
-  'Tarefas desta categoria abertas para um cliente reduzem o score dele: −40 pontos por tarefa nos últimos 90 dias e −10 pelas de até 12 meses (até −200). Use em categorias como Retificação ou Correção.';
-
-/** The "Conta como retrabalho" checkbox of the category sheet, with its description tied to it. */
+/** The "Retrabalho" checkbox of the category sheet (what it does is in the manual, not on screen). */
 export function ReworkField({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
   const id = useId();
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-3">
-      <Checkbox id={id} checked={checked} onCheckedChange={onChange} aria-describedby={`${id}-help`} className="mt-px" />
-      <div className="min-w-0">
-        <label htmlFor={id} className="block cursor-pointer text-caption font-medium text-fg">
-          Conta como retrabalho
-        </label>
-        <p id={`${id}-help`} className="mt-0.5 text-caption text-muted">
-          {REWORK_FIELD_HELP}
-        </p>
-      </div>
-    </div>
+    <label htmlFor={id} className="flex cursor-pointer items-center gap-2.5 text-body-sm text-fg">
+      <Checkbox id={id} checked={checked} onCheckedChange={onChange} />
+      Retrabalho
+    </label>
   );
 }
 
@@ -191,7 +179,7 @@ export function ReworkBadge({ className }: { className?: string }) {
   );
 }
 
-/** New or edited task category (spec §13.5 and §6.1): name, icon, colour, rework and the preview. */
+/** New or edited task category (spec §13.5 and §6.1): name, icon, colour and rework. */
 export function TaskCategorySheet({
   open,
   category,
@@ -262,14 +250,6 @@ export function TaskCategorySheet({
           <ColorPicker value={color} onChange={setColor} />
         </Field>
         <ReworkField checked={isRework} onChange={setIsRework} />
-        <div className="flex flex-col gap-1.5">
-          <span className="text-caption font-medium text-fg">Prévia</span>
-          <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
-            <CategoryIcon tinted icon={icon} color={color} />
-            <span className="min-w-0 truncate text-body-sm font-semibold text-fg">{name.trim() || 'Nova categoria'}</span>
-            {isRework ? <ReworkBadge /> : null}
-          </div>
-        </div>
       </div>
     </Sheet>
   );

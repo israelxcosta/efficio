@@ -64,10 +64,10 @@ describe('RepeatFieldView', () => {
     expect(render({ canRegistry: true })).toContain('Recorrente para vários clientes');
   });
 
-  it('says the summary politely and warns when the first date moves', () => {
+  it('keeps the form clean (no summary or explanations) and still warns when the first date moves', () => {
     const html = render({ form: { frequency: 'weekly', weekdays: [1, 3] } });
-    const live = html.slice(html.indexOf('aria-live="polite"'));
-    expect(live.slice(0, live.indexOf('</p>'))).toContain('Toda semana na segunda e na quarta');
+    expect(html).not.toContain('Toda semana na segunda e na quarta');
+    expect(html).not.toContain('Meta:');
     expect(html).toContain('Esta tarefa passa a vencer em 11/11 (qua), o primeiro dia da regra.');
   });
 });

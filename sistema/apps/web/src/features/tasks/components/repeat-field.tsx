@@ -1,7 +1,6 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { RECURRING_TARGET_DAYS_BEFORE,
-  MAX_REFERENCE_OFFSET,
+import {
   RECURRENCE_FREQUENCIES,
   RECURRENCE_FREQUENCY_LABELS,
   RECURRENCE_INTERVAL_UNITS,
@@ -15,8 +14,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { dueRuleHint, referenceOptionLabel } from '../recurring-rules';
-import { firstDateNotice, hasInterval, isAnchored, isDayBased, repeatSummary, type repeatErrors, type RepeatForm } from '../repeat-rules';
+import { firstDateNotice, hasInterval, isAnchored, isDayBased, type repeatErrors, type RepeatForm } from '../repeat-rules';
 import { AnchorMonthField, DueDayField, NonBusinessField } from './recurrence-fields';
 
 /** "S T Q Q S S D", Monday first (ISO 1 … 7). */
@@ -121,9 +119,6 @@ export function RepeatFieldView({ on, onToggle, form, onForm, start, today, erro
                   />
                 </Field>
               ) : null}
-              {isAnchored(f) && f !== 'annual' ? (
-                <p className="text-mini text-muted sm:col-span-2">{dueRuleHint({ period: f, dueDay: Number(form.dueDay) || 1, dueMonth: Number(form.dueMonth) || 1 })}</p>
-              ) : null}
             </div>
           ) : null}
 
@@ -141,11 +136,6 @@ export function RepeatFieldView({ on, onToggle, form, onForm, start, today, erro
 
           <EndsField form={form} disabled={locked} errors={errors} onForm={onForm} />
 
-          <TargetAndReference form={form} disabled={locked} error={errors.targetDaysBefore} onForm={onForm} />
-
-          <p aria-live="polite" className="text-caption text-muted">
-            {start ? repeatSummary(form, start, today) : 'Informe quando começa para ver as próximas datas.'}
-          </p>
           {start && firstDateNotice(form, start) ? <p className="text-caption text-warning">{firstDateNotice(form, start)}</p> : null}
 
           {note}
@@ -282,41 +272,6 @@ function EndsField({ form, disabled, errors, onForm }: { form: RepeatForm; disab
           {error}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-/** The fixed target (3 days before the due date) and the reference month, collapsed unless it is not the default. */
-function TargetAndReference({ form, disabled, onForm }: { form: RepeatForm; disabled: boolean; error?: string; onForm: (f: RepeatForm) => void }) {
-  const f = form.frequency;
-  const custom = !isDayBased(f) && Number(form.referenceOffset) > 0;
-  const [open, setOpen] = useState(custom);
-  // Daily: the target is the day itself and there is no reference month.
-  if (f === 'daily') return null;
-  const target = <p className="text-mini text-muted">Meta: {RECURRING_TARGET_DAYS_BEFORE} dias antes do vencimento (regra do escritório; antecipa se cair em dia não útil).</p>;
-  if (isDayBased(f)) return target;
-  if (!open && !custom) {
-    return (
-      <div className="flex flex-col gap-1">
-        {target}
-        <Button variant="link" size="sm" className="self-start" onClick={() => setOpen(true)}>
-          Competência de referência
-        </Button>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-1.5">
-      {target}
-      <Field label="Competência de referência">
-        <Select disabled={disabled} value={form.referenceOffset} onChange={(e) => onForm({ ...form, referenceOffset: e.target.value })}>
-          {Array.from({ length: MAX_REFERENCE_OFFSET + 1 }, (_, i) => (
-            <option key={i} value={String(i)}>
-              {i === 0 ? 'Mesmo mês' : referenceOptionLabel(i)}
-            </option>
-          ))}
-        </Select>
-      </Field>
     </div>
   );
 }
