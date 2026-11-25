@@ -9,10 +9,12 @@ import {
   CLIENT_DOCUMENT_KIND_LABELS,
   CLIENT_DOCUMENT_KINDS,
   clientDocumentInputSchema,
+  diffInDays,
   feeAdjustmentPreviewQuerySchema,
   indexValuesOf,
   LATE_FEE_CATEGORY,
   occurrencesInCompetence,
+  RECURRING_TARGET_DAYS_BEFORE,
   REGIME_GROUP_ITEMS,
   registerSchema,
   renewalPeriodIn,
@@ -103,14 +105,16 @@ describe('yearly fee adjustment (contract clause 3)', () => {
 });
 
 describe('catalog fixes (13/11/2026)', () => {
-  it('DCTFWeb: legal deadline on the last business day of the following month, target by the 15th', () => {
+  it('DCTFWeb: legal deadline on the last business day of the following month, target 3 days before (office rule)', () => {
     const dctf = REGIME_GROUP_ITEMS.find((i) => i.key === 'dctfweb')!;
-    expect(occurrencesInCompetence(dctf, '2026-11')[0]).toMatchObject({ legalDueDate: '2026-11-30', targetDate: '2026-11-13', referenceMonth: '2026-10' });
+    // 30/11/2026 is a Monday: the target is 3 days before, Friday the 27th.
+    expect(occurrencesInCompetence(dctf, '2026-11')[0]).toMatchObject({ legalDueDate: '2026-11-30', targetDate: '2026-11-27', referenceMonth: '2026-10' });
     // 2027-01-31 is a Sunday: the last business day is Friday the 29th.
     expect(occurrencesInCompetence(dctf, '2027-01')[0]).toMatchObject({ legalDueDate: '2027-01-29', referenceMonth: '2026-12' });
     for (let m = 1; m <= 12; m++) {
       const [o] = occurrencesInCompetence(dctf, `2027-${String(m).padStart(2, '0')}`);
-      expect(Number(o!.targetDate.slice(8)), o!.targetDate).toBeLessThanOrEqual(15);
+      // 3 days before, anticipated to a business day: never fewer than 3 days ahead of the legal deadline.
+      expect(diffInDays(o!.legalDueDate, o!.targetDate), o!.targetDate).toBeGreaterThanOrEqual(RECURRING_TARGET_DAYS_BEFORE);
     }
     expect(dctf.description).toContain('último dia útil do mês seguinte');
   });

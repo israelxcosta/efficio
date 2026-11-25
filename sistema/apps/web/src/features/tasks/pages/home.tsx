@@ -34,7 +34,6 @@ import { useUpdatedLabel } from '@/lib/updated-label';
 import { cn, pluralize } from '@/lib/utils';
 import { useRecurringTasks, useTaskDashboard, useTaskHome, useTaskOptions, useTasks } from '../api';
 import { AgendaCard, ClientsOverviewCard, ConventionsCard, DocumentsCard, FeesCard, FiscalCard, FlowCard, IncompleteCard, ProcessesCard, TaskStatusCard } from '../components/dashboard-cards';
-import { ClientRequestsCard } from '../components/client-requests-card';
 import { DashboardListSheet, type DashboardList } from '../components/dashboard-list-sheet';
 import { BreakdownItem, type BreakdownRow } from '../components/breakdown-list';
 import { TaskRow } from '../components/task-row';
@@ -134,7 +133,6 @@ export default function TaskHomePage() {
     conv: <ConventionsCard {...cards0} />,
     fees: <FeesCard {...cards0} onList={setList} />,
     incomplete: <IncompleteCard {...cards0} onList={setList} canFinance={can('finance')} />,
-    requests: <ClientRequestsCard />,
   };
   const renderCard: RenderCard = (id) => nodes[id] ?? null;
 
@@ -310,7 +308,7 @@ function HomeSummary({ home, today }: { home: TaskHomeResponse | undefined; toda
     {
       key: 'target',
       label: 'Fora da meta',
-      info: 'Recorrentes abertas depois da meta interna, ainda dentro do prazo legal.',
+      info: 'Tarefas abertas que passaram da meta e ainda estão no prazo legal. A meta é 3 dias antes do prazo legal nas recorrentes; nas avulsas e solicitações é o próprio vencimento (passou dele, conta em Atrasadas).',
       value: t?.targetMissed ?? 0,
       href: tasksHref({ ...base, kind: 'recurring' }),
       aria: `Fora da meta${where}: ${t?.targetMissed ?? 0}. Ver na lista de tarefas.`,

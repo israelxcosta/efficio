@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import {
+import { RECURRING_TARGET_DAYS_BEFORE,
   MAX_REFERENCE_OFFSET,
   RECURRENCE_FREQUENCIES,
   RECURRENCE_FREQUENCY_LABELS,
@@ -286,49 +286,37 @@ function EndsField({ form, disabled, errors, onForm }: { form: RepeatForm; disab
   );
 }
 
-/** "Meta e referência", collapsed unless a value is not the default. */
-function TargetAndReference({ form, disabled, error, onForm }: { form: RepeatForm; disabled: boolean; error?: string; onForm: (f: RepeatForm) => void }) {
+/** The fixed target (3 days before the due date) and the reference month, collapsed unless it is not the default. */
+function TargetAndReference({ form, disabled, onForm }: { form: RepeatForm; disabled: boolean; error?: string; onForm: (f: RepeatForm) => void }) {
   const f = form.frequency;
-  const custom = (f !== 'daily' && Number(form.targetDaysBefore) > 0) || (!isDayBased(f) && Number(form.referenceOffset) > 0);
-  const [open, setOpen] = useState(custom || Boolean(error));
+  const custom = !isDayBased(f) && Number(form.referenceOffset) > 0;
+  const [open, setOpen] = useState(custom);
   // Daily: the target is the day itself and there is no reference month.
   if (f === 'daily') return null;
-  if (!open && !custom && !error) {
+  const target = <p className="text-mini text-muted">Meta: {RECURRING_TARGET_DAYS_BEFORE} dias antes do vencimento (regra do escritório; antecipa se cair em dia não útil).</p>;
+  if (isDayBased(f)) return target;
+  if (!open && !custom) {
     return (
-      <Button variant="link" size="sm" className="self-start" onClick={() => setOpen(true)}>
-        Meta e referência
-      </Button>
+      <div className="flex flex-col gap-1">
+        {target}
+        <Button variant="link" size="sm" className="self-start" onClick={() => setOpen(true)}>
+          Competência de referência
+        </Button>
+      </div>
     );
   }
   return (
-    <div className={cn('grid gap-3', !isDayBased(f) && 'sm:grid-cols-2')}>
-      <Field label="Meta interna" error={error}>
-        <div className="flex h-10 items-center gap-2">
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={f === 'weekly' ? 6 : 30}
-            disabled={disabled}
-            className="w-16"
-            aria-label="Meta interna, em dias antes"
-            value={form.targetDaysBefore}
-            onChange={(e) => onForm({ ...form, targetDaysBefore: e.target.value })}
-          />
-          <span className="text-body-sm text-muted">dias antes</span>
-        </div>
+    <div className="flex flex-col gap-1.5">
+      {target}
+      <Field label="Competência de referência">
+        <Select disabled={disabled} value={form.referenceOffset} onChange={(e) => onForm({ ...form, referenceOffset: e.target.value })}>
+          {Array.from({ length: MAX_REFERENCE_OFFSET + 1 }, (_, i) => (
+            <option key={i} value={String(i)}>
+              {i === 0 ? 'Mesmo mês' : referenceOptionLabel(i)}
+            </option>
+          ))}
+        </Select>
       </Field>
-      {!isDayBased(f) ? (
-        <Field label="Competência de referência">
-          <Select disabled={disabled} value={form.referenceOffset} onChange={(e) => onForm({ ...form, referenceOffset: e.target.value })}>
-            {Array.from({ length: MAX_REFERENCE_OFFSET + 1 }, (_, i) => (
-              <option key={i} value={String(i)}>
-                {i === 0 ? 'Mesmo mês' : referenceOptionLabel(i)}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      ) : null}
     </div>
   );
 }

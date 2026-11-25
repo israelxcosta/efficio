@@ -75,7 +75,7 @@ describe('qa-gestao: grupos padrão por regime', () => {
     // FGTS Digital (anticipates): 20/11 → 19; target 16 (Monday).
     expect(one(sOcc, 'fgts_digital', '2026-11')).toMatchObject({ due_date: '2026-11-19', target_date: '2026-11-16' });
     // DCTFWeb: last business day (31/10 Saturday → 30), target 16 days before → 14.
-    expect(one(sOcc, 'dctfweb', '2026-10')).toMatchObject({ due_date: '2026-10-30', target_date: '2026-10-14' });
+    expect(one(sOcc, 'dctfweb', '2026-10')).toMatchObject({ due_date: '2026-10-30', target_date: '2026-10-27' });
     // Payroll on the 5th, postponed: 05/12 Saturday → Monday 07; target 2 days before (Saturday) → Friday 04.
     expect(one(pOcc, 'payroll', '2026-12')).toMatchObject({ due_date: '2026-12-07', target_date: '2026-12-04' });
     // eSocial on the 15th, anticipated: 15/11 Sunday (Proclamação) → Friday 13; target → Tuesday 10.
@@ -84,7 +84,7 @@ describe('qa-gestao: grupos padrão por regime', () => {
     expect(one(pOcc, 'pis_cofins', '2026-11')).toMatchObject({ due_date: '2026-11-25', target_date: '2026-11-19' });
     // EFD-Contribuições: reference two months back; IRPJ quarterly: 30/10, target 25 (Sunday) → 23, ref. 09.
     expect(one(pOcc, 'efd_contribuicoes', '2026-10')).toMatchObject({ due_date: '2026-10-14', reference_month: '2026-08' });
-    expect(one(pOcc, 'irpj_csll_quarterly', '2026-10')).toMatchObject({ due_date: '2026-10-30', target_date: '2026-10-23', reference_month: '2026-09' });
+    expect(one(pOcc, 'irpj_csll_quarterly', '2026-10')).toMatchObject({ due_date: '2026-10-30', target_date: '2026-10-27', reference_month: '2026-09' });
 
     // Applying again: nothing created, nothing duplicated.
     const total = async () => (await rows<{ n: number }>(sql`select count(*)::int as n from tasks where workspace_id = ${ws}`))[0]!.n;

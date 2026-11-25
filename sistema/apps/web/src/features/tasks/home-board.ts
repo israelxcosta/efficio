@@ -49,7 +49,6 @@ const ALL: WidgetSpec[] = [
   small('conv', 'Convenções coletivas', 'Datas-base das convenções dos clientes.'),
   small('fees', 'Honorários próximos de vencer', 'Vigências de honorários que terminam em breve.'),
   wide('incomplete', 'clientes', 'Cadastro incompleto', 'Clientes com dados faltando no cadastro.', 4),
-  wide('requests', 'clientes', 'Pedidos dos clientes', 'Tarefas pedidas pelos clientes, ainda abertas.', 3),
 ];
 
 /** The fees card needs access to the finances; everyone else gets the same board. */

@@ -60,7 +60,8 @@ Estado do projeto para quem continuar o trabalho (pessoa ou agente). Leia junto 
     Tarefas; Relatório de tarefas com "Por responsável" numa linha e ordenação no título das colunas.
   - Financeiro: card sólido de inadimplência ao lado dos números do Painel; célula sólida de Vencido
     (Receber/Pagar) e de Conferido (Recebimentos).
-  - Tarefas: campo **"Pedido por"** (`requestChannel`, migração 0029), pronto para o portal.
+  - Tarefas: campo **"Pedido por"** (`requestChannel`, migração 0029), pronto para o portal — retirado da
+    interface em 25/11/2026 (a coluna fica para o portal). Meta das recorrentes fixa em 3 dias antes do prazo legal.
 - Relatórios dessas decisões: artifacts "Redesign Seu dia — relatório consolidado" e "Análise de design".
 
 ## 3. Pendências

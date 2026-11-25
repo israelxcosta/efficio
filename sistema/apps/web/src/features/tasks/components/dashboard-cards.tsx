@@ -133,7 +133,7 @@ export function FlowCard(p: CardProps & { base: TaskFilterPatch }) {
     <WidgetCard
       title="Fluxo de tarefas por dia"
       subtitle={p.data ? flowInsight(flowDays(p.data.flow, p.data.flow[0]?.date ?? p.data.today, p.data.today), (p.data.asOf ?? p.data.today) < p.data.today) : 'Em aberto, pela data de trabalho, nos próximos 7 dias'}
-      info="Tarefas em aberto pela data de trabalho (a meta interna, nas recorrentes), hoje e nos próximos 6 dias. Clique num dia para ver a lista."
+      info="Todas as tarefas em aberto pela data de trabalho: a meta nas recorrentes (3 dias antes do prazo legal) e o vencimento nas avulsas e solicitações, hoje e nos próximos 6 dias. Clique num dia para ver a lista."
     >
       <Body {...p}>
         {(d) => {

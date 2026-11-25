@@ -18,6 +18,7 @@ import {
   flowTemplateInputSchema,
   formatMonthKey,
   monthKey,
+  recurringTargetDays,
   recurringTaskInputSchema,
   TASK_TIME_ZONE,
   taskAttachmentInputSchema,
@@ -394,8 +395,12 @@ export async function seedTasks(
 
     // --- phase 2: recurring obligations, processes, notes, an attachment ---------------------------
     const staff = [...withStaff].map(client).filter((v): v is string => v !== null);
+    // Every recurrence follows the office's target rule (3 days before the legal deadline).
     const recurring = async (input: RecurringTaskInput) =>
-      createRecurring(admin, recurringTaskInputSchema.parse({ startCompetence: previousMonth, ...input }));
+      createRecurring(
+        admin,
+        recurringTaskInputSchema.parse({ startCompetence: previousMonth, ...input, targetDaysBefore: recurringTargetDays(input.period ?? 'monthly') }),
+      );
     const fiscalOrders = { departmentId: fiscal.id, categoryId: cat.obrigacoes, assigneeId: ids.ana };
     const dpOrders = { departmentId: pessoal.id, categoryId: cat.folha, assigneeId: ids.juliana };
     const contabilOrders = { departmentId: contabil.id, categoryId: cat.contabil, assigneeId: ids.bruno };

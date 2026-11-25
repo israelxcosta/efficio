@@ -1143,8 +1143,11 @@ membro do espaço → 422.
 - Campo opcional da tarefa: o canal em que o cliente pediu — `portal`, `whatsapp`, `email`, `phone`,
   `in_person`, `other` (`TASK_REQUEST_CHANNELS`); `null` = interna ou não informado. Aceito no
   `POST /tasks` e no `PATCH /tasks/:id` (`null` limpa); CHECK `tasks_request_channel_chk` no banco.
-- Pronto para o portal do cliente: os pedidos que vierem dele nascem com `portal`. O card "Pedidos dos
-  clientes" do Início lista as abertas com `GET /tasks?situation=open&requestChannel=any`.
+- Pronto para o portal do cliente: os pedidos que vierem dele nascem com `portal`.
+- **Fora da interface desde 25/11/2026** (decisão do dono: a origem do pedido não faz diferença no
+  escritório): o formulário da tarefa não mostra mais o campo e o card "Pedidos dos clientes" saiu do
+  Início. A coluna, o contrato e o filtro `requestChannel` continuam para o portal; o `PATCH` do
+  formulário não envia o campo, então um valor já gravado é preservado.
 
 ### Listagem (`GET /tasks`)
 
@@ -1214,7 +1217,10 @@ células).
   fica no departamento da recorrente), periodicidade (`weekly | monthly | bimonthly | quarterly | semiannual | annual`),
   **prazo legal obrigatório** (`dueDay`: dia 1–31, onde 31 vira o último dia dos meses curtos; na
   semanal, o dia da semana ISO 1–7, a spec usa segunda a sexta) e, de bimestral a anual, o mês-âncora
-  `dueMonth`; meta interna `targetDaysBefore` (0–30; semanal 0–6); regra de dia não útil
+  `dueMonth`; meta interna `targetDaysBefore` (0–30; semanal 0–6 — **regra do escritório desde 25/11/2026:
+  3 dias antes do prazo legal em todas as recorrentes, `RECURRING_TARGET_DAYS_BEFORE`/`recurringTargetDays`
+  em `@effinance/shared`; a interface não oferece o campo e sempre envia a regra, assim como o catálogo
+  por regime; avulsas e solicitações não têm meta própria: a meta é o vencimento**); regra de dia não útil
   (`anticipate | postpone | keep`); competência de referência `referenceOffset` (0 = a mesma, 1 = a
   anterior — padrão —, até 12; semanal sempre 0); regimes e/ou clientes específicos (união), menos as
   **exceções** (`excludedClientIds`); `startCompetence` (padrão: a atual) e `endCompetence` (inclusive).

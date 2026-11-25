@@ -22,6 +22,7 @@ import {
   type TaskRecurrenceInput,
   type TaskLockedField,
   type TaskUpdateInput,
+  recurringTargetDays,
 } from '@effinance/shared';
 import { shortDate } from './due';
 import { shortMonthsWarning } from './recurring-rules';
@@ -134,7 +135,8 @@ export function toRecurrenceInput(form: RepeatForm, start: ISODate): TaskRecurre
     ends: form.ends,
     endDate: form.ends === 'date' ? form.endDate || null : null,
     count: form.ends === 'count' ? toInt(form.count) : null,
-    targetDaysBefore: f === 'daily' ? 0 : toInt(form.targetDaysBefore || '0'),
+    // Fixed rule of the office: 3 days before the due date (the day itself in daily ones).
+    targetDaysBefore: recurringTargetDays(f),
     nonBusinessDayRule: nonBusinessOf(form),
     referenceOffset: isDayBased(f) ? 0 : toInt(form.referenceOffset || '0'),
   };
@@ -148,7 +150,7 @@ export function scheduleOf(form: RepeatForm, start: ISODate): RecurringSchedule 
     period: f,
     dueDay: isDayBased(f) ? (form.weekdays[0] ?? isoWeekday(start)) : Math.min(31, Math.max(1, int(form.dueDay, Number(start.slice(8, 10))))),
     dueMonth: isAnchored(f) ? Math.min(12, Math.max(1, int(form.dueMonth, Number(start.slice(5, 7))))) : null,
-    targetDaysBefore: f === 'daily' ? 0 : Math.max(0, int(form.targetDaysBefore, 0)),
+    targetDaysBefore: recurringTargetDays(f),
     nonBusinessDayRule: nonBusinessOf(form),
     referenceOffset: isDayBased(f) ? 0 : Math.max(0, int(form.referenceOffset, 0)),
     interval: hasInterval(f) ? Math.max(1, int(form.interval, 1)) : 1,

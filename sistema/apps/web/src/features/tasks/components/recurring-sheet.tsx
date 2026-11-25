@@ -16,6 +16,8 @@ import {
   type RecurringTaskInput,
   type TaskOptionsResponse,
   type TaxRegime,
+  RECURRING_TARGET_DAYS_BEFORE,
+  recurringTargetDays,
 } from '@effinance/shared';
 import { HelpTip } from '@/components/ui/help-tip';
 import { Button } from '@/components/ui/button';
@@ -122,7 +124,8 @@ export function recurringInputFromForm(f: RecurringForm): RecurringTaskInput {
     assigneeId: f.assigneeId,
     dueDay: num(f.dueDay) as number,
     dueMonth: num(f.dueMonth),
-    targetDaysBefore: num(f.targetDaysBefore) ?? 0,
+    // Fixed rule of the office (3 days before the legal deadline): no field in the form.
+    targetDaysBefore: recurringTargetDays(f.period),
     nonBusinessDayRule: f.nonBusinessDayRule,
     referenceOffset: num(f.referenceOffset) ?? 1,
     regimes: f.regimes,
@@ -207,11 +210,11 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
       period: form.period,
       dueDay,
       dueMonth: form.dueMonth ? Number(form.dueMonth) : null,
-      targetDaysBefore: Math.max(0, Math.min(form.period === 'weekly' ? 6 : 30, Number(form.targetDaysBefore) || 0)),
+      targetDaysBefore: recurringTargetDays(form.period),
       nonBusinessDayRule: form.nonBusinessDayRule,
       referenceOffset: form.period === 'weekly' ? 0 : Number(form.referenceOffset) || 0,
     };
-  }, [form.period, form.dueDay, form.dueMonth, form.targetDaysBefore, form.nonBusinessDayRule, form.referenceOffset]);
+  }, [form.period, form.dueDay, form.dueMonth, form.nonBusinessDayRule, form.referenceOffset]);
 
   async function submit() {
     const next = validateRecurring(form);
@@ -344,22 +347,13 @@ export function RecurringTaskSheet({ open, onOpenChange, recurring, duplicate, o
             </div>
             <DueFields form={form} errors={errors} readOnly={readOnly} set={set} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Meta interna" error={errors.targetDaysBefore} hint={errors.targetDaysBefore ? undefined : 'Com 0, a meta é o próprio prazo legal.'}>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={form.period === 'weekly' ? 6 : 30}
-                    inputMode="numeric"
-                    disabled={readOnly}
-                    className="w-20"
-                    aria-label="Meta interna, em dias antes do prazo legal"
-                    value={form.targetDaysBefore}
-                    onChange={(e) => set('targetDaysBefore', e.target.value)}
-                  />
-                  <span className="text-body-sm text-muted">dias antes do prazo legal</span>
-                </div>
-              </Field>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-caption font-medium text-fg">Meta interna</span>
+                <p className="flex h-10 items-center text-body-sm text-fg">
+                  {RECURRING_TARGET_DAYS_BEFORE} dias antes do prazo legal
+                </p>
+                <p className="text-mini text-muted">Regra do escritório para todas as recorrentes; antecipa se cair em dia não útil.</p>
+              </div>
               <Field
                 label="Competência de referência"
                 hint={form.period === 'weekly' ? 'Na semanal, a referência é a própria semana.' : 'O DAS que vence em outubro se refere a setembro: aparece como ref. 09/2026.'}

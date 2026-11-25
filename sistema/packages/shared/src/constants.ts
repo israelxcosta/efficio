@@ -1075,3 +1075,16 @@ export const MAX_CONTRACT_TOTAL_CHARS = 400_000;
 
 /** Receipts listed by the receipts report (the totals always cover the whole range). */
 export const RECEIPTS_ITEMS_LIMIT = 1000;
+
+/**
+ * Internal target ("meta") of the recurring tasks (owner's decision, 25/11/2026): 3 days before the legal
+ * deadline, anticipated to a business day when it falls on a weekend or holiday; the day itself in the
+ * daily recurrences. Standalone tasks and client requests have no separate target: the goal is the due
+ * date. The interface no longer offers the field; it always sends this rule.
+ */
+export const RECURRING_TARGET_DAYS_BEFORE = 3;
+
+/** Days before the legal deadline of a recurrence's target, by its period. */
+export function recurringTargetDays(period: string): number {
+  return period === 'daily' ? 0 : RECURRING_TARGET_DAYS_BEFORE;
+}
