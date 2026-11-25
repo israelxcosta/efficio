@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Info } from 'lucide-react';
 import {
@@ -42,7 +42,11 @@ import { TaskStatusGlyph } from '../components/task-status';
 import { RecurringOccurrenceRow, useOccurrenceSheetLinks } from '../components/occurrence-row';
 import { occurrenceBucket, taskBucket } from '../occurrence';
 import { monthName } from '../components/tasks-summary';
-import { CardRow, DashColsContext, SlotList, SortableBoard, type BoardCard } from '../components/dash-slot';
+import { DashColsContext, SlotList } from '../components/dash-slot';
+import { BoardEditControls, useBoardEditing } from '@/features/dashboard/layout/board-editing';
+import { CustomizeSheet } from '@/features/dashboard/layout/customize-sheet';
+import { FreeBoard, type RenderCard } from '@/features/dashboard/layout/widget-grid';
+import { HOME_BOARD, HOME_BOARD_NO_FEES, HOME_GROUPS } from '../home-board';
 import { daysText, shortDate, shortName } from '../due';
 import { longDay } from '../format';
 import { useTaskSheetLinks } from '../task-links';
@@ -76,8 +80,6 @@ export default function TaskHomePage() {
   const cards0 = { data: dash.data, loading: dash.isPending, error: dash.isError ? dash.error : null, onRetry: () => void dash.refetch() };
   const [list, setList] = useState<DashboardList | null>(null);
   const { can } = usePermissions();
-  const showFees = can('finance') && Boolean(dash.data?.fees);
-  const showIncomplete = Boolean(dash.data?.incomplete);
   const today = o?.today ?? todayISO();
   const h = home.data;
   // The page width picks the columns of the card grid (same bands as the financial board).
@@ -115,40 +117,31 @@ export default function TaskHomePage() {
       ? `${longDay(today)} · ${o.departments.length ? `Todos os departamentos, ${pluralize(people.length, 'pessoa', 'pessoas')}` : 'todo o escritório'}`
       : `${longDay(today)} · suas tarefas`;
 
-  const cards: BoardCard[] = [
-    { id: 'mine', title: 'Minhas tarefas', rows: 4, node: <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} /> },
-    { id: 'status', title: 'Situação das tarefas', rows: 4, mediumRows: 3, node: <TaskStatusCard {...cards0} base={h ? listBase(h) : {}} /> },
-    { id: 'flow', title: 'Fluxo de tarefas por dia', rows: 3, node: <FlowCard {...cards0} base={h ? listBase(h) : {}} /> },
-    { id: 'processes', title: 'Processos por departamento', rows: 3, fit: true, node: <ProcessesCard {...cards0} /> },
-    { id: 'agenda', title: 'Agenda', rows: 3, phoneRows: 4, node: <AgendaCard {...cards0} /> },
-    { id: 'assignees', title: 'Por responsável', rows: 3, fit: true, node: <ByAssignee home={h} people={people} where={where} loading={home.isPending} /> },
-    { id: 'fiscal', title: 'Pendências fiscais', rows: 4, fit: true, node: <FiscalCard {...cards0} /> },
-    { id: 'clients', title: 'Visão geral dos clientes', rows: 4, mediumRows: 3, fit: true, node: <ClientsOverviewCard {...cards0} onList={setList} /> },
-    {
-      id: 'due-row',
-      title: 'Vencimentos (certificados, laudos, convenções e honorários)',
-      rows: 3,
-      grow: true,
-      span: 'full',
-      node: (
-        <CardRow rows={3}>
-          {[
-            <DocumentsCard key="cert" {...cards0} kind="certificates" onList={setList} />,
-            <DocumentsCard key="docs" {...cards0} kind="documents" onList={setList} />,
-            <ConventionsCard key="conv" {...cards0} />,
-            showFees ? <FeesCard key="fees" {...cards0} onList={setList} /> : null,
-          ]}
-        </CardRow>
-      ),
-    },
-    ...(showIncomplete ? [{ id: 'incomplete', title: 'Cadastro incompleto', rows: 3 as const, fit: true, node: <IncompleteCard {...cards0} onList={setList} canFinance={can('finance')} /> }] : []),
-    { id: 'requests', title: 'Pedidos dos clientes', rows: 3, fit: true, node: <ClientRequestsCard /> },
-  ];
+  // The same free board as the Painel financeiro and the Minha área: move, resize, hide, "Organizar".
+  const board = can('finance') ? HOME_BOARD : HOME_BOARD_NO_FEES;
+  const edit = useBoardEditing(board, workspace?.kind, page.width);
+  const nodes: Record<string, ReactNode> = {
+    mine: <MyTasks home={h} loading={home.isPending} error={home.isError ? home.error : null} today={today} onRetry={() => home.refetch()} />,
+    status: <TaskStatusCard {...cards0} base={h ? listBase(h) : {}} />,
+    flow: <FlowCard {...cards0} base={h ? listBase(h) : {}} />,
+    processes: <ProcessesCard {...cards0} />,
+    agenda: <AgendaCard {...cards0} />,
+    assignees: <ByAssignee home={h} people={people} where={where} loading={home.isPending} />,
+    fiscal: <FiscalCard {...cards0} />,
+    clients: <ClientsOverviewCard {...cards0} onList={setList} />,
+    cert: <DocumentsCard {...cards0} kind="certificates" onList={setList} />,
+    docs: <DocumentsCard {...cards0} kind="documents" onList={setList} />,
+    conv: <ConventionsCard {...cards0} />,
+    fees: <FeesCard {...cards0} onList={setList} />,
+    incomplete: <IncompleteCard {...cards0} onList={setList} canFinance={can('finance')} />,
+    requests: <ClientRequestsCard />,
+  };
+  const renderCard: RenderCard = (id) => nodes[id] ?? null;
 
   return (
     <div ref={page.ref} className="calm-text flex flex-col gap-5">
       {/* "Nova tarefa" lives in the bottom bar (quick actions): no button repeated up here. */}
-      <PageHeader title="Início" description={updated ? `${description} · ${updated}` : description} />
+      <PageHeader title="Início" description={updated ? `${description} · ${updated}` : description} actions={<BoardEditControls editing={edit} />} />
 
       {/* Filters on their own fixed line: changing the department or the month never moves them. */}
       <div className="-mt-2 flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -178,10 +171,14 @@ export default function TaskHomePage() {
       {o && canPickDepartment(o) ? <SetupChecklist options={o} storeKey={`effinance.tasks.setup.v1:${workspace?.id ?? ''}`} /> : null}
 
       <DashColsContext.Provider value={cols}>
-        <SortableBoard cards={cards} storeKey={`effinance.tasks.home-cards.v1:${workspace?.id ?? ''}:${user?.id ?? ''}`} label="Cards do Início" />
+        <FreeBoard width={page.width} board={board} kind={workspace?.kind} renderCard={renderCard} onCustomize={() => edit.start(true)} editing={edit.editing} />
       </DashColsContext.Provider>
 
       <DashboardListSheet list={list} data={dash.data} onChange={setList} />
+      <CustomizeSheet open={edit.customizing} onOpenChange={edit.setCustomizing} kind={workspace?.kind} board={board} groups={HOME_GROUPS} place="Início" />
+      <p aria-live="polite" className="sr-only">
+        {edit.message}
+      </p>
     </div>
   );
 }

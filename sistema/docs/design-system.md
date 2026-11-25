@@ -463,13 +463,15 @@ Revisto a pedido do dono: a coluna à direita foi **removida** (perdia espaço).
   lugar. Onde está: Início (o **próximo prazo legal** com clientes pendentes — não repete o "Atrasadas" da
   faixa), Minha área, Clientes da gestão e Painel financeiro (a **próxima conta a pagar**, ou as contas a pagar
   vencidas quando houver — a inadimplência já tem o card dela no quadro, então o sólido não a repete).
-- **Cards em duas colunas que se arrastam** (`SortableBoard` em `features/tasks/components/dash-slot.tsx`):
-  Início. (A Minha área passou, em 25/11/2026, ao quadro livre do Painel financeiro — `FreeBoard`, com
-  redimensionar e ocultar.) Arrasta-se pelo título do card ou pela alça que aparece no topo ao passar o mouse;
-  pelo teclado, a alça aceita as setas. A ordem fica salva por escritório e pessoa neste navegador
-  (`effinance.tasks.home-cards.v1`), com "Restaurar a ordem dos cards". O Painel
-  financeiro continua com a grade livre dele (Personalizar). `span: 'full'` + `CardRow` põe cards pequenos
-  lado a lado numa linha inteira (os quatro vencimentos: certificados, laudos, convenções, honorários).
+- **Um quadro ajustável nos três painéis** (25/11/2026, pedido do dono): Início, Minha área e Painel
+  financeiro usam o mesmo `FreeBoard` (`features/dashboard/layout/widget-grid.tsx`), cada um com seu
+  catálogo (`HOME_BOARD` em `features/tasks/home-board.ts`, `MY_AREA_BOARD`, os widgets do financeiro).
+  Em **Personalizar**: arrastar para qualquer lugar, redimensionar pelo canto, ocultar pelo olho,
+  **Organizar** fecha os espaços e **Cards** reexibe e escolhe tamanhos. Alturas padrão pelo conteúdo de
+  cada card (3 ou 4 linhas de 96px); os quatro vencimentos (certificados, laudos, convenções,
+  honorários) são cards de 1 coluna lado a lado. O layout fica salvo por escritório e pessoa neste
+  navegador (`effinance.tasks.home-board.v1`, `…my-area-board.v1`, `effinance.dashboardLayout.v1`). O
+  antigo `SortableBoard` (duas colunas, só reordenar) foi removido.
 - **Texto sem vermelho nos painéis** (`.calm-text` em `styles/index.css`): no Início, Minha área, Clientes
   da gestão e Painel financeiro, `text-danger`/`text-warning` ficam na tinta padrão; a cor fica só nas
   marcas (barras, pontos, o card sólido). Erros de formulário e listas continuam com vermelho.

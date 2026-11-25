@@ -52,8 +52,8 @@ Estado do projeto para quem continuar o trabalho (pessoa ou agente). Leia junto 
 
 - Conferido com o extrato (migração 0028), M1–M8 de design (pago/pendente, densidade, CSV, lote…).
 - **Redesign "Seu dia"** (ver `design-system.md` §7). Revisto no mesmo dia: a coluna à direita saiu; fica o
-  card sólido na primeira linha (`SpotlightCard`/`SpotlightRow`), os cards do Início e da Minha área em duas
-  colunas que se arrastam (`SortableBoard`), texto sem vermelho nos painéis (`.calm-text`), sem o botão
+  card sólido na primeira linha (`SpotlightCard`/`SpotlightRow`), os cards do Início e da Minha área no quadro
+  ajustável do Painel financeiro (`FreeBoard`: mover, redimensionar, ocultar), texto sem vermelho nos painéis (`.calm-text`), sem o botão
   "Nova tarefa" no topo do Início (fica na barra inferior). Também: `StackedBar` e `MiniStat solid`.
   - Gestão: Início com filtros fixos (departamento + **competência**: uma competência passada é contada no
     seu último dia, `asOf`), vencimentos em quatro cards lado a lado (uma linha do quadro) e o card "Pedidos dos clientes"; Clientes com coluna
