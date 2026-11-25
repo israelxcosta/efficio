@@ -11,6 +11,7 @@
 //   (field names and document kinds, never values). Creating, inactivating, reactivating and deleting a
 //   client, the fees, the contract and the notes stay in the financial routes (`finance`).
 
+import { syncClientTasks } from '../tasks/client-sync';
 import { and, count, desc, eq, gt, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -126,9 +127,12 @@ export const clientRecordRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.patch('/:id/registration', { ...registry, schema: { params, body: clientRegistrationInputSchema } }, async (req) => {
     assertSubscriptionAllowsWrite(req.access);
-    const { client, fields } = await run(req, (ctx) =>
-      updateClientRegistration(ctx.db, ctx.workspaceId, req.params.id, req.body, { fees: ctx.permissions.finance === true }),
-    );
+    const { client, fields } = await run(req, async (ctx) => {
+      const result = await updateClientRegistration(ctx.db, ctx.workspaceId, req.params.id, req.body, { fees: ctx.permissions.finance === true });
+      // The regime may have changed: the client's recurring tasks follow, in the same transaction.
+      if (result.fields.length > 0) await syncClientTasks(app.db, { db: ctx.db, workspaceId: ctx.workspaceId, userId: req.userId, access: req.access, log: req.log }, req.params.id);
+      return result;
+    });
     if (fields.length > 0) await recordChange(req, REGISTRATION_UPDATED_ACTION, { fields });
     return client;
   });

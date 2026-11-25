@@ -232,7 +232,8 @@ describe('preview of the next 3 competences', () => {
   it('starts at the later of the current competence and the start, and keeps the date when told to', () => {
     expect(previewLines(monthly, '2026-11', '2027-02')[0]).toMatch(/^Fevereiro \(ref\. 01\/2027\)/);
     const keep = previewLines({ ...monthly, nonBusinessDayRule: 'keep', targetDaysBefore: 0 }, '2026-12', null)[0];
-    expect(keep).toBe('Dezembro (ref. 11/2026): prazo legal 20/12 (dom; 20/12 é domingo, fica na data).');
+    // The legal deadline stays on the Sunday; the internal goal is still a business day (the Friday before).
+    expect(keep).toBe('Dezembro (ref. 11/2026): meta 18/12 (sex) · prazo legal 20/12 (dom; 20/12 é domingo, fica na data).');
   });
 
   it('lists weeks for a weekly task', () => {

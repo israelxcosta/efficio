@@ -54,6 +54,11 @@ const CLOSED_DAY = sql`(coalesce(${tasks.completedAt}, ${tasks.updatedAt}) at ti
 
 const count = (cond: SQL) => sql<number>`count(*) filter (where ${cond})`.mapWith(Number);
 
+/** A task's status on the reference day of `asOfSql`. */
+function statusOn(a: ReturnType<typeof asOfSql>) {
+  return sql<TaskStatus>`case when ${a.done} then 'done' when ${a.canceled} then 'canceled' when ${OPEN_SQL} then ${tasks.status} else coalesce(${tasks.reopenStatus}, 'todo') end`;
+}
+
 /** Outcomes on the reference day `r` (today, or the last day of a past competence). */
 function outcomeCounts(r: string, past: boolean) {
   const a = asOfSql(r, past);
@@ -119,8 +124,13 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
         ? eq(tasks.assigneeId, ctx.userId)
         : undefined;
   const week = addDays(t, 7);
+  // A past competence: open work due after the month (or without a due date) counts only if it already
+  // existed on its last day — a task created in December was not open on 30/09.
+  const openThen = past
+    ? and(a.open, or(lte(tasks.dueDate, to), sql`(${tasks.createdAt} at time zone 'America/Sao_Paulo')::date <= ${t}`))
+    : a.open;
   const inMonth = or(
-    a.open,
+    openThen,
     and(gte(tasks.dueDate, from), lte(tasks.dueDate, to)),
     and(CLOSED_SQL, sql`${CLOSED_DAY} between ${from} and ${to}`),
   );
@@ -151,11 +161,13 @@ export async function taskHome(ctx: TaskContext, q: HomeQuery): Promise<TaskHome
         })
         .from(tasks)
         .where(where),
+      // Status on the reference day: closed by then as it was closed; otherwise open — its current open
+      // status, or the one it had before being closed later (`reopen_status`).
       ctx.db
-        .select({ status: tasks.status, n: sql<number>`count(*)`.mapWith(Number) })
+        .select({ status: statusOn(a), n: sql<number>`count(*)`.mapWith(Number) })
         .from(tasks)
         .where(where)
-        .groupBy(tasks.status),
+        .groupBy(sql`1`),
       ctx.db
         .select({ id: tasks.assigneeId, ...outcomes })
         .from(tasks)

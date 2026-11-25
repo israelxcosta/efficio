@@ -1325,8 +1325,8 @@ horário e a descrição da série. Serviços: `modules/tasks/task-recurrence.ts
   compatível) altera só a ocorrência — descrição, prioridade, responsável (`manual`, "Atribuída só nesta
   ocorrência"); título, cliente, categoria, departamento, horário e datas → 422. `applyTo: 'series'` (ou
   enviar `recurrence`) altera a **série**: título, cliente, categoria, responsável, fila, prioridade,
-  descrição e horário; a ocorrência editada recebe tudo na hora e as não iniciadas da competência atual em
-  diante seguem (`syncOpenOccurrences`); em andamento e concluídas não mudam. **Datas** vêm sempre da regra
+  descrição e horário; a ocorrência editada recebe tudo na hora e as não iniciadas com vencimento a
+  partir dela seguem (`syncOpenOccurrences` com `fromDate`; as anteriores não iniciadas ficam como estavam); em andamento e concluídas não mudam. **Datas** vêm sempre da regra
   (`startDate`/`dueDate` → 422). Troca de cliente (inclusive para interna e de volta) **move** as não
   iniciadas no lugar (sem cancelar e recriar). Regra nova: as não iniciadas cujo período deixou de existir
   são canceladas com motivo, as que faltam são geradas, e a ocorrência editada, se "A fazer", **muda para o

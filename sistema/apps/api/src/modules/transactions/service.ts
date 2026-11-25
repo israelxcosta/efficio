@@ -1,6 +1,12 @@
 import { and, asc, desc, eq, gt, gte, ilike, inArray, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
+  addDays,
+  addMonths,
   buildOccurrenceDates,
+  occurrenceDate,
+  parseISODate,
+  type Frequency,
+  type ISODate,
   DISCOUNT_CATEGORY,
   earnsDiscount,
   LATE_FEE_CATEGORY,
@@ -24,6 +30,7 @@ import {
   creditCards,
   recurrences,
   transactions,
+  type CreditCardRow,
   type NewTransactionRow,
   type RecurrenceTemplate,
   type TransactionRow,
@@ -41,6 +48,7 @@ import { encryptNotes } from './notes';
 import {
   ensureMaterialized,
   invoiceMonthFor,
+  seriesInvoiceMonthFor,
   materializationHorizon,
   materializeSeries,
   occurrenceRow,
@@ -410,7 +418,16 @@ export async function updateTransaction(
     }
 
     if (scope === 'one' || !row.recurrenceId) return;
+    // A new due day with "esta e as próximas"/"todas": the series' anchor moves so this occurrence lands on
+    // the new date; the pending ones after it (all of them with "todas") and the ones still to be
+    // generated follow. Paid occurrences keep their dates.
+    if (input.date !== undefined && input.date !== row.date && row.occurrenceIndex !== null) {
+      await moveSeriesDay(tx, workspaceId, row, input.date, scope, card);
+    }
     const seriesPatch: SeriesPatch = pickSeriesPatch(input);
+    // The form always sends the amount: copy it to the others only when it changed (changing just the
+    // category of every installment must not turn 33,34 + 33,33 + 33,33 into 3 × 33,34).
+    if (seriesPatch.amount !== undefined && seriesPatch.amount === row.amount) delete seriesPatch.amount;
     if (merged.subcategoryId !== row.subcategoryId) seriesPatch.subcategoryId = merged.subcategoryId;
     if (Object.keys(seriesPatch).length === 0) return;
 
@@ -427,10 +444,14 @@ export async function updateTransaction(
     if (seriesPatch.creditCardId !== undefined) {
       // The invoice depends on each occurrence's date.
       const siblings = await tx.select().from(transactions).where(siblingsWhere);
+      const [seriesRow] = await tx.select().from(recurrences).where(and(eq(recurrences.workspaceId, workspaceId), eq(recurrences.id, row.recurrenceId)));
       for (const s of siblings) {
         await tx
           .update(transactions)
-          .set({ ...seriesPatch, invoiceMonth: invoiceMonthFor(card, s.date) })
+          .set({
+            ...seriesPatch,
+            invoiceMonth: seriesRow && s.occurrenceIndex !== null ? seriesInvoiceMonthFor(card, seriesRow, s.occurrenceIndex, s.date) : invoiceMonthFor(card, s.date),
+          })
           .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, s.id)));
       }
     } else {
@@ -451,6 +472,56 @@ export async function updateTransaction(
   });
 
   return getTransaction(db, workspaceId, id);
+}
+
+/** The series' new start so that occurrence `index` falls on `date` (the anchor day is the new date's). */
+function shiftedStart(frequency: Frequency, index: number, date: ISODate): ISODate {
+  if (frequency === 'weekly') return addDays(date, -7 * index);
+  const step = frequency === 'monthly' ? 1 : frequency === 'semiannual' ? 6 : 12;
+  return addMonths(date, -index * step, parseISODate(date).day);
+}
+
+async function moveSeriesDay(
+  tx: DbExecutor,
+  workspaceId: string,
+  row: TransactionRow,
+  date: ISODate,
+  scope: 'future' | 'all',
+  card: CreditCardRow | null,
+): Promise<void> {
+  const [series] = await tx
+    .select()
+    .from(recurrences)
+    .where(and(eq(recurrences.workspaceId, workspaceId), eq(recurrences.id, row.recurrenceId!)));
+  if (!series) return;
+  const frequency = series.frequency as Frequency;
+  const startDate = shiftedStart(frequency, row.occurrenceIndex!, date);
+  const moved = { ...series, startDate };
+  const siblings = await tx
+    .select()
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.workspaceId, workspaceId),
+        eq(transactions.recurrenceId, series.id),
+        ne(transactions.id, row.id),
+        eq(transactions.paid, false),
+        sql`${transactions.occurrenceIndex} is not null`,
+        scope === 'future' ? gt(transactions.occurrenceIndex, row.occurrenceIndex!) : undefined,
+      ),
+    );
+  for (const s of siblings) {
+    const next = occurrenceDate(startDate, frequency, s.occurrenceIndex!);
+    if (next === s.date) continue;
+    await tx
+      .update(transactions)
+      .set({ date: next, ...(s.creditCardId ? { invoiceMonth: seriesInvoiceMonthFor(card, moved, s.occurrenceIndex!, next) } : {}) })
+      .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, s.id)));
+  }
+  await tx
+    .update(recurrences)
+    .set({ startDate, nextDate: series.nextDate === null ? null : occurrenceDate(startDate, frequency, series.nextIndex) })
+    .where(and(eq(recurrences.workspaceId, workspaceId), eq(recurrences.id, series.id)));
 }
 
 export async function setPaid(
@@ -544,7 +615,7 @@ function lateFeesOf(workspaceId: string, id: string): SQL {
 async function syncLateFees(
   tx: DbExecutor,
   workspaceId: string,
-  original: Pick<NewTransactionRow, 'id' | 'date' | 'paid' | 'paidAt' | 'accountId' | 'creditCardId' | 'contactId'>,
+  original: Pick<NewTransactionRow, 'id' | 'date' | 'paid' | 'paidAt' | 'accountId' | 'creditCardId' | 'contactId' | 'paymentMethod'>,
 ) {
   const where = lateFeesOf(workspaceId, original.id!);
   const { paid, paidAt, date } = original;
@@ -559,6 +630,8 @@ async function syncLateFees(
       paidAt,
       accountId: original.accountId,
       contactId: original.contactId,
+      // A later correction of how it was received carries the interest and fine with it.
+      paymentMethod: original.paymentMethod,
     })
     .where(where);
 }
@@ -632,7 +705,7 @@ function discountOf(workspaceId: string, id: string): SQL {
 async function syncDiscount(
   tx: DbExecutor,
   workspaceId: string,
-  original: Pick<NewTransactionRow, 'id' | 'amount' | 'date' | 'paid' | 'paidAt' | 'accountId' | 'creditCardId' | 'contactId'>,
+  original: Pick<NewTransactionRow, 'id' | 'amount' | 'date' | 'paid' | 'paidAt' | 'accountId' | 'creditCardId' | 'contactId' | 'paymentMethod'>,
 ) {
   const where = discountOf(workspaceId, original.id!);
   const { paid, paidAt, date } = original;
@@ -647,6 +720,7 @@ async function syncDiscount(
       paidAt,
       accountId: original.accountId,
       contactId: original.contactId,
+      paymentMethod: original.paymentMethod,
       amount: sql`least(${transactions.amount}, ${original.amount})`,
     })
     .where(where);
@@ -699,7 +773,8 @@ async function discountRow(
     categoryId,
     subcategoryId: subcategories[DISCOUNT_CATEGORY.discount],
     contactId: row.contactId,
-    paymentMethod: row.paymentMethod,
+    // The discount goes with the payment confirmed now (like interest and fine).
+    paymentMethod: patch.paymentMethod ?? row.paymentMethod,
     discountOf: row.id,
   };
 }

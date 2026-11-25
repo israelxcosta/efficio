@@ -32,6 +32,7 @@ import {
   monthKey,
   occurrencesInCompetence,
   type AssigneeSource,
+  type ISODate,
   type MonthKey,
   type RecurrenceOrigin,
   type RecurringSchedule,
@@ -450,7 +451,16 @@ async function canceledBySystem(ctx: Pick<TaskContext, 'db' | 'workspaceId'>, id
  * - an occurrence the system canceled that applies again goes back to "A fazer";
  * - the missing ones are generated.
  */
-export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: string): Promise<void> {
+export async function syncOpenOccurrences(
+  ctx: TaskContext,
+  recurringTaskId: string,
+  /**
+   * `clientId`: only this client's occurrences (a change in the client's registration: regime,
+   * contract start, inactivation). `fromDate`: only those due on or after it ("esta e as próximas" of a
+   * task's series). `generate: false`: the caller generates the missing ones once for many syncs.
+   */
+  opts: { clientId?: string; fromDate?: ISODate; generate?: boolean } = {},
+): Promise<void> {
   const [def] = await loadDefs(ctx, [recurringTaskId]);
   if (!def) return;
   const { current } = generationBounds(ctx.today);
@@ -474,6 +484,8 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
           eq(tasks.recurringTaskId, recurringTaskId),
           gte(tasks.competence, current),
           inArray(tasks.status, ['todo', 'canceled']),
+          opts.clientId ? eq(tasks.clientId, opts.clientId) : undefined,
+          opts.fromDate ? gte(tasks.dueDate, opts.fromDate) : undefined,
         ),
       ),
   ]);
@@ -486,6 +498,18 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
     const list = defActiveIn(def.row, competence) ? occurrencesInCompetence(schedule, competence) : [];
     scheduledByCompetence.set(competence, new Map(list.map((x) => [x.periodKey, x])));
   }
+  // A period may now fall in a neighbouring competence (a weekly task moved from Friday to Monday: the
+  // week of Monday 30/11 is November's now, no longer December's). Its row moves there instead of being
+  // canceled — the unique key (task, client, period) has no competence, so a new row could not be born.
+  const byPeriod = new Map<string, ScheduledOccurrence>();
+  for (const competence of new Set(rows.flatMap((r) => [addMonthKey(r.competence!, -1), r.competence!, addMonthKey(r.competence!, 1)]))) {
+    if (!defActiveIn(def.row, competence)) continue;
+    for (const x of occurrencesInCompetence(schedule, competence)) if (!byPeriod.has(x.periodKey)) byPeriod.set(x.periodKey, x);
+  }
+  const appliesIn = (row: SyncRow, competence: MonthKey) => {
+    const client = row.clientId ? clientById.get(row.clientId) : undefined;
+    return def.row.internal ? row.clientId === null : Boolean(client && clientActiveIn(client, competence) && appliesTo(def, client));
+  };
   const notStarted: { row: SyncRow; scheduled: ScheduledOccurrence }[] = [];
   const stale: { row: SyncRow; note: string }[] = [];
   const restorable: { row: SyncRow; scheduled: ScheduledOccurrence }[] = [];
@@ -497,17 +521,26 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
     const applies = def.row.internal
       ? Boolean(scheduled) && row.clientId === null
       : Boolean(scheduled && client && clientActiveIn(client, competence) && appliesTo(def, client));
+    const moved = !scheduled ? byPeriod.get(row.periodKey!) : undefined;
+    const movesTo = moved && moved.competence !== competence && appliesIn(row, moved.competence) ? moved : undefined;
     if (row.status === 'canceled') {
       if (applies) restorable.push({ row, scheduled: scheduled! });
+      else if (movesTo) restorable.push({ row, scheduled: movesTo });
       continue;
     }
     if (applies) {
       notStarted.push({ row, scheduled: scheduled! });
       continue;
     }
+    if (movesTo) {
+      notStarted.push({ row, scheduled: movesTo });
+      continue;
+    }
     const endedByDate = def.row.endDate !== null && row.dueDate !== null && row.dueDate > def.row.endDate;
     const note = !defActiveIn(def.row, competence)
-      ? 'A tarefa recorrente foi encerrada antes desta competência'
+      ? competence < def.row.startCompetence
+        ? 'A tarefa recorrente passou a começar depois desta competência'
+        : 'A tarefa recorrente foi encerrada antes desta competência'
       : endedByDate
         ? 'A recorrência foi encerrada antes desta data'
         : !def.row.internal && client && clientActiveIn(client, competence) && !appliesTo(def, client)
@@ -549,6 +582,8 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
           title: def.row.name,
           departmentId: def.row.departmentId,
           categoryId: def.row.categoryId,
+          // The competence too: a period that now falls in a neighbouring month moves with its row.
+          competence: scheduled.competence,
           dueDate: scheduled.legalDueDate,
           targetDate: scheduled.targetDate,
           referenceMonth: scheduled.referenceMonth,
@@ -611,7 +646,34 @@ export async function syncOpenOccurrences(ctx: TaskContext, recurringTaskId: str
     }
   }
   await recordEvents(ctx, events);
-  await ensureOccurrences(ctx, [0, 1, 2].map((n) => addMonthKey(current, n)), { recurringTaskIds: [recurringTaskId] });
+  if (opts.generate !== false) await ensureOccurrences(ctx, [0, 1, 2].map((n) => addMonthKey(current, n)), { recurringTaskIds: [recurringTaskId] });
+}
+
+/**
+ * A client's registration changed (tax regime, contract start, inactivation, reactivation): their
+ * not-started occurrences from the current competence on follow, by the same rule as an edit of the
+ * recurring task (`syncOpenOccurrences`) — those that no longer apply are canceled with the reason,
+ * the ones the system canceled come back when they apply again — and the new regime's are generated.
+ * Concluded and in-progress occurrences never change.
+ */
+export async function syncClientOccurrences(ctx: TaskContext, clientId: string): Promise<void> {
+  if (!ctx.canWrite) return;
+  const { current } = generationBounds(ctx.today);
+  const defs = await ctx.db
+    .selectDistinct({ id: tasks.recurringTaskId })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.workspaceId, ctx.workspaceId),
+        eq(tasks.clientId, clientId),
+        sql`${tasks.recurringTaskId} is not null`,
+        gte(tasks.competence, current),
+        inArray(tasks.status, ['todo', 'canceled']),
+      ),
+    );
+  for (const { id } of defs) await syncOpenOccurrences(ctx, id!, { clientId, generate: false });
+  // The change bumped the generation version: the regime's recurring tasks fill in what is missing.
+  await ensureOccurrences(ctx, [0, 1, 2].map((n) => addMonthKey(current, n)));
 }
 
 /**

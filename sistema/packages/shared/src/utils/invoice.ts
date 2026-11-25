@@ -52,6 +52,25 @@ export function getInvoiceForPurchase(
   return getInvoiceDates(month, closingDay, dueDay);
 }
 
+/**
+ * Invoice of occurrence `index` of a series on the card that starts on `startDate`. Monthly series
+ * (installments, subscriptions) take consecutive invoices — the k-th one in the first one's invoice + k —
+ * so a date pulled to the month end (29/01 → 28/02) never meets a closing day pulled to the same end
+ * (30 → 28/02) and skips an invoice. Other frequencies follow each occurrence's own date.
+ */
+export function getInvoiceForSeriesOccurrence(
+  startDate: ISODate,
+  frequency: string,
+  index: number,
+  date: ISODate,
+  closingDay: number,
+  dueDay: number,
+): InvoiceDates {
+  if (frequency !== 'monthly') return getInvoiceForPurchase(date, closingDay, dueDay);
+  const first = getInvoiceForPurchase(startDate, closingDay, dueDay);
+  return getInvoiceDates(addMonthKey(first.month, index), closingDay, dueDay);
+}
+
 export function getInvoiceStatus(
   dates: InvoiceDates,
   options: { total: number; unpaidTotal: number; today: ISODate },

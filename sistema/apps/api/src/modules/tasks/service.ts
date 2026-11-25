@@ -739,7 +739,9 @@ async function updateSeriesFromTask(ctx: TaskContext, current: TaskRow, patch: T
     })
     .where(taskKey(ctx, current.id));
   if (patch.recurrence) await rekeyOccurrence(ctx, await getTaskRowOrThrow(ctx, current.id), rule);
-  await syncOpenOccurrences(ctx, def.id);
+  // "Esta e as próximas": only the occurrences due from this one on follow; earlier ones not started
+  // yet keep what they had.
+  await syncOpenOccurrences(ctx, def.id, current.dueDate ? { fromDate: current.dueDate } : {});
 
   const sent = (Object.keys(patch) as (keyof TaskPatch)[]).filter((k) => k !== 'applyTo' && k !== 'assigneeId' && k !== 'departmentId');
   const events: EventInput[] = [];
@@ -832,6 +834,9 @@ export async function changeTaskStatus(
   status: TaskStatus,
   reason: string | null = null,
 ): Promise<TaskStatusChangeResponse> {
+  // Two "Concluir" at the same time: the second waits for the first and then sees the task concluded
+  // (no second event, no overwriting who concluded it and when).
+  await ctx.db.select({ id: tasks.id }).from(tasks).where(taskKey(ctx, id)).for('update');
   const current = await getTaskRowOrThrow(ctx, id);
   let activated: string | null = null;
   if (current.status !== status) {

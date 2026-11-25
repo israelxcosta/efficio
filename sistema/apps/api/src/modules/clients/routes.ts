@@ -1,4 +1,5 @@
 import type { FastifyRequest } from 'fastify';
+import { syncClientTasks } from '../tasks/client-sync';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
@@ -83,22 +84,29 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
     reply.code(201).send(present(req, await createClient(req.db, req.workspaceId, req.body, actorOf(req)))),
   );
 
-  app.put('/:id', { schema: { params: idParams, body: clientInputSchema } }, async (req) =>
-    present(req, await updateClient(req.db, req.workspaceId, req.params.id, req.body, actorOf(req))),
-  );
+  app.put('/:id', { schema: { params: idParams, body: clientInputSchema } }, async (req) => {
+    const client = await updateClient(req.db, req.workspaceId, req.params.id, req.body, actorOf(req));
+    // Regime or contract start may have changed: the client's recurring tasks follow.
+    await syncClientTasks(app.db, req, req.params.id);
+    return present(req, client);
+  });
 
   app.delete('/:id', { schema: { params: idParams } }, async (req, reply) => {
     await deleteClient(req.db, req.workspaceId, req.params.id);
     return reply.code(204).send();
   });
 
-  app.post('/:id/inactivate', { schema: { params: idParams, body: clientInactivationSchema } }, async (req) =>
-    present(req, await inactivateClient(req.db, req.workspaceId, req.params.id, req.body)),
-  );
+  app.post('/:id/inactivate', { schema: { params: idParams, body: clientInactivationSchema } }, async (req) => {
+    const client = await inactivateClient(req.db, req.workspaceId, req.params.id, req.body);
+    await syncClientTasks(app.db, req, req.params.id);
+    return present(req, client);
+  });
 
-  app.post('/:id/reactivate', { schema: { params: idParams } }, async (req) =>
-    present(req, await reactivateClient(req.db, req.workspaceId, req.params.id)),
-  );
+  app.post('/:id/reactivate', { schema: { params: idParams } }, async (req) => {
+    const client = await reactivateClient(req.db, req.workspaceId, req.params.id);
+    await syncClientTasks(app.db, req, req.params.id);
+    return present(req, client);
+  });
 
   // Fee periods (honorários): financial, reads included (child plugin: same prefix and boundary).
   await app.register(clientFeeRoutes);

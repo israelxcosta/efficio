@@ -12,7 +12,7 @@ import {
 import type { DbExecutor } from '../../db/client';
 import { accounts, transactions } from '../../db/schema';
 import { ValidationError } from '../../lib/errors';
-import { countAll, sumOf } from '../../lib/sql';
+import { countAll } from '../../lib/sql';
 import { getAccountOrThrow } from '../common/ownership';
 import { toTransactions } from '../transactions/mapper';
 
@@ -22,8 +22,16 @@ const receivedOn = sql<ISODate>`coalesce(${transactions.paidAt}, ${transactions.
 /** Same rule as the overview: a card purchase counts as credit card when no method was chosen. */
 const methodOf = sql<PaymentMethod | null>`coalesce(${transactions.paymentMethod}, case when ${transactions.creditCardId} is not null then 'credit_card' end)`;
 
+/**
+ * What actually came in: the amount minus its discount for paying on time (the linked `discount_of` row),
+ * the value the bank statement shows — the same net figure as the evolution report. Outer columns spelled
+ * out: Drizzle leaves them unqualified in a single-table select.
+ */
+const netAmount = sql<number>`(${transactions.amount} - (select coalesce(sum(d.amount), 0) from transactions d where d.workspace_id = transactions.workspace_id and d.discount_of = transactions.id and d.paid))`;
+const netSum = sql<number>`coalesce(sum(${netAmount}), 0)`.mapWith(Number);
+
 /** Amount / count of the rows checked against the statement ("conferido com o extrato"). */
-const reconciledSum = sql<number>`coalesce(sum(${transactions.amount}) filter (where ${transactions.reconciledAt} is not null), 0)`.mapWith(Number);
+const reconciledSum = sql<number>`coalesce(sum(${netAmount}) filter (where ${transactions.reconciledAt} is not null), 0)`.mapWith(Number);
 const reconciledCountOf = sql<number>`count(*) filter (where ${transactions.reconciledAt} is not null)`.mapWith(Number);
 
 /**
@@ -48,24 +56,26 @@ export async function receiptsReport(db: DbExecutor, workspaceId: string, q: Rec
   const where = and(...filters);
 
   const [byMethodRows, byAccountRows, byDayRows, rows, accountRows] = await Promise.all([
-    db.select({ key: methodOf, amount: sumOf(transactions.amount), count: countAll(), reconciled: reconciledSum }).from(transactions).where(where).groupBy(sql`1`),
+    db.select({ key: methodOf, amount: netSum, count: countAll(), reconciled: reconciledSum }).from(transactions).where(where).groupBy(sql`1`),
     db
-      .select({ key: transactions.accountId, amount: sumOf(transactions.amount), count: countAll(), reconciled: reconciledSum })
+      .select({ key: transactions.accountId, amount: netSum, count: countAll(), reconciled: reconciledSum })
       .from(transactions)
       .where(where)
       .groupBy(transactions.accountId),
     db
-      .select({ date: receivedOn, method: methodOf, amount: sumOf(transactions.amount), count: countAll(), reconciledCount: reconciledCountOf })
+      .select({ date: receivedOn, method: methodOf, amount: netSum, count: countAll(), reconciledCount: reconciledCountOf })
       .from(transactions)
       .where(where)
       .groupBy(sql`1`, sql`2`)
       .orderBy(sql`1`),
     db
-      .select()
+      .select({ row: transactions, net: netAmount })
       .from(transactions)
       .where(where)
       .orderBy(desc(receivedOn), desc(transactions.createdAt))
-      .limit(RECEIPTS_ITEMS_LIMIT + 1),
+      .limit(RECEIPTS_ITEMS_LIMIT + 1)
+      // Each line shows what came in (net of the discount), so the lines add up to the day.
+      .then((list) => list.map(({ row, net }) => ({ ...row, amount: Number(net) }))),
     db.select({ id: accounts.id, name: accounts.name }).from(accounts).where(eq(accounts.workspaceId, workspaceId)),
   ]);
 

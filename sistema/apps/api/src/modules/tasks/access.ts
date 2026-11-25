@@ -26,6 +26,7 @@ import {
 import type { DbExecutor } from '../../db/client';
 import { userPhotos, users, workspaceMembers } from '../../db/schema';
 import { todayIn } from '../../lib/clock';
+import { getCipher } from '../../lib/crypto/keyring';
 import type { FieldCipher } from '../../lib/crypto/field-cipher';
 import { ForbiddenError, SubscriptionRequiredError } from '../../lib/errors';
 import { ADMIN_FORBIDDEN_MESSAGE, can } from '../../lib/permissions';
@@ -142,4 +143,27 @@ export async function runTasks<T>(
 
 export function assertTaskPermission(ctx: Pick<TaskContext, 'permissions'>, key: PermissionKey): void {
   if (!ctx.permissions[key]) throw new ForbiddenError(TASK_ADMIN_MESSAGE);
+}
+
+/**
+ * The task context of a request that already runs in its tenant transaction (`req.db`), so task rules
+ * can follow a change made in the same transaction (a client's registration → `syncClientOccurrences`).
+ */
+export async function taskContextOfRequest(
+  system: DbExecutor,
+  req: { db: DbExecutor; workspaceId: string; userId: string; access: Access; log?: TaskContext['log'] },
+): Promise<TaskContext> {
+  return {
+    db: req.db,
+    workspaceId: req.workspaceId,
+    userId: req.userId,
+    role: req.access.role,
+    isAdmin: isTaskAdmin(req.access),
+    permissions: req.access.permissions ?? effectivePermissions(req.access.role),
+    canWrite: req.access.subscription.canWrite,
+    members: await loadMembers(system, req.workspaceId),
+    today: todayIn(TASK_TIME_ZONE),
+    cipher: await getCipher(req.workspaceId),
+    log: req.log,
+  };
 }

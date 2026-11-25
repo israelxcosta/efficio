@@ -281,10 +281,9 @@ export function deadlinesFrom(
   // `skip` never reaches a non-business day (the occurrence does not exist): nothing to move.
   const rule: NonBusinessDayRule = schedule.nonBusinessDayRule === 'skip' ? 'keep' : schedule.nonBusinessDayRule;
   const legalDueDate = adjustToBusinessDay(nominal, rule, holidays);
-  const targetDate =
-    schedule.targetDaysBefore > 0
-      ? adjustToBusinessDay(addDays(legalDueDate, -schedule.targetDaysBefore), 'anticipate', holidays)
-      : legalDueDate;
+  // Always a business day, even with no days before: with the "keep" rule the legal deadline may be a
+  // Saturday, and the internal goal then is the Friday before.
+  const targetDate = adjustToBusinessDay(addDays(legalDueDate, -schedule.targetDaysBefore), 'anticipate', holidays);
   return { legalDueDate, targetDate };
 }
 

@@ -4,6 +4,7 @@ import { and, eq, inArray, isNotNull, lte } from 'drizzle-orm';
 import {
   addMonths,
   getInvoiceForPurchase,
+  getInvoiceForSeriesOccurrence,
   maxISO,
   minISO,
   occurrenceDate,
@@ -38,9 +39,19 @@ export function invoiceMonthFor(card: CreditCardRow | null | undefined, date: IS
   return card ? getInvoiceForPurchase(date, card.closingDay, card.dueDay).month : null;
 }
 
+/** The invoice of occurrence `index` of a series on the card (monthly: consecutive invoices). */
+export function seriesInvoiceMonthFor(
+  card: CreditCardRow | null | undefined,
+  series: Pick<RecurrenceRow, 'startDate' | 'frequency'>,
+  index: number,
+  date: ISODate,
+): string | null {
+  return card ? getInvoiceForSeriesOccurrence(series.startDate, series.frequency, index, date, card.closingDay, card.dueDay).month : null;
+}
+
 export function occurrenceRow(
   workspaceId: string,
-  series: Pick<RecurrenceRow, 'id' | 'kind' | 'frequency'>,
+  series: Pick<RecurrenceRow, 'id' | 'kind' | 'frequency' | 'startDate'>,
   template: RecurrenceTemplate,
   index: number,
   date: ISODate,
@@ -56,7 +67,7 @@ export function occurrenceRow(
     paidAt: null,
     accountId: template.accountId,
     creditCardId: template.creditCardId,
-    invoiceMonth: invoiceMonthFor(card, date),
+    invoiceMonth: seriesInvoiceMonthFor(card, series, index, date),
     categoryId: template.categoryId,
     subcategoryId: template.subcategoryId,
     contactId: template.contactId,

@@ -62,9 +62,11 @@ export async function handOverMemberWork(
     .update(recurringTasks)
     .set({ defaultAssigneeId: toId })
     .where(and(eq(recurringTasks.workspaceId, ctx.workspaceId), eq(recurringTasks.defaultAssigneeId, fromId)));
+  // Waiting process steps go to the successor and, like the open tasks above, to their department (the
+  // step is born in it when activated).
   await ctx.db
     .update(taskFlowSteps)
-    .set({ assigneeId: toId })
+    .set({ assigneeId: toId, ...(department ? { departmentId: department } : {}) })
     .where(and(eq(taskFlowSteps.workspaceId, ctx.workspaceId), eq(taskFlowSteps.assigneeId, fromId), isNull(taskFlowSteps.activatedAt)));
   const person = (id: string) => {
     const m = ctx.members.get(id);

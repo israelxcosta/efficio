@@ -228,7 +228,10 @@ describe('task recurrence: changing and ending it from the task', () => {
     const renamed = await carla.patch(`/tasks/${second}`, { title: 'Ligar para a Padaria (vendas)', priority: 'urgent', applyTo: 'series' });
     expect(renamed.status, JSON.stringify(renamed.body)).toBe(200);
     list = await seriesRows(seriesId);
-    expect(list.every((r) => r.title === 'Ligar para a Padaria (vendas)' && r.priority === 'urgent')).toBe(true);
+    // "Esta e as próximas" from the 2nd: the 2nd and the later ones follow; the 1st (earlier, not started)
+    // keeps what it had.
+    expect(list.slice(1).every((r) => r.title === 'Ligar para a Padaria (vendas)' && r.priority === 'urgent')).toBe(true);
+    expect(list[0]).toMatchObject({ title: 'Ligar para a Padaria' });
     // Only this occurrence: like any occurrence (priority, responsible).
     expect((await carla.patch(`/tasks/${second}`, { priority: 'low' })).status).toBe(200);
     expect((await seriesRows(seriesId)).find((r) => r.id === second)!.priority).toBe('low');
